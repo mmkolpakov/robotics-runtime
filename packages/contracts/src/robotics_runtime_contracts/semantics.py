@@ -791,6 +791,13 @@ def _validate_transport_qualification(document: Mapping[str, Any]) -> None:
                     "must continue from the preceding channel destination",
                 )
         hop_ids = [hop["channel_id"] for hop in chain["hops"]]
+        for hop_index, hop_id in enumerate(hop_ids):
+            if hop_id not in contract_ids:
+                _fail(
+                    schema_name,
+                    f"$.causal_chains[{index}].hops[{hop_index}].channel_id",
+                    f"unknown channel contract: {hop_id!r}",
+                )
         if len(hop_ids) != len(set(hop_ids)):
             _fail(
                 schema_name,

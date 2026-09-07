@@ -102,8 +102,13 @@ class _Artifact:
     document: Mapping[str, Any] | None
 
 
-def _fail(message: str) -> NoReturn:
-    raise QualificationError(message)
+def _fail(
+    message: str,
+    *,
+    error_id: str = "qualification.invalid",
+    json_path: str | None = None,
+) -> NoReturn:
+    raise QualificationError(message, error_id=error_id, json_path=json_path)
 
 
 def _document(artifact: _Artifact) -> Mapping[str, Any]:
@@ -948,6 +953,24 @@ def _validate_transport(
         _fail("aggregate transport qualification pointer does not match local result")
 
     chains, channels, observations = _transport_sources(grouped, run_id)
+    for artifact in channels.values():
+        channel = _document(artifact)
+        for endpoint in ("source", "destination"):
+            domain_id = channel[endpoint]["domain_id"]
+            if domain_id not in results:
+                _fail(
+                    f"{artifact.subject_name}: unknown acceptance run domain {domain_id!r}",
+                    error_id="qualification.unknown_domain",
+                    json_path=f"$.{endpoint}.domain_id",
+                )
+    for chain_index, chain in enumerate(transport_document["causal_chains"]):
+        for hop_index, hop in enumerate(chain["hops"]):
+            if hop["channel_id"] not in channels:
+                _fail(
+                    f"{transport.subject_name}: unknown channel {hop['channel_id']!r}",
+                    error_id="qualification.unknown_channel",
+                    json_path=f"$.causal_chains[{chain_index}].hops[{hop_index}].channel_id",
+                )
     relation_artifacts = grouped.get("clock_relation", ())
     scenario = _document(scenario_artifact)
     _require_equal(
@@ -977,7 +1000,14 @@ def _validate_transport(
             relation["finished_at"],
             evaluated_at,
         )
-        for domain_id in (relation["source_domain_id"], relation["destination_domain_id"]):
+        for field in ("source_domain_id", "destination_domain_id"):
+            domain_id = relation[field]
+            if domain_id not in results:
+                _fail(
+                    f"{artifact.subject_name}: unknown acceptance run domain {domain_id!r}",
+                    error_id="qualification.unknown_domain",
+                    json_path=f"$.{field}",
+                )
             domain_result = _document(results[domain_id])
             _require_time_order(
                 f"clock relation {relation_id} domain {domain_id} window",
