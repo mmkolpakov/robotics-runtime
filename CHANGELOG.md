@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Lock the published 0.16 schema resources and catalog with a byte-digest and
+  resource-inventory tripwire; structural compatibility checking remains planned.
 - Document the breaking 0.15 to 0.16 migration and known consumer versions.
 - Replace the pre-1.0 schema-name reuse policy with the compatibility rules in
   [ADR 0007](docs/decisions/0007-preserve-published-schema-compatibility.md).

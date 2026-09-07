@@ -57,6 +57,19 @@ The canonical IDs use the `urn:robotics-runtime-contracts:v1:*` namespace.
 Public role schemas and internal reusable resources have disjoint IDs. Schema
 digests are derived from packaged bytes with `schema_digest()`.
 
+[`docs/schema-digests.json`](docs/schema-digests.json) records SHA-256 for all
+29 schema resources and the catalog from `v0.16.0` (`0c2c0f4`). The test compares
+raw packaged bytes and the complete file inventory with this checked-in
+snapshot. Whitespace changes, modified internal cores, missing files and new
+files all require review; JSON is not normalized before hashing.
+
+The snapshot also ships in the source distribution so its bundled tests can
+run. Tests never regenerate expected digests. After the structural gate exists,
+an intentional snapshot update must accompany a changelog entry and a passing
+compatibility comparison, or a new schema major and migration notes for a
+breaking change. Updating hashes merely to make a failure disappear is not a
+compatibility review.
+
 Tagged release artifacts and their attestations are immutable. Under a published
 name only additive changes are permitted. Breaking changes require a new schema
 major, a catalog role and migration notes. The planned structural comparison
