@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:robotics-runtime-contracts:v1:runtime-manifest",
+  "title": "Robotics runtime manifest v1",
+  "description": "Provider-neutral observed runtime facts and execution-subject identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "runtime_id", "generated_at", "execution_subject", "components",
+    "host_platform", "execution_platform", "ros", "provider_bindings", "render", "workload",
+    "execution", "evaluator_bindings", "authorization", "data_plane", "security",
+    "lifecycle_states", "physical_targets", "clock"
+  ],
+  "properties": {
+    "schema_version": {"const": "runtime-manifest.v1"},
+    "runtime_id": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/runtime_id"},
+    "generated_at": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/generated_at"},
+    "execution_subject": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/execution_subject"},
+    "components": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/components"},
+    "configuration_artifacts": {"type": "array", "items": {"$ref": "#/$defs/configurationArtifact"}},
+    "host_platform": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/host_platform"},
+    "execution_platform": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/execution_platform"},
+    "ros": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/ros"},
+    "provider_bindings": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/provider_bindings"},
+    "render": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/render"},
+    "workload": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/workload"},
+    "execution": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/execution"},
+    "evaluator_bindings": {
+      "type": "array",
+      "items": {"$ref": "urn:robotics-runtime-contracts:v1:acceptance-scenario#/$defs/evaluatorRequirement"}
+    },
+    "authorization": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/authorization"},
+    "data_plane": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/data_plane"},
+    "security": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/security"},
+    "lifecycle_states": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/lifecycle_states"},
+    "physical_targets": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/physical_targets"},
+    "clock": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/clock"},
+    "extensions": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/extensions"}
+  },
+  "allOf": [
+    {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/allOf/0"},
+    {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/allOf/1"}
+  ],
+  "$defs": {
+    "configurationArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "sha256"],
+      "properties": {
+        "kind": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$", "maxLength": 128},
+        "sha256": {"$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/$defs/imported__runtime-manifest__sha256"}
+      }
+    }
+  }
+}

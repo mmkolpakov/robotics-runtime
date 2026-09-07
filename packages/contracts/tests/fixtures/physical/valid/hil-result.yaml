@@ -1,0 +1,104 @@
+---
+schema_version: acceptance-result.v1
+result_id: result-41234567-89ab-4def-8123-456789abcdef
+run_id: run-41234567-89ab-4def-8123-456789abcdef
+scenario_id: org.example.controller-hil-observation
+domain_id: controller-domain
+verdict_scope: domain
+unevaluated: []
+scenario_sha256: '1111111111111111111111111111111111111111111111111111111111111111'
+runtime_manifest_sha256: '7777777777777777777777777777777777777777777777777777777777777777'
+started_at: '2026-07-12T10:00:00Z'
+finished_at: '2026-07-12T10:02:00Z'
+monotonic_duration_sec: 120
+status: passed
+assertion_results:
+  - assertion_id: telemetry-ready
+    status: passed
+    observed_value: 1
+    unit: count
+    source: core
+observed_ros_graph:
+  stable_for_sec: 3
+  topics:
+    - name: /telemetry/state
+      type: example_msgs/msg/State
+      publishers: 1
+      subscribers: 1
+      first_message_at_ns: 1000000000
+  services: []
+  actions: []
+forbidden_graph_observation:
+  passed: true
+  checked_topics:
+    - /cmd_vel
+  checked_services: []
+  checked_actions: []
+  violations: []
+execution:
+  target_environment: hil
+  data_source: live_target
+  plant_backend: real_hardware
+  time_mode: hardware_realtime
+  data_plane_profile: secure_shared_memory
+authorization:
+  mode: verified_execution_permit
+  permit_sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  execution_verification_sha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  trust_policy_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  target:
+    environment: hil
+    target_id: controller-alpha
+    identity_kind: mavlink_system_component
+    identity_sha256: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+workload:
+  kind: none
+lifecycle_states: []
+clock_observation:
+  monotonic: true
+  offset_ms: 0.5
+  drift_ppm: 2
+  real_time_factor: 1
+  deadline_miss_ratio: 0
+time_authority_observation:
+  source_id: controller-clock
+  sample_count: 120
+  window_start_ns: 1
+  window_end_ns: 120
+  p50_delivery_latency_ms: 0.5
+  p95_delivery_latency_ms: 1
+  max_delivery_latency_ms: 2
+  within_policy: true
+  evidence_sha256: '8888888888888888888888888888888888888888888888888888888888888888'
+hardware_clock_observation:
+  sync_protocol: mavlink_timesync
+  source: mavlink_timesync_status
+  measured_at: '2026-07-12T10:01:00Z'
+  sample_count: 120
+  offset_ms: 0.5
+  jitter_ms: 0.2
+  drift_ppm: 2
+  max_sample_age_ms: 10
+  within_policy: true
+  evidence_sha256: '8888888888888888888888888888888888888888888888888888888888888888'
+shutdown:
+  observer_detached: true
+  recorders_closed: true
+  evidence_index_finalized: true
+evidence:
+  - uri: file:///evidence/hardware-clock.json
+    media_type: application/json
+    sha256: '8888888888888888888888888888888888888888888888888888888888888888'
+    size_bytes: 512
+    retention_class: pull-request-7d
+    artifact_id: evidence-0
+    kind: observation
+evaluation_mode: live
+runtime_observation:
+  execution_subject_digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  ros_domain_id: 42
+  rmw_implementation: rmw_fastrtps_cpp
+  rmw_version: 0.0.0-fixture
+  security_enabled: true
+  security_strategy: Enforce
+evaluators: []

@@ -1,0 +1,89 @@
+schema_version: acceptance-result.v1
+result_id: result-01234567-89ab-4def-8123-456789abcdef
+run_id: run-01234567-89ab-4def-8123-456789abcdef
+scenario_id: org.example.camera-stream
+domain_id: primary
+verdict_scope: domain
+unevaluated: []
+time_authority_observation:
+  source_id: simulation-clock
+  sample_count: 30
+  window_start_ns: 1000000000
+  window_end_ns: 30000000000
+  p50_delivery_latency_ms: 0.1
+  p95_delivery_latency_ms: 0.2
+  max_delivery_latency_ms: 0.3
+  within_policy: true
+  evidence_sha256: 57c087f21f9185e09d3bf8e6592332451c8d5a57760807f011ee44d804bef598
+scenario_sha256: 6971f903d4d734723158ad510e98caba99d7375132eba3ecad980677ea7816b8
+runtime_manifest_sha256: 759c6555f4ed98ad3974cd41821ec21e49d36cb64d16a5fdf430dc1d14915ccc
+started_at: '2026-07-26T12:00:00Z'
+finished_at: '2026-07-26T12:02:00Z'
+monotonic_duration_sec: 120
+status: passed
+assertion_results:
+  - assertion_id: camera-age
+    status: passed
+    observed_value: 20.1
+    unit: ms
+    source: core
+observed_ros_graph:
+  stable_for_sec: 3
+  topics:
+    - name: /clock
+      type: rosgraph_msgs/msg/Clock
+      publishers: 1
+      subscribers: 1
+      first_message_at_ns: 1000000000
+    - name: /camera/image
+      type: sensor_msgs/msg/Image
+      publishers: 1
+      subscribers: 1
+      first_message_at_ns: 1100000000
+  services: []
+  actions: []
+forbidden_graph_observation:
+  passed: true
+  checked_topics: []
+  checked_services: []
+  checked_actions: []
+  violations: []
+execution:
+  target_environment: simulation
+  data_source: simulator
+  plant_backend: simulated_physics
+  time_mode: simulation_realtime
+  data_plane_profile: standard_isolated
+workload:
+  kind: none
+authorization:
+  mode: none
+lifecycle_states: []
+clock_observation:
+  monotonic: true
+  offset_ms: 0
+  drift_ppm: 0
+  real_time_factor: 0.99
+  deadline_miss_ratio: 0
+shutdown:
+  observer_detached: true
+  recorders_closed: true
+  evidence_index_finalized: true
+evidence:
+  - artifact_id: artifact-0
+    kind: observation
+    uri: file:///evidence/time-authority.json
+    media_type: application/json
+    sha256: 57c087f21f9185e09d3bf8e6592332451c8d5a57760807f011ee44d804bef598
+    size_bytes: 252
+    retention_class: pull-request-7d
+    segment_index: 0
+evaluation_mode: live
+runtime_observation:
+  execution_subject_digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  ros_domain_id: 42
+  rmw_implementation: rmw_fastrtps_cpp
+  rmw_version: 0.0.0-fixture
+  security_enabled: false
+  security_strategy: none
+evaluators: []

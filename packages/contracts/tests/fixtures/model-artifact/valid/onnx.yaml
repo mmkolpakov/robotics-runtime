@@ -1,0 +1,51 @@
+---
+schema_version: model-artifact-manifest.v1
+source:
+  uri: oci://ghcr.io/example/models/detector@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  size_bytes: 1
+  format: onnx
+  media_type: application/onnx
+  runtime_family: onnx
+  execution_provider: reference
+  inputs: &id001
+    - name: images
+      element_type: float32
+      shape:
+        - batch
+        - 3
+        - 640
+        - 640
+  outputs: &id002
+    - name: detections
+      element_type: float32
+      shape:
+        - batch
+        - candidates
+        - 6
+target:
+  uri: oci://ghcr.io/example/models/detector@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  size_bytes: 1
+  format: onnx
+  media_type: application/onnx
+  runtime_family: onnxruntime_cpu
+  execution_provider: CPUExecutionProvider
+  inputs: *id001
+  outputs: *id002
+build:
+  tool: onnx
+  version: 1.20.1
+  configuration_sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  source_artifact_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+numerical_conformance:
+  report_sha256: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+  reference_artifact_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  sample_dataset_sha256: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+  absolute_tolerance: 0
+  relative_tolerance: 0
+  passed: true
+compatibility:
+  portable: true
+  hardware: []
+model_id: org.example.detector.onnx

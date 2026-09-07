@@ -1,0 +1,48 @@
+---
+schema_version: model-artifact-manifest.v1
+source:
+  uri: s3://models/source.onnx
+  sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  size_bytes: 1
+  format: onnx
+  media_type: application/onnx
+  runtime_family: onnx
+  execution_provider: reference
+  inputs: &id001
+    - name: input
+      element_type: float32
+      shape:
+        - 1
+  outputs: &id002
+    - name: output
+      element_type: float32
+      shape:
+        - 1
+target:
+  uri: s3://models/output.engine
+  sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  size_bytes: 1
+  format: tensorrt_engine
+  media_type: application/vnd.nvidia.tensorrt.engine
+  runtime_family: onnxruntime_tensorrt
+  execution_provider: TensorrtExecutionProvider
+  inputs: *id001
+  outputs: *id002
+build:
+  tool: TensorRT
+  version: 11.0.0
+  configuration_sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  source_artifact_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+numerical_conformance:
+  report_sha256: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+  reference_artifact_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  sample_dataset_sha256: ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+  absolute_tolerance: 0.001
+  relative_tolerance: 0.01
+  passed: true
+compatibility:
+  portable: true
+  hardware:
+    - vendor: example
+      device_family: accelerator
+model_id: org.example.invalid
