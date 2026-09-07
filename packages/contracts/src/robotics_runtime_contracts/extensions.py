@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from hashlib import sha256
 from typing import Any, NoReturn
@@ -11,11 +10,9 @@ from referencing import Registry
 from referencing.exceptions import Unresolvable
 from referencing.jsonschema import DRAFT202012
 
+from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.semantics import SemanticValidationError
-from robotics_runtime_contracts.serialization import (
-    NonFiniteNumberError,
-    ensure_finite_numbers,
-)
+from robotics_runtime_contracts.serialization import loads_mapping
 
 
 class ExtensionValidationError(SemanticValidationError):
@@ -146,16 +143,13 @@ def validate_extensions(
             )
 
         try:
-            extension_schema = json.loads(raw_bytes)
-            ensure_finite_numbers(extension_schema)
-        except (UnicodeDecodeError, json.JSONDecodeError, NonFiniteNumberError) as error:
+            extension_schema = loads_mapping(raw_bytes, source_name="extension-schema.json")
+        except ContractError as error:
             _fail(
                 schema_name,
                 f"$.extension_schemas[{index}]",
                 f"schema must be UTF-8 JSON: {error}",
             )
-        if not isinstance(extension_schema, dict):
-            _fail(schema_name, f"$.extension_schemas[{index}]", "schema root must be an object")
         if extension_schema.get("$id") != uri:
             _fail(
                 schema_name,

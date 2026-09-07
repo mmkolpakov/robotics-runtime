@@ -8,8 +8,6 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, NoReturn
 
-import yaml
-
 from robotics_runtime_contracts import (
     ensure_finite_numbers,
     loads_mapping,
@@ -24,6 +22,11 @@ from robotics_runtime_contracts.document_ops import (
     semantic_diff,
 )
 from robotics_runtime_contracts.errors import CLIArgumentError, ContractError
+from robotics_runtime_contracts.serialization import (
+    dumps_yaml,
+    read_document_bytes,
+    read_document_stream,
+)
 
 
 class ContractArgumentParser(argparse.ArgumentParser):
@@ -138,7 +141,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _read_document_source(path: str) -> tuple[Mapping[str, Any], bytes]:
-    source = sys.stdin.buffer.read() if path == "-" else Path(path).expanduser().read_bytes()
+    source = read_document_stream(sys.stdin.buffer) if path == "-" else read_document_bytes(path)
     document = loads_mapping(source, source_name=path)
     return document, source
 
@@ -152,7 +155,7 @@ def _write_document(path: str | Path, document: Mapping[str, Any]) -> Path:
     output = Path(path).expanduser()
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.suffix.lower() in {".yaml", ".yml"}:
-        content = yaml.safe_dump(dict(document), sort_keys=False)
+        content = dumps_yaml(document)
     else:
         content = json.dumps(document, allow_nan=False, indent=2, sort_keys=True) + "\n"
     output.write_text(content, encoding="utf-8")
@@ -167,7 +170,7 @@ def _read_extension_schemas(values: Sequence[str]) -> dict[str, bytes]:
             raise CLIArgumentError("--extension-schema must use URI=PATH")
         if uri in schemas:
             raise CLIArgumentError(f"duplicate extension schema URI: {uri}")
-        schemas[uri] = Path(path).expanduser().read_bytes()
+        schemas[uri] = read_document_bytes(path)
     return schemas
 
 

@@ -140,6 +140,35 @@ validate_document(
 Promote an extension into the common catalog only after it has reusable
 semantics and evidence from more than one domain.
 
+## JSON and YAML input
+
+Documents are UTF-8 mappings with string keys and finite JSON values. Files
+ending in `.json` are parsed strictly as JSON, without a YAML fallback;
+`.yaml`/`.yml` select YAML. For unnamed input, standard input, and other suffixes,
+a leading `{` or `[` selects strict JSON and other input selects YAML. Pass a
+YAML `source_name` to `loads_mapping` when using YAML flow syntax such as
+`{key: value}`. Duplicate keys are rejected in both formats, including nested
+objects and escaped spellings of the same JSON key. Digest-pinned extension
+schemas use the same strict JSON parser.
+
+The YAML loader uses the [YAML 1.2 core scalar rules](https://yaml.org/spec/1.2.2/#1032-tag-resolution):
+dates and timestamps stay strings; `yes`, `no`, `on`, `off`, `1:30`, `0b10` and
+`1_000` stay strings; only the core `true`/`false` spellings become booleans.
+`010` is decimal 10; `0o10` is octal 8 and `0x10` is hexadecimal 16. `1.10` and
+`1e2` are numbers; quote them when they represent textual versions or IDs.
+Non-finite numbers, non-string keys, non-core tags, aliases (including recursive
+and merge aliases), and multiple YAML documents are rejected. `<<` has no merge
+semantics. YAML output quotes strings using the same scalar rules and emits no
+aliases, so reading a written document preserves its JSON values.
+
+Each contract document or extension schema is limited to 8 MiB of UTF-8 input,
+64 node levels (root at level 1), and 100,000 nodes, counting mapping keys and
+values. File and stdin reads stop at the byte limit plus one sentinel byte.
+These bounds apply to document loaders, not retained raw evidence files.
+Limit failures use `input.limit_exceeded`, duplicates use `input.duplicate_key`
+with the member path, and aliases use `input.yaml_alias`. Other malformed input
+uses `input.parse_failed`; non-finite values use `input.non_finite_number`.
+
 ## Errors and resource paths
 
 Expected validation and document-operation failures inherit from the public

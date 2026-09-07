@@ -127,14 +127,14 @@ def test_canonical_loader_reads_every_artifact_once(monkeypatch: pytest.MonkeyPa
     specifications = qualification_specifications("inference")
     fixture_paths = {Path(value.partition("=")[2]) for value in specifications}
     reads: Counter[Path] = Counter()
-    original = Path.read_bytes
+    original = Path.open
 
-    def tracked(path: Path) -> bytes:
+    def tracked(path: Path, *args: Any, **kwargs: Any) -> Any:
         if path in fixture_paths:
             reads[path] += 1
-        return original(path)
+        return original(path, *args, **kwargs)
 
-    monkeypatch.setattr(Path, "read_bytes", tracked)
+    monkeypatch.setattr(Path, "open", tracked)
 
     validate_qualification_artifacts(specifications)
 

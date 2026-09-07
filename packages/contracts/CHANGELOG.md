@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Load YAML with 1.2 core scalar rules and matching output quoting; reject
+  duplicate JSON/YAML keys, aliases, non-JSON values and oversized/deep input.
+  JSON files and extension schemas no longer fall back to YAML parsing.
 - Unify expected failures under `ContractError`; report relevant schema errors,
   argument exit code 2 and `internal.error` for unexpected CLI failures. Expand
   home paths consistently, resolve schema references offline, retain extracted
