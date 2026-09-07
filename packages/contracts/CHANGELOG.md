@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reject foreign qualification domains and hop channels with explicit error IDs
+  and JSON paths, including failed, incomplete and error chains.
 - Add the CPython 3.12-3.14 CI matrix and declare `>=3.12,<3.15` support.
 - Allow `referencing>=0.37,<1` while retaining the locked resolution; enable
   Renovate hook updates and group duplicate tool pins. Hosted bot onboarding
