@@ -26,6 +26,7 @@ from robotics_runtime_contracts.qualification_policy import (
     derive_channel_violations,
     hardware_clock_within_policy,
 )
+from robotics_runtime_contracts.serialization import read_document_bytes
 
 _ARTIFACT_ROLES = {
     "scenario": "acceptance_scenario",
@@ -1376,7 +1377,7 @@ def _load_artifact(
         raise CLIArgumentError(f"non-canonical qualification subject name: {subject_name}")
 
     path = Path(path_value).expanduser()
-    raw = path.read_bytes()
+    raw = read_document_bytes(path) if kind in _CONTRACT_SCHEMAS else path.read_bytes()
     document = None
     if kind in _CONTRACT_SCHEMAS:
         try:
