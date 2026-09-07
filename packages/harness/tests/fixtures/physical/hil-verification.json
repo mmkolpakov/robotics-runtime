@@ -1,0 +1,36 @@
+{
+  "cosign_subject_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "cosign_version": "3.0.6",
+  "decision": "allow",
+  "permit_sha256": "407a59cbd730247a873117066239440c6128b724bee8d6d60ca4db41c80dfa58",
+  "policy_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "schema_version": "execution-verification.v1",
+  "signers": [
+    {
+      "bundle_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "identity": "operator@example.org",
+      "integrated_time": 1783846500,
+      "issuer": "https://token.actions.githubusercontent.com",
+      "role": "operator",
+      "transparency_log_verified": true
+    },
+    {
+      "bundle_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "identity": "safety@example.org",
+      "integrated_time": 1783846520,
+      "issuer": "https://token.actions.githubusercontent.com",
+      "role": "approver",
+      "transparency_log_verified": true
+    }
+  ],
+  "statement_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "target": {
+    "environment": "hil",
+    "identity_kind": "mavlink_system_component",
+    "identity_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "target_id": "controller-alpha"
+  },
+  "trust_policy_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "verification_id": "org.example.hil-verification-001",
+  "verified_at": "2026-07-12T09:56:00Z"
+}

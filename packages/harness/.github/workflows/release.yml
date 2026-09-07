@@ -1,0 +1,188 @@
+---
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  CONTRACTS_VERSION: "0.16.0"
+
+defaults:
+  run:
+    shell: bash
+    working-directory: robotics-acceptance-harness
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      attestations: read
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          path: robotics-acceptance-harness
+      - name: Verify tag belongs to main
+        run: |
+          set -euo pipefail
+          git fetch --force --no-tags origin \
+            refs/heads/main:refs/remotes/origin/main
+          tagged_commit="$(git rev-parse 'HEAD^{commit}')"
+          main_commit="$(git rev-parse 'refs/remotes/origin/main^{commit}')"
+          if ! git merge-base --is-ancestor "$tagged_commit" "$main_commit"; then
+            echo "::error::Tagged commit $tagged_commit is not reachable from origin/main"
+            exit 1
+          fi
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+        with:
+          version: "0.11.28"
+          enable-cache: true
+          cache-dependency-glob: robotics-acceptance-harness/uv.lock
+      - name: Synchronize locked environment
+        run: uv sync --locked --all-groups
+      - name: Validate release source
+        run: |
+          uv run pre-commit run --all-files --show-diff-on-failure
+          uv run python - <<'PY'
+          from importlib.metadata import version
+          import os
+
+          assert f"v{version('robotics-acceptance-harness')}" == os.environ["GITHUB_REF_NAME"]
+          PY
+      - name: Run tests
+        run: |
+          uv run pytest \
+            -p robotics_acceptance_harness.plugin \
+            --robotics-scenario tests/fixtures/simulation/scenario.yaml \
+            --robotics-runtime tests/fixtures/simulation/runtime.yaml
+      - name: Build distributions
+        run: |
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          export SOURCE_DATE_EPOCH
+          uv build --no-sources --out-dir dist
+      - name: Download and verify contracts wheel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir contracts-dist
+          gh release download "v${CONTRACTS_VERSION}" \
+            --repo mmkolpakov/robotics-runtime-contracts \
+            --pattern "robotics_runtime_contracts-${CONTRACTS_VERSION}-py3-none-any.whl" \
+            --dir contracts-dist
+          contracts_wheel="$(find contracts-dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          test -n "$contracts_wheel"
+          gh attestation verify "$contracts_wheel" \
+            --repo mmkolpakov/robotics-runtime-contracts
+      - name: Verify built wheel
+        run: |
+          set -euo pipefail
+          wheel="$(find dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          contracts_wheel="$(find contracts-dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          test -n "$wheel"
+          test -n "$contracts_wheel"
+          uv run --isolated --no-project \
+            --with "$contracts_wheel" \
+            --with "$wheel" \
+            robotics-acceptance --version
+          uv run --isolated --no-project \
+            --with "$contracts_wheel" \
+            --with "$wheel" \
+            robotics-acceptance explain \
+              --scenario tests/fixtures/simulation/scenario.yaml \
+              --runtime tests/fixtures/simulation/runtime.yaml
+      - name: Upload distributions
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: python-distributions
+          path: robotics-acceptance-harness/dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-pypi:
+    if: vars.PYPI_PUBLISH_ENABLED == 'true'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/robotics-acceptance-harness
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
+        with:
+          name: python-distributions
+          path: robotics-acceptance-harness/dist/
+      - name: Publish distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247  # v1.14.1
+        with:
+          packages-dir: robotics-acceptance-harness/dist/
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v8.0.0
+        with:
+          name: python-distributions
+          path: robotics-acceptance-harness/dist/
+      - name: Detect an existing release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --json tagName >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Attest distributions
+        if: steps.release.outputs.exists != 'true'
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763  # v4.1.1
+        with:
+          subject-path: robotics-acceptance-harness/dist/*
+      - name: Publish GitHub release
+        if: steps.release.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes --verify-tag
+      - name: Verify immutable release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for attempt in {1..12}; do
+            if gh release verify "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+              break
+            fi
+            if (( attempt < 12 )); then
+              sleep 5
+            fi
+          done
+          gh release verify "$GITHUB_REF_NAME"
+          for artifact in dist/*; do
+            gh release verify-asset "$GITHUB_REF_NAME" "$artifact"
+          done
