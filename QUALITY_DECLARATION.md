@@ -55,9 +55,11 @@ quality level.
 
 ## Dependencies
 
-The runtime dependency is `jsonschema` with its non-GPL format-validation
-extras. It is version constrained in `pyproject.toml` and resolved in
-`uv.lock`. The package has no runtime ROS dependency.
+The runtime dependencies are `jsonschema` with non-GPL format-validation extras,
+`referencing`, `PyYAML` and `json-merge-patch`. They are constrained in
+`pyproject.toml` and resolved in `uv.lock`. The package has no runtime ROS
+dependency. Consumer-example tests use the current checkout; they do not certify
+compatibility with released harness/infra combinations.
 
 ## Platform Support
 
