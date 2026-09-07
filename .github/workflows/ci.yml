@@ -18,6 +18,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  required-validation:
+    name: validate
+    needs: validate
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require every supported Python to pass
+        env:
+          MATRIX_RESULT: ${{ needs.validate.result }}
+        run: test "${MATRIX_RESULT}" = success
+
   validate:
     name: validate (Python ${{ matrix.python-version }})
     runs-on: ubuntu-24.04
