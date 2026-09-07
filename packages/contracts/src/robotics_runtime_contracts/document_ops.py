@@ -8,13 +8,17 @@ from typing import Any
 from uuid import uuid4
 
 from json_merge_patch import create_patch, merge  # type: ignore[import-untyped]
+from referencing.exceptions import Unresolvable
+from referencing.jsonschema import DRAFT202012
 
 from robotics_runtime_contracts import (
     load_schema,
     resolve_schema_name,
     schema_digest,
+    schema_registry,
     validate_document,
 )
+from robotics_runtime_contracts.errors import ContractError
 
 
 def _resolve_property(
@@ -23,26 +27,34 @@ def _resolve_property(
     current_schema: Mapping[str, Any],
 ) -> Mapping[str, Any]:
     resolved = value
-    schema = current_schema
-    visited: set[str] = set()
+    resolver = schema_registry().resolver_with_root(
+        DRAFT202012.create_resource(dict(current_schema))
+    )
+    resolver = resolver.in_subresource(DRAFT202012.create_resource(dict(value)))
+    visited: set[int] = set()
     while "$ref" in resolved:
         reference = str(resolved["$ref"])
-        if reference in visited:
-            raise ValueError(f"cyclic schema reference: {reference}")
-        visited.add(reference)
-        schema_id, _, fragment = reference.partition("#")
-        if schema_id:
-            schema = load_schema(schema_id)
-        target: Any = schema
-        if fragment:
-            if not fragment.startswith("/"):
-                raise ValueError(f"unsupported schema fragment: {reference}")
-            for token in fragment[1:].split("/"):
-                key = token.replace("~1", "/").replace("~0", "~")
-                target = target[key]
+        if id(resolved) in visited:
+            raise ContractError(
+                f"cyclic schema reference: {reference}", error_id="schema.reference_invalid"
+            )
+        visited.add(id(resolved))
+        try:
+            lookup = resolver.lookup(reference)
+        except Unresolvable as error:
+            raise ContractError(
+                f"unresolvable schema reference: {reference}", error_id="schema.reference_invalid"
+            ) from error
+        target = lookup.contents
+        if isinstance(target, bool):
+            return {}
         if not isinstance(target, Mapping):
-            raise ValueError(f"schema reference does not resolve to an object: {reference}")
+            raise ContractError(
+                f"schema reference does not resolve to a schema: {reference}",
+                error_id="schema.reference_invalid",
+            )
         resolved = target
+        resolver = lookup.resolver
     return resolved
 
 
@@ -94,9 +106,9 @@ def semantic_diff(
 
     patch = create_patch(dict(source), dict(target))
     if not isinstance(patch, dict):
-        raise ValueError("document roots must remain objects")
+        raise ContractError("document roots must remain objects")
     if merge(deepcopy(dict(source)), deepcopy(patch)) != dict(target):
-        raise ValueError(
+        raise ContractError(
             "target cannot be represented by RFC 7396 because null denotes member removal"
         )
     return patch
@@ -122,7 +134,7 @@ def create_execution_permit(
     """Create a validated, unsigned physical-execution permit predicate."""
 
     if not 1 <= validity_sec <= 1800:
-        raise ValueError("validity_sec must be between 1 and 1800")
+        raise ContractError("validity_sec must be between 1 and 1800")
     issued_at = (now or datetime.now(UTC)).astimezone(UTC)
     expires_at = issued_at + timedelta(seconds=validity_sec)
     document = {

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Unify expected failures under `ContractError`; report relevant schema errors,
+  argument exit code 2 and `internal.error` for unexpected CLI failures. Expand
+  home paths consistently, resolve schema references offline, retain extracted
+  schema paths until process exit, and share timestamp comparison parsing.
 - Reject foreign qualification domains and hop channels with explicit error IDs
   and JSON paths, including failed, incomplete and error chains.
 - Add the CPython 3.12-3.14 CI matrix and declare `>=3.12,<3.15` support.

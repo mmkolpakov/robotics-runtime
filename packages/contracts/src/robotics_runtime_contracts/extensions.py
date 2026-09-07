@@ -6,6 +6,10 @@ from hashlib import sha256
 from typing import Any, NoReturn
 
 from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema.exceptions import SchemaError, best_match
+from referencing import Registry
+from referencing.exceptions import Unresolvable
+from referencing.jsonschema import DRAFT202012
 
 from robotics_runtime_contracts.semantics import SemanticValidationError
 from robotics_runtime_contracts.serialization import (
@@ -162,22 +166,29 @@ def validate_extensions(
         _reject_external_references(schema_name, extension_schema)
         try:
             Draft202012Validator.check_schema(extension_schema)
-        except Exception as error:
+        except SchemaError as error:
             _fail(
                 schema_name,
                 f"$.extension_schemas[{index}]",
                 f"invalid Draft 2020-12 schema: {error}",
             )
 
-        errors = sorted(
-            Draft202012Validator(
-                extension_schema,
-                format_checker=FormatChecker(),
-            ).iter_errors(extensions[namespace]),
-            key=lambda error: tuple(str(part) for part in error.path),
-        )
-        if errors:
-            validation_error = errors[0]
+        registry = Registry().with_resource(uri, DRAFT202012.create_resource(extension_schema))
+        try:
+            validation_error = best_match(
+                Draft202012Validator(
+                    extension_schema,
+                    format_checker=FormatChecker(),
+                    registry=registry,
+                ).iter_errors(extensions[namespace])
+            )
+        except (Unresolvable, RecursionError) as error:
+            _fail(
+                schema_name,
+                f"$.extension_schemas[{index}]",
+                f"schema reference cannot be evaluated: {error}",
+            )
+        if validation_error is not None:
             suffix = validation_error.json_path.removeprefix("$")
             _fail(
                 schema_name,

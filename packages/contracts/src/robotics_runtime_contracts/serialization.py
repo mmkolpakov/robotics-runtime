@@ -8,12 +8,16 @@ from typing import Any
 
 import yaml
 
+from robotics_runtime_contracts.errors import ContractError
 
-class DocumentParseError(ValueError):
+
+class DocumentParseError(ContractError):
     """Raised when a JSON or YAML document cannot be loaded as an object."""
 
+    error_id = "input.parse_failed"
 
-class NonFiniteNumberError(ValueError):
+
+class NonFiniteNumberError(ContractError):
     """Raised when a document contains a number forbidden by RFC 8259."""
 
     error_id = "input.non_finite_number"
@@ -23,7 +27,7 @@ def ensure_finite_numbers(value: Any, path: str = "$") -> None:
     """Reject NaN and infinities before schema or policy evaluation."""
 
     if isinstance(value, float) and not isfinite(value):
-        raise NonFiniteNumberError(f"{path}: non-finite numbers are not valid JSON")
+        raise NonFiniteNumberError(f"{path}: non-finite numbers are not valid JSON", json_path=path)
     if isinstance(value, Mapping):
         for key, item in value.items():
             ensure_finite_numbers(item, f"{path}.{key}")
@@ -43,7 +47,10 @@ def loads_mapping(
 ) -> dict[str, Any]:
     """Parse a JSON or YAML object while preserving JSON number semantics."""
 
-    text = source.decode("utf-8") if isinstance(source, bytes) else source
+    try:
+        text = source.decode("utf-8") if isinstance(source, bytes) else source
+    except UnicodeDecodeError as error:
+        raise DocumentParseError(f"{source_name} must be UTF-8") from error
     try:
         value = json.loads(text, parse_constant=_reject_json_constant)
     except json.JSONDecodeError:
@@ -60,7 +67,7 @@ def loads_mapping(
 def load_mapping(path: str | Path) -> dict[str, Any]:
     """Load a JSON or YAML object from disk."""
 
-    document_path = Path(path)
+    document_path = Path(path).expanduser()
     return loads_mapping(document_path.read_bytes(), source_name=str(document_path))
 
 

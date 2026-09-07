@@ -140,6 +140,46 @@ validate_document(
 Promote an extension into the common catalog only after it has reusable
 semantics and evidence from more than one domain.
 
+## Errors and resource paths
+
+Expected validation and document-operation failures inherit from the public
+`ContractError`, which remains a `ValueError`. Existing specialized exception
+classes and their constructor signatures remain available. Every contract
+error has an `error_id` and a `json_path` (`None` when no document location
+applies). The CLI keeps its JSON diagnostic envelope
+`{"error": {"error_id": "...", "message": "...", "path": "..."}}`; `path` is
+omitted when unavailable. Schema diagnostics use jsonschema's `best_match`,
+including nested `anyOf`/`oneOf` errors, so the chosen message can change. See
+[jsonschema's selection rules](https://python-jsonschema.readthedocs.io/en/stable/errors/#best-match-and-relevance).
+
+CLI exit codes are 0 for success, 1 for invalid input, I/O failures or internal
+errors, and 2 for invalid arguments (including conflicting paths and malformed
+artifact/extension options). I/O errors use `input.io_error`; unexpected
+exceptions use `internal.error` without a traceback. Python I/O APIs retain
+their normal `OSError` behavior. Library programming errors are not converted
+to validation failures. `--help` and process interrupts retain normal behavior.
+All CLI file inputs and outputs expand `~` before accessing the filesystem.
+
+Error families include `schema.validation_failed`, `schema.unknown`,
+`schema.role_unknown`, `schema.reference_invalid`, `semantic.validation_failed`,
+`extension.validation_failed`, `qualification.invalid`,
+`qualification.unknown_domain`, `qualification.unknown_channel`,
+`provider.requirements_unsatisfied`, `receipt.validation_failed`,
+`clock.evidence_invalid`, `status.invalid`, `input.parse_failed`,
+`input.non_finite_number`, `input.invalid_timestamp`, `input.invalid`,
+and `cli.arguments_invalid`. Extension references resolve offline; dangling or
+non-terminating references encountered during validation are extension errors.
+Timestamp comparisons share one offset-aware parser; timestamp format
+validation remains the responsibility of the contract schema.
+
+`schema_dir()` and `schema_path()` still return `pathlib.Path` objects. For
+zip imports, `importlib.resources.as_file` extracts the schema directory once
+and its context stays open until process exit; an `atexit` handler removes the
+temporary directory, following the
+[resource context lifetime](https://docs.python.org/3/library/importlib.resources.html#importlib.resources.as_file).
+Callers can retain these paths within the process without
+adopting a context-manager API. Paths must not be persisted for another process.
+
 ## Version Policy
 
 Known consumers include the acceptance harness and runtime infra. They use

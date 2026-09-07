@@ -159,5 +159,7 @@ def test_passed_result_rejects_forbidden_interface_violation() -> None:
         "violations": [{"kind": "topic", "name": "/cmd_vel"}],
     }
 
-    with pytest.raises(ContractValidationError, match="True was expected"):
+    with pytest.raises(ContractValidationError, match="expected to be empty") as caught:
         validate_document(result)
+    assert caught.value.error_id == "schema.validation_failed"
+    assert caught.value.json_path == "$.forbidden_graph_observation.violations"
