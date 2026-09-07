@@ -11,6 +11,12 @@ repos:
       - id: check-merge-conflict
       - id: mixed-line-ending
         args: [--fix=lf]
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.37.4
+    hooks:
+      - id: check-metaschema
+        files: ^packages/contracts/src/robotics_runtime_contracts/schemas/.*\.schema\.json$
+      - id: check-github-workflows
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.21
     hooks:
@@ -29,6 +35,7 @@ repos:
     rev: v1.7.12
     hooks:
       - id: actionlint
+        files: ^\.github/workflows/.*\.ya?ml$
   - repo: https://github.com/semgrep/semgrep
     rev: v1.164.0
     hooks:
@@ -36,19 +43,29 @@ repos:
         name: Enforce attach-only API boundary
         args:
           - scan
-          - --config=.semgrep/attach-only.yml
+          - --config=packages/harness/.semgrep/attach-only.yml
           - --error
           - --metrics=off
-          - src/robotics_acceptance_harness
+          - packages/harness/src/robotics_acceptance_harness
         pass_filenames: false
       - id: semgrep
         name: Test attach-only policy rules
-        args: [--test, .semgrep, --metrics=off]
+        args: [--test, packages/harness/.semgrep, --metrics=off]
         pass_filenames: false
   - repo: local
     hooks:
-      - id: mypy
-        name: mypy
-        entry: uv run --no-sync python -m mypy src/robotics_acceptance_harness
+      - id: validate-contract-examples
+        name: Validate contract examples
+        entry: uv run --no-sync robotics-contracts validate --quiet
+        language: system
+        files: ^packages/contracts/tests/fixtures/scenario/valid/.*\.(json|ya?ml)$
+      - id: mypy-contracts
+        name: mypy contracts
+        entry: uv run --no-sync --directory packages/contracts python -m mypy src
+        language: system
+        pass_filenames: false
+      - id: mypy-harness
+        name: mypy harness
+        entry: uv run --no-sync --directory packages/harness python -m mypy src
         language: system
         pass_filenames: false

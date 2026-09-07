@@ -1,0 +1,41 @@
+[dependency-groups]
+dev = [
+  "check-jsonschema==0.37.4",
+  "coverage[toml]==7.15.0",
+  "mypy==2.3.0",
+  "pre-commit==4.6.0",
+  "pytest==9.1.1",
+  "ruff==0.15.21",
+  "types-jsonschema==4.26.0.20260518",
+  "types-protobuf==7.34.1.20260518",
+  "types-PyYAML==6.0.12.20260518",
+  "yamllint==1.38.0",
+]
+
+[tool.uv.workspace]
+members = ["packages/*"]
+exclude = ["robotics-runtime-contracts", "robotics-acceptance-harness", "robotics-runtime-infra"]
+
+[tool.uv.sources]
+robotics-runtime-contracts = { workspace = true }
+robotics-acceptance-harness = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["junitparser.*", "opentelemetry.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests/workspace"]
+addopts = ["--strict-config", "--strict-markers"]

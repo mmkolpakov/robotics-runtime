@@ -29,18 +29,6 @@ Homepage = "https://github.com/mmkolpakov/robotics-runtime-contracts"
 Repository = "https://github.com/mmkolpakov/robotics-runtime-contracts"
 Issues = "https://github.com/mmkolpakov/robotics-runtime-contracts/issues"
 
-[dependency-groups]
-dev = [
-  "check-jsonschema==0.37.4",
-  "mypy==2.3.0",
-  "pre-commit==4.6.0",
-  "pytest==9.1.1",
-  "ruff==0.15.21",
-  "types-jsonschema==4.26.0.20260518",
-  "types-PyYAML==6.0.12.20260518",
-  "yamllint==1.38.0",
-]
-
 [build-system]
 requires = ["hatchling==1.29.0"]
 build-backend = "hatchling.build"
@@ -56,14 +44,5 @@ testpaths = ["tests"]
 addopts = ["--strict-config", "--strict-markers"]
 
 [tool.ruff]
-line-length = 100
-target-version = "py312"
+extend = "../../pyproject.toml"
 src = ["src", "tests"]
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
-
-[tool.mypy]
-python_version = "3.12"
-strict = true
-files = ["src/robotics_runtime_contracts"]

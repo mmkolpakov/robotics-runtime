@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "robotics-acceptance-harness"
 version = "0.18.0"
 description = "Attach-only acceptance observer for validated robotics executions."
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12,<3.15"
 readme = "README.md"
 license = "MIT"
 authors = [{ name = "mmkolpakov" }]
@@ -18,6 +18,7 @@ classifiers = [
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Software Development :: Testing",
 ]
 dependencies = [
@@ -29,7 +30,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-robotics-runtime-contracts = { git = "https://github.com/mmkolpakov/robotics-runtime-contracts.git", rev = "6c6b72a90eda7540bdc84992fd7b26acd78ea8fe" }
+robotics-runtime-contracts = { workspace = true }
 
 [project.optional-dependencies]
 pytest = ["pytest>=8,<10"]
@@ -41,18 +42,6 @@ robotics-acceptance = "robotics_acceptance_harness.cli:main"
 Homepage = "https://github.com/mmkolpakov/robotics-acceptance-harness"
 Repository = "https://github.com/mmkolpakov/robotics-acceptance-harness"
 Issues = "https://github.com/mmkolpakov/robotics-acceptance-harness/issues"
-
-[dependency-groups]
-dev = [
-  "coverage[toml]==7.15.0",
-  "mypy==2.3.0",
-  "pre-commit==4.6.0",
-  "pytest==9.1.1",
-  "ruff==0.15.21",
-  "types-protobuf==7.34.1.20260518",
-  "types-pyyaml==6.0.12.20260518",
-  "yamllint==1.38.0",
-]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -66,18 +55,6 @@ source = ["robotics_acceptance_harness"]
 show_missing = true
 skip_covered = true
 
-[tool.mypy]
-python_version = "3.12"
-strict = true
-warn_unused_ignores = true
-
-[[tool.mypy.overrides]]
-module = ["junitparser.*", "opentelemetry.*"]
-ignore_missing_imports = true
-
 [tool.ruff]
-line-length = 100
-target-version = "py312"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+extend = "../../pyproject.toml"
+src = ["src", "tests"]
