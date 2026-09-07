@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from enum import StrEnum
 
+from robotics_runtime_contracts.errors import ContractError
+
 
 class OutcomeStatus(StrEnum):
     PASSED = "passed"
@@ -23,9 +25,12 @@ def worst_status(
 ) -> str:
     """Return the deterministic worst outcome from a non-empty collection."""
 
-    values = tuple(OutcomeStatus(status) for status in statuses)
+    try:
+        values = tuple(OutcomeStatus(status) for status in statuses)
+    except ValueError as error:
+        raise ContractError(str(error), error_id="status.invalid") from error
     if not values:
-        raise ValueError("at least one status is required")
+        raise ContractError("at least one status is required", error_id="status.invalid")
     status = max(values, key=_PRIORITY.__getitem__)
     if collapse_cancelled and status is OutcomeStatus.CANCELLED:
         return OutcomeStatus.INCOMPLETE.value

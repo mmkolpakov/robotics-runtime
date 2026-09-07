@@ -3,11 +3,15 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Set
 from typing import Any, Literal
 
+from robotics_runtime_contracts.errors import ContractError
+
 ChannelObservationStatus = Literal["passed", "failed", "incomplete", "error"]
 
 
-class ClockEvidenceValidationError(ValueError):
+class ClockEvidenceValidationError(ContractError):
     """Raised when a clock relation references evidence from the wrong domain."""
+
+    error_id = "clock.evidence_invalid"
 
 
 def validate_clock_relation_evidence(

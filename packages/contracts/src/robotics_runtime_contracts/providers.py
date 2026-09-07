@@ -3,9 +3,13 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from robotics_runtime_contracts.errors import ContractError
 
-class ProviderRequirementError(ValueError):
+
+class ProviderRequirementError(ContractError):
     """Raised when runtime provider bindings do not satisfy a scenario."""
+
+    error_id = "provider.requirements_unsatisfied"
 
 
 def _json_scalar_equal(left: Any, right: Any) -> bool:

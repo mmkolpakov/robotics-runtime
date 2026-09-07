@@ -4,6 +4,8 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from typing import Any, NoReturn
 
+from robotics_runtime_contracts._timestamps import parse_timestamp
+from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.qualification_policy import (
     RESERVED_ASSERTION_IDS,
     RESERVED_METRIC_NAMES,
@@ -12,7 +14,7 @@ from robotics_runtime_contracts.qualification_policy import (
 from robotics_runtime_contracts.status import worst_status
 
 
-class SemanticValidationError(ValueError):
+class SemanticValidationError(ContractError):
     """Raised when structurally valid contract fields contradict each other."""
 
     error_id = "semantic.validation_failed"
@@ -21,7 +23,7 @@ class SemanticValidationError(ValueError):
         self.schema_name = schema_name
         self.json_path = json_path
         self.validation_message = message
-        super().__init__(f"{json_path}: {message}")
+        super().__init__(f"{json_path}: {message}", json_path=json_path)
 
 
 def _fail(schema_name: str, path: str, message: str) -> NoReturn:
@@ -30,9 +32,8 @@ def _fail(schema_name: str, path: str, message: str) -> NoReturn:
 
 def _timestamp(schema_name: str, path: str, value: str) -> datetime:
     try:
-        normalized = f"{value[:-1]}+00:00" if value.endswith(("Z", "z")) else value
-        return datetime.fromisoformat(normalized)
-    except (TypeError, ValueError) as error:
+        return parse_timestamp(value, json_path=path)
+    except ContractError as error:
         _fail(schema_name, path, f"must be a valid date-time: {error}")
 
 

@@ -5,7 +5,6 @@ import re
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -20,6 +19,8 @@ from robotics_runtime_contracts import (
     validate_document,
     validate_provider_requirements,
 )
+from robotics_runtime_contracts._timestamps import parse_timestamp as _timestamp
+from robotics_runtime_contracts.errors import CLIArgumentError, ContractError
 from robotics_runtime_contracts.qualification_policy import (
     channel_observation_status,
     derive_channel_violations,
@@ -75,22 +76,10 @@ _EXECUTION_FIELDS = (
 )
 
 
-class QualificationError(ValueError):
+class QualificationError(ContractError):
     """Raised when individually valid qualification documents contradict each other."""
 
     error_id = "qualification.invalid"
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        error_id: str | None = None,
-        json_path: str | None = None,
-    ) -> None:
-        if error_id is not None:
-            self.error_id = error_id
-        self.json_path = json_path
-        super().__init__(message)
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,11 +104,6 @@ def _document(artifact: _Artifact) -> Mapping[str, Any]:
     if artifact.document is None:
         _fail(f"{artifact.kind} requires a contract document")
     return artifact.document
-
-
-def _timestamp(value: str) -> datetime:
-    normalized = f"{value[:-1]}+00:00" if value.endswith(("Z", "z")) else value
-    return datetime.fromisoformat(normalized)
 
 
 def _require_time_order(label: str, *values: str) -> None:
@@ -1385,20 +1369,22 @@ def _load_artifact(
     kind, kind_separator, remainder = specification.partition(":")
     subject_name, path_separator, path_value = remainder.partition("=")
     if not kind_separator or not path_separator or not kind or not subject_name or not path_value:
-        _fail("--artifact must use KIND:SUBJECT=PATH")
+        raise CLIArgumentError("--artifact must use KIND:SUBJECT=PATH")
     if kind not in _CONTRACT_SCHEMAS and kind not in _RAW_ARTIFACT_KINDS:
-        _fail(f"unsupported qualification artifact kind: {kind}")
+        raise CLIArgumentError(f"unsupported qualification artifact kind: {kind}")
     if not _SUBJECT_NAME.fullmatch(subject_name) or ".." in subject_name or "//" in subject_name:
-        _fail(f"non-canonical qualification subject name: {subject_name}")
+        raise CLIArgumentError(f"non-canonical qualification subject name: {subject_name}")
 
-    path = Path(path_value)
+    path = Path(path_value).expanduser()
     raw = path.read_bytes()
     document = None
     if kind in _CONTRACT_SCHEMAS:
         try:
             document = loads_mapping(raw, source_name=str(path))
-        except ValueError as error:
-            _fail(str(error))
+        except ContractError as error:
+            raise QualificationError(
+                str(error), error_id=error.error_id, json_path=error.json_path
+            ) from error
         schema = document.get("schema_version")
         if not isinstance(schema, str) or schema not in _CONTRACT_SCHEMAS[kind]:
             _fail(
@@ -1411,11 +1397,11 @@ def _load_artifact(
                 schema=schema,
                 extension_schemas=((extension_schemas or None) if kind == "scenario" else None),
             )
-        except ValueError as error:
+        except ContractError as error:
             raise QualificationError(
                 f"{path} does not satisfy {schema}: {error}",
-                error_id=getattr(error, "error_id", None),
-                json_path=getattr(error, "json_path", None),
+                error_id=error.error_id,
+                json_path=error.json_path,
             ) from error
     return _Artifact(kind, subject_name, hashlib.sha256(raw).hexdigest(), len(raw), document)
 
