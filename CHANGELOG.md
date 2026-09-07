@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add the CPython 3.12-3.14 CI matrix and declare `>=3.12,<3.15` support.
+- Allow `referencing>=0.37,<1` while retaining the locked resolution; enable
+  Renovate hook updates and group duplicate tool pins. Hosted bot onboarding
+  and the first dependency PR remain an external acceptance gate.
 - Lock the published 0.16 schema resources and catalog with a byte-digest and
   resource-inventory tripwire; structural compatibility checking remains planned.
 - Document the breaking 0.15 to 0.16 migration and known consumer versions.

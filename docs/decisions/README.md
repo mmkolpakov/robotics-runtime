@@ -13,3 +13,4 @@ they govern.
 | [0005](0005-keep-the-package-domain-neutral.md) | Keep the package domain neutral |
 | [0006](0006-separate-transport-qualification.md) | Separate transport qualification from acceptance aggregation |
 | [0007](0007-preserve-published-schema-compatibility.md) | Preserve published schema compatibility |
+| [0008](0008-test-supported-python-versions.md) | Test the declared Python support range |

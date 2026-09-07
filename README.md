@@ -30,7 +30,7 @@ they do not select a schema.
 
 ## Install
 
-Python 3.12 or newer is required. Install a wheel from a tagged
+Python 3.12 through 3.14 is supported. Install a wheel from a tagged
 [GitHub Release](https://github.com/mmkolpakov/robotics-runtime-contracts/releases),
 or create a development environment:
 

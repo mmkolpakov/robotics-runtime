@@ -19,7 +19,7 @@ not belong in this repository.
 
 ## Development
 
-Requirements: Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
+Requirements: Python 3.12 through 3.14 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync --locked --all-groups
@@ -41,3 +41,33 @@ weights, recordings, or hardware identifiers.
 Keep each commit independently reviewable. Explain the compatibility effect,
 the consumer problem being solved, and why an existing schema or extension is
 insufficient. CI must pass before merge.
+
+## Dependency Updates
+
+Renovate tracks Python runtime, development and build requirements and `uv.lock`
+through its [PEP 621 manager](https://docs.renovatebot.com/modules/manager/pep621/).
+The [GitHub Actions manager](https://docs.renovatebot.com/modules/manager/github-actions/)
+tracks action SHA pins and the `astral-sh/setup-uv` `version` input. Hook updates
+are explicitly enabled through the
+[pre-commit manager](https://docs.renovatebot.com/modules/manager/pre-commit/).
+Ruff and check-jsonschema package/hook updates are grouped so their duplicate
+pins can be reviewed together. Lock maintenance runs weekly in Helsinki time;
+automerge is disabled.
+
+The Python support range, CI matrix and `.python-version` (the minimum supported
+development version) are reviewed together when support changes. A dependency
+bot update alone must not expand the support claim.
+
+Validate configuration changes with Renovate's official
+[config validator](https://docs.renovatebot.com/config-validation/):
+
+```bash
+renovate-config-validator --strict renovate.json
+```
+
+Configuration in Git is not proof that the hosted bot is installed or active.
+An administrator must enable the Renovate GitHub App for this repository and
+complete onboarding. The M0 acceptance criterion is an actual dependency PR
+from Renovate with passing checks, not a local config-validation result. If no
+such PR exists by the end of M0, remove the inactive configuration as required
+by the implementation plan. This remains an external gate until a PR is observed.
