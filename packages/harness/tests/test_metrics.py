@@ -537,7 +537,8 @@ def test_delta_histogram_rejects_total_gaps_exceeding_window_tolerance() -> None
         window_end_ns=10_000_000_000,
     )[0]
 
-    assert result.status == "error"
+    assert result.status == "skipped"
+    assert result.observed_value is None
     assert "does not cover enough" in result.message
 
 
