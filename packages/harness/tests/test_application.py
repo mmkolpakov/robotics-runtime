@@ -11,6 +11,7 @@ from junitparser import JUnitXml
 
 from robotics_acceptance_harness.application import (
     VerificationError,
+    VerificationOutputs,
     evaluate_from_evidence,
     run_verification,
 )
@@ -390,7 +391,7 @@ def _run_case(
     window: tuple[int, int],
     interval: tuple[datetime, datetime],
     sleep_fn: Callable[[float], None] | None = None,
-):
+) -> VerificationOutputs:
     wall_times = iter(window)
     utc_times = iter(interval)
     return run_verification(
@@ -419,7 +420,7 @@ def _simulation_case(
     source_scale: float = 1,
     include_metrics: bool = True,
     observer_type: type[FakeObserver] | type[LegacyFakeObserver] = FakeObserver,
-):
+) -> VerificationOutputs:
     bundle = _simulation_bundle(tmp_path)
     metrics_path = tmp_path / "metrics.otlp.json"
     _write_metrics(
@@ -469,7 +470,7 @@ def _physical_case(
     *,
     forbidden_publishers: int = 0,
     offset_ms: float = 0.5,
-):
+) -> tuple[VerificationOutputs, FakeObserver]:
     bundle = _physical_bundle()
     started = datetime(2026, 7, 12, 10, 0, tzinfo=UTC)
     start_ns = int(started.timestamp() * 1_000_000_000)
@@ -685,7 +686,7 @@ def test_physical_verification_emits_authorized_result(tmp_path: Path) -> None:
     assert result["status"] == "passed"
     assert result["authorization"]["mode"] == "verified_execution_permit"
     assert result["hardware_clock_observation"]["within_policy"] is True
-    assert JUnitXml.fromfile(outputs.junit_path).failures == 0
+    assert JUnitXml.fromfile(str(outputs.junit_path)).failures == 0
     assert observer.closed
 
 

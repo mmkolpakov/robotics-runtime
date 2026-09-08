@@ -4,9 +4,11 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import Mapping, Sequence
 from hashlib import sha256
 from pathlib import Path
 from time import monotonic, sleep, time_ns
+from typing import TYPE_CHECKING, Literal, cast
 from uuid import uuid4
 from xml.etree import ElementTree
 
@@ -15,26 +17,32 @@ import yaml
 from robotics_runtime_contracts import validate_document
 
 from robotics_acceptance_harness.documents import load_bundle
-from robotics_acceptance_harness.metrics import HistogramSample
+from robotics_acceptance_harness.metrics import HistogramSample, MetricPoint, MetricSample
 from robotics_acceptance_harness.otel import load_otlp_json_metrics, select_metric_points
+from tests.graph_types import ExpectedGraph
+from tests.live.collector import Collector
 from tests.live.evidence import (
     QUALIFICATION_GOLDEN,
     QUALIFICATION_METRICS,
     clock_recording,
     qualification_metrics,
 )
+from tests.live.types import Attribute, LiveResult, MetricGolden, MetricsPayload
 from tests.support import local_evidence_artifact, write_evidence_index
+
+if TYPE_CHECKING:
+    from tests.live.graph import LiveGraph
 
 pytestmark = pytest.mark.live_ros
 BASE = Path(__file__).parents[1] / "fixtures" / "simulation"
 GOLDEN = Path(__file__).parent / "fixtures" / "metric-golden.json"
 
 
-def _attributes(values: dict) -> list[dict]:
+def _attributes(values: Mapping[str, str]) -> list[Attribute]:
     return [{"key": key, "value": {"stringValue": value}} for key, value in values.items()]
 
 
-def _payload(golden: dict, run_id: str, domain_id: str) -> dict:
+def _payload(golden: MetricGolden, run_id: str, domain_id: str) -> MetricsPayload:
     return {
         "resourceMetrics": [
             {
@@ -67,7 +75,21 @@ def _payload(golden: dict, run_id: str, domain_id: str) -> dict:
     }
 
 
-def _write_bundle(graph: dict, live_output: Path, *, qualified: bool = False) -> tuple[Path, Path]:
+def _assert_golden_gauges(points: Sequence[MetricPoint], golden: MetricGolden) -> None:
+    gauges = [point for point in points if point.name == golden["name"]]
+    assert len(gauges) >= 10
+    for gauge in gauges:
+        assert isinstance(gauge, MetricSample)
+        assert (gauge.name, gauge.unit, gauge.value) == (
+            golden["name"],
+            golden["unit"],
+            golden["value"],
+        )
+
+
+def _write_bundle(
+    graph: ExpectedGraph, live_output: Path, *, qualified: bool = False
+) -> tuple[Path, Path]:
     scenario = yaml.safe_load((BASE / "scenario.yaml").read_text(encoding="utf-8"))
     runtime = yaml.safe_load((BASE / "runtime.yaml").read_text(encoding="utf-8"))
     runtime["ros"]["domain_id"] = int(os.environ.get("ROS_DOMAIN_ID", "0"))
@@ -85,7 +107,7 @@ def _write_bundle(graph: dict, live_output: Path, *, qualified: bool = False) ->
         "max_time_authority_delivery_latency_p95_ms": 100,
         "max_time_authority_delivery_latency_ms": 100,
     }
-    golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
+    golden = cast(MetricGolden, json.loads(GOLDEN.read_text(encoding="utf-8")))
     scenario["metric_definitions"] = [
         {
             "metric_name": golden["name"],
@@ -126,11 +148,13 @@ def _write_bundle(graph: dict, live_output: Path, *, qualified: bool = False) ->
     return scenario_path, runtime_path
 
 
-def _verify(live_graph, collector, live_output: Path, *, qualified: bool) -> dict:
+def _verify(
+    live_graph: LiveGraph, collector: Collector, live_output: Path, *, qualified: bool
+) -> LiveResult:
     scenario_path, runtime_path = _write_bundle(
         live_graph.expected(), live_output, qualified=qualified
     )
-    golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
+    golden = cast(MetricGolden, json.loads(GOLDEN.read_text(encoding="utf-8")))
     run_id = f"run-{uuid4()}"
     domain_id = "live-domain"
     run_context = live_output / "acceptance-run.json"
@@ -219,11 +243,7 @@ def _verify(live_graph, collector, live_output: Path, *, qualified: bool) -> dic
             points = select_metric_points(
                 load_otlp_json_metrics(collector.metrics), run_id=run_id, domain_id=domain_id
             )
-            gauges = [p for p in points if p.name == golden["name"]]
-            assert len(gauges) >= 10
-            assert {(p.name, p.unit, p.value) for p in gauges} == {
-                (golden["name"], golden["unit"], golden["value"])
-            }
+            _assert_golden_gauges(points, golden)
             assert all(
                 all(p.attributes.get(k) == v for k, v in golden["resource_attributes"].items())
                 for p in points
@@ -240,7 +260,7 @@ def _verify(live_graph, collector, live_output: Path, *, qualified: bool) -> dic
                     == QUALIFICATION_GOLDEN["interval_ns"]
                 )
                 if isinstance(point, HistogramSample):
-                    key = (
+                    key: Literal["message_age_ms", "delivery_latency_ms"] = (
                         "message_age_ms"
                         if point.name == "robotics.message.age"
                         else "delivery_latency_ms"
@@ -256,7 +276,7 @@ def _verify(live_graph, collector, live_output: Path, *, qualified: bool) -> dic
                     assert point.monotonic
                     assert point.value == QUALIFICATION_GOLDEN["counters"][point.name]
             artifact = local_evidence_artifact(collector.metrics, media_type="application/x-ndjson")
-            artifacts = [artifact]
+            artifacts: list[dict[str, object]] = [artifact]
             if qualified:
                 artifacts.append(
                     clock_recording(live_output, tuple(live_graph.recorded_clock_samples[-100:]))
@@ -276,7 +296,10 @@ def _verify(live_graph, collector, live_output: Path, *, qualified: bool) -> dic
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait(timeout=5)
-    result = json.loads((live_output / "acceptance-result.json").read_text(encoding="utf-8"))
+    result = cast(
+        LiveResult,
+        json.loads((live_output / "acceptance-result.json").read_text(encoding="utf-8")),
+    )
     validate_document(result)
     assert result["evaluation_mode"] == "live"
     assertions = {item["assertion_id"]: item for item in result["assertion_results"]}
@@ -309,7 +332,9 @@ def _verify(live_graph, collector, live_output: Path, *, qualified: bool) -> dic
     return result
 
 
-def test_verify_passes_with_complete_evidence(live_graph, collector, live_output: Path) -> None:
+def test_verify_passes_with_complete_evidence(
+    live_graph: LiveGraph, collector: Collector, live_output: Path
+) -> None:
     result = _verify(live_graph, collector, live_output, qualified=True)
     assert result["status"] == "passed"
     assert result["unevaluated"] == []
@@ -324,7 +349,9 @@ def test_verify_passes_with_complete_evidence(live_graph, collector, live_output
     assert assertions["policy-evidence-compression"]["status"] == "passed"
 
 
-def test_verify_rejects_missing_evidence(live_graph, collector, live_output: Path) -> None:
+def test_verify_rejects_missing_evidence(
+    live_graph: LiveGraph, collector: Collector, live_output: Path
+) -> None:
     result = _verify(live_graph, collector, live_output, qualified=False)
     # Assert rejection and its evidence causes, not the current status-folding precedence.
     assert result["status"] != "passed"

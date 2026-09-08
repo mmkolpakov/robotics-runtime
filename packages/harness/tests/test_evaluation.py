@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import base64
 import hashlib
+from collections.abc import Iterable
+from importlib.metadata import EntryPoint, FileHash, PackagePath, PathDistribution
 from pathlib import Path
-from types import MappingProxyType, SimpleNamespace
+from types import MappingProxyType
 
 import pytest
 import yaml
@@ -31,25 +33,22 @@ FIXTURES = Path(__file__).parent / "fixtures" / "simulation"
 EVIDENCE_DIGEST = "a" * 64
 
 
-class FakePackagePath:
-    def __init__(self, name: str, path: Path, digest: str | None) -> None:
-        self._name = name
-        self._path = path
-        self.hash = SimpleNamespace(mode="sha256", value=digest) if digest is not None else None
+def _package_path(name: str, root: Path, digest: str | None) -> PackagePath:
+    package_path = PackagePath(name)
+    package_path.dist = PathDistribution(root / "example_evaluator-1.0.dist-info")
+    package_path.hash = FileHash(f"sha256={digest}") if digest is not None else None
+    package_path.size = (root / name).stat().st_size
+    return package_path
 
-    @property
-    def name(self) -> str:
-        return Path(self._name).name
 
-    @property
-    def suffix(self) -> str:
-        return Path(self._name).suffix
-
-    def locate(self) -> Path:
-        return self._path
-
-    def __str__(self) -> str:
-        return self._name
+def _write_record(root: Path, files: Iterable[PackagePath]) -> None:
+    lines = []
+    for item in files:
+        digest = f"{item.hash.mode}={item.hash.value}" if item.hash is not None else ""
+        lines.append(f"{item},{digest},{item.size}")
+    (root / "example_evaluator-1.0.dist-info" / "RECORD").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8"
+    )
 
 
 def _record_digest(path: Path) -> str:
@@ -58,8 +57,8 @@ def _record_digest(path: Path) -> str:
     )
 
 
-def _installed_distribution(tmp_path: Path) -> tuple[SimpleNamespace, dict[str, FakePackagePath]]:
-    files: dict[str, FakePackagePath] = {}
+def _installed_distribution(tmp_path: Path) -> tuple[EntryPoint, dict[str, PackagePath]]:
+    files: dict[str, PackagePath] = {}
     for name, content in (
         ("example_evaluator.py", "def evaluate():\n    return ()\n"),
         ("example_evaluator-1.0.dist-info/METADATA", "Name: example-evaluator\n"),
@@ -71,13 +70,14 @@ def _installed_distribution(tmp_path: Path) -> tuple[SimpleNamespace, dict[str, 
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
-        files[name] = FakePackagePath(name, path, _record_digest(path))
+        files[name] = _package_path(name, tmp_path, _record_digest(path))
     record_name = "example_evaluator-1.0.dist-info/RECORD"
     record_path = tmp_path / record_name
     record_path.write_text("fixture RECORD\n", encoding="utf-8")
-    files[record_name] = FakePackagePath(record_name, record_path, None)
-    distribution = SimpleNamespace(name="example-evaluator", files=tuple(files.values()))
-    return SimpleNamespace(name="org.example", dist=distribution), files
+    files[record_name] = _package_path(record_name, tmp_path, None)
+    _write_record(tmp_path, files.values())
+    distribution = PathDistribution(record_path.parent)
+    return distribution.entry_points["org.example"], files
 
 
 def context(bundle: DocumentBundle | None = None) -> EvaluationContext:
@@ -122,6 +122,7 @@ def context(bundle: DocumentBundle | None = None) -> EvaluationContext:
 def test_evaluator_module_requires_an_installed_record_hash(tmp_path: Path) -> None:
     entry_point, files = _installed_distribution(tmp_path)
     files["example_evaluator.py"].hash = None
+    _write_record(tmp_path, files.values())
 
     with pytest.raises(EvaluationError, match="has no RECORD hash"):
         _verify_installed_record(entry_point)
@@ -133,10 +134,11 @@ def test_sourceless_bytecode_cannot_bypass_the_record_hash(tmp_path: Path) -> No
     pyc_path = tmp_path / pyc_name
     pyc_path.parent.mkdir(parents=True, exist_ok=True)
     pyc_path.write_bytes(b"untrusted bytecode")
-    pyc = FakePackagePath(pyc_name, pyc_path, None)
-    entry_point.dist.files = tuple(
-        item for name, item in files.items() if name != "example_evaluator.py"
-    ) + (pyc,)
+    pyc = _package_path(pyc_name, tmp_path, None)
+    _write_record(
+        tmp_path,
+        [item for name, item in files.items() if name != "example_evaluator.py"] + [pyc],
+    )
 
     with pytest.raises(EvaluationError, match="has no RECORD hash"):
         _verify_installed_record(entry_point)
@@ -157,10 +159,7 @@ def test_installer_metadata_exception_is_scoped_to_dist_info(tmp_path: Path) -> 
     entry_point, files = _installed_distribution(tmp_path)
     installer_path = tmp_path / "INSTALLER"
     installer_path.write_text("untrusted\n", encoding="utf-8")
-    entry_point.dist.files = (
-        *files.values(),
-        FakePackagePath("INSTALLER", installer_path, None),
-    )
+    _write_record(tmp_path, [*files.values(), _package_path("INSTALLER", tmp_path, None)])
 
     with pytest.raises(EvaluationError, match="has no RECORD hash"):
         _verify_installed_record(entry_point)
@@ -177,7 +176,11 @@ def test_entry_point_cannot_be_shadowed_outside_its_distribution(
     shadow.parent.mkdir()
     shadow.write_text("trusted = False\n", encoding="utf-8")
     monkeypatch.syspath_prepend(str(shadow.parent))
-    entry_point = SimpleNamespace(name="org.example", module="example_evaluator")
+    entry_point = EntryPoint(
+        name="org.example",
+        value="example_evaluator:evaluate",
+        group="robotics_acceptance.evaluators",
+    )
 
     with pytest.raises(EvaluationError, match="outside its verified RECORD"):
         _verify_entry_point_origin(entry_point, frozenset({trusted.resolve()}))
@@ -195,7 +198,7 @@ def test_evaluator_import_files_must_match_the_installed_record(
     name: str,
 ) -> None:
     entry_point, files = _installed_distribution(tmp_path)
-    files[name]._path.write_text("tampered\n", encoding="utf-8")
+    Path(files[name].locate()).write_text("tampered\n", encoding="utf-8")
 
     with pytest.raises(EvaluationError, match="differs from RECORD"):
         _verify_installed_record(entry_point)

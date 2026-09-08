@@ -1,0 +1,131 @@
+---
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: ${{ matrix.package }} (Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [contracts, harness]
+        python: ["3.12", "3.13", "3.14"]
+    env:
+      UV_PYTHON: ${{ matrix.python }}
+      PACKAGE: ${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+        with:
+          version: "0.11.28"
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Synchronize the complete locked workspace
+        run: |
+          uv sync --locked --all-packages --all-groups
+          uv pip check --python .venv/bin/python
+      - name: Check source and test types
+        run: uv run --no-sync --directory "packages/${PACKAGE}" mypy src tests
+      - name: Run package tests with coverage
+        run: |
+          mkdir -p "artifacts/${PACKAGE}"
+          cd "packages/${PACKAGE}"
+          if [[ "$PACKAGE" == harness ]]; then
+            uv run --no-sync coverage run --branch -m pytest \
+              --junitxml=../../artifacts/harness/junit.xml
+            uv run --no-sync coverage report --show-missing --fail-under=80
+            uv run --no-sync coverage xml -o ../../artifacts/harness/coverage.xml
+          else
+            uv run --no-sync pytest --junitxml=../../artifacts/contracts/junit.xml
+          fi
+      - name: Upload package validation results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ${{ matrix.package }}-${{ matrix.python }}-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 7
+
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+        with:
+          version: "0.11.28"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked --all-packages --all-groups
+      - run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure
+      - run: uv run --no-sync pytest tests/ci
+
+  live-ros:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Build ROS 2 Jazzy integration environment
+        run: >-
+          docker build --file packages/harness/tests/live/Dockerfile
+          --tag harness-live:ci .
+      - name: Exercise real ROS observer and installed CLI
+        run: |
+          mkdir -p artifacts/live
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --env HOME=/tmp \
+            --mount "type=bind,source=${PWD}/artifacts/live,target=/workspace/artifacts/live" \
+            harness-live:ci
+      - name: Upload ROS and Collector evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: live-ros-jazzy-${{ github.sha }}
+          path: artifacts/live/
+          if-no-files-found: warn
+          retention-days: 7
+
+  required-validation:
+    name: ci
+    needs: [package, quality, live-ros]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require every validation job to pass
+        env:
+          PACKAGE_RESULT: ${{ needs.package.result }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          ROS_RESULT: ${{ needs.live-ros.result }}
+        run: |
+          test "$PACKAGE_RESULT" = success
+          test "$QUALITY_RESULT" = success
+          test "$ROS_RESULT" = success

@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import TypedDict
 
 import pytest
 from junitparser import JUnitXml
 
-from robotics_acceptance_harness.documents import load_bundle
-from robotics_acceptance_harness.evidence import load_evidence_index
+from robotics_acceptance_harness.documents import DocumentBundle, load_bundle
+from robotics_acceptance_harness.evidence import VerifiedEvidence, load_evidence_index
 from robotics_acceptance_harness.forbidden_graph import ForbiddenGraphObservation
 from robotics_acceptance_harness.metrics import AssertionEvaluation
 from robotics_acceptance_harness.readiness import (
@@ -31,7 +33,26 @@ RUN_ID = "run-00000000-0000-4000-8000-000000000001"
 OTHER_RUN_ID = "run-00000000-0000-4000-8000-000000000002"
 
 
-def result_inputs(tmp_path: Path, *, evidence_run_id: str = RUN_ID) -> dict[str, object]:
+class ResultInputs(TypedDict):
+    result_id: str
+    run_id: str
+    domain_id: str
+    bundle: DocumentBundle
+    readiness: ReadinessResult
+    timing: TimingObservation
+    time_authority: TimeAuthorityObservation
+    time_authority_evidence_sha256: str | None
+    assertions: Sequence[AssertionEvaluation]
+    unevaluated: Sequence[str]
+    started_at: datetime
+    finished_at: datetime
+    monotonic_duration_sec: float
+    shutdown: Mapping[str, bool]
+    evidence_index: VerifiedEvidence
+    forbidden_graph: ForbiddenGraphObservation
+
+
+def result_inputs(tmp_path: Path, *, evidence_run_id: str = RUN_ID) -> ResultInputs:
     evidence_file = tmp_path / f"{evidence_run_id}.json"
     evidence_file.write_text("{}\n", encoding="utf-8")
     evidence = load_evidence_index(
@@ -131,7 +152,7 @@ def test_json_and_junit_outputs_share_status(tmp_path: Path) -> None:
     junit_path = write_junit_xml(result, tmp_path / "junit.xml")
 
     assert json.loads(json_path.read_text(encoding="utf-8"))["status"] == "failed"
-    xml = JUnitXml.fromfile(junit_path)
+    xml = JUnitXml.fromfile(str(junit_path))
     assert (xml.failures, xml.errors) == (1, 0)
 
 
@@ -170,5 +191,5 @@ def test_result_and_junit_mark_skipped_assertion_incomplete(tmp_path: Path) -> N
     assert result["status"] == "incomplete"
     assert result["unevaluated"] == ["$.assertions.optional-check"]
     assert result["assertion_results"][0]["observed_value"] == "not-observed"
-    junit = JUnitXml.fromfile(write_junit_xml(result, tmp_path / "junit.xml"))
+    junit = JUnitXml.fromfile(str(write_junit_xml(result, tmp_path / "junit.xml")))
     assert junit.skipped == 1

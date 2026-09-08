@@ -8,6 +8,7 @@ import pytest
 
 from robotics_acceptance_harness.readiness import evaluate_graph
 from robotics_acceptance_harness.ros import RosGraphObserver, RosObserverError
+from tests.graph_types import ExpectedGraph
 
 
 class FakeContext:
@@ -145,7 +146,7 @@ class GetState:
         pass
 
 
-def expected_graph() -> dict[str, object]:
+def expected_graph() -> ExpectedGraph:
     return {
         "topics": [
             {
@@ -244,11 +245,12 @@ def test_ros_observer_reports_graph_clock_and_lifecycle_without_writing() -> Non
     assert node.subscription_qos["/clock"] == SimpleNamespace(
         depth=1, reliability="best-effort", durability="volatile"
     )
-    assert observer.clock_samples == ()
+    initial_samples = observer.clock_samples
+    assert initial_samples == ()
     observer.start_clock_observation()
     node.callbacks["/clock"](SimpleNamespace(clock=SimpleNamespace(sec=1, nanosec=2)))
-    observer.stop_clock_observation()
-    assert observer.clock_samples[-1].source_time_ns == 1_000_000_002
+    samples = observer.stop_clock_observation()
+    assert samples[-1].source_time_ns == 1_000_000_002
     node.callbacks["/clock"](SimpleNamespace(clock=SimpleNamespace(sec=2, nanosec=0)))
     assert len(observer.clock_samples) == 1
     observer.snapshot()
@@ -327,7 +329,7 @@ def test_ros_observer_skips_action_graph_outside_scenario_scope() -> None:
         get_action_server_names_and_types_by_node=unexpected_query,
         get_action_client_names_and_types_by_node=unexpected_query,
     )
-    graph = {"topics": [], "services": [], "actions": [], "lifecycle_nodes": []}
+    graph: ExpectedGraph = {"topics": [], "services": [], "actions": [], "lifecycle_nodes": []}
 
     with RosGraphObserver(
         graph,

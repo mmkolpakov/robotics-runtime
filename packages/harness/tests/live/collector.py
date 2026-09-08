@@ -12,6 +12,8 @@ from urllib.request import Request, urlopen
 
 import yaml
 
+from tests.live.types import MetricsPayload
+
 
 class Collector:
     """Run the actual Collector file exporter; never write its output ourselves."""
@@ -62,7 +64,7 @@ class Collector:
             stderr=subprocess.STDOUT,
         )
 
-    def send(self, payload: dict) -> None:
+    def send(self, payload: MetricsPayload) -> None:
         request = Request(
             self.url,
             data=json.dumps(payload).encode(),
@@ -100,5 +102,5 @@ class Collector:
     def __enter__(self) -> Collector:
         return self
 
-    def __exit__(self, *_args) -> None:
+    def __exit__(self, *_args: object) -> None:
         self.stop()

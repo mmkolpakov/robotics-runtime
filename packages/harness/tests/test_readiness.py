@@ -11,10 +11,11 @@ from robotics_acceptance_harness.readiness import (
     evaluate_graph,
     wait_for_readiness,
 )
+from tests.graph_types import ExpectedGraph
 from tests.support import FakeTime
 
 
-def expected_graph() -> dict[str, object]:
+def expected_graph() -> ExpectedGraph:
     return {
         "topics": [
             {

@@ -4,6 +4,7 @@ import json
 from copy import deepcopy
 from hashlib import sha256
 from pathlib import Path
+from typing import TypedDict, cast
 
 import pytest
 import yaml
@@ -12,6 +13,11 @@ from robotics_runtime_contracts import ExtensionValidationError, validate_docume
 
 FIXTURE = Path(__file__).parent / "fixtures" / "scenario" / "valid" / "simulation-realtime.yaml"
 SCHEMA_URI = "https://schemas.example.org/sorting-item.v1.schema.json"
+
+
+class _ScenarioWithExtension(TypedDict):
+    extension_schemas: list[dict[str, str]]
+    extensions: dict[str, dict[str, object]]
 
 
 def extension_schema() -> bytes:
@@ -26,8 +32,8 @@ def extension_schema() -> bytes:
     return json.dumps(schema, separators=(",", ":"), sort_keys=True).encode()
 
 
-def scenario_with_extension() -> dict[str, object]:
-    scenario = yaml.safe_load(FIXTURE.read_text(encoding="utf-8"))
+def scenario_with_extension() -> _ScenarioWithExtension:
+    scenario: dict[str, object] = yaml.safe_load(FIXTURE.read_text(encoding="utf-8"))
     raw_schema = extension_schema()
     scenario["extension_schemas"] = [
         {
@@ -37,7 +43,7 @@ def scenario_with_extension() -> dict[str, object]:
         }
     ]
     scenario["extensions"] = {"org.example.sorting": {"item_id": "parcel-42"}}
-    return scenario
+    return cast(_ScenarioWithExtension, scenario)
 
 
 def test_namespaced_extension_is_validated_from_digest_pinned_json() -> None:

@@ -1,19 +1,25 @@
 from __future__ import annotations
 
 from time import monotonic, sleep
+from typing import TYPE_CHECKING
 
 import pytest
 
 from robotics_acceptance_harness.readiness import evaluate_graph, wait_for_readiness
 from robotics_acceptance_harness.ros import RosGraphObserver
+from tests.graph_types import ExpectedGraph
+
+if TYPE_CHECKING:
+    from tests.live.graph import LiveGraph
 
 pytestmark = pytest.mark.live_ros
 
 
-def test_clock_not_declared_in_expected_graph(live_graph) -> None:
-    graph = {"topics": [], "services": [], "actions": [], "lifecycle_nodes": []}
+def test_clock_not_declared_in_expected_graph(live_graph: LiveGraph) -> None:
+    graph: ExpectedGraph = {"topics": [], "services": [], "actions": [], "lifecycle_nodes": []}
     with RosGraphObserver(graph, observe_clock=True) as observer:
-        assert observer.clock_samples == ()
+        initial_samples = observer.clock_samples
+        assert initial_samples == ()
         observer.start_clock_observation()
         deadline = monotonic() + 15
         while len(observer.clock_samples) < 10 and monotonic() < deadline:
@@ -32,7 +38,7 @@ def test_clock_not_declared_in_expected_graph(live_graph) -> None:
         assert observer.snapshot().topics == {}
 
 
-def test_observes_topic_service_action_and_lifecycle(live_graph) -> None:
+def test_observes_topic_service_action_and_lifecycle(live_graph: LiveGraph) -> None:
     graph = live_graph.expected()
     with RosGraphObserver(graph, observe_clock=False) as observer:
         readiness = wait_for_readiness(

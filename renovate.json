@@ -1,0 +1,36 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "enabledManagers": [
+    "github-actions",
+    "pep621",
+    "pre-commit"
+  ],
+  "pre-commit": {
+    "enabled": true
+  },
+  "timezone": "Europe/Helsinki",
+  "packageRules": [
+    {
+      "matchPackageNames": ["ruff", "astral-sh/ruff-pre-commit"],
+      "groupName": "Ruff package and hooks"
+    },
+    {
+      "matchPackageNames": ["check-jsonschema", "python-jsonschema/check-jsonschema"],
+      "groupName": "check-jsonschema package and hooks"
+    }
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 4am on monday"
+    ]
+  },
+  "automerge": false
+}
