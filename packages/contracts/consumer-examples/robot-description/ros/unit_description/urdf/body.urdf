@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<robot name="unit">
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1"/>
+      <inertia ixx="0.0016666666666666668" ixy="0" ixz="0" iyy="0.0016666666666666668" iyz="0" izz="0.0016666666666666668"/>
+    </inertial>
+    <visual><geometry><mesh filename="package://unit_description/meshes/body.obj"/></geometry></visual>
+    <collision><geometry><box size="0.1 0.1 0.1"/></geometry></collision>
+  </link>
+</robot>

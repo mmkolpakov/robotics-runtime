@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:robotics-runtime-contracts:v1:execution-trust-policy",
+  "title": "Robotics execution trust policy v1",
+  "description": "Signer and physical-target allowlists consumed by the infrastructure execution policy. This document grants no execution permission by itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "max_permit_lifetime_seconds",
+    "principals",
+    "targets"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "execution-trust-policy.v1"
+    },
+    "policy_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+    },
+    "max_permit_lifetime_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1800
+    },
+    "principals": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/principal"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "operator"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "approver"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          }
+        }
+      ]
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/target"
+      }
+    }
+  },
+  "$defs": {
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "identity",
+        "issuer"
+      ],
+      "properties": {
+        "role": {
+          "$ref": "urn:robotics-runtime-contracts:v1:execution-verification#/$defs/signer/properties/role"
+        },
+        "identity": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/principal"
+        },
+        "issuer": {
+          "$ref": "urn:robotics-runtime-contracts:v1:execution-verification#/$defs/signer/properties/issuer"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_id",
+        "identity_kind",
+        "identity_sha256",
+        "environments"
+      ],
+      "properties": {
+        "target_id": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+        },
+        "identity_kind": {
+          "$ref": "urn:robotics-runtime-contracts:v1:execution-permit#/$defs/target/properties/identity_kind"
+        },
+        "identity_sha256": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256",
+          "maxLength": 64
+        },
+        "environments": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "urn:robotics-runtime-contracts:v1:execution-permit#/$defs/target/properties/environment"
+          }
+        }
+      }
+    }
+  }
+}

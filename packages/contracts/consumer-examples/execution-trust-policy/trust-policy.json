@@ -1,0 +1,27 @@
+{
+  "schema_version": "execution-trust-policy.v1",
+  "policy_id": "org.example.robotics-lab",
+  "max_permit_lifetime_seconds": 1800,
+  "principals": [
+    {
+      "role": "operator",
+      "identity": "operator@example.org",
+      "issuer": "https://token.actions.githubusercontent.com"
+    },
+    {
+      "role": "approver",
+      "identity": "safety@example.org",
+      "issuer": "https://token.actions.githubusercontent.com"
+    }
+  ],
+  "targets": [
+    {
+      "target_id": "unit-controller",
+      "identity_kind": "udev_serial",
+      "identity_sha256": "ee3244180559bd445405a361a9db30fa3c11717b298f2c86a8013662c8eb0c51",
+      "environments": [
+        "hil"
+      ]
+    }
+  ]
+}
