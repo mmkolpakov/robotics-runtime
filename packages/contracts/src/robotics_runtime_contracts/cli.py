@@ -14,7 +14,7 @@ from robotics_runtime_contracts import (
     resolve_schema_name,
     validate_document,
 )
-from robotics_runtime_contracts._qualification import validate_qualification_artifacts
+from robotics_runtime_contracts._writer_cli import add_writer_commands, run_writer
 from robotics_runtime_contracts.document_ops import (
     create_execution_permit,
     describe_schema,
@@ -23,11 +23,16 @@ from robotics_runtime_contracts.document_ops import (
 )
 from robotics_runtime_contracts.errors import CLIArgumentError as CLIArgumentError
 from robotics_runtime_contracts.errors import ContractError
+from robotics_runtime_contracts.qualification import (
+    QualificationError,
+    validate_qualification_artifacts,
+)
 from robotics_runtime_contracts.serialization import (
     dumps_yaml,
     read_document_bytes,
     read_document_stream,
 )
+from robotics_runtime_contracts.writers import protect_inputs
 
 
 class ContractArgumentParser(argparse.ArgumentParser):
@@ -138,6 +143,7 @@ def _parser() -> argparse.ArgumentParser:
     permit_init.add_argument("--interlock-sha256", required=True)
     permit_init.add_argument("--validity-sec", type=int, default=900)
     permit_init.add_argument("--output", required=True, metavar="PATH")
+    add_writer_commands(subparsers, _add_extension_schemas)
     return parser
 
 
@@ -190,6 +196,9 @@ def _emit_error(error: ContractError, *, output_format: str) -> None:
     json_path = error.json_path
     if json_path is not None:
         payload["path"] = json_path
+    if isinstance(error, QualificationError):
+        payload["diagnostics"] = [item.as_dict() for item in error.diagnostics]
+        payload["blocked_checks"] = list(error.blocked_checks)
     if output_format == "json":
         print(
             json.dumps({"error": payload}, allow_nan=False, sort_keys=True),
@@ -197,6 +206,11 @@ def _emit_error(error: ContractError, *, output_format: str) -> None:
         )
     else:
         print(f"invalid: {payload['message']} [{payload['error_id']}]", file=sys.stderr)
+        if isinstance(error, QualificationError):
+            for item in error.diagnostics[1:]:
+                print(f"invalid: {item.message} [{item.error_id}] ({item.check})", file=sys.stderr)
+            if error.blocked_checks:
+                print(f"blocked checks: {', '.join(error.blocked_checks)}", file=sys.stderr)
 
 
 def _scenario_resolve(arguments: argparse.Namespace) -> None:
@@ -291,6 +305,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     except ContractError as error:
         _emit_error(error, output_format=output_format)
+        if error.error_id == CLIArgumentError.error_id:
+            return 2
     except OSError as error:
         _emit_error(
             ContractError(str(error), error_id="input.io_error"), output_format=output_format
@@ -325,6 +341,12 @@ def _validate_documents(arguments: argparse.Namespace) -> list[tuple[str, str]]:
 
 
 def _run(arguments: argparse.Namespace) -> int:
+    if hasattr(arguments, "writer_operation"):
+        output = run_writer(arguments, _read_extension_schemas(arguments.extension_schema))
+        _emit(
+            {"message": f"written: {output}", "output": str(output)}, output_format=arguments.format
+        )
+        return 0
     documents: list[tuple[str, str]] = []
     if arguments.command == "validate":
         documents = _validate_documents(arguments)
@@ -334,6 +356,16 @@ def _run(arguments: argparse.Namespace) -> int:
             _read_extension_schemas(arguments.extension_schema),
         )
         if arguments.output:
+            protect_inputs(
+                arguments.output,
+                [
+                    item.partition("=")[2]
+                    for item in (
+                        *arguments.artifact,
+                        *arguments.extension_schema,
+                    )
+                ],
+            )
             _write_document(arguments.output, result)
     elif arguments.command == "describe":
         print(

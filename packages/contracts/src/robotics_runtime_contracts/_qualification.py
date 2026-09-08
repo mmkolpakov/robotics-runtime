@@ -1,32 +1,26 @@
 from __future__ import annotations
 
-import hashlib
 import re
-from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, NoReturn
 
 from robotics_runtime_contracts import (
     ArtifactReceiptValidationError,
     ClockEvidenceValidationError,
     ProviderRequirementError,
-    loads_mapping,
     schema_for_role,
     validate_artifact_receipt,
     validate_clock_relation_evidence,
-    validate_document,
     validate_provider_requirements,
 )
+from robotics_runtime_contracts._qualification_types import QualificationArtifact as _Artifact
+from robotics_runtime_contracts._qualification_types import QualificationError
 from robotics_runtime_contracts._timestamps import parse_timestamp as _timestamp
-from robotics_runtime_contracts.errors import CLIArgumentError, ContractError
 from robotics_runtime_contracts.qualification_policy import (
     channel_observation_status,
     derive_channel_violations,
     hardware_clock_within_policy,
 )
-from robotics_runtime_contracts.serialization import read_document_bytes
 
 _ARTIFACT_ROLES = {
     "scenario": "acceptance_scenario",
@@ -75,21 +69,6 @@ _EXECUTION_FIELDS = (
     "time_mode",
     "data_plane_profile",
 )
-
-
-class QualificationError(ContractError):
-    """Raised when individually valid qualification documents contradict each other."""
-
-    error_id = "qualification.invalid"
-
-
-@dataclass(frozen=True, slots=True)
-class _Artifact:
-    kind: str
-    subject_name: str
-    sha256: str
-    size_bytes: int
-    document: Mapping[str, Any] | None
 
 
 def _fail(
@@ -1214,232 +1193,3 @@ def _validate_evidence(
             _fail("recording summary size does not match its evidence-index reference")
         if _document(summary)["source_sha256"] != source_digest:
             _fail("recording summary source does not match its evidence segment")
-
-
-def _validate_links(artifacts: Sequence[_Artifact]) -> tuple[str, str]:
-    """Validate cross-document links after each contract has passed schema validation."""
-
-    subject_names = [artifact.subject_name for artifact in artifacts]
-    if len(subject_names) != len(set(subject_names)):
-        _fail("qualification subject names must be unique")
-    grouped: dict[str, list[_Artifact]] = defaultdict(list)
-    for artifact in artifacts:
-        grouped[artifact.kind].append(artifact)
-
-    scenario_artifact = _one(grouped, "scenario", "scenario.json")
-    run_artifact = _one(grouped, "acceptance_run", "acceptance-run.json")
-    aggregate_artifact = _one(grouped, "acceptance_aggregate", "acceptance-aggregate.json")
-    runtimes = _labeled(grouped, "runtime_manifest", "runtime-manifests/")
-    results = _labeled(grouped, "domain_result", "results/")
-    evidence_indexes = _labeled(grouped, "evidence_index", "evidence-indexes/")
-    recording_summaries = _labeled(grouped, "recording_summary", "recording-summaries/")
-
-    scenario = _document(scenario_artifact)
-    acceptance_run = _document(run_artifact)
-    aggregate = _document(aggregate_artifact)
-    run_id = acceptance_run["run_id"]
-    run_created_at = acceptance_run["created_at"]
-    aggregate_generated_at = aggregate["generated_at"]
-    run_domains = {item["domain_id"] for item in acceptance_run["domains"]}
-    for label, expected_value, actual_value in (
-        ("acceptance run scenario_id", scenario["scenario_id"], acceptance_run["scenario_id"]),
-        (
-            "acceptance run scenario digest",
-            scenario_artifact.sha256,
-            acceptance_run["scenario_sha256"],
-        ),
-        ("aggregate run_id", run_id, aggregate["run_id"]),
-        (
-            "aggregate acceptance run digest",
-            run_artifact.sha256,
-            aggregate["acceptance_run_sha256"],
-        ),
-    ):
-        _require_equal(label, expected_value, actual_value)
-    for name, values in (
-        ("runtime manifest", runtimes),
-        ("domain result", results),
-        ("evidence index", evidence_indexes),
-    ):
-        if set(values) != run_domains:
-            _fail(f"{name} set does not equal acceptance run domains")
-    aggregate_results = {
-        item["domain_id"]: {
-            "result_id": item["result_id"],
-            "result_sha256": item["result_sha256"],
-            "status": item["status"],
-        }
-        for item in aggregate["per_domain_results"]
-    }
-    local_results: dict[str, dict[str, Any]] = {}
-    for domain_id, artifact in results.items():
-        result = _document(artifact)
-        runtime = _document(runtimes[domain_id])
-        evidence_index = _document(evidence_indexes[domain_id])
-        _require_time_order(
-            f"qualification timeline for {domain_id}",
-            run_created_at,
-            runtime["generated_at"],
-            result["started_at"],
-            evidence_index["generated_at"],
-            result["finished_at"],
-            aggregate_generated_at,
-        )
-        for label, expected_value, actual_value in (
-            ("run_id", run_id, result["run_id"]),
-            ("domain_id", domain_id, result["domain_id"]),
-            ("scenario_id", scenario["scenario_id"], result["scenario_id"]),
-            ("scenario digest", scenario_artifact.sha256, result["scenario_sha256"]),
-            (
-                "runtime manifest digest",
-                runtimes[domain_id].sha256,
-                result["runtime_manifest_sha256"],
-            ),
-        ):
-            _require_equal(f"result {domain_id} {label}", expected_value, actual_value)
-        _validate_execution_alignment(
-            scenario,
-            acceptance_run,
-            runtime,
-            result,
-            domain_id,
-        )
-        declared_assertions = {item["assertion_id"] for item in scenario["assertions"]}
-        result_assertions = {item["assertion_id"] for item in result["assertion_results"]}
-        missing_assertions = declared_assertions - result_assertions
-        if missing_assertions:
-            _fail(f"result {domain_id} omits scenario assertions: {sorted(missing_assertions)}")
-        indexed_artifacts = _document(evidence_indexes[domain_id])["artifacts"]
-        evidence_fields = (
-            "artifact_id",
-            "kind",
-            "uri",
-            "immutable_revision",
-            "receipt_sha256",
-            "sha256",
-            "size_bytes",
-            "media_type",
-            "retention_class",
-        )
-
-        result_evidence = {
-            item["artifact_id"]: _project_fields(item, evidence_fields)
-            for item in result["evidence"]
-        }
-        indexed_evidence = {
-            item["artifact_id"]: _project_fields(item, evidence_fields)
-            for item in indexed_artifacts
-        }
-        indexed_segments = {
-            item["artifact_id"]: item.get("segment_index") for item in indexed_artifacts
-        }
-        if result_evidence != indexed_evidence or any(
-            "segment_index" in item
-            and item["segment_index"] != indexed_segments[item["artifact_id"]]
-            for item in result["evidence"]
-        ):
-            _fail(f"result {domain_id} evidence does not exactly match its index")
-        local_results[domain_id] = {
-            "result_id": result["result_id"],
-            "result_sha256": artifact.sha256,
-            "status": result["status"],
-        }
-    if local_results != aggregate_results:
-        _fail("aggregate per_domain_results do not exactly match local results")
-
-    for domain_id, artifact in evidence_indexes.items():
-        _require_equal(f"evidence index {domain_id} run_id", run_id, _document(artifact)["run_id"])
-
-    _validate_provider_bindings(grouped, scenario, run_id, runtimes, run_created_at)
-    _validate_receipts(
-        grouped,
-        scenario,
-        run_id,
-        evidence_indexes,
-        run_created_at,
-        aggregate_generated_at,
-    )
-    _validate_model_and_dataset(grouped, scenario, runtimes, results)
-    _validate_retained_configuration(grouped, scenario, acceptance_run, runtimes)
-    _validate_physical_authorization(grouped, scenario_artifact, runtimes, results)
-    _validate_evidence(grouped, evidence_indexes, recording_summaries)
-    _validate_transport(
-        grouped,
-        run_id,
-        run_domains,
-        scenario_artifact,
-        aggregate,
-        evidence_indexes,
-        results,
-        run_created_at,
-        aggregate_generated_at,
-    )
-    return run_id, aggregate["generated_at"]
-
-
-def _load_artifact(
-    specification: str,
-    extension_schemas: Mapping[str, bytes],
-) -> _Artifact:
-    kind, kind_separator, remainder = specification.partition(":")
-    subject_name, path_separator, path_value = remainder.partition("=")
-    if not kind_separator or not path_separator or not kind or not subject_name or not path_value:
-        raise CLIArgumentError("--artifact must use KIND:SUBJECT=PATH")
-    if kind not in _CONTRACT_SCHEMAS and kind not in _RAW_ARTIFACT_KINDS:
-        raise CLIArgumentError(f"unsupported qualification artifact kind: {kind}")
-    if not _SUBJECT_NAME.fullmatch(subject_name) or ".." in subject_name or "//" in subject_name:
-        raise CLIArgumentError(f"non-canonical qualification subject name: {subject_name}")
-
-    path = Path(path_value).expanduser()
-    raw = read_document_bytes(path) if kind in _CONTRACT_SCHEMAS else path.read_bytes()
-    document = None
-    if kind in _CONTRACT_SCHEMAS:
-        try:
-            document = loads_mapping(raw, source_name=str(path))
-        except ContractError as error:
-            raise QualificationError(
-                str(error), error_id=error.error_id, json_path=error.json_path
-            ) from error
-        schema = document.get("schema_version")
-        if not isinstance(schema, str) or schema not in _CONTRACT_SCHEMAS[kind]:
-            _fail(
-                f"{path}: unsupported {kind} schema_version {schema!r}; "
-                f"expected one of {sorted(_CONTRACT_SCHEMAS[kind])}"
-            )
-        try:
-            validate_document(
-                document,
-                schema=schema,
-                extension_schemas=((extension_schemas or None) if kind == "scenario" else None),
-            )
-        except ContractError as error:
-            raise QualificationError(
-                f"{path} does not satisfy {schema}: {error}",
-                error_id=error.error_id,
-                json_path=error.json_path,
-            ) from error
-    return _Artifact(kind, subject_name, hashlib.sha256(raw).hexdigest(), len(raw), document)
-
-
-def validate_qualification_artifacts(
-    specifications: Sequence[str],
-    extension_schemas: Mapping[str, bytes] | None = None,
-) -> dict[str, Any]:
-    """Validate one artifact set and return metadata for the exact bytes read."""
-
-    artifacts = [
-        _load_artifact(specification, extension_schemas or {}) for specification in specifications
-    ]
-    run_id, generated_at = _validate_links(artifacts)
-    return {
-        "run_id": run_id,
-        "generated_at": generated_at,
-        "artifacts": [
-            {
-                "kind": item.kind,
-                "subject_name": item.subject_name,
-                "sha256": item.sha256,
-            }
-            for item in sorted(artifacts, key=lambda item: item.subject_name)
-        ],
-    }

@@ -1,0 +1,44 @@
+{
+  "schema_version": "robot-description.v1",
+  "robot_id": "unit",
+  "source": {
+    "path": "cad/body.scad",
+    "sha256": "sha256:52e5ac9990a65f67cce8683a8c892b144e63233c1dccd4f3a0c7e7acd88d5077"
+  },
+  "package": {
+    "name": "unit_description",
+    "path": "ros/unit_description"
+  },
+  "description": {
+    "format": "urdf",
+    "path": "ros/unit_description/urdf/body.urdf",
+    "sha256": "ff6ba45e2dfafaaa617e1a2d0db16f8fe36da9ba33018b207f0753efb3ce9c9f"
+  },
+  "meshes": [
+    {
+      "path": "ros/unit_description/meshes/body.obj",
+      "sha256": "2fbb3f7e4529b449eb3ba74bf6d845d476be7ceca9df21544a2325a0d269a89f"
+    }
+  ],
+  "mass_kg": 1,
+  "center_of_mass_m": [
+    0,
+    0,
+    0
+  ],
+  "inertia_check": {
+    "status": "passed",
+    "detail": "One 1 kg, 0.1 m uniform cube: principal moments m*(a*a+a*a)/12; cross terms zero."
+  },
+  "spawn": {
+    "frame": "world",
+    "pose": [
+      0,
+      0,
+      0.05,
+      0,
+      0,
+      0
+    ]
+  }
+}

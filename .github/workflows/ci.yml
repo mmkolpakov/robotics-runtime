@@ -75,6 +75,11 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Fetch the immutable pre-workspace contracts baseline
+        run: >-
+          git fetch --no-tags https://github.com/mmkolpakov/robotics-runtime-contracts.git
+          refs/tags/v0.16.0:refs/tags/contracts-legacy/v0.16.0
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
         with:
           version: "0.11.28"
@@ -82,15 +87,26 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
       - run: uv sync --locked --all-packages --all-groups
+      - name: Keep the compatibility checker within its complexity budget
+        run: >-
+          uv run --no-sync ruff check --extend-select C901,PLR0913
+          scripts/check_schema_compatibility.py scripts/schema_compatibility
+          tests/test_schema_compatibility.py
+      - name: Require published schema and semantic compatibility
+        run: uv run --no-sync python scripts/check_schema_compatibility.py
       - run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure
       - name: Require reproducible core schema bytes
         run: |
           uv run --no-sync python scripts/bundle_schemas.py --check
           git diff --exit-code -- packages/contracts/src/robotics_runtime_contracts/schemas
-      - run: uv run --no-sync python -m pytest tests/ci tests/release tests/schema_bundler
+      - run: >-
+          uv run --no-sync python -m pytest tests/ci tests/release tests/schema_bundler
+          tests/test_schema_compatibility.py
       - run: >-
           uv run --no-sync mypy --explicit-package-bases
           scripts/release scripts/bundle_schemas.py tests/release tests/workspace tests/schema_bundler
+          scripts/check_schema_compatibility.py scripts/schema_compatibility
+          tests/test_schema_compatibility.py
         env:
           MYPYPATH: packages/contracts/src:packages/harness/src
 

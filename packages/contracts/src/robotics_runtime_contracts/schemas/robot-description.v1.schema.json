@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:robotics-runtime-contracts:v1:robot-description",
+  "title": "Robotics robot description v1",
+  "description": "CAD-linked artifact manifest for a runnable URDF or SDF description. All paths are relative to the product root containing sim/ and ros/. Digests cover exact file bytes, not canonical JSON or XML.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "robot_id",
+    "source",
+    "package",
+    "description",
+    "meshes",
+    "mass_kg",
+    "center_of_mass_m",
+    "inertia_check",
+    "spawn"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "robot-description.v1"
+    },
+    "robot_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "package": {
+      "$ref": "#/$defs/package"
+    },
+    "description": {
+      "$ref": "#/$defs/description"
+    },
+    "meshes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/fileArtifact"
+      },
+      "description": "Mesh artifacts used by the description; empty for descriptions using only analytic geometry. Mesh coordinates are in metres."
+    },
+    "mass_kg": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "center_of_mass_m": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number"
+      },
+      "description": "Whole-robot centre of mass [x, y, z] in metres in the description root-link/model frame."
+    },
+    "inertia_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "not_checked"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "description": "Producer-reported inertia consistency check; schema validation does not establish physical correctness or readiness to spawn."
+    },
+    "spawn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame",
+        "pose"
+      ],
+      "properties": {
+        "frame": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*(?:/[A-Za-z][A-Za-z0-9_]*)*(?![\\s\\S])"
+        },
+        "pose": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "number"
+          },
+          "description": "[x, y, z, roll, pitch, yaw]; position in metres, fixed-axis RPY in radians, relative to frame."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fileArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(?!.*(?:^|/)\\.\\.?(?:/|$))[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*(?![\\s\\S])",
+          "description": "Portable product-root-relative file-system path, using forward slashes; no URI, absolute path, dot or parent segments."
+        },
+        "sha256": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256",
+          "maxLength": 64
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/fileArtifact/properties/path"
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri",
+          "description": "Absolute source artifact URI, not a file-system path; the SHA-256 binds the retrieved artifact bytes."
+        },
+        "sha256": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256",
+          "maxLength": 64
+        },
+        "revision": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/gitRevision"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "path"
+          ],
+          "not": {
+            "required": [
+              "uri"
+            ]
+          }
+        },
+        {
+          "required": [
+            "uri"
+          ],
+          "not": {
+            "required": [
+              "path"
+            ]
+          }
+        }
+      ]
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "path"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(?![\\s\\S])"
+        },
+        "path": {
+          "$ref": "#/$defs/fileArtifact/properties/path"
+        }
+      },
+      "description": "ROS description package name and product-root-relative directory containing package.xml."
+    },
+    "description": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "format": {
+          "enum": [
+            "urdf",
+            "sdf"
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/fileArtifact/properties/path"
+        },
+        "sha256": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256",
+          "maxLength": 64
+        }
+      },
+      "description": "Ready-to-load XML artifact; expand Xacro before hashing and recording the URDF."
+    }
+  }
+}

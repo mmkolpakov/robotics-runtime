@@ -3,6 +3,7 @@ dev = [
   "check-jsonschema==0.37.4",
   "coverage[toml]==7.15.0",
   "mypy==2.3.0",
+  "mcap>=1.4,<2",
   "pre-commit==4.6.0",
   "pytest==9.1.1",
   "ruff==0.15.21",
@@ -31,6 +32,8 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 python_version = "3.12"
 strict = true
 warn_unused_ignores = true
+# Upstream MCAP 1.4 leaves this zero-argument finalizer unannotated.
+untyped_calls_exclude = ["mcap.writer.Writer.finish"]
 
 [[tool.mypy.overrides]]
 module = ["junitparser.*", "opentelemetry.*"]
@@ -51,3 +54,9 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests/workspace"]
 addopts = ["--strict-config", "--strict-markers"]
+
+# MCAP 1.4's writer imports .__init__ for __version__, aliasing the package file.
+# Skip only that alias; keep the actual MCAP reader/writer API types checked.
+[[tool.mypy.overrides]]
+module = ["mcap.__init__"]
+follow_imports = "skip"

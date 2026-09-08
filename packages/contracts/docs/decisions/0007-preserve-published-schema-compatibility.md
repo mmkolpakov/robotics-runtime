@@ -26,10 +26,11 @@ under that name must be additive after resolving references in both versions:
   notes. A package minor release does not authorize reuse of an old name.
 
 Digest snapshots are a tripwire for accidental byte changes, not a compatibility
-proof. The planned structural comparison against the last released schemas
-(implementation item 25) is not implemented yet. Until that gate exists,
-published schema changes remain deferred. Once implemented, an intentional
-digest update requires a passing compatibility check, consumer tests and a
+proof. The [published compatibility gate](../schema-compatibility.md)
+(implementation item 25) compares actual released Git schemas and semantic
+regression fixtures. It accepts only the supported D10 additions and fails closed
+on unsupported or ambiguous cases. An intentional digest update requires a
+passing compatibility check, consumer tests and a
 changelog entry, or the new-major migration path for a breaking change.
 
 ## Consequences
@@ -37,5 +38,5 @@ changelog entry, or the new-major migration path for a breaking change.
 Released 0.15 and 0.16 artifacts remain unchanged. Historical readers must select
 the original package version as described in the migration guide. The catalog
 still gives consumers an explicit role-to-schema mapping. This decision changes
-the forward policy; it does not claim that cross-repository or structural
-compatibility gates already exist.
+the forward policy. Its bounded structural gate and semantic regression corpus
+do not prove general schema implication or exhaustive Python semantic compatibility.

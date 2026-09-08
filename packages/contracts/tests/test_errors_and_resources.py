@@ -16,10 +16,10 @@ from jsonschema.exceptions import ValidationError
 
 import robotics_runtime_contracts as contracts
 from robotics_runtime_contracts import ContractError, load_mapping
-from robotics_runtime_contracts._qualification import QualificationError
 from robotics_runtime_contracts._timestamps import parse_timestamp
 from robotics_runtime_contracts.cli import CLIArgumentError, main
 from robotics_runtime_contracts.document_ops import _resolve_property
+from robotics_runtime_contracts.qualification import QualificationError
 from tests.test_cli import FIXTURE
 from tests.test_extensions import SCHEMA_URI, extension_schema, scenario_with_extension
 

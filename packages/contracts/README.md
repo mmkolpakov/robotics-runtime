@@ -59,7 +59,9 @@ robotics-contracts scenario resolve base.yaml \
   --trace-output resolution-trace.json
 ```
 
-Validate a complete, digest-linked qualification set:
+Qualification subjects use the following naming pattern. Add the evidence index,
+retained raw artifacts, and other bindings required by the scenario to make the set
+complete; see [qualification validation](docs/qualification.md).
 
 ```bash
 robotics-contracts validate-qualification \
@@ -92,8 +94,10 @@ registry = schema_registry()
 ```
 
 Validation is offline, does not mutate inputs, and rejects non-finite numbers.
-It reports the first failure; structural and semantic document errors normally
-include a JSON path, while qualification-link and some input errors do not.
+Individual document validation reports its first failure; structural and semantic
+errors normally include a JSON path. The public `qualification` module accumulates
+independent document and link failures in `QualificationReport`, with explicit
+blocked checks when prerequisites are invalid. Link errors can have no JSON path.
 The package exports `worst_status()` for consumers to share status-folding
 rules; this does not mean every consumer already uses it.
 
@@ -107,16 +111,22 @@ machine-readable source of truth is
 | Area | Public roles |
 | --- | --- |
 | Execution | scenario, run, observation, result, aggregate, campaign |
-| Runtime | runtime manifest, model manifest, dataset manifest |
+| Runtime | runtime manifest, model manifest, dataset manifest, robot description |
 | Evidence | evidence index, recording summary, artifact receipt |
 | Qualification | profile, conformance result, bundle, policy |
-| Physical safety | execution permit and verification |
+| Physical safety | execution permit, verification, trust policy |
 | Cross-domain transport | channel, observation, clock relation, causal chain, qualification result |
 
 Every public document uses JSON Schema Draft 2020-12, declares a
 `schema_version` ending in `.v1`, rejects unknown root fields, and has an ID in
 the `urn:robotics-runtime-contracts:v1:*` namespace. Internal schema resources
 exist only to remove duplication and are not document roles.
+
+The working catalog adds `execution_trust_policy` and `robot_description` for
+the next release; these roles were not published in 0.16. See
+[product artifact roles](docs/product-artifact-roles.md) for their field and
+path conventions and [consumer examples](consumer-examples/README.md) for
+complete documents with real artifact byte digests.
 
 ## Extensions
 

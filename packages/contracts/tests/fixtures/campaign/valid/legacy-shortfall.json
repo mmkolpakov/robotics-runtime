@@ -1,0 +1,37 @@
+{
+  "schema_version": "campaign-summary.v1",
+  "campaign_id": "campaign-legacy-shortfall",
+  "scenario_id": "simulation-smoke",
+  "scenario_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "generated_at": "2026-08-17T12:00:00Z",
+  "runs": [
+    {
+      "run_id": "run-1",
+      "acceptance_run_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "aggregate_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "parameters": {},
+      "status": "passed"
+    },
+    {
+      "run_id": "run-2",
+      "acceptance_run_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "aggregate_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "parameters": {},
+      "status": "passed"
+    }
+  ],
+  "acceptance": {
+    "minimum_passed_runs": 3,
+    "maximum_failed_runs": 0,
+    "maximum_incomplete_runs": 0,
+    "maximum_error_runs": 0
+  },
+  "verdict": {
+    "status": "failed",
+    "total_runs": 2,
+    "passed_runs": 2,
+    "failed_runs": 0,
+    "incomplete_runs": 0,
+    "error_runs": 0
+  }
+}

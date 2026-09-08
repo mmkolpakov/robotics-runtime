@@ -24,3 +24,31 @@ files in `minimal-simulation/` are the actual digests of those files, and CI
 recomputes the complete acyclic chain. A successful result contains evaluated
 assertions and evidence; observation digests identify the corresponding item in
 both the result and the evidence index.
+
+## New product artifact examples
+
+`execution-trust-policy/trust-policy.json` matches the allowlist consumed by
+infrastructure's execution policy. Its target hash covers the exact bytes of
+`execution-trust-policy/target-identity.txt`, including the final LF. The identity
+is synthetic; this example is not a physical-execution permit or authorization.
+
+`robot-description/` is a portable product root with `cad/`, `ros/`, and `sim/`.
+`sim/robot-description.json` records a ready URDF and
+`sim/robot-description-sdf.json` records the alternative SDF for the same neutral
+1 kg, 0.1 m cube. Both bind actual CAD source and description file bytes; the
+URDF also binds its external mesh. The SDF uses analytic box geometry.
+The mesh is expressed in metres, while the OpenSCAD source is in millimetres.
+The ROS package contains static description assets, not a CAD exporter or launch
+integration. These example artifacts are authored to agree; no CAD tool was run
+as part of contract validation.
+
+From this directory, validate the examples with the existing CLI:
+
+```bash
+robotics-contracts validate execution-trust-policy/trust-policy.json \
+  robot-description/sim/robot-description.json \
+  robot-description/sim/robot-description-sdf.json
+```
+
+See [product artifact roles](../docs/product-artifact-roles.md) for locator rules,
+units, producer-reported checks, and the boundary with later consumer integration.

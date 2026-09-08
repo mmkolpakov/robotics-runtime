@@ -1,6 +1,5 @@
 {
   "packages/contracts/src/robotics_runtime_contracts/_qualification.py::_transport_sources::C901": 12,
-  "packages/contracts/src/robotics_runtime_contracts/_qualification.py::_validate_links::C901": 12,
   "packages/contracts/src/robotics_runtime_contracts/_qualification.py::_validate_model_and_dataset::C901": 12,
   "packages/contracts/src/robotics_runtime_contracts/_qualification.py::_validate_physical_authorization::C901": 16,
   "packages/contracts/src/robotics_runtime_contracts/_qualification.py::_validate_receipts::C901": 14,
