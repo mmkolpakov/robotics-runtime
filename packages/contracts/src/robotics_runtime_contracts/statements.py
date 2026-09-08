@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from robotics_runtime_contracts import validate_document
-from robotics_runtime_contracts._qualification import validate_qualification_artifacts
+from robotics_runtime_contracts.qualification import validate_qualification_artifacts
 from robotics_runtime_contracts.writers import protect_inputs, write_document
 
 
