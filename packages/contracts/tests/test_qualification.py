@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, cast
 
@@ -19,6 +20,7 @@ from robotics_runtime_contracts.qualification import (
     RAW_ARTIFACT_KINDS,
     QualificationArtifact,
     QualificationError,
+    inspect_qualification_documents,
     load_qualification_artifact,
     validate_qualification_artifacts,
     validate_qualification_documents,
@@ -79,6 +81,49 @@ _PLAYBACK = {
 @pytest.mark.parametrize("case", ["transport", "inference", "physical"])
 def test_schema_valid_qualification_fixture_is_complete(case: str) -> None:
     validate_qualification_artifacts(qualification_specifications(case))
+
+
+@pytest.mark.parametrize("case", ["transport", "inference", "physical"])
+def test_robot_description_binding_uses_retained_file_bytes(case: str, tmp_path: Path) -> None:
+    items = artifacts(case)
+    description_path = tmp_path / "robot-description.json"
+    source = Path(__file__).parent / "fixtures/robot-description/valid/urdf.json"
+    original = source.read_bytes()
+    description_path.write_bytes(original)
+    digest = sha256(original).hexdigest()
+    # Exercise the descriptor API for the pre-existing fixture graph; the new
+    # raw artifact always goes through the real file loader.
+    document(items, "scenario.json")["workload"] = {"robot_description_sha256": digest}
+    for item in items:
+        if item.kind == "runtime_manifest":
+            document(items, item.subject_name)["workload"]["robot_description"] = {"sha256": digest}
+    specification = f"other_evidence:robot-description.json={description_path}"
+    retained = load_qualification_artifact(specification)
+    assert retained.sha256 == digest
+    assert inspect_qualification_documents([*items, retained]).diagnostics == ()
+    report = inspect_qualification_documents(items)
+    assert [item.check for item in report.diagnostics] == ["robot.description"]
+    assert "robot description" in report.diagnostics[0].message
+    # Whitespace leaves the JSON document unchanged but changes its identity.
+    description_path.write_bytes(original + b"\n")
+    changed = load_qualification_artifact(specification)
+    assert changed.sha256 != digest
+    report = inspect_qualification_documents([*items, changed])
+    assert [item.check for item in report.diagnostics] == ["robot.description"]
+
+
+def test_qualification_rejects_wrong_scenario_robot_digest() -> None:
+    items = artifacts("transport")
+    document(items, "scenario.json")["workload"] = {"robot_description_sha256": "a" * 64}
+    for item in items:
+        if item.kind == "runtime_manifest":
+            document(items, item.subject_name)["workload"]["robot_description"] = {
+                "sha256": "b" * 64
+            }
+    report = inspect_qualification_documents(items)
+    assert len(report.diagnostics) == 1
+    assert report.diagnostics[0].error_id == "workload.robot_description_mismatch"
+    assert report.diagnostics[0].check == "robot.description"
 
 
 @pytest.mark.parametrize("case", ["transport", "inference", "physical"])

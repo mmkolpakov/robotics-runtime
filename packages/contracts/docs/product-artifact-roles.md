@@ -91,6 +91,25 @@ The `source`, `package`, and `inertia_check` subfields and pose representation
 above make SPEC §2.5's artifact interface concrete; there is no existing CAD
 robot-manifest producer being silently reinterpreted.
 
-Runtime/scenario workload bindings, robot-description digest fields in those
-existing roles, flight-controller enums, and infrastructure spawning are later
-integration steps. They are not introduced by this role addition.
+## Workload bindings
+
+An optional `workload.robot_description_sha256` in an acceptance scenario pins
+the exact retained `robot-description.json` bytes. Each runtime manifest must
+then report the same digest in `workload.robot_description.sha256`. Both `none`
+and `inference` workloads may carry this optional binding. Existing documents
+without it keep their behavior; a runtime may also report an unpinned description.
+
+`validate_robot_description_binding(scenario, runtime)` compares schema-validated
+documents and reports `workload.robot_description_mismatch` for a missing or
+different runtime digest. Consumers can call it before starting observation.
+Qualification additionally requires each reported description digest to resolve
+to a retained `other_evidence` artifact. Register it with
+`--artifact other_evidence:robot-description.json=PATH`. This preserves the
+published qualification statement's artifact-kind vocabulary. The file loader
+hashes the original bytes, so changing whitespace changes the binding too.
+
+The binding identifies the description manifest, not the URDF/SDF XML, CAD source,
+or a reserialized JSON value. Validate the `robot_description` role separately
+when admitting the manifest; the qualification raw-artifact boundary does not
+parse its contents. Referenced XML and mesh files still require the product
+admission checks above. Infrastructure spawning remains a later integration step.

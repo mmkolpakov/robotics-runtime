@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Bind optional scenario robot-description digests to runtime workload metadata
+  and the exact retained description artifact bytes during qualification. Keep
+  existing workload documents and qualification artifact kinds compatible.
+- Prove additive changes inside `oneOf` only when all object branches retain
+  a required, distinct string discriminator; ambiguous unions stay frozen.
+
 ## 0.17.0rc1 - Release candidate
 
 The first candidate from the shared `robotics-runtime` workspace. Its distribution

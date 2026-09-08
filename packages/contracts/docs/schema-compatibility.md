@@ -88,8 +88,13 @@ input role.
 
 An optional property is not automatically safe in an open object: an old object
 can already contain that key with a value rejected by the new property schema.
-`oneOf`, `not`, `if`, `contains` and other nonmonotone contexts freeze assertion
-changes. Changes at an annotation-dependent `unevaluatedProperties` or
+`not`, `if`, `contains` and other nonmonotone contexts freeze assertion changes.
+`oneOf` is also frozen unless every branch is an object requiring the same
+discriminator property with a distinct string `const`, before and after the
+change. This proves branches cannot overlap. Each branch must still pass the
+ordinary D10 comparison, which rejects changing the discriminator or adding a
+required property. Negative enclosing contexts remain frozen.
+Changes at an annotation-dependent `unevaluatedProperties` or
 `unevaluatedItems` node also require review. Even mathematically plausible
 widenings outside the explicit table are not guessed by this tool. The finite
 keyword domain and these conservative rules are intentional, not a general
