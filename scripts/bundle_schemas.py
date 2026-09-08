@@ -21,6 +21,7 @@ PACKAGE = ROOT / "packages/contracts"
 SOURCES = PACKAGE / "schemas/src"
 RESOURCES = PACKAGE / "src/robotics_runtime_contracts/schemas"
 SOURCE_PREFIX = "urn:robotics-runtime-contracts:build:"
+DIALECT = "https://json-schema.org/draft/2020-12/schema"
 Schema = dict[str, Any]
 
 
@@ -38,6 +39,8 @@ def read_schemas(directory: Path) -> dict[str, Schema]:
 
 
 def registry_for(schemas: dict[str, Schema]) -> Registry[Any]:
+    for schema in schemas.values():
+        check_dialect(schema)
     resources = [(value["$id"], Resource.from_contents(value)) for value in schemas.values()]
     if len({uri for uri, _ in resources}) != len(resources):
         raise ValueError("Duplicate schema $id")
@@ -45,19 +48,47 @@ def registry_for(schemas: dict[str, Schema]) -> Registry[Any]:
 
 
 def subschemas(schema: Schema) -> Iterator[Schema]:
-    """Visit schema locations using the dialect, never instance/example dictionaries."""
+    """Visit Draft 2020-12 schema locations without guessing nested dialects."""
     pending = [DRAFT202012.create_resource(schema)]
     while pending:
         resource = pending.pop()
         if isinstance(resource.contents, dict):
             yield resource.contents
-        pending.extend(resource.subresources())
+        pending.extend(
+            DRAFT202012.create_resource(child)
+            for child in DRAFT202012.subresources_of(resource.contents)
+        )
+
+
+def check_dialect(schema: Schema) -> None:
+    """Require the one supported root dialect; nested declarations are unsupported."""
+    if schema.get("$schema") != DIALECT:
+        raise ValueError(f"Schema must declare Draft 2020-12: {schema.get('$id')}")
+    for node in subschemas(schema):
+        if node is not schema and "$schema" in node:
+            raise ValueError(
+                f"Nested $schema is outside the core source format: {schema.get('$id')}"
+            )
+
+
+def schema_locations(registry: Registry[Any]) -> set[int]:
+    """Identify schema objects by location, never by equality with instance data."""
+    return {id(node) for resource in registry.values() for node in subschemas(resource.contents)}
+
+
+def check_target(target: Any, locations: set[int], reference: str) -> None:
+    """Reject objects outside the dialect's schema locations, including chained refs."""
+    Draft202012Validator.check_schema(target)
+    if isinstance(target, dict) and id(target) not in locations:
+        raise ValueError(f"Reference target is not a known schema location: {reference}")
 
 
 def check_references(schemas: dict[str, Schema]) -> None:
-    registry = registry_for(schemas)
-    for name, schema in schemas.items():
+    for schema in schemas.values():
         Draft202012Validator.check_schema(schema)
+    registry = registry_for(schemas)
+    locations = schema_locations(registry)
+    for name, schema in schemas.items():
         resolver = registry.resolver(schema["$id"])
         for node in subschemas(schema):
             # This assembler's sources use absolute resource IDs and static refs.
@@ -67,7 +98,8 @@ def check_references(schemas: dict[str, Schema]) -> None:
             if "$dynamicRef" in node or "$dynamicAnchor" in node:
                 raise ValueError(f"Dynamic references are outside the core source format: {name}")
             if "$ref" in node:
-                resolver.lookup(node["$ref"])
+                target = resolver.lookup(node["$ref"]).contents
+                check_target(target, locations, node["$ref"])
 
 
 def assemble(schema: Schema, registry: Registry[Any]) -> Schema:
@@ -78,6 +110,7 @@ def assemble(schema: Schema, registry: Registry[Any]) -> Schema:
     sibling constraints or accidentally changing JSON Schema evaluation scope.
     """
     result = deepcopy(schema)
+    locations = schema_locations(registry)
     for name, definition in result.get("$defs", {}).items():
         if not isinstance(definition, dict):
             raise ValueError(f"Core definitions must be schema objects: {name}")
@@ -86,6 +119,7 @@ def assemble(schema: Schema, registry: Registry[Any]) -> Schema:
             if set(definition) != {"$ref"}:
                 raise ValueError(f"Definition import must contain only $ref: {name}")
             resolved = registry.resolver(schema["$id"]).lookup(reference).contents
+            check_target(resolved, locations, reference)
             if not isinstance(resolved, dict):
                 raise ValueError(f"Definition import must resolve to a schema object: {name}")
             result["$defs"][name] = deepcopy(resolved)
