@@ -8,6 +8,7 @@ from pathlib import Path
 
 from robotics_runtime_contracts import load_mapping
 from robotics_runtime_contracts.recordings import recording_summary_from_mcap
+from robotics_runtime_contracts.statements import write_qualification_statement
 from robotics_runtime_contracts.writers import (
     add_evidence_artifact,
     create_evidence_index,
@@ -49,6 +50,19 @@ def add_writer_commands[ParserT: argparse.ArgumentParser](
     mcap.add_argument("--output", required=True, metavar="PATH")
     add_extensions(mcap)
     mcap.set_defaults(writer_operation="recording")
+
+    qualification = subparsers.add_parser(
+        "qualification", help="produce a validated qualification bundle"
+    )
+    statement = qualification.add_subparsers(dest="operation", required=True).add_parser(
+        "statement"
+    )
+    statement.add_argument(
+        "--artifact", action="append", required=True, metavar="KIND:SUBJECT=PATH"
+    )
+    statement.add_argument("--output", required=True, metavar="PATH")
+    add_extensions(statement)
+    statement.set_defaults(writer_operation="qualification_statement")
 
 
 def _add_evidence_operations[ParserT: argparse.ArgumentParser](
@@ -108,6 +122,17 @@ def _recording(arguments: argparse.Namespace, _extensions: Mapping[str, bytes]) 
     return write_document(recording_summary_from_mcap(arguments.source), arguments.output)
 
 
+def _qualification_statement(
+    arguments: argparse.Namespace, extensions: Mapping[str, bytes]
+) -> Path:
+    protect_inputs(
+        arguments.output, [item.partition("=")[2] for item in arguments.extension_schema]
+    )
+    return write_qualification_statement(
+        arguments.artifact, arguments.output, extension_schemas=extensions
+    )
+
+
 def run_writer(arguments: argparse.Namespace, extensions: Mapping[str, bytes]) -> Path:
     operations = {
         "runtime": _runtime,
@@ -115,5 +140,6 @@ def run_writer(arguments: argparse.Namespace, extensions: Mapping[str, bytes]) -
         "evidence_add": _evidence_add,
         "evidence_finalize": _evidence_finalize,
         "recording": _recording,
+        "qualification_statement": _qualification_statement,
     }
     return operations[arguments.writer_operation](arguments, extensions)
