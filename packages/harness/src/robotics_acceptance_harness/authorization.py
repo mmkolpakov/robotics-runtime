@@ -24,7 +24,7 @@ def _equal(
 
 
 def _timestamp(value: Any) -> datetime:
-    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    return datetime.fromisoformat(str(value))
 
 
 def evaluate_physical_authorization(
