@@ -8,7 +8,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import SchemaError, best_match
 from referencing import Registry
 from referencing.exceptions import Unresolvable
-from referencing.jsonschema import DRAFT202012
+from referencing.jsonschema import DRAFT202012, SchemaRegistry
 
 from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.semantics import SemanticValidationError
@@ -82,6 +82,33 @@ def _reject_external_references(schema_name: str, schema: object, path: str = "$
                     child,
                     f"{path}.{keyword}.{name}",
                 )
+
+
+def _validate_reference_targets(
+    schema_name: str,
+    schema: Mapping[str, Any],
+    registry: SchemaRegistry,
+    declaration_path: str,
+) -> None:
+    resource = DRAFT202012.create_resource(dict(schema))
+    pending = [(resource, registry.resolver_with_root(resource))]
+    while pending:
+        current, resolver = pending.pop()
+        contents = current.contents
+        if isinstance(contents, Mapping):
+            for keyword in ("$ref", "$dynamicRef"):
+                reference = contents.get(keyword)
+                if isinstance(reference, str):
+                    try:
+                        resolved = resolver.lookup(reference)
+                        Draft202012Validator.check_schema(resolved.contents)
+                    except (Unresolvable, ValueError, SchemaError) as error:
+                        _fail(
+                            schema_name,
+                            declaration_path,
+                            f"schema reference cannot be evaluated: {error}",
+                        )
+        pending.extend((child, resolver.in_subresource(child)) for child in current.subresources())
 
 
 def validate_extensions(
@@ -182,6 +209,13 @@ def validate_extensions(
                 f"$.extension_schemas[{index}]",
                 f"schema reference cannot be evaluated: {error}",
             )
+        except (AttributeError, TypeError, ValueError):
+            # Normalize malformed targets only after reference evaluation fails.
+            # Unused references retain their previous behavior; unrelated faults propagate.
+            _validate_reference_targets(
+                schema_name, extension_schema, registry, f"$.extension_schemas[{index}]"
+            )
+            raise
         if validation_error is not None:
             suffix = validation_error.json_path.removeprefix("$")
             _fail(

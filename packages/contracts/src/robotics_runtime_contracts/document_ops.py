@@ -7,6 +7,8 @@ from secrets import token_hex
 from typing import Any
 from uuid import uuid4
 
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
 from referencing.exceptions import Unresolvable
 from referencing.jsonschema import DRAFT202012
 
@@ -42,7 +44,8 @@ def _resolve_property(
         visited.add(id(resolved))
         try:
             lookup = resolver.lookup(reference)
-        except Unresolvable as error:
+            Draft202012Validator.check_schema(lookup.contents)
+        except (Unresolvable, ValueError, SchemaError) as error:
             raise ContractError(
                 f"unresolvable schema reference: {reference}", error_id="schema.reference_invalid"
             ) from error
