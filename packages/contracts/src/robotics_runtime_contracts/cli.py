@@ -32,6 +32,7 @@ from robotics_runtime_contracts.serialization import (
     read_document_bytes,
     read_document_stream,
 )
+from robotics_runtime_contracts.statements import validate_qualification_statement
 from robotics_runtime_contracts.writers import protect_inputs
 
 
@@ -86,6 +87,11 @@ def _parser() -> argparse.ArgumentParser:
     _add_extension_schemas(qualification)
     qualification.add_argument("--quiet", action="store_true")
     qualification.add_argument("--output", metavar="PATH")
+    qualification.add_argument(
+        "--statement",
+        metavar="PATH",
+        help="also match a decoded qualification statement; does not verify signatures",
+    )
 
     describe = subparsers.add_parser("describe", help="describe a published schema")
     describe.add_argument("schema")
@@ -340,6 +346,24 @@ def _validate_documents(arguments: argparse.Namespace) -> list[tuple[str, str]]:
     return documents
 
 
+def _validate_qualification(arguments: argparse.Namespace) -> None:
+    extensions = _read_extension_schemas(arguments.extension_schema)
+    if arguments.statement:
+        result = validate_qualification_statement(
+            arguments.statement, arguments.artifact, extension_schemas=extensions
+        )
+    else:
+        result = validate_qualification_artifacts(arguments.artifact, extensions)
+    if arguments.output:
+        inputs = [
+            item.partition("=")[2] for item in (*arguments.artifact, *arguments.extension_schema)
+        ]
+        if arguments.statement:
+            inputs.append(arguments.statement)
+        protect_inputs(arguments.output, inputs)
+        _write_document(arguments.output, result)
+
+
 def _run(arguments: argparse.Namespace) -> int:
     if hasattr(arguments, "writer_operation"):
         output = run_writer(arguments, _read_extension_schemas(arguments.extension_schema))
@@ -351,22 +375,7 @@ def _run(arguments: argparse.Namespace) -> int:
     if arguments.command == "validate":
         documents = _validate_documents(arguments)
     elif arguments.command == "validate-qualification":
-        result = validate_qualification_artifacts(
-            arguments.artifact,
-            _read_extension_schemas(arguments.extension_schema),
-        )
-        if arguments.output:
-            protect_inputs(
-                arguments.output,
-                [
-                    item.partition("=")[2]
-                    for item in (
-                        *arguments.artifact,
-                        *arguments.extension_schema,
-                    )
-                ],
-            )
-            _write_document(arguments.output, result)
+        _validate_qualification(arguments)
     elif arguments.command == "describe":
         print(
             json.dumps(

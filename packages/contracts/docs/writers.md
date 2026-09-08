@@ -165,3 +165,19 @@ claim. It does not sign, upload or grant execution authorization. Invalid links,
 missing/duplicate subjects, changed file bytes and output/input aliases fail
 before output replacement. Tests generate statements for the complete transport,
 inference and physical fixtures and validate the existing public statement schema.
+
+After an external verifier authenticates the DSSE payload, use
+`robotics-contracts validate-qualification --statement decoded-statement.json`
+with the same `--artifact` and `--extension-schema` arguments. The public API is
+`validate_qualification_statement(statement_path, specifications, extension_schemas=...)`.
+It returns the validated artifact metadata, including hashes of the original
+subject bytes. The CLI can write that metadata with `--output` and refuses to
+replace the statement, artifacts, or extension schemas.
+
+Matching uses the same deterministic JSON profile as the writer: whitespace and
+object-key order do not matter, while subject and classification arrays must use
+the writer's sorted order. Mismatches report `qualification.statement_mismatch`.
+The original statement and subjects remain untouched. This checks content and
+cross-document links only; it does not authenticate a signature, identity, trust
+root, transparency log, or receipt. The verifier must pass the same payload bytes
+it authenticated, rather than rereading a mutable external bundle afterwards.
