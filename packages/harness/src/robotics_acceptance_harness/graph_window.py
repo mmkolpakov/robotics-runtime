@@ -61,8 +61,7 @@ class ExpectedGraphMonitor:
         if not issues:
             return ()
         detail = "; ".join(
-            _issue_detail(issue, observed_at_ns)
-            for issue, observed_at_ns in issues.items()
+            _issue_detail(issue, observed_at_ns) for issue, observed_at_ns in issues.items()
         )
         return (
             AssertionEvaluation(

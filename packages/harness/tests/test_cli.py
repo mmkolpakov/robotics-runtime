@@ -420,7 +420,7 @@ def test_timing_check_exposes_policy_result(
                     "media_type": "application/x-ndjson",
                     "sha256": "a" * 64,
                 }
-            }
+            },
         ),
     )
     monkeypatch.setattr(
