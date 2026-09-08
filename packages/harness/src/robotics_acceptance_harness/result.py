@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from tempfile import mkstemp
@@ -150,6 +151,18 @@ def _hardware_clock_result(
     }
 
 
+def _append_time_evidence(
+    assertions: Sequence[AssertionEvaluation], evaluation: AssertionEvaluation
+) -> tuple[AssertionEvaluation, ...]:
+    existing = {assertion.assertion_id for assertion in assertions}
+    identifier = evaluation.assertion_id
+    suffix = 2
+    while identifier in existing:
+        identifier = f"{evaluation.assertion_id}-{suffix}"
+        suffix += 1
+    return (*assertions, replace(evaluation, assertion_id=identifier))
+
+
 def build_acceptance_result(
     *,
     result_id: str,
@@ -188,13 +201,17 @@ def build_acceptance_result(
         raise ValueError("simulation acceptance result does not accept hardware timing")
 
     effective_unevaluated = set(unevaluated)
+    if not assertions:
+        effective_unevaluated.add("$.assertions")
+    if time_authority.evaluation is not None:
+        assertions = _append_time_evidence(assertions, time_authority.evaluation)
+        if time_authority.evaluation.status in {"skipped", "error"}:
+            effective_unevaluated.add("$.time_authority_observation")
     effective_unevaluated.update(
         f"$.assertions.{evaluation.assertion_id}"
         for evaluation in assertions
         if evaluation.status == "skipped"
     )
-    if not assertions:
-        effective_unevaluated.add("$.assertions")
     if physical:
         effective_unevaluated.update(
             ("$.clock_observation.real_time_factor", "$.clock_observation.deadline_miss_ratio")

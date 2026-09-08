@@ -166,6 +166,30 @@ revision, media type, size, and SHA-256. The harness needs no storage
 credentials. Upload, signing, and retention lifecycle remain infrastructure
 responsibilities. OTLP file-exporter streams use `application/x-ndjson`.
 
+## Histogram windows
+
+Explicit-bucket histogram counts and recorded sums are aggregated over their
+actual contribution intervals. Cumulative evidence needs a baseline at the
+window boundary. An earlier baseline is usable only when an unchanged point
+after the boundary proves that the intervening interval contained no events.
+Otherwise event timestamps cannot be recovered and the window is unevaluated.
+A changed start timestamp delimits a reset; a decreasing count without a new
+start timestamp leaves the reset boundary unknown.
+
+After baseline subtraction, lifetime minima and maxima are discarded unless
+the baseline was empty. Quantiles use the inverse empirical CDF (integer rank
+`ceil(p * count)`) and report conservative bucket intervals. A threshold passes
+or fails only when the entire interval proves that outcome. A straddling or
+unbounded interval produces a skipped assertion and an incomplete result.
+Delta histograms can also lack recorded extrema; the same bound rules apply.
+
+Time-authority results keep the measured event count when only latency bounds
+are uncertain. Their required numeric fields contain finite bound endpoints;
+the `time-authority-evidence` assertion records the full intervals and outcome.
+Missing statistics use explicit unevaluated markers and diagnostic placeholders,
+never proof of a measured zero or a threshold breach. JUnit preserves these
+skipped outcomes. Artifact digests and existing result schema fields are unchanged.
+
 ## Contract Inputs
 
 | Input | Contract role |
