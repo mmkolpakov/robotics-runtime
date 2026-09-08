@@ -1,6 +1,6 @@
 [project]
 name = "robotics-runtime-contracts"
-version = "0.16.0"
+version = "0.17.0rc1"
 description = "Canonical acceptance and evidence contracts for robotics runtimes."
 requires-python = ">=3.12,<3.15"
 readme = "README.md"
@@ -27,9 +27,9 @@ robotics-contracts = "robotics_runtime_contracts.cli:main"
 mcap = ["mcap>=1.4,<2"]
 
 [project.urls]
-Homepage = "https://github.com/mmkolpakov/robotics-runtime-contracts"
-Repository = "https://github.com/mmkolpakov/robotics-runtime-contracts"
-Issues = "https://github.com/mmkolpakov/robotics-runtime-contracts/issues"
+Homepage = "https://github.com/mmkolpakov/robotics-runtime/tree/main/packages/contracts"
+Repository = "https://github.com/mmkolpakov/robotics-runtime"
+Issues = "https://github.com/mmkolpakov/robotics-runtime/issues"
 
 [build-system]
 requires = ["hatchling==1.29.0"]

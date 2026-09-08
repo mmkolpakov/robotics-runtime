@@ -9,12 +9,13 @@ Tag pushes must resolve to the checked-out commit and be reachable from `origin/
 
 ## Current readiness and dry runs
 
-At the workspace import, contracts is **0.16.0** and harness is **0.18.0**.
-A dry run of `contracts-v0.16.0` exercises the actual current metadata without changing
-it. This is a build candidate, not permission to republish an existing PyPI version.
-The planned `contracts-v0.17.0-rc.1` dry run remains blocked until an explicitly reviewed
-version change sets `0.17.0rc1` (SPEC 26). Harness `0.19.0` needs the corresponding
-version and dependency changes (SPEC 37). This workflow never synthesizes those versions.
+The current candidate is **contracts 0.17.0rc1**. Dispatch
+`contracts-v0.17.0-rc.1` on its reviewed branch to build and install both archives
+without publishing. A successful candidate run does not establish PyPI publisher
+registration or a stable release. Harness remains **0.18.0** during development;
+its temporary workspace bound admits this contracts candidate. Before the stable
+contracts release, replace that bound with `>=0.17,<0.18`. Harness `0.19.0` also
+requires its own version, changelog and completed contracts release (SPEC 37).
 
 `workflow_dispatch` requires a `candidate` input and always runs in dry-run mode.
 Select the ref containing the reviewed source and matching version. It executes helper
@@ -32,7 +33,7 @@ uv sync --locked --only-group dev --no-install-workspace --python 3.12
 PY="$UV_PROJECT_ENVIRONMENT/bin/python"
 "$PY" -m pytest tests/release
 "$PY" -m scripts.release.plan \
-  --candidate contracts-v0.16.0 --event workflow_dispatch \
+  --candidate contracts-v0.17.0-rc.1 --event workflow_dispatch \
   --repository mmkolpakov/robotics-runtime --output artifacts/release/plan.json
 uv build --package robotics-runtime-contracts --no-sources --out-dir artifacts/release/dist
 "$PY" -m scripts.release.verify_install \
@@ -92,7 +93,8 @@ version explicitly. `uv pip check` verifies dependency compatibility.
 
 Smoke runs use the clean interpreter with `-I`, without `PYTHONPATH` or editable packages.
 They check installed file inventories and digests, schema resource loading, API validation
-of the copied consumer example, and `robotics-contracts validate`. Harness additionally
+of the copied consumer example, runtime writer round-trip, structured qualification
+diagnostics, the new role resources, and `robotics-contracts validate`. Harness additionally
 checks its existing `EvaluationContext`/`ProductEvaluator` exports and
 `robotics-acceptance explain`. Contracts has no `--version` option; no harness SDK is assumed
 before SPEC 56 introduces one. A temporary directory configured inside the workspace fails.

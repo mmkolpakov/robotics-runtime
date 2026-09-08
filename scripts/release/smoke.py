@@ -74,6 +74,20 @@ def main() -> None:
     assert documents
     for path in documents:
         contracts.validate_document(contracts.load_mapping(path))
+    writers = import_module("robotics_runtime_contracts.writers")
+    qualification = import_module("robotics_runtime_contracts.qualification")
+    runtime = writers.create_runtime_manifest(
+        contracts.load_mapping(examples / "runtime-manifest.yaml")
+    )
+    output = writers.write_document(runtime, Path("generated-runtime.json"))
+    assert contracts.load_mapping(output) == runtime
+    assert contracts.file_sha256(output) == sha256(output.read_bytes()).hexdigest()
+    report = qualification.inspect_qualification_artifacts(
+        [f"scenario:scenario.json={examples / 'scenario.yaml'}"]
+    )
+    assert not report.valid and report.diagnostics and report.blocked_checks
+    for role in ("execution_trust_policy", "robot_description"):
+        assert contracts.load_schema(contracts.schema_for_role(role))["$id"]
     scripts = Path(sysconfig.get_path("scripts"))
     suffix = ".exe" if sys.platform == "win32" else ""
     subprocess.run(
