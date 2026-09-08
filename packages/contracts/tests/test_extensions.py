@@ -92,7 +92,7 @@ def test_extension_payload_must_satisfy_its_schema() -> None:
     scenario["extensions"]["org.example.sorting"] = {"item_id": ""}
     with pytest.raises(ExtensionValidationError) as caught:
         validate_document(scenario, extension_schemas={SCHEMA_URI: extension_schema()})
-    assert caught.value.json_path == "$.extensions.org.example.sorting.item_id"
+    assert caught.value.json_path == '$.extensions["org.example.sorting"].item_id'
 
 
 def test_external_references_are_rejected_without_network_access() -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from hashlib import sha256
 from typing import Any, NoReturn
@@ -220,7 +221,7 @@ def validate_extensions(
             suffix = validation_error.json_path.removeprefix("$")
             _fail(
                 schema_name,
-                f"$.extensions.{namespace}{suffix}",
+                f"$.extensions[{json.dumps(namespace, ensure_ascii=False)}]{suffix}",
                 validation_error.message,
             )
 
