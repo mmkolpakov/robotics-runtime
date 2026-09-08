@@ -20,7 +20,8 @@ def create_qualification_statement(
 
     The artifact validator owns parsing, cross-document validation and hashing.
     Its metadata is used directly: no input is reserialized or rehashed here.
-    Timestamp/run identity come from the validated run, not writer defaults.
+    The timestamp comes from the validated aggregate; run identity comes from
+    the validated run. Neither value is a writer default.
     """
     metadata = validate_qualification_artifacts(specifications, extension_schemas)
     artifacts = metadata["artifacts"]
