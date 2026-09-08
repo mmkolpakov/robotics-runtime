@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -11,6 +12,7 @@ from zipfile import ZipFile
 
 import pytest
 from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError
 
 import robotics_runtime_contracts as contracts
 from robotics_runtime_contracts import ContractError, load_mapping
@@ -123,13 +125,25 @@ def test_schema_validation_selects_the_relevant_anyof_child(
     assert "integer" in caught.value.validation_message
 
 
-@pytest.mark.parametrize("reference", ["#/$defs/missing", "#missing-anchor", "#"])
+@pytest.mark.parametrize(
+    "reference",
+    [
+        "#/$defs/missing",
+        "#missing-anchor",
+        "#",
+        "#/allOf/nope",
+        "#/type",
+        "#/required",
+        "#/properties/item_id/minLength",
+    ],
+)
 def test_extension_reference_failures_are_contract_errors(
     reference: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     scenario = scenario_with_extension()
     schema = json.loads(extension_schema())
-    schema["properties"]["item_id"] = {"$ref": reference}
+    schema["allOf"] = [{}]
+    schema["properties"]["item_id"]["$ref"] = reference
     if reference == "#":
         schema["$ref"] = "#"
     raw = json.dumps(schema).encode()
@@ -177,11 +191,50 @@ def test_property_lookup_understands_anchors_escaped_pointers_and_scoped_ids() -
     assert _resolve_property({"$ref": "child"}, current_schema=schema)["type"] == "string"
 
 
+def test_unused_extension_reference_keeps_existing_validation_behavior() -> None:
+    scenario = scenario_with_extension()
+    schema = json.loads(extension_schema())
+    schema["$defs"] = {"unused": {"$ref": "#/type"}}
+    raw = json.dumps(schema).encode()
+    declarations: Any = scenario["extension_schemas"]
+    declarations[0]["sha256"] = sha256(raw).hexdigest()
+    contracts.validate_document(scenario, extension_schemas={SCHEMA_URI: raw})
+
+
+def test_unrelated_validator_fault_is_not_reclassified(monkeypatch: pytest.MonkeyPatch) -> None:
+    original = Draft202012Validator.iter_errors
+
+    def fail_on_payload(validator: Any, instance: Any) -> Iterator[ValidationError]:
+        if validator.schema.get("$id") == SCHEMA_URI:
+            raise TypeError("unexpected validator implementation failure")
+        yield from original(validator, instance)
+
+    monkeypatch.setattr(Draft202012Validator, "iter_errors", fail_on_payload)
+    with pytest.raises(TypeError, match="unexpected validator implementation failure"):
+        contracts.validate_document(
+            scenario_with_extension(), extension_schemas={SCHEMA_URI: extension_schema()}
+        )
+
+
 @pytest.mark.parametrize("reference", ["#absent", "#/$defs/absent", "#"])
 def test_property_lookup_reports_missing_or_cyclic_references(reference: str) -> None:
     schema = {"$id": "https://example.org/root", "$ref": reference}
     with pytest.raises(ContractError) as caught:
         _resolve_property(schema, current_schema=schema)
+    assert caught.value.error_id == "schema.reference_invalid"
+
+
+@pytest.mark.parametrize("reference", ["#/allOf/nope", "#/type", "#/required", "#/const"])
+def test_property_lookup_rejects_invalid_pointer_targets(reference: str) -> None:
+    schema = {
+        "$id": "https://example.org/root",
+        "allOf": [{}],
+        "type": "object",
+        "required": ["value"],
+        "const": {"type": 7},
+    }
+    with pytest.raises(ContractError) as caught:
+        _resolve_property({"$ref": reference}, current_schema=schema)
     assert caught.value.error_id == "schema.reference_invalid"
 
 
