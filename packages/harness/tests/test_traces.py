@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -404,6 +405,52 @@ def test_causal_chain_requires_forward_reachability_between_channels() -> None:
     assert valid.status == "passed"
     assert reversed_edge.status == "failed"
     assert [violation.code for violation in reversed_edge.violations] == ["relationship_mismatch"]
+
+
+@pytest.mark.parametrize("channel_index", [0, 1])
+@pytest.mark.parametrize("violation", ["relationship_mismatch", "temporal_order_mismatch"])
+def test_valid_message_cannot_hide_another_broken_causal_pair(
+    channel_index: int, violation: str
+) -> None:
+    chain, channels = _causal_contracts()
+    spans = _causal_spans(reverse_middle_edge=False)
+    channel = channels[channel_index]
+    source = channel["source"]["domain_id"]
+    destination = channel["destination"]["domain_id"]
+    producer = next(
+        item for item in spans[source] if item.name == channel["trace"]["producer_span_name"]
+    )
+    consumer = next(
+        item for item in spans[destination] if item.name == channel["trace"]["consumer_span_name"]
+    )
+    extra_producer = replace(
+        producer, span_id="a" * 16, message_id="additional-message", parent_span_id=""
+    )
+    extra_consumer = replace(
+        consumer,
+        span_id="b" * 16,
+        message_id="additional-message",
+        parent_span_id=extra_producer.span_id if channel_index == 1 else "",
+        links=(TraceLink(extra_producer.trace_id, extra_producer.span_id, "additional-message"),)
+        if channel_index == 0
+        else (),
+    )
+    if violation == "relationship_mismatch":
+        extra_consumer = replace(extra_consumer, parent_span_id="", links=())
+    else:
+        extra_consumer = replace(
+            extra_consumer,
+            start_time_unix_nano=extra_producer.start_time_unix_nano - 1,
+        )
+    spans[source].append(extra_producer)
+    spans[destination].append(extra_consumer)
+
+    evaluation = evaluate_causal_chain(chain, channels, spans)
+
+    assert evaluation.status == "failed"
+    assert [(item.code, item.channel_id) for item in evaluation.violations] == [
+        (violation, channel["channel_id"])
+    ]
 
 
 def test_causal_chain_rejects_consumer_before_producer() -> None:
