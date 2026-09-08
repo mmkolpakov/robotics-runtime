@@ -267,22 +267,31 @@ def test_ros_observer_reports_graph_clock_and_lifecycle_without_writing() -> Non
         observer.snapshot()
 
 
-def test_ros_observer_bounds_unique_clock_samples() -> None:
+@pytest.mark.parametrize("source_seconds", [(1, 1, 1, 1), (1, 2, 3, 4)])
+def test_ros_observer_bounds_all_clock_samples(source_seconds: tuple[int, ...]) -> None:
     node = FakeNode()
     observer = RosGraphObserver(
         expected_graph(),
         observe_clock=True,
         module_loader=fake_modules(node).__getitem__,
-        max_clock_samples=1,
+        max_clock_samples=2,
     )
 
     assert node.executor_started.wait(timeout=1.0)
     observer.start_clock_observation()
-    node.callbacks["/clock"](SimpleNamespace(clock=SimpleNamespace(sec=1, nanosec=0)))
-    node.callbacks["/clock"](SimpleNamespace(clock=SimpleNamespace(sec=1, nanosec=0)))
-    node.callbacks["/clock"](SimpleNamespace(clock=SimpleNamespace(sec=2, nanosec=0)))
+    for source in source_seconds:
+        node.callbacks["/clock"](SimpleNamespace(clock=SimpleNamespace(sec=source, nanosec=0)))
+    assert len(observer.clock_samples) == 2
     with pytest.raises(RosObserverError, match="exceeded the configured limit"):
         observer.stop_clock_observation()
+    observer.start_clock_observation()
+    for _ in range(2):
+        node.callbacks["/clock"](SimpleNamespace(clock=SimpleNamespace(sec=5, nanosec=0)))
+    assert [sample.source_time_ns for sample in observer.stop_clock_observation()] == [
+        5_000_000_000,
+        5_000_000_000,
+    ]
+    assert RosGraphObserver.DEFAULT_MAX_CLOCK_SAMPLES == 1_000_000
     observer.close()
 
 

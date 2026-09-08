@@ -131,7 +131,7 @@ class RosGraphObserver:
         if overflow:
             raise RosObserverError(
                 "clock observation exceeded the configured limit of "
-                f"{self._max_clock_samples} unique samples"
+                f"{self._max_clock_samples} clock samples"
             )
         return samples
 
@@ -173,10 +173,9 @@ class RosGraphObserver:
         source_time_ns = int(message.clock.sec) * 1_000_000_000 + int(message.clock.nanosec)
         with self._observation_lock:
             self._first_messages.setdefault("/clock", observed_at_ns)
-            changed = (
-                not self._clock_samples or self._clock_samples[-1].source_time_ns != source_time_ns
-            )
-            if self._record_clock and changed:
+            # Repeated source times are evidence of a pause, including before
+            # catch-up and at the measurement tail. Never silently discard them.
+            if self._record_clock:
                 if len(self._clock_samples) >= self._max_clock_samples:
                     self._clock_sample_overflow = True
                     return

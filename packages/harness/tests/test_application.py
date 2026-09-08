@@ -299,7 +299,8 @@ def _write_metrics(
 def _simulation_bundle(tmp_path: Path) -> DocumentBundle:
     scenario = yaml.safe_load((FIXTURES / "scenario.yaml").read_text(encoding="utf-8"))
     scenario["timeouts"]["stable_for_sec"] = 0
-    scenario["timeouts"]["execution_sec"] = 0.2
+    # Match the one-second wall-clock evidence window used by these fixtures.
+    scenario["timeouts"]["execution_sec"] = 1
     scenario_path = tmp_path / "scenario.yaml"
     scenario_path.write_text(yaml.safe_dump(scenario, sort_keys=False), encoding="utf-8")
     return load_bundle(scenario_path, runtime_path=FIXTURES / "runtime.yaml")

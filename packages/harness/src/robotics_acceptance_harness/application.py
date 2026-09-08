@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from math import isfinite
 from pathlib import Path
 from time import monotonic_ns, sleep, time_ns
 from typing import Any, Protocol, cast
@@ -47,6 +48,7 @@ from robotics_acceptance_harness.ros import RosGraphObserver
 from robotics_acceptance_harness.run_context import load_run_context
 from robotics_acceptance_harness.time_authority import evaluate_time_authority
 from robotics_acceptance_harness.timing import (
+    ClockMeasurementWindow,
     ClockSample,
     TimingObservation,
     TimingValidationError,
@@ -117,14 +119,16 @@ def explain_bundle(bundle: DocumentBundle) -> dict[str, Any]:
     }
 
 
-def _maximum_gauge(samples: Sequence[MetricPoint], name: str) -> float | None:
+def _maximum_deadline_ratio(samples: Sequence[MetricPoint]) -> float | None:
     matches = [
         sample.value
         for sample in samples
         if isinstance(sample, MetricSample)
         and sample.instrument_kind == "gauge"
-        and sample.name == name
+        and sample.name == "robotics.simulation.deadline_miss_ratio"
     ]
+    if any(not isfinite(value) or not 0 <= value <= 1 for value in matches):
+        raise VerificationError("all deadline gauges must be finite ratios in [0, 1]")
     return max(matches, default=None)
 
 
@@ -155,20 +159,20 @@ def _enrich_clock_samples(
     samples: Sequence[ClockSample],
     metrics: Sequence[MetricPoint],
 ) -> tuple[ClockSample, ...]:
-    if mode != "simulation_realtime" or len(samples) < 2:
+    if mode != "simulation_realtime":
         return tuple(samples)
 
+    deadline_ratio = _maximum_deadline_ratio(metrics)
     ratios: list[float] = []
     for previous, current in zip(samples, samples[1:], strict=False):
         wall_delta = current.observed_at_ns - previous.observed_at_ns
         source_delta = current.source_time_ns - previous.source_time_ns
         ratios.append(source_delta / wall_delta if wall_delta > 0 else 0.0)
-    deadline_ratio = _maximum_gauge(metrics, "robotics.simulation.deadline_miss_ratio")
     return tuple(
         ClockSample(
             observed_at_ns=sample.observed_at_ns,
             source_time_ns=sample.source_time_ns,
-            real_time_factor=ratios[min(index, len(ratios) - 1)],
+            real_time_factor=ratios[min(index, len(ratios) - 1)] if ratios else None,
             deadline_miss_ratio=deadline_ratio,
         )
         for index, sample in enumerate(samples)
@@ -380,7 +384,14 @@ def run_verification(
             metric_samples,
         )
         try:
-            timing = evaluate_timing(execution, scenario["time_policy"], clock_samples)
+            timing = evaluate_timing(
+                execution,
+                scenario["time_policy"],
+                clock_samples,
+                measurement_window=ClockMeasurementWindow(
+                    measurement_started_monotonic_ns, measurement_finished_monotonic_ns
+                ),
+            )
         except TimingValidationError as error:
             timing = error.observation
             timing_failure = AssertionEvaluation(

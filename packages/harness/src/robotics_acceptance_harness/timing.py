@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bisect import bisect_left, bisect_right
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -40,6 +41,26 @@ class ClockSample:
 
 
 @dataclass(frozen=True, slots=True)
+class ClockMeasurementWindow:
+    """Monotonic measurement bounds and an explicit callback coverage allowance.
+
+    The 250 ms default applies to each boundary and every adjacent callback gap.
+    It is an evidence-availability allowance, never permission to extrapolate
+    source-clock progress or lower the configured minimum RTF.
+    """
+
+    start_ns: int
+    end_ns: int
+    max_sample_gap_ns: int = 250_000_000
+
+    def __post_init__(self) -> None:
+        if self.start_ns < 0 or self.end_ns <= self.start_ns:
+            raise ValueError("clock measurement requires increasing nonnegative bounds")
+        if self.max_sample_gap_ns <= 0:
+            raise ValueError("clock sample gap allowance must be positive")
+
+
+@dataclass(frozen=True, slots=True)
 class TimingObservation:
     monotonic: bool
     offset_ms: float
@@ -63,17 +84,92 @@ def _required_values(
     return [float(value) for value in values if value is not None]
 
 
+def _clock_coverage(
+    samples: Sequence[ClockSample], window: ClockMeasurementWindow, issues: list[ReadinessIssue]
+) -> bool:
+    first, last = samples[0].observed_at_ns, samples[-1].observed_at_ns
+    if first < window.start_ns or last > window.end_ns:
+        issues.append(
+            ReadinessIssue("$.time_policy", "clock samples fall outside measurement bounds")
+        )
+        return False
+    maximum = max(
+        first - window.start_ns,
+        window.end_ns - last,
+        max(
+            (
+                b.observed_at_ns - a.observed_at_ns
+                for a, b in zip(samples, samples[1:], strict=False)
+            ),
+            default=0,
+        ),
+    )
+    if maximum > window.max_sample_gap_ns:
+        issues.append(
+            ReadinessIssue(
+                "$.time_policy.min_realtime_factor",
+                f"clock coverage gap {maximum} ns exceeds allowance {window.max_sample_gap_ns} ns",
+            )
+        )
+        return False
+    return True
+
+
+def _interval_realtime_factor(samples: Sequence[ClockSample], start_ns: int, end_ns: int) -> float:
+    """Lower bound from recorded endpoints at or inside the requested interval."""
+    first = bisect_left(samples, start_ns, key=lambda sample: sample.observed_at_ns)
+    last = bisect_right(samples, end_ns, key=lambda sample: sample.observed_at_ns) - 1
+    if first >= last:
+        return 0.0
+    return (samples[last].source_time_ns - samples[first].source_time_ns) / (end_ns - start_ns)
+
+
+def _measurement_realtime_factor(
+    samples: Sequence[ClockSample], window: ClockMeasurementWindow, window_ns: int
+) -> float:
+    minimum = _interval_realtime_factor(samples, window.start_ns, window.end_ns)
+    if window.end_ns - window.start_ns < window_ns:
+        return max(0.0, minimum)
+    # Include both measurement edges even if neither coincides with a callback.
+    minimum = min(
+        minimum,
+        _interval_realtime_factor(samples, window.start_ns, window.start_ns + window_ns),
+        _interval_realtime_factor(samples, window.end_ns - window_ns, window.end_ns),
+    )
+    left = 0
+    for index, current in enumerate(samples):
+        # Between callbacks the last observed source stays fixed while the left
+        # endpoint can only advance. Check just before each new callback too:
+        # a catch-up jump must not conceal the pause immediately preceding it.
+        for end_ns, right in (
+            (current.observed_at_ns - 1, index - 1),
+            (current.observed_at_ns, index),
+        ):
+            start_ns = end_ns - window_ns
+            if start_ns < window.start_ns:
+                continue
+            while samples[left].observed_at_ns < start_ns:
+                left += 1
+            progress = (
+                0 if left >= right else samples[right].source_time_ns - samples[left].source_time_ns
+            )
+            minimum = min(minimum, progress / window_ns)
+    return max(0.0, minimum)
+
+
 def _windowed_realtime_factor(
     samples: Sequence[ClockSample],
     window_ns: int,
     issues: list[ReadinessIssue],
+    measurement_window: ClockMeasurementWindow | None,
 ) -> float:
-    """Take the worst integral or overlapping RTF over at least window_ns.
+    """Take the worst integral or overlapping RTF with recorded endpoints.
 
-    Each callback ends a window whose first sample is the latest one at or
-    before the requested boundary. This uses measured endpoints, without
-    interpolating source time. Startup prefixes are not individual windows;
-    a recording shorter than window_ns is assessed only by its integral RTF.
+    Explicit bounds require callback coverage and use conservative exact-length
+    windows including the measurement edges. Without bounds, preserve the
+    historical observed-span diagnostic: each callback ends a window whose
+    first sample is at or before the requested boundary, at least window_ns
+    apart. Neither mode interpolates source time; short spans use integral RTF.
     """
 
     if len(samples) < 2:
@@ -85,6 +181,10 @@ def _windowed_realtime_factor(
     ):
         issues.append(ReadinessIssue("$.time_policy", "clock observation times must increase"))
         return 0.0
+    if measurement_window is not None:
+        if not _clock_coverage(samples, measurement_window, issues):
+            return 0.0
+        return _measurement_realtime_factor(samples, measurement_window, window_ns)
     elapsed_ns = samples[-1].observed_at_ns - samples[0].observed_at_ns
     minimum = (samples[-1].source_time_ns - samples[0].source_time_ns) / elapsed_ns
     left = 0
@@ -104,11 +204,20 @@ def _evaluate_realtime(
     samples: Sequence[ClockSample],
     issues: list[ReadinessIssue],
     window_ns: int,
+    measurement_window: ClockMeasurementWindow | None,
 ) -> tuple[float, float]:
-    real_time_factor = _windowed_realtime_factor(samples, window_ns, issues)
+    real_time_factor = _windowed_realtime_factor(samples, window_ns, issues, measurement_window)
     deadline_values = _required_values(
         samples, "deadline_miss_ratio", "$.time_policy.max_deadline_miss_ratio", issues
     )
+    if any(not isfinite(value) or not 0 <= value <= 1 for value in deadline_values):
+        issues.append(
+            ReadinessIssue(
+                "$.time_policy.max_deadline_miss_ratio",
+                "all deadline ratios must be finite and in [0, 1]; statistic unavailable",
+            )
+        )
+        deadline_values = []
     deadline_miss_ratio = max(deadline_values, default=0.0)
     if real_time_factor < time_policy["min_realtime_factor"]:
         issues.append(
@@ -133,8 +242,14 @@ def evaluate_timing(
     samples: Sequence[ClockSample],
     *,
     rtf_window_sec: float = 1.0,
+    measurement_window: ClockMeasurementWindow | None = None,
 ) -> TimingObservation:
-    """Evaluate clock policy, with realtime RTF from timestamp windows and the full span."""
+    """Evaluate timing; full measurement claims require explicit monotonic bounds.
+
+    Without measurement_window, the low-level API evaluates only the supplied
+    observed span, retaining its historical endpoint-based diagnostic behavior.
+    Application verification always supplies the actual measurement window.
+    """
 
     if not isfinite(rtf_window_sec) or rtf_window_sec < 1.0:
         raise ValueError("RTF window must be finite and at least one second")
@@ -155,7 +270,11 @@ def evaluate_timing(
         issues.append(ReadinessIssue("$.time_policy", "source clock moved backwards"))
 
     elapsed_ns = samples[-1].observed_at_ns - samples[0].observed_at_ns
-    clock_hz = (len(samples) - 1) * 1_000_000_000 / elapsed_ns if elapsed_ns > 0 else 0.0
+    transitions = sum(
+        current.source_time_ns != previous.source_time_ns
+        for previous, current in zip(samples, samples[1:], strict=False)
+    )
+    clock_hz = transitions * 1_000_000_000 / elapsed_ns if elapsed_ns > 0 else 0.0
     mode = execution["time_mode"]
 
     real_time_factor = 0.0
@@ -166,7 +285,7 @@ def evaluate_timing(
 
     if mode == "simulation_realtime":
         real_time_factor, deadline_miss_ratio = _evaluate_realtime(
-            time_policy, samples, issues, round(rtf_window_sec * 1_000_000_000)
+            time_policy, samples, issues, round(rtf_window_sec * 1_000_000_000), measurement_window
         )
     elif mode == "playback_clocked":
         if clock_hz < time_policy["min_clock_hz"]:
@@ -181,12 +300,12 @@ def evaluate_timing(
     elif mode == "simulation_stepped":
         step_ns = round(float(time_policy["step_size_sec"]) * 1_000_000_000)
         max_skipped_steps = int(time_policy["max_skipped_steps"])
-        transitions = [
+        step_transitions = [
             current
             for previous, current in zip(samples, samples[1:], strict=False)
             if current.source_time_ns != previous.source_time_ns
         ]
-        transition_sources = [samples[0], *transitions]
+        transition_sources = [samples[0], *step_transitions]
         deltas = [
             current.source_time_ns - previous.source_time_ns
             for previous, current in zip(
