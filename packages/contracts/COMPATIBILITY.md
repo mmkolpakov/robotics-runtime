@@ -51,6 +51,16 @@ supersedes the former pre-1.0 replacement policy.
   validation.
 - There is no implicit downgrade path.
 
+For `campaign-summary.v1`, a shortage of passed runs with no failed or error runs
+may be reported as `incomplete`. The reader also accepts the legacy `failed`
+verdict for an all-passed shortage, as emitted by the 0.16.0 generation. Retained
+documents remain valid without rewriting their bytes or digest links. New harness
+writers emit `incomplete` for that shortage; they require a reader with this
+additive semantic relaxation. A `passed` verdict still requires every campaign
+acceptance threshold to be met. Existing failure/error precedence and tolerated
+run limits are unchanged, including when the passed-run minimum is not met.
+The schema identifier, schema bytes and catalog are unchanged.
+
 ## Schema Identity
 
 The canonical IDs use the `urn:robotics-runtime-contracts:v1:*` namespace.
