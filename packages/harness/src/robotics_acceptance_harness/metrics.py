@@ -216,6 +216,37 @@ def _interval_coverage(samples: Sequence[MetricPoint]) -> MetricIntervalCoverage
     )
 
 
+def _interior_coverage_gap_ns(
+    intervals: Sequence[tuple[int, int]],
+    *,
+    metric_name: str,
+    temporality: MetricTemporality | None,
+    window_start_ns: int,
+    window_end_ns: int,
+) -> int:
+    """Validate ordered intervals and total their gaps inside the evaluation window."""
+
+    uncovered_ns = 0
+    previous_end_ns: int | None = None
+    for start_ns, end_ns in intervals:
+        if start_ns >= end_ns:
+            raise MetricAggregationError(
+                f"{metric_name} contains empty or reversed coverage intervals"
+            )
+        if previous_end_ns is not None:
+            if start_ns < previous_end_ns:
+                raise MetricAggregationError(
+                    f"{metric_name} contains overlapping coverage intervals"
+                )
+            if start_ns > previous_end_ns and temporality != "delta":
+                raise MetricAggregationError(f"{metric_name} contains gapped coverage intervals")
+            uncovered_ns += max(
+                0, min(start_ns, window_end_ns) - max(previous_end_ns, window_start_ns)
+            )
+        previous_end_ns = end_ns
+    return uncovered_ns
+
+
 def require_window_coverage(
     coverage: MetricIntervalCoverage,
     *,
@@ -225,7 +256,7 @@ def require_window_coverage(
     window_end_ns: int,
     tolerance_ns: int = METRIC_WINDOW_COVERAGE_TOLERANCE_NS,
 ) -> None:
-    """Require valid intervals that reach both boundaries of the declared window."""
+    """Require each series' total uncovered window time to stay within tolerance."""
 
     if tolerance_ns < 0:
         raise ValueError("metric coverage tolerance cannot be negative")
@@ -243,17 +274,13 @@ def require_window_coverage(
         by_series[series_key].append((start_ns, end_ns))
     for intervals in by_series.values():
         ordered = sorted(intervals)
-        for (_, previous_end_ns), (start_ns, _) in zip(
+        interior_gap_ns = _interior_coverage_gap_ns(
             ordered,
-            ordered[1:],
-            strict=False,
-        ):
-            if start_ns < previous_end_ns:
-                raise MetricAggregationError(
-                    f"{metric_name} contains overlapping coverage intervals"
-                )
-            if start_ns > previous_end_ns and temporality != "delta":
-                raise MetricAggregationError(f"{metric_name} contains gapped coverage intervals")
+            metric_name=metric_name,
+            temporality=temporality,
+            window_start_ns=window_start_ns,
+            window_end_ns=window_end_ns,
+        )
         first_start_ns = ordered[0][0]
         last_end_ns = ordered[-1][1]
         if abs(first_start_ns - window_start_ns) > effective_tolerance_ns:
@@ -264,8 +291,10 @@ def require_window_coverage(
             raise MetricAggregationError(
                 f"{metric_name} ends outside the evaluation-window coverage tolerance"
             )
-        uncovered_ns = max(0, first_start_ns - window_start_ns) + max(
-            0, window_end_ns - last_end_ns
+        uncovered_ns = (
+            max(0, first_start_ns - window_start_ns)
+            + interior_gap_ns
+            + max(0, window_end_ns - last_end_ns)
         )
         if uncovered_ns > effective_tolerance_ns:
             raise MetricAggregationError(

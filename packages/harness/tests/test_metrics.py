@@ -514,7 +514,7 @@ def test_histogram_window_limits_total_uncovered_edges() -> None:
     assert "does not cover enough" in result.message
 
 
-def test_delta_histogram_accepts_gaps_between_recorded_intervals() -> None:
+def test_delta_histogram_rejects_total_gaps_exceeding_window_tolerance() -> None:
     result = evaluate_metric_assertions(
         [assertion(aggregation="count", operator="eq", threshold=2)],
         [
@@ -537,7 +537,8 @@ def test_delta_histogram_accepts_gaps_between_recorded_intervals() -> None:
         window_end_ns=10_000_000_000,
     )[0]
 
-    assert result.status == "passed"
+    assert result.status == "error"
+    assert "does not cover enough" in result.message
 
 
 def test_generic_metric_assertion_rejects_otlp_sum() -> None:
