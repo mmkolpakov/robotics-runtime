@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from collections.abc import Callable, Iterable, Mapping, Sequence
+import os
+import sys
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
-from importlib.machinery import PathFinder
+from importlib import import_module
+from importlib.abc import MetaPathFinder
+from importlib.machinery import ModuleSpec, PathFinder, SourceFileLoader
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path, PurePosixPath
+from types import CodeType, ModuleType
 from typing import Any, cast
 
 from packaging.utils import canonicalize_name
@@ -63,19 +69,151 @@ class EvaluationContext:
 type ProductEvaluator = Callable[[EvaluationContext], Iterable[AssertionEvaluation]]
 
 
-def _load_evaluator(entry_point: EntryPoint) -> ProductEvaluator:
+@dataclass(frozen=True)
+class _VerifiedRecord:
+    paths: frozenset[Path]
+    sources: Mapping[Path, bytes]
+
+
+def _check_bytecode_prefix() -> None:
+    if sys.pycache_prefix is not None:
+        raise EvaluationError("evaluator loading does not support sys.pycache_prefix")
+
+
+def _installed_path(path: Path) -> Path:
+    absolute = Path(os.path.abspath(path))
+    if path.resolve() != absolute:
+        raise EvaluationError(f"installed evaluator path contains a symlink: {path}")
+    return absolute
+
+
+def _remember_source(path: Path, payload: bytes, sources: dict[Path, bytes]) -> None:
+    if path.suffix == ".py":
+        sources[path] = payload
+
+
+class _VerifiedSourceLoader(SourceFileLoader):
+    """Compile the bytes hashed against RECORD; never consult or write a cache."""
+
+    def __init__(self, name: str, path: Path, source: bytes) -> None:
+        super().__init__(name, str(path))
+        self.source = source
+
+    def get_code(self, fullname: str) -> CodeType:
+        return self.source_to_code(self.source, self.path)
+
+
+def _check_namespace(name: str, locations: Sequence[str], paths: frozenset[Path]) -> None:
+    for location in locations:
+        directory = _installed_path(Path(location))
+        if not any(path.is_relative_to(directory) for path in paths):
+            raise EvaluationError(f"evaluator namespace {name!r} is outside its verified RECORD")
+
+
+def _record_spec(
+    name: str, search_path: Sequence[str] | None, paths: frozenset[Path]
+) -> ModuleSpec:
+    spec = PathFinder.find_spec(name, search_path)
+    if spec is None:
+        raise EvaluationError(f"cannot resolve evaluator module {name!r}")
+    if spec.origin is None and spec.submodule_search_locations:
+        # Namespace packages execute no code, but every search location must be owned.
+        _check_namespace(name, spec.submodule_search_locations, paths)
+    elif spec.origin is None or _installed_path(Path(spec.origin)) not in paths:
+        raise EvaluationError(f"evaluator module {name!r} resolves outside its verified RECORD")
+    return spec
+
+
+class _VerifiedImports(MetaPathFinder):
+    """Constrain this distribution's Python imports, leaving dependencies to Python."""
+
+    def __init__(self, entry_point: EntryPoint, record: _VerifiedRecord) -> None:
+        assert entry_point.dist is not None
+        root = _installed_path(Path(str(entry_point.dist.locate_file(""))))
+        self.roots = {entry_point.module.split(".")[0]}
+        self.roots.update(
+            path.relative_to(root).parts[0].split(".")[0]
+            for path in record.paths
+            if path.is_relative_to(root)
+        )
+        self.record = record
+
+    def owns(self, name: str) -> bool:
+        return name.split(".")[0] in self.roots
+
+    def find_spec(
+        self, fullname: str, path: Sequence[str] | None, target: ModuleType | None = None
+    ) -> ModuleSpec | None:
+        if not self.owns(fullname):
+            return None
+        spec = _record_spec(fullname, path, self.record.paths)
+        if spec.origin is not None:
+            source_path = _installed_path(Path(spec.origin))
+            if source_path not in self.record.sources:
+                raise EvaluationError(
+                    f"evaluator module {fullname!r} requires RECORD-hashed source"
+                )
+            spec.loader = _VerifiedSourceLoader(
+                fullname, source_path, self.record.sources[source_path]
+            )
+        return spec
+
+    def check_loaded(self, name: str, module: ModuleType) -> None:
+        spec = module.__spec__
+        if spec is not None and spec.origin is None and spec.submodule_search_locations:
+            _check_namespace(name, module.__path__, self.record.paths)
+            return
+        loader = getattr(spec, "loader", None)
+        if (
+            not isinstance(loader, _VerifiedSourceLoader)
+            or self.record.sources.get(Path(loader.path)) != loader.source
+        ):
+            raise EvaluationError(
+                f"evaluator module {name!r} was already imported without verification"
+            )
+
+
+@contextmanager
+def _verified_imports(finder: _VerifiedImports) -> Iterator[None]:
+    _check_bytecode_prefix()
+    for name, module in tuple(sys.modules.items()):
+        if module is not None and finder.owns(name):
+            finder.check_loaded(name, module)
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    sys.meta_path.insert(0, finder)
     try:
-        evaluator = entry_point.load()
+        yield
+    finally:
+        sys.meta_path.remove(finder)
+        sys.dont_write_bytecode = previous
+
+
+def _load_evaluator(entry_point: EntryPoint, record: _VerifiedRecord) -> ProductEvaluator:
+    finder = _VerifiedImports(entry_point, record)
+    try:
+        with _verified_imports(finder):
+            evaluator = import_module(entry_point.module)
+            attributes = entry_point.attr.split(".") if entry_point.attr else ()
+            for attribute in attributes:
+                evaluator = getattr(evaluator, attribute)
     except Exception as error:
         raise EvaluationError(
             f"cannot load evaluator entry point {entry_point.name!r}: {error}"
         ) from error
     if not callable(evaluator):
         raise EvaluationError(f"entry point {entry_point.name!r} is not callable")
-    return cast(ProductEvaluator, evaluator)
+    product_evaluator = cast(ProductEvaluator, evaluator)
+
+    def evaluate(context: EvaluationContext) -> Iterable[AssertionEvaluation]:
+        with _verified_imports(finder):
+            yield from product_evaluator(context)
+
+    return evaluate
 
 
-def _verify_installed_record(entry_point: EntryPoint) -> frozenset[Path]:
+def _verify_installed_record(entry_point: EntryPoint) -> _VerifiedRecord:
+    _check_bytecode_prefix()
     distribution = entry_point.dist
     if distribution is None or distribution.files is None:
         raise EvaluationError(f"entry point {entry_point.name!r} has no installed file manifest")
@@ -85,13 +223,14 @@ def _verify_installed_record(entry_point: EntryPoint) -> frozenset[Path]:
     record_name = PurePosixPath(str(record_files[0]).replace("\\", "/"))
     dist_info = record_name.parent
     hashed_paths = {
-        Path(path.locate()).resolve() for path in distribution.files if path.hash is not None
+        _installed_path(Path(path.locate())) for path in distribution.files if path.hash is not None
     }
 
+    sources: dict[Path, bytes] = {}
     verified_files = 0
     for package_path in distribution.files:
         installed_name = PurePosixPath(str(package_path).replace("\\", "/"))
-        installed_path = Path(package_path.locate())
+        installed_path = _installed_path(Path(package_path.locate()))
         if not installed_path.is_file():
             raise EvaluationError(f"installed evaluator file is missing: {package_path}")
         file_hash = package_path.hash
@@ -106,10 +245,9 @@ def _verify_installed_record(entry_point: EntryPoint) -> frozenset[Path]:
                 )
             continue
         try:
+            payload = installed_path.read_bytes()
             observed = (
-                base64.urlsafe_b64encode(
-                    hashlib.new(file_hash.mode, installed_path.read_bytes()).digest()
-                )
+                base64.urlsafe_b64encode(hashlib.new(file_hash.mode, payload).digest())
                 .rstrip(b"=")
                 .decode("ascii")
             )
@@ -118,6 +256,7 @@ def _verify_installed_record(entry_point: EntryPoint) -> frozenset[Path]:
         if observed != file_hash.value:
             raise EvaluationError(f"installed evaluator file differs from RECORD: {package_path}")
         verified_files += 1
+        _remember_source(installed_path, payload, sources)
         if installed_name.suffix == ".py":
             bytecode_candidates = [installed_path.with_suffix(".pyc")]
             pycache = installed_path.parent / "__pycache__"
@@ -134,34 +273,24 @@ def _verify_installed_record(entry_point: EntryPoint) -> frozenset[Path]:
                 )
     if verified_files == 0:
         raise EvaluationError(f"distribution {distribution.name!r} RECORD has no file digests")
-    return frozenset(hashed_paths)
+    return _VerifiedRecord(frozenset(hashed_paths), sources)
 
 
 def _verify_entry_point_origin(entry_point: EntryPoint, hashed_paths: frozenset[Path]) -> None:
     search_path: Sequence[str] | None = None
     qualified_name = ""
-    spec = None
     for part in entry_point.module.split("."):
         qualified_name = f"{qualified_name}.{part}" if qualified_name else part
-        spec = PathFinder.find_spec(qualified_name, search_path)
-        if spec is None:
-            raise EvaluationError(f"cannot resolve evaluator module {entry_point.module!r}")
+        spec = _record_spec(qualified_name, search_path, hashed_paths)
         search_path = spec.submodule_search_locations
-    if spec is None or spec.origin in {None, "built-in", "frozen"}:
-        raise EvaluationError(f"evaluator module {entry_point.module!r} has no file origin")
-    origin = Path(spec.origin).resolve()
-    if origin not in hashed_paths:
-        raise EvaluationError(
-            f"evaluator module {entry_point.module!r} resolves outside its verified RECORD"
-        )
 
 
 def _qualified_entry_points(
     requirements: Sequence[Mapping[str, Any]],
     receipts: VerifiedReceiptSet,
-) -> tuple[EntryPoint, ...]:
+) -> tuple[tuple[EntryPoint, _VerifiedRecord], ...]:
     installed = tuple(entry_points(group=EVALUATOR_ENTRY_POINT_GROUP))
-    qualified: list[EntryPoint] = []
+    qualified: list[tuple[EntryPoint, _VerifiedRecord]] = []
     for requirement in requirements:
         namespace = str(requirement["namespace"])
         candidates = [entry_point for entry_point in installed if entry_point.name == namespace]
@@ -189,9 +318,9 @@ def _qualified_entry_points(
             str(requirement["receipt_sha256"]),
             {"sha256": requirement["artifact_sha256"]},
         )
-        hashed_paths = _verify_installed_record(entry_point)
-        _verify_entry_point_origin(entry_point, hashed_paths)
-        qualified.append(entry_point)
+        record = _verify_installed_record(entry_point)
+        _verify_entry_point_origin(entry_point, record.paths)
+        qualified.append((entry_point, record))
     if {str(item["receipt_sha256"]) for item in requirements} != set(receipts.by_digest):
         raise EvaluationError("evaluator qualification contains unreferenced receipts")
     return tuple(qualified)
@@ -202,8 +331,8 @@ def _installed_evaluators(
     receipts: VerifiedReceiptSet,
 ) -> tuple[tuple[str, ProductEvaluator], ...]:
     return tuple(
-        (entry_point.name, _load_evaluator(entry_point))
-        for entry_point in _qualified_entry_points(requirements, receipts)
+        (entry_point.name, _load_evaluator(entry_point, record))
+        for entry_point, record in _qualified_entry_points(requirements, receipts)
     )
 
 
@@ -308,7 +437,12 @@ def evaluator_inventory(
     """Describe installed product evaluators without importing their targets."""
 
     installed = (
-        _qualified_entry_points(requirements, receipts or VerifiedReceiptSet({}))
+        tuple(
+            entry_point
+            for entry_point, _record in _qualified_entry_points(
+                requirements, receipts or VerifiedReceiptSet({})
+            )
+        )
         if requirements
         else tuple(entry_points(group=EVALUATOR_ENTRY_POINT_GROUP))
     )

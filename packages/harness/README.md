@@ -230,6 +230,20 @@ that installation belongs to the observed execution-subject image. PEP 610
 metadata and an installed `RECORD` are not treated as proof of released wheel
 identity. Unhashed bytecode and module origins outside that `RECORD` fail
 closed; evaluator images should install with bytecode generation disabled.
+Evaluator loading also refuses `sys.pycache_prefix` (including
+`PYTHONPYCACHEPREFIX`), symlinked installed paths, and evaluator modules already
+imported by an unverified loader. Start the harness in a fresh interpreter.
+
+The harness compiles the Python source bytes checked against `RECORD` using an
+explicit source loader, without reading or writing bytecode caches. This covers
+the evaluator's parent packages and imports within the distribution's module
+namespaces, including imports deferred until evaluation. Regular packages,
+namespace packages, relative imports, and dotted entry-point attributes are
+supported. Evaluator-owned modules require hashed Python source; native and
+sourceless evaluator modules are rejected. Dependencies outside those namespaces
+use Python's normal import machinery and remain part of the execution image's
+trust boundary. This loading check is not a sandbox for malicious Python code,
+and a locally editable `RECORD` does not authenticate the released wheel.
 
 An evaluator receives an immutable `EvaluationContext` and returns
 `AssertionEvaluation` objects in its own namespace. Every product assertion
