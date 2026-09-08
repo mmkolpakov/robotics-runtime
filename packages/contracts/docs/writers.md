@@ -88,3 +88,39 @@ Upstream references: [MCAP Python 1.4.0](https://pypi.org/project/mcap/1.4.0/),
 The CLI producer regression in `tests/test_writers.py` generates a runtime and
 evidence index from the existing minimal-simulation example, validates both, and
 checks file-byte bindings. Those inputs are labelled fixtures, not live observations.
+
+## Qualification statement
+
+```sh
+robotics-contracts qualification statement \
+  --artifact scenario:scenario.json=scenario.json \
+  --artifact acceptance_run:acceptance-run.json=run.json \
+  --artifact runtime_manifest:runtime-manifests/primary.json=runtime.json \
+  --artifact domain_result:results/primary.json=result.json \
+  --artifact acceptance_aggregate:acceptance-aggregate.json=aggregate.json \
+  --artifact evidence_index:evidence-indexes/primary.json=evidence-index.json \
+  --artifact other_evidence:evidence/metrics.json=metrics.json \
+  --output qualification-statement.json
+```
+
+This illustrates labels, not a complete artifact inventory. Supply **every**
+artifact required by the run, including provider configuration/profile/conformance,
+recording summaries, retained evidence and authorization when applicable. Domain
+labels must equal the IDs in `acceptance-run.domains`, not generic filenames.
+The existing complete qualification validation is mandatory before writing.
+Inputs use the same `KIND:SUBJECT=PATH` syntax as `validate-qualification`.
+
+The public API is `robotics_runtime_contracts.statements.create_qualification_statement`
+or `write_qualification_statement(specifications, output, extension_schemas=...)`.
+The result is an unsigned [in-toto Statement v1](https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md):
+`_type`, `subject`, `predicateType`, `predicate`. Each subject's SHA-256 comes
+directly from the bytes consumed by qualification validation. The writer does
+not reserialize or reread subjects to construct their digests. The run ID and
+timestamp come from the validated bundle; subject/kind lists sort by subject name.
+Reordering command arguments therefore leaves output bytes unchanged.
+
+This constructs an unsigned bundle statement, not a signature or a passed-verdict
+claim. It does not sign, upload or grant execution authorization. Invalid links,
+missing/duplicate subjects, changed file bytes and output/input aliases fail
+before output replacement. Tests generate statements for the complete transport,
+inference and physical fixtures and validate the existing public statement schema.
