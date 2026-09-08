@@ -19,17 +19,17 @@
       "const": "acceptance-run.v1"
     },
     "run_id": {
-      "$ref": "#/$defs/runId"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runId"
     },
     "created_at": {
       "type": "string",
       "format": "date-time"
     },
     "scenario_id": {
-      "$ref": "#/$defs/identifier"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "scenario_sha256": {
-      "$ref": "#/$defs/sha256"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runSha256"
     },
     "time_authority": {
       "$ref": "#/$defs/timeAuthority"
@@ -44,17 +44,13 @@
   },
   "$defs": {
     "identifier": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
-      "maxLength": 128
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "runId": {
-      "type": "string",
-      "pattern": "^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runId"
     },
     "sha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runSha256"
     },
     "domain": {
       "type": "object",
@@ -65,10 +61,10 @@
       ],
       "properties": {
         "domain_id": {
-          "$ref": "#/$defs/identifier"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
         },
         "role": {
-          "$ref": "#/$defs/identifier"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
         }
       }
     },
@@ -91,10 +87,10 @@
           ]
         },
         "source_id": {
-          "$ref": "#/$defs/identifier"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
         },
         "configuration_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runSha256"
         }
       }
     }

@@ -19,14 +19,14 @@
       "const": "causal-chain.v1"
     },
     "chain_id": {
-      "$ref": "#/$defs/identifier"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "required_domain_ids": {
       "type": "array",
       "minItems": 2,
       "uniqueItems": true,
       "items": {
-        "$ref": "#/$defs/identifier"
+        "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
       }
     },
     "channel_contracts": {
@@ -41,10 +41,10 @@
         ],
         "properties": {
           "channel_id": {
-            "$ref": "#/$defs/identifier"
+            "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
           },
           "sha256": {
-            "$ref": "#/$defs/sha256"
+            "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
           }
         }
       }
@@ -61,13 +61,10 @@
   },
   "$defs": {
     "identifier": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
-      "maxLength": 128
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "sha256": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     }
   }
 }

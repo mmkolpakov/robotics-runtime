@@ -32,14 +32,13 @@
       "pattern": "^observation-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
     },
     "run_id": {
-      "type": "string",
-      "pattern": "^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runId"
     },
     "channel_id": {
-      "$ref": "#/$defs/identifier"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "channel_contract_sha256": {
-      "$ref": "#/$defs/sha256"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     },
     "started_at": {
       "type": "string",
@@ -70,9 +69,7 @@
       "minimum": 0
     },
     "loss_ratio": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 1
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/ratio"
     },
     "max_message_age_ms": {
       "type": "number",
@@ -124,13 +121,10 @@
   ],
   "$defs": {
     "identifier": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
-      "maxLength": 128
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "sha256": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     },
     "violation": {
       "type": "object",

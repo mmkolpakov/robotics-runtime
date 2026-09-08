@@ -17,7 +17,7 @@
       "const": "recording-summary.v1"
     },
     "source_sha256": {
-      "$ref": "#/$defs/sha256"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     },
     "statistics": {
       "$ref": "#/$defs/statistics"
@@ -40,8 +40,7 @@
   },
   "$defs": {
     "sha256": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     },
     "statistics": {
       "type": "object",

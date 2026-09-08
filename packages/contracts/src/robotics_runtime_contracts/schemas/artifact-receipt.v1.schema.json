@@ -14,26 +14,55 @@
     "verification_sha256"
   ],
   "properties": {
-    "schema_version": {"const": "artifact-receipt.v1"},
-    "receipt_id": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"},
+    "schema_version": {
+      "const": "artifact-receipt.v1"
+    },
+    "receipt_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+    },
     "artifact": {
       "allOf": [
-        {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"},
-        {"required": ["media_type", "immutable_revision"]}
+        {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+        },
+        {
+          "required": [
+            "media_type",
+            "immutable_revision"
+          ]
+        }
       ]
     },
     "producer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["identity", "implementation"],
+      "required": [
+        "identity",
+        "implementation"
+      ],
       "properties": {
-        "identity": {"type": "string", "minLength": 1, "maxLength": 1024},
-        "implementation": {"type": "string", "minLength": 1, "maxLength": 256}
+        "identity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "implementation": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/spanName"
+        }
       }
     },
-    "created_at": {"type": "string", "format": "date-time"},
-    "run_id": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runId"},
-    "statement_sha256": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"},
-    "verification_sha256": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"}
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "run_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runId"
+    },
+    "statement_sha256": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
+    },
+    "verification_sha256": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
+    }
   }
 }

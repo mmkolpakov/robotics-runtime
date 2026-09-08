@@ -19,7 +19,7 @@
       "const": "qualification-policy.v1"
     },
     "policy_id": {
-      "$ref": "#/$defs/identifier"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "predicate_type": {
       "const": "https://robotics-runtime-contracts.dev/attestations/qualification-bundle/v1"
@@ -40,7 +40,7 @@
       "maxLength": 1024
     },
     "trusted_root_sha256": {
-      "$ref": "#/$defs/sha256"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     },
     "required_artifact_kinds": {
       "type": "array",
@@ -85,13 +85,10 @@
   },
   "$defs": {
     "identifier": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
-      "maxLength": 128
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "sha256": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     }
   }
 }

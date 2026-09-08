@@ -20,7 +20,7 @@
       "const": "transport-channel.v1"
     },
     "channel_id": {
-      "$ref": "#/$defs/identifier"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "source": {
       "$ref": "#/$defs/endpoint"
@@ -38,9 +38,7 @@
       ],
       "properties": {
         "implementation_id": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
-          "maxLength": 128
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
         },
         "version": {
           "type": "string",
@@ -48,7 +46,7 @@
           "maxLength": 64
         },
         "configuration_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
         },
         "options": {
           "type": "object",
@@ -56,7 +54,12 @@
             "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
           },
           "additionalProperties": {
-            "type": ["string", "number", "integer", "boolean"]
+            "type": [
+              "string",
+              "number",
+              "integer",
+              "boolean"
+            ]
           }
         }
       }
@@ -153,8 +156,7 @@
       ],
       "properties": {
         "observation_window_sec": {
-          "type": "number",
-          "exclusiveMinimum": 0
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/positiveSeconds"
         },
         "minimum_source_messages": {
           "type": "integer",
@@ -164,9 +166,7 @@
           "const": "messaging.message.id"
         },
         "max_loss_ratio": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/ratio"
         },
         "max_duplicate_count": {
           "type": "integer",
@@ -204,23 +204,20 @@
           ]
         },
         "producer_span_name": {
-          "$ref": "#/$defs/spanName"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/spanName"
         },
         "consumer_span_name": {
-          "$ref": "#/$defs/spanName"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/spanName"
         }
       }
     }
   },
   "$defs": {
     "identifier": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
-      "maxLength": 128
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "sha256": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     },
     "endpoint": {
       "type": "object",
@@ -234,7 +231,7 @@
       ],
       "properties": {
         "domain_id": {
-          "$ref": "#/$defs/identifier"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
         },
         "ros_domain_id": {
           "type": "integer",
@@ -242,10 +239,10 @@
           "maximum": 232
         },
         "topic": {
-          "$ref": "#/$defs/rosName"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/transportRosName"
         },
         "message_type": {
-          "$ref": "#/$defs/rosType"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/transportRosMessageType"
         },
         "type_hash": {
           "type": "string",
@@ -265,19 +262,13 @@
       ]
     },
     "rosName": {
-      "type": "string",
-      "pattern": "^/[A-Za-z0-9_~/]+$",
-      "maxLength": 512
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/transportRosName"
     },
     "rosType": {
-      "type": "string",
-      "pattern": "^[A-Za-z][A-Za-z0-9_]*/msg/[A-Za-z][A-Za-z0-9_]*$",
-      "maxLength": 256
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/transportRosMessageType"
     },
     "spanName": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 256
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/spanName"
     }
   }
 }
