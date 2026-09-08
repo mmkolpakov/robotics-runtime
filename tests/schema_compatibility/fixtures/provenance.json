@@ -1,0 +1,8 @@
+{
+  "legacy-shortfall.json": {
+    "commit": "ae89248d2fb7d842766a0c70eeb6380619801974",
+    "path": "packages/contracts/tests/fixtures/campaign/valid/legacy-shortfall.json",
+    "blob": "f1bb2d8c43937e77768a6feb3d3b1ced8489839d",
+    "sha256": "07dae3f85aed3441462285d4fc7436c07830a5af4b888f98ccb89f903b5f604b"
+  }
+}

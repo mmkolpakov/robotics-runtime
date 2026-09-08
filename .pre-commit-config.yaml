@@ -54,6 +54,12 @@ repos:
         pass_filenames: false
   - repo: local
     hooks:
+      - id: schema-compatibility
+        name: Check compatibility with published contracts
+        entry: uv run --no-sync python scripts/check_schema_compatibility.py
+        language: system
+        pass_filenames: false
+        always_run: true
       - id: bundle-core-schemas
         name: Check generated core schema bytes
         entry: uv run --no-sync python scripts/bundle_schemas.py --check
