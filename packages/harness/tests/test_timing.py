@@ -119,7 +119,7 @@ def test_stepped_timing_rejects_large_jump() -> None:
 def test_realtime_policy_rejects_slow_or_late_execution() -> None:
     samples = [
         ClockSample(0, 0, real_time_factor=0.7, deadline_miss_ratio=0.1),
-        ClockSample(1, 1, real_time_factor=0.8, deadline_miss_ratio=0.2),
+        ClockSample(1_000_000_000, 700_000_000, real_time_factor=0.8, deadline_miss_ratio=0.2),
     ]
     with pytest.raises(TimingValidationError) as caught:
         evaluate_timing(
