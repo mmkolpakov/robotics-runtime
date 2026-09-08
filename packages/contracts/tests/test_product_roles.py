@@ -14,6 +14,7 @@ from referencing.jsonschema import DRAFT202012
 from robotics_runtime_contracts import (
     ContractValidationError,
     NonFiniteNumberError,
+    SemanticValidationError,
     contract_roles,
     file_sha256,
     load_mapping,
@@ -126,6 +127,7 @@ def test_policy_supports_both_physical_environments_and_multiple_principals(life
         {**document["principals"][0], "identity": "second-operator@example.org"}
     )
     validate_document(document)
+    validate_role(document, "execution_trust_policy")
 
 
 @pytest.mark.parametrize("field", ["principals", "targets"])
@@ -135,6 +137,56 @@ def test_policy_rejects_duplicate_allowlist_entries(field: str) -> None:
     with pytest.raises(ContractValidationError) as caught:
         validate_document(document)
     assert caught.value.json_path == f"$.{field}"
+
+
+@pytest.mark.parametrize("index", [0, 1])
+def test_policy_rejects_a_second_issuer_for_the_same_role_and_identity(index: int) -> None:
+    document = load_mapping(POLICY)
+    document["principals"].append(
+        {**document["principals"][index], "issuer": "https://issuer.example.org"}
+    )
+    with pytest.raises(SemanticValidationError) as caught:
+        validate_role(document, "execution_trust_policy")
+    assert caught.value.schema_name == "execution-trust-policy.v1"
+    assert caught.value.error_id == "semantic.validation_failed"
+    assert caught.value.json_path == "$.principals"
+    assert caught.value.validation_message == "role and identity pairs must be unique"
+
+
+@pytest.mark.parametrize("output_format", ["text", "json"])
+def test_cli_reports_ambiguous_policy_principals(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], output_format: str
+) -> None:
+    document = load_mapping(POLICY)
+    document["principals"].append(
+        {**document["principals"][0], "issuer": "https://issuer.example.org"}
+    )
+    path = tmp_path / "ambiguous-policy.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    assert main(["--format", output_format, "validate", str(path)]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    message = "$.principals: role and identity pairs must be unique"
+    if output_format == "json":
+        assert json.loads(captured.err) == {
+            "error": {
+                "error_id": "semantic.validation_failed",
+                "path": "$.principals",
+                "message": message,
+            }
+        }
+    else:
+        assert captured.err == f"invalid: {message} [semantic.validation_failed]\n"
+
+
+@pytest.mark.parametrize(
+    "issuer", ["https://token.actions.githubusercontent.com", "https://issuer.example.org"]
+)
+def test_policy_allows_the_same_identity_in_different_roles(issuer: str) -> None:
+    document = load_mapping(POLICY)
+    document["principals"][1]["identity"] = document["principals"][0]["identity"]
+    document["principals"][1]["issuer"] = issuer
+    validate_role(document, "execution_trust_policy")
 
 
 def test_policy_target_identity_is_a_file_byte_digest() -> None:

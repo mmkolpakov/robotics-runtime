@@ -16,19 +16,27 @@ match infrastructure's `policy/execution.rego`,
 | --- | --- |
 | `policy_id` | Common contract identifier. |
 | `max_permit_lifetime_seconds` | Integer from 1 through 1800, inclusive. |
-| `principals[]` | `{role, identity, issuer}`; role is `operator` or `approver`, identity uses the common principal primitive, issuer is an absolute HTTPS URI. At least one principal of each role is required. |
+| `principals[]` | `{role, identity, issuer}`; role is `operator` or `approver`, identity uses the common principal primitive, issuer is an absolute HTTPS URI. At least one principal of each role is required; `(role, identity)` pairs must be unique. |
 | `targets[]` | `{target_id, identity_kind, identity_sha256, environments}`; a nonempty allowlist. |
 | `targets[].identity_kind` | The existing permit identity kinds: `udev_serial`, `pci_device`, `mavlink_system_component`, `x509_spki`, `tpm_ek`, `vendor_soc`. |
 | `targets[].identity_sha256` | Common lowercase, unprefixed, 64-character SHA-256 of the target identity evidence bytes. |
 | `targets[].environments` | Nonempty, unique subset of `hil` and `real_robot`. |
 
 Unknown fields and exact duplicate principal/target entries are rejected.
+Public `validate_document`, `validate_role`, and CLI validation also reject
+repeated `(role, identity)` pairs with different issuers. Infrastructure selects
+exactly one issuer by that pair; listing both old and new issuers during a
+migration would prevent that principal from executing. This key uniqueness is
+a semantic check: JSON Schema's `uniqueItems` only detects whole-object duplicates.
+The diagnostic is `semantic.validation_failed` at `$.principals`.
 Multiple operators, approvers, and target records are allowed; distinct records
-may authorize different identities or environments for a target. Role/issuer
+may authorize different identities or environments for a target. An identity may
+appear once in each role, with the same or different issuers. Role/issuer
 and target-kind/environment constraints reference the existing verification and
 permit schemas, while shared identifiers and digests belong to `common.v1`.
 
-The schema requires a usable two-role allowlist. Infrastructure's authorization
+The schema requires both roles; public validation ensures each role/identity pair
+selects one issuer. Infrastructure's authorization
 step remains responsible for two distinct verified signers, current time,
 permit lifetime, target and environment matching, and the observed runtime,
 scenario, and subject digests. A valid policy alone authorizes no execution.

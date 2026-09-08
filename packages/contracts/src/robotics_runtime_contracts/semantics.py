@@ -407,6 +407,16 @@ def _validate_permit(document: Mapping[str, Any]) -> None:
         _fail(schema_name, "$.expires_at", "must be no more than 30 minutes after issued_at")
 
 
+def _validate_execution_trust_policy(document: Mapping[str, Any]) -> None:
+    keys = [(item["role"], item["identity"]) for item in document["principals"]]
+    if len(keys) != len(set(keys)):
+        _fail(
+            "execution-trust-policy.v1",
+            "$.principals",
+            "role and identity pairs must be unique",
+        )
+
+
 def _validate_execution_verification(document: Mapping[str, Any]) -> None:
     schema_name = "execution-verification.v1"
     signers = document["signers"]
@@ -1226,6 +1236,7 @@ _VALIDATORS: dict[str, Callable[[Mapping[str, Any]], None]] = {
     "dataset-manifest.v1": _validate_dataset,
     "runtime-manifest.v1": _validate_runtime,
     "execution-permit.v1": _validate_permit,
+    "execution-trust-policy.v1": _validate_execution_trust_policy,
     "execution-verification.v1": _validate_execution_verification,
     "acceptance-result.v1": _validate_result,
     "evidence-index.v1": _validate_evidence_index,
