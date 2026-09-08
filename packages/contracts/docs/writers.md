@@ -63,6 +63,33 @@ outputs, and commands reject outputs that would overwrite evidence inputs.
 Python equivalents: `create_evidence_index`, `add_evidence_artifact`,
 `write_evidence_draft`, and `finalize_evidence_index`. Inputs are copied.
 
+## Artifact receipt
+
+```sh
+robotics-contracts artifact-receipt create \
+  --template receipt-metadata.json --source recording.mcap \
+  --verification artifact-verification.json \
+  --dependency statement.json --dependency trust-policy.json \
+  --dependency verification-evidence.json --output artifact-receipt.json
+```
+
+The template supplies `receipt_id`, `created_at` and the optional `run_id`.
+The artifact descriptor, producer identity/implementation and statement digest
+come from a validated `artifact-verification.v1`; any values supplied in the
+template must agree. The receipt hashes the original verification file bytes,
+checks the source file's SHA-256 and size against that descriptor, and requires
+all provenance dependencies by their raw-byte digests. Include the content
+manifest when the verification references one. Missing, duplicate and unreferenced
+dependency bytes are rejected. The receipt must not predate verification.
+
+The Python API is `create_artifact_receipt(template, source, verification,
+dependencies)`. Like the other producers, it checks consistency of supplied
+facts. It does not run a signature verifier or establish trust in an arbitrary
+verification JSON. The caller must first verify provenance through its trusted
+external verifier and preserve the verification evidence. S3 object metadata or
+an upload checksum alone cannot supply that verification. CLI output cannot
+overwrite the source, template, verification, or any dependency file.
+
 ## Recording summary
 
 Install `robotics-runtime-contracts[mcap]` (MCAP Python 1.4 or later, below 2).

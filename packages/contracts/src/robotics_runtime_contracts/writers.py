@@ -27,6 +27,7 @@ from robotics_runtime_contracts import (
 )
 from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.extensions import validate_extensions
+from robotics_runtime_contracts.receipts import validate_artifact_receipt
 from robotics_runtime_contracts.semantics import validate_semantics
 from robotics_runtime_contracts.serialization import read_document_bytes
 
@@ -240,9 +241,55 @@ def finalize_evidence_index(
     return index
 
 
+def create_artifact_receipt(
+    template: Mapping[str, Any],
+    source: str | Path,
+    verification: str | Path,
+    dependencies: Sequence[str | Path],
+) -> dict[str, Any]:
+    """Bind a receipt to source bytes and an externally produced verification.
+
+    This producer checks consistency; signature verification belongs to the
+    external verifier that supplies the verification document and its evidence.
+    """
+    verification_path = Path(verification).expanduser().resolve()
+    raw = read_document_bytes(verification_path)
+    verified = loads_mapping(raw, source_name=str(verification_path))
+    validate_role(verified, "artifact_verification")
+    document = deepcopy(dict(template))
+    document.setdefault("schema_version", "artifact-receipt.v1")
+    for field, value in (
+        ("artifact", verified["artifact"]),
+        (
+            "producer",
+            {
+                "identity": verified["producer_identity"],
+                "implementation": verified["producer_implementation"],
+            },
+        ),
+        ("statement_sha256", verified["statement_sha256"]),
+        ("verification_sha256", hashlib.sha256(raw).hexdigest()),
+    ):
+        _bind(document, field, deepcopy(value))
+    digest, size = _file_facts(Path(source).expanduser().resolve())
+    _bind(document["artifact"], "sha256", digest)
+    _bind(document["artifact"], "size_bytes", size)
+    validate_role(document, "artifact_receipt")
+    dependency_digests = [
+        _file_facts(Path(path).expanduser().resolve())[0] for path in dependencies
+    ]
+    if len(set(dependency_digests)) != len(dependency_digests):
+        raise WriterError("duplicate provenance dependency bytes")
+    used = validate_artifact_receipt(document, verified, dependency_digests)
+    if used != set(dependency_digests):
+        raise WriterError("unreferenced provenance dependency")
+    return document
+
+
 __all__ = [
     "WriterError",
     "add_evidence_artifact",
+    "create_artifact_receipt",
     "create_evidence_index",
     "create_runtime_manifest",
     "finalize_evidence_index",
