@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add a flight-controller interface profile and qualification examples using the
+  existing extensible provider identifiers, with six required capabilities and
+  checks that reject missing capabilities or a mismatched provider kind.
 - Bind optional scenario robot-description digests to runtime workload metadata
   and the exact retained description artifact bytes during qualification. Keep
   existing workload documents and qualification artifact kinds compatible.
