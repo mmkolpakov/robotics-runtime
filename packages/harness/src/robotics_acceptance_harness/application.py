@@ -11,7 +11,11 @@ from uuid import uuid4
 
 from robotics_acceptance_harness.documents import DocumentBundle
 from robotics_acceptance_harness.evaluation import EvaluationContext, evaluate_acceptance
-from robotics_acceptance_harness.evidence import VerifiedEvidence, load_evidence_index
+from robotics_acceptance_harness.evidence import (
+    EvidenceValidationError,
+    VerifiedEvidence,
+    load_evidence_index,
+)
 from robotics_acceptance_harness.forbidden_graph import (
     ForbiddenGraphMonitor,
     ForbiddenGraphObservation,
@@ -191,20 +195,28 @@ def _wait_for_evidence(
     now_ns: Callable[[], int],
     sleep_fn: Callable[[float], None],
 ) -> VerifiedEvidence:
+    if not isfinite(timeout_sec) or timeout_sec < 0:
+        raise ValueError("evidence timeout must be finite and nonnegative")
+    if not isfinite(poll_interval_sec) or poll_interval_sec <= 0:
+        raise ValueError("evidence poll interval must be finite and positive")
     source = Path(path).expanduser().resolve()
     deadline_ns = now_ns() + int(timeout_sec * 1_000_000_000)
-    while not source.is_file():
-        if now_ns() >= deadline_ns:
-            raise VerificationError(f"finalized evidence index did not appear: {source}")
-        remaining_sec = max(0.0, (deadline_ns - now_ns()) / 1_000_000_000)
-        sleep_fn(min(poll_interval_sec, remaining_sec))
-    return load_evidence_index(
-        source,
-        expected_run_id=run_id,
-        receipt_paths=receipt_paths,
-        verification_paths=verification_paths,
-        receipt_dependency_paths=receipt_dependency_paths,
-    )
+    while True:
+        try:
+            return load_evidence_index(
+                source,
+                expected_run_id=run_id,
+                receipt_paths=receipt_paths,
+                verification_paths=verification_paths,
+                receipt_dependency_paths=receipt_dependency_paths,
+            )
+        except (EvidenceValidationError, OSError) as error:
+            remaining_sec = (deadline_ns - now_ns()) / 1_000_000_000
+            if remaining_sec <= 0:
+                raise VerificationError(
+                    f"finalized evidence index not ready before deadline: {source}: {error}"
+                ) from error
+            sleep_fn(min(poll_interval_sec, remaining_sec))
 
 
 def run_verification(
@@ -347,6 +359,7 @@ def run_verification(
         load_otlp_json_metrics(
             metrics_path,
             expected_sha256=metrics_evidence_sha256,
+            evidence_root=evidence.index.path.parent,
         ),
         run_id=run_id,
         domain_id=domain_id,
@@ -511,6 +524,7 @@ def evaluate_from_evidence(
             load_otlp_json_metrics(
                 metrics_path,
                 expected_sha256=str(metric_link["sha256"]),
+                evidence_root=evidence.index.path.parent,
             ),
             run_id=run_id,
             domain_id=domain_id,

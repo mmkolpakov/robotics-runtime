@@ -16,6 +16,7 @@ from robotics_runtime_contracts import (
     validate_provider_requirements,
     validate_role,
 )
+from robotics_runtime_contracts.serialization import read_document_bytes
 
 from robotics_acceptance_harness.authorization import (
     AuthorizationIssue,
@@ -135,16 +136,11 @@ class DocumentBundle:
         return cast(RuntimeDocument, self.runtime.data)
 
 
-def _read_mapping(path: Path) -> tuple[bytes, dict[str, Any]]:
+def _read_bytes(path: Path) -> bytes:
     try:
-        raw = path.read_bytes()
-    except OSError as error:
+        return read_document_bytes(path)
+    except (OSError, ValueError) as error:
         raise BundleValidationError("$", f"cannot read {path}: {error}") from error
-    try:
-        value = loads_mapping(raw, source_name=str(path))
-    except ValueError as error:
-        raise BundleValidationError("$", f"cannot parse {path}: {error}") from error
-    return raw, value
 
 
 def load_document(
@@ -156,7 +152,26 @@ def load_document(
     """Load, validate, hash, and freeze one contract document."""
 
     resolved_path = Path(path).expanduser().resolve()
-    raw, value = _read_mapping(resolved_path)
+    return load_document_bytes(
+        _read_bytes(resolved_path),
+        source=resolved_path,
+        expected_role=expected_role,
+        extension_schemas=extension_schemas,
+    )
+
+
+def load_document_bytes(
+    raw: bytes,
+    *,
+    source: Path,
+    expected_role: str | None = None,
+    extension_schemas: Mapping[str, bytes | str] | None = None,
+) -> LoadedDocument:
+    """Validate and hash the same captured bytes without reopening their source."""
+    try:
+        value = loads_mapping(raw, source_name=str(source))
+    except ValueError as error:
+        raise BundleValidationError("$", f"cannot parse {source}: {error}") from error
     schema_version = value.get("schema_version")
     if expected_role is not None and schema_version != schema_for_role(expected_role):
         raise BundleValidationError(
@@ -169,9 +184,9 @@ def load_document(
         else:
             validate_role(value, expected_role, extension_schemas=extension_schemas)
     except ValueError as error:
-        raise BundleValidationError("$", f"invalid {resolved_path}: {error}") from error
+        raise BundleValidationError("$", f"invalid {source}: {error}") from error
     return LoadedDocument(
-        path=resolved_path,
+        path=source,
         data=_freeze(value),
         sha256=sha256(raw).hexdigest(),
     )

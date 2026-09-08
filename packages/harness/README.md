@@ -12,6 +12,9 @@ lifecycle states, execute cryptographic signature tools, or publish commands to 
 It verifies externally produced signature results and their digest chain; the
 signature tool itself remains an infrastructure responsibility.
 
+See [local evidence and timestamps](docs/evidence-files.md) for filesystem
+containment, finalized-file reads and the distinction between Unix and monotonic time.
+
 ## Architecture
 
 ```text

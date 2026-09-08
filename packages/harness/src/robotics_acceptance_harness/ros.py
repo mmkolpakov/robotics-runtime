@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from importlib import import_module
 from threading import Lock, Thread
-from time import monotonic_ns
+from time import monotonic_ns, time_ns
 from typing import Any, Literal
 
 from robotics_acceptance_harness.readiness import (
@@ -164,7 +164,7 @@ class RosGraphObserver:
     def _message_callback(self, topic: str) -> Callable[[Any], None]:
         def callback(_message: Any) -> None:
             with self._observation_lock:
-                self._first_messages.setdefault(topic, monotonic_ns())
+                self._first_messages.setdefault(topic, time_ns())
 
         return callback
 
@@ -172,7 +172,7 @@ class RosGraphObserver:
         observed_at_ns = monotonic_ns()
         source_time_ns = int(message.clock.sec) * 1_000_000_000 + int(message.clock.nanosec)
         with self._observation_lock:
-            self._first_messages.setdefault("/clock", observed_at_ns)
+            self._first_messages.setdefault("/clock", time_ns())
             # Repeated source times are evidence of a pause, including before
             # catch-up and at the measurement tail. Never silently discard them.
             if self._record_clock:
@@ -310,7 +310,7 @@ class RosGraphObserver:
     def snapshot(self) -> GraphSnapshot:
         self._require_running()
         observed_at_ns = monotonic_ns()
-        self._poll_lifecycle(observed_at_ns)
+        self._poll_lifecycle(time_ns())
         with self._observation_lock:
             first_messages = dict(self._first_messages)
 
@@ -322,7 +322,7 @@ class RosGraphObserver:
                 self._node.count_subscribers(name) - self._own_subscription_counts.get(name, 0),
             )
             topics[name] = TopicObservation(
-                types=tuple(topic_types.get(name, ())),
+                types=tuple(sorted(topic_types.get(name, ()))),
                 publishers=self._node.count_publishers(name),
                 subscribers=subscribers,
                 first_message_at_ns=first_messages.get(name),

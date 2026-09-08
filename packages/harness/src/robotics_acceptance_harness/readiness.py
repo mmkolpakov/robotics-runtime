@@ -9,6 +9,8 @@ from typing import Any, Literal, Protocol
 
 @dataclass(frozen=True, slots=True)
 class TopicObservation:
+    """Observed topic facts; first-message time is Unix nanoseconds."""
+
     types: tuple[str, ...]
     publishers: int
     subscribers: int
@@ -25,12 +27,16 @@ class EndpointObservation:
 
 @dataclass(frozen=True, slots=True)
 class LifecycleObservation:
+    """Lifecycle state and its observation time in Unix nanoseconds."""
+
     state: str
     observed_at_ns: int
 
 
 @dataclass(frozen=True, slots=True)
 class GraphSnapshot:
+    """Graph facts with a monotonic snapshot time for readiness duration checks."""
+
     observed_at_ns: int
     topics: Mapping[str, TopicObservation] = field(default_factory=dict)
     services: Mapping[str, EndpointObservation] = field(default_factory=dict)

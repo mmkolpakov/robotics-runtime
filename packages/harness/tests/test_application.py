@@ -527,7 +527,11 @@ def test_verification_accepts_legacy_observer_factory(tmp_path: Path) -> None:
     assert outputs.result["status"] == "passed"
 
 
-def test_verification_finalizes_measurement_before_reading_evidence(tmp_path: Path) -> None:
+@pytest.mark.parametrize("initial_index", [None, b'{"artifacts":', b"{}"])
+def test_verification_finalizes_measurement_before_reading_evidence(
+    tmp_path: Path,
+    initial_index: bytes | None,
+) -> None:
     bundle = _simulation_bundle(tmp_path)
     metrics_path = tmp_path / "metrics.otlp.json"
     _write_metrics(
@@ -544,6 +548,8 @@ def test_verification_finalizes_measurement_before_reading_evidence(tmp_path: Pa
         run_id=SIMULATION_RUN_ID,
     )
     evidence_path = tmp_path / "evidence.yaml"
+    if initial_index is not None:
+        evidence_path.write_bytes(initial_index)
     marker = tmp_path / "measurement-complete"
     context = _write_run_context(
         tmp_path / "run.yaml",
