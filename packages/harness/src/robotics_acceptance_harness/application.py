@@ -117,13 +117,15 @@ def explain_bundle(bundle: DocumentBundle) -> dict[str, Any]:
     }
 
 
-def _latest_metric(samples: Sequence[MetricPoint], name: str) -> float | None:
+def _maximum_gauge(samples: Sequence[MetricPoint], name: str) -> float | None:
     matches = [
-        sample for sample in samples if isinstance(sample, MetricSample) and sample.name == name
+        sample.value
+        for sample in samples
+        if isinstance(sample, MetricSample)
+        and sample.instrument_kind == "gauge"
+        and sample.name == name
     ]
-    if not matches:
-        return None
-    return max(matches, key=lambda sample: sample.observed_at_ns).value
+    return max(matches, default=None)
 
 
 def _measurement_metrics(
@@ -161,7 +163,7 @@ def _enrich_clock_samples(
         wall_delta = current.observed_at_ns - previous.observed_at_ns
         source_delta = current.source_time_ns - previous.source_time_ns
         ratios.append(source_delta / wall_delta if wall_delta > 0 else 0.0)
-    deadline_ratio = _latest_metric(metrics, "robotics.simulation.deadline_miss_ratio")
+    deadline_ratio = _maximum_gauge(metrics, "robotics.simulation.deadline_miss_ratio")
     return tuple(
         ClockSample(
             observed_at_ns=sample.observed_at_ns,

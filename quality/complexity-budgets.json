@@ -45,7 +45,7 @@
   "packages/harness/src/robotics_acceptance_harness/ros.py::RosGraphObserver.__init__::PLR0913": 6,
   "packages/harness/src/robotics_acceptance_harness/run_context.py::create_run_context::PLR0913": 8,
   "packages/harness/src/robotics_acceptance_harness/time_authority.py::evaluate_time_authority::PLR0913": 7,
-  "packages/harness/src/robotics_acceptance_harness/timing.py::evaluate_timing::C901": 18,
+  "packages/harness/src/robotics_acceptance_harness/timing.py::evaluate_timing::C901": 15,
   "packages/harness/src/robotics_acceptance_harness/traces.py::evaluate_causal_chain::C901": 15,
   "packages/harness/src/robotics_acceptance_harness/traces.py::evaluate_channel_delivery::C901": 11,
   "packages/harness/src/robotics_acceptance_harness/traces.py::load_otlp_json_traces::C901": 16,
