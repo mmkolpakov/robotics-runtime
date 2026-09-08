@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, replace
 from hashlib import sha256
-from typing import Any, NoReturn
+from typing import Any, NoReturn, Protocol, cast
 
 from jsonschema import Draft202012Validator, FormatChecker
-from jsonschema.exceptions import SchemaError, best_match
+from jsonschema.exceptions import SchemaError, ValidationError, best_match
+from jsonschema.protocols import Validator
+from jsonschema.validators import validator_for
 from referencing import Registry
 from referencing.exceptions import Unresolvable
-from referencing.jsonschema import DRAFT202012, SchemaRegistry
+from referencing.jsonschema import DRAFT202012, Schema, SchemaRegistry, SchemaResource
 
 from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.semantics import SemanticValidationError
@@ -85,31 +88,99 @@ def _reject_external_references(schema_name: str, schema: object, path: str = "$
                 )
 
 
-def _validate_reference_targets(
+class _ReferenceResolver(Protocol):
+    def lookup(self, ref: str) -> _ResolvedReference: ...
+
+    def in_subresource(self, subresource: SchemaResource) -> _ReferenceResolver: ...
+
+    def dynamic_scope(self) -> Iterable[tuple[str, SchemaRegistry]]: ...
+
+
+class _ResolvedReference(Protocol):
+    @property
+    def contents(self) -> Schema: ...
+
+    @property
+    def resolver(self) -> _ReferenceResolver: ...
+
+
+class _ResolverValidatorFactory(Protocol):
+    def __call__(
+        self,
+        schema: Schema,
+        *,
+        format_checker: FormatChecker,
+        registry: SchemaRegistry,
+        _resolver: _ReferenceResolver,
+    ) -> Validator: ...
+
+
+@dataclass(frozen=True)
+class _CheckedReference:
+    contents: Schema
+    resolver: _ReferenceResolver
+
+
+@dataclass(frozen=True)
+class _CheckedResolver:
+    resolver: _ReferenceResolver
+    schema_name: str
+    declaration_path: str
+
+    def lookup(self, ref: str) -> _ResolvedReference:
+        try:
+            resolved = self.resolver.lookup(ref)
+        except (Unresolvable, ValueError, TypeError) as error:
+            _fail(
+                self.schema_name,
+                self.declaration_path,
+                f"schema reference cannot be evaluated: {error}",
+            )
+        try:
+            if isinstance(resolved.contents, Mapping):
+                validator_for(resolved.contents, default=Draft202012Validator).check_schema(
+                    dict(resolved.contents)
+                )
+            else:
+                Draft202012Validator.check_schema(resolved.contents)
+        except SchemaError as error:
+            _fail(
+                self.schema_name,
+                self.declaration_path,
+                f"schema reference cannot be evaluated: {error}",
+            )
+        return _CheckedReference(resolved.contents, replace(self, resolver=resolved.resolver))
+
+    def in_subresource(self, subresource: SchemaResource) -> _CheckedResolver:
+        resolver = self.resolver.in_subresource(subresource)
+        return self if resolver is self.resolver else replace(self, resolver=resolver)
+
+    def dynamic_scope(self) -> Iterable[tuple[str, SchemaRegistry]]:
+        return self.resolver.dynamic_scope()
+
+
+def _extension_validation_error(
     schema_name: str,
     schema: Mapping[str, Any],
-    registry: SchemaRegistry,
+    instance: Any,
     declaration_path: str,
-) -> None:
-    resource = DRAFT202012.create_resource(dict(schema))
-    pending = [(resource, registry.resolver_with_root(resource))]
-    while pending:
-        current, resolver = pending.pop()
-        contents = current.contents
-        if isinstance(contents, Mapping):
-            for keyword in ("$ref", "$dynamicRef"):
-                reference = contents.get(keyword)
-                if isinstance(reference, str):
-                    try:
-                        resolved = resolver.lookup(reference)
-                        Draft202012Validator.check_schema(resolved.contents)
-                    except (Unresolvable, ValueError, SchemaError) as error:
-                        _fail(
-                            schema_name,
-                            declaration_path,
-                            f"schema reference cannot be evaluated: {error}",
-                        )
-        pending.extend((child, resolver.in_subresource(child)) for child in current.subresources())
+) -> ValidationError | None:
+    resource = DRAFT202012.create_resource(schema)
+    registry = Registry().with_resource(resource.id() or "", resource)
+    resolver = _CheckedResolver(
+        registry.resolver_with_root(resource), schema_name, declaration_path
+    )
+    # jsonschema 4.26 has no public per-lookup hook for local references. Keep its
+    # private resolver injection here; evolve/descend retain this adapter even
+    # across $schema dialect changes. All resolution stays in referencing.
+    validator = cast(_ResolverValidatorFactory, Draft202012Validator)(
+        schema, format_checker=FormatChecker(), registry=registry, _resolver=resolver
+    )
+    try:
+        validation_error: ValidationError | None = best_match(validator.iter_errors(instance))
+        return validation_error
+    except RecursionError as error:
+        _fail(schema_name, declaration_path, f"schema reference cannot be evaluated: {error}")
 
 
 def validate_extensions(
@@ -195,28 +266,9 @@ def validate_extensions(
                 f"invalid Draft 2020-12 schema: {error}",
             )
 
-        registry = Registry().with_resource(uri, DRAFT202012.create_resource(extension_schema))
-        try:
-            validation_error = best_match(
-                Draft202012Validator(
-                    extension_schema,
-                    format_checker=FormatChecker(),
-                    registry=registry,
-                ).iter_errors(extensions[namespace])
-            )
-        except (Unresolvable, RecursionError) as error:
-            _fail(
-                schema_name,
-                f"$.extension_schemas[{index}]",
-                f"schema reference cannot be evaluated: {error}",
-            )
-        except (AttributeError, TypeError, ValueError):
-            # Normalize malformed targets only after reference evaluation fails.
-            # Unused references retain their previous behavior; unrelated faults propagate.
-            _validate_reference_targets(
-                schema_name, extension_schema, registry, f"$.extension_schemas[{index}]"
-            )
-            raise
+        validation_error = _extension_validation_error(
+            schema_name, extension_schema, extensions[namespace], f"$.extension_schemas[{index}]"
+        )
         if validation_error is not None:
             suffix = validation_error.json_path.removeprefix("$")
             _fail(
