@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core",
+  "title": "Robotics runtime manifest v1",
+  "description": "Observed runtime identity with cryptographically authorized physical target facts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "runtime_id",
+    "generated_at",
+    "execution_subject",
+    "components",
+    "host_platform",
+    "execution_platform",
+    "ros",
+    "provider_bindings",
+    "render",
+    "workload",
+    "execution",
+    "authorization",
+    "data_plane",
+    "security",
+    "lifecycle_states",
+    "physical_targets",
+    "clock"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "runtime-manifest.v1"
+    },
+    "runtime_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "execution_subject": {
+      "$ref": "#/$defs/executionSubject"
+    },
+    "components": {
+      "$ref": "#/$defs/components"
+    },
+    "configuration_artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/configurationArtifact"
+      },
+      "uniqueItems": true
+    },
+    "host_platform": {
+      "$ref": "#/$defs/platform"
+    },
+    "execution_platform": {
+      "$ref": "#/$defs/platform"
+    },
+    "ros": {
+      "$ref": "#/$defs/ros"
+    },
+    "provider_bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/providerBinding"
+      },
+      "uniqueItems": true
+    },
+    "render": {
+      "$ref": "#/$defs/render"
+    },
+    "workload": {
+      "$ref": "#/$defs/workload"
+    },
+    "execution": {
+      "$ref": "#/$defs/execution"
+    },
+    "authorization": {
+      "$ref": "#/$defs/authorization"
+    },
+    "data_plane": {
+      "$ref": "#/$defs/dataPlane"
+    },
+    "security": {
+      "$ref": "#/$defs/security"
+    },
+    "lifecycle_states": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/lifecycleState"
+      }
+    },
+    "physical_targets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/physicalTarget"
+      }
+    },
+    "clock": {
+      "$ref": "#/$defs/clock"
+    },
+    "extensions": {
+      "$ref": "#/$defs/extensions"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "#/$defs/simulationConstraints"
+    },
+    {
+      "$ref": "#/$defs/physicalConstraints"
+    }
+  ],
+  "$defs": {
+    "authorization": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/authorization"
+    },
+    "physicalTarget": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/physicalTarget"
+    },
+    "providerBinding": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/providerBinding"
+    },
+    "configurationArtifact": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/configurationArtifact"
+    },
+    "identifier": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/identifier"
+    },
+    "executionSubject": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/executionSubject"
+    },
+    "components": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/components"
+    },
+    "gitRevision": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/gitRevision"
+    },
+    "platform": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/platform"
+    },
+    "ros": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/ros"
+    },
+    "render": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/render"
+    },
+    "workload": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/workload"
+    },
+    "model": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/model"
+    },
+    "sha256": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/sha256"
+    },
+    "inference": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/inference"
+    },
+    "provider": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/provider"
+    },
+    "accelerator": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/accelerator"
+    },
+    "execution": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/execution"
+    },
+    "dataPlane": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/dataPlane"
+    },
+    "security": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/security"
+    },
+    "lifecycleState": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/lifecycleState"
+    },
+    "clock": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/clock"
+    },
+    "extensions": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/extensions"
+    },
+    "simulationConstraints": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/simulationConstraints"
+    },
+    "physicalConstraints": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/physicalConstraints"
+    }
+  }
+}

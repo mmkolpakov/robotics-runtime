@@ -12,9 +12,24 @@
       "type": "string",
       "pattern": "^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
     },
-    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-    "subjectDigest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
-    "status": {"enum": ["passed", "skipped", "cancelled", "incomplete", "failed", "error"]},
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "subjectDigest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "skipped",
+        "cancelled",
+        "incomplete",
+        "failed",
+        "error"
+      ]
+    },
     "qualificationArtifactKind": {
       "enum": [
         "scenario",
@@ -52,13 +67,34 @@
     "artifactRef": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["uri", "sha256", "size_bytes"],
+      "required": [
+        "uri",
+        "sha256",
+        "size_bytes"
+      ],
       "properties": {
-        "uri": {"type": "string", "format": "uri", "maxLength": 2048},
-        "sha256": {"$ref": "#/$defs/sha256"},
-        "size_bytes": {"type": "integer", "minimum": 0},
-        "media_type": {"type": "string", "minLength": 3, "maxLength": 255},
-        "immutable_revision": {"type": "string", "minLength": 1, "maxLength": 1024}
+        "uri": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "media_type": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 255
+        },
+        "immutable_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
       }
     },
     "sceneObservation": {
@@ -71,33 +107,137 @@
         "physical_parameters"
       ],
       "properties": {
-        "semantic_scene_id": {"$ref": "#/$defs/identifier"},
+        "semantic_scene_id": {
+          "$ref": "#/$defs/identifier"
+        },
         "entities": {
           "type": "array",
           "uniqueItems": true,
-          "items": {"type": "string", "minLength": 1, "maxLength": 256}
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
         },
         "interfaces": {
           "type": "array",
           "uniqueItems": true,
-          "items": {"type": "string", "minLength": 1, "maxLength": 256}
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
         },
         "physical_parameters": {
           "type": "object",
-          "additionalProperties": {"type": ["number", "integer", "string", "boolean"]}
+          "additionalProperties": {
+            "type": [
+              "number",
+              "integer",
+              "string",
+              "boolean"
+            ]
+          }
         }
       }
     },
     "providerIdentity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "implementation_id", "version", "configuration_sha256"],
+      "required": [
+        "kind",
+        "implementation_id",
+        "version",
+        "configuration_sha256"
+      ],
       "properties": {
-        "kind": {"$ref": "#/$defs/identifier"},
-        "implementation_id": {"$ref": "#/$defs/identifier"},
-        "version": {"type": "string", "minLength": 1, "maxLength": 128},
-        "configuration_sha256": {"$ref": "#/$defs/sha256"}
+        "kind": {
+          "$ref": "#/$defs/identifier"
+        },
+        "implementation_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
+    },
+    "rosName": {
+      "type": "string",
+      "pattern": "^/[^\\s]+$"
+    },
+    "runSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "positiveSeconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "rosType": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*/(?:msg|srv|action)/[A-Za-z][A-Za-z0-9_]*$"
+    },
+    "ratio": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "metricName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z][a-z0-9_]*)+$",
+      "maxLength": 255
+    },
+    "parameterValue": {
+      "type": [
+        "string",
+        "number",
+        "integer",
+        "boolean",
+        "null"
+      ]
+    },
+    "rosMessageType": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*/msg/[A-Za-z][A-Za-z0-9_]*$"
+    },
+    "mediaType": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}$",
+      "maxLength": 255
+    },
+    "principal": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9@._:/-]{2,255}$"
+    },
+    "gitRevision": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "providerName": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]*$",
+      "maxLength": 128
+    },
+    "transportRosName": {
+      "type": "string",
+      "pattern": "^/[A-Za-z0-9_~/]+$",
+      "maxLength": 512
+    },
+    "transportRosMessageType": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*/msg/[A-Za-z][A-Za-z0-9_]*$",
+      "maxLength": 256
+    },
+    "spanName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
     }
   }
 }

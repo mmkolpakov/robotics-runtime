@@ -24,11 +24,10 @@
       "pattern": "^aggregate-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
     },
     "run_id": {
-      "type": "string",
-      "pattern": "^run-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runId"
     },
     "acceptance_run_sha256": {
-      "$ref": "#/$defs/sha256"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     },
     "generated_at": {
       "type": "string",
@@ -57,13 +56,10 @@
   },
   "$defs": {
     "identifier": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
-      "maxLength": 128
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "sha256": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     },
     "domainStatus": {
       "enum": [
@@ -93,14 +89,14 @@
       ],
       "properties": {
         "domain_id": {
-          "$ref": "#/$defs/identifier"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
         },
         "result_id": {
           "type": "string",
           "pattern": "^result-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
         },
         "result_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
         },
         "status": {
           "$ref": "#/$defs/domainStatus"
@@ -148,7 +144,7 @@
               "pattern": "^qualification-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
             },
             "result_sha256": {
-              "$ref": "#/$defs/sha256"
+              "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
             },
             "status": {
               "$ref": "#/$defs/transportStatus"

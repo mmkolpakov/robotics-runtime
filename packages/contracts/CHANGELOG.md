@@ -7,6 +7,11 @@
   2**53, and native finite float spelling. Apply the input depth/node/byte bounds
   and report invalid types/Unicode with `ContractError` paths. Add `file_sha256`
   for chunked hashing of original bytes; existing artifact hashes remain unchanged.
+- Restore reproducible core schema sources and an offline generation gate. Replace
+  positional conditional references with named definitions and centralize primitive
+  constraints in `common.v1`, preserving resolved assertions and fixture outcomes.
+  Intentionally update schema digest snapshots; see the baseline reproduction and
+  equivalence evidence in [schema bundling](docs/schema-bundling.md).
 - Replace `json-merge-patch` with a typed RFC 7396 implementation. Semantic diff
   distinguishes booleans, integers and floats recursively, preserves input
   containers, and reports `diff.unrepresentable` for unrepresentable null members.

@@ -83,8 +83,14 @@ jobs:
           cache-dependency-glob: uv.lock
       - run: uv sync --locked --all-packages --all-groups
       - run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure
-      - run: uv run --no-sync python -m pytest tests/ci tests/release
-      - run: uv run --no-sync mypy --explicit-package-bases scripts/release tests/release tests/workspace
+      - name: Require reproducible core schema bytes
+        run: |
+          uv run --no-sync python scripts/bundle_schemas.py --check
+          git diff --exit-code -- packages/contracts/src/robotics_runtime_contracts/schemas
+      - run: uv run --no-sync python -m pytest tests/ci tests/release tests/schema_bundler
+      - run: >-
+          uv run --no-sync mypy --explicit-package-bases
+          scripts/release scripts/bundle_schemas.py tests/release tests/workspace tests/schema_bundler
         env:
           MYPYPATH: packages/contracts/src:packages/harness/src
 

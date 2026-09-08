@@ -19,50 +19,98 @@
     "evidence"
   ],
   "properties": {
-    "schema_version": {"const": "conformance-result.v1"},
-    "result_id": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"},
-    "run_id": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runId"},
-    "generated_at": {"type": "string", "format": "date-time"},
+    "schema_version": {
+      "const": "conformance-result.v1"
+    },
+    "result_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+    },
+    "run_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runId"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "qualification_profile_sha256": {
       "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     },
     "execution_subject_digest": {
-      "type": "string",
-      "pattern": "^sha256:[a-f0-9]{64}$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/subjectDigest"
     },
-    "provider": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/providerIdentity"},
-    "scene": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sceneObservation"},
-    "target_id": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"},
-    "status": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/status"},
+    "provider": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/providerIdentity"
+    },
+    "scene": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sceneObservation"
+    },
+    "target_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+    },
+    "status": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/status"
+    },
     "capabilities": {
       "type": "array",
       "uniqueItems": true,
-      "items": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"}
+      "items": {
+        "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+      }
     },
-    "checks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/check"}},
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/check"
+      }
+    },
     "evidence": {
       "type": "array",
-      "items": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"}
+      "items": {
+        "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+      }
     }
   },
   "$defs": {
     "check": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["check_id", "capability", "status", "observed_value"],
+      "required": [
+        "check_id",
+        "capability",
+        "status",
+        "observed_value"
+      ],
       "properties": {
-        "check_id": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"},
-        "capability": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"},
+        "check_id": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+        },
+        "capability": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+        },
         "status": {
           "description": "Normative verdict produced by the qualified check implementation.",
           "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/status"
         },
         "observed_value": {
           "description": "Informational measurement; it has no intrinsic truth semantics.",
-          "type": ["number", "integer", "string", "boolean", "null"]
+          "type": [
+            "number",
+            "integer",
+            "string",
+            "boolean",
+            "null"
+          ]
         },
-        "unit": {"type": "string", "minLength": 1, "maxLength": 64},
-        "message": {"type": "string", "maxLength": 4096}
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4096
+        }
       }
     }
   }
