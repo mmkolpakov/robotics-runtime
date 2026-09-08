@@ -10,10 +10,12 @@ from tempfile import TemporaryFile
 from typing import IO, Any
 
 from mcap.reader import make_reader
-from mcap.records import Attachment, Channel, Chunk, Message, Metadata, Schema
+from mcap.records import Chunk, Statistics
 from mcap.stream_reader import StreamReader
 from mcap.summary import Summary
 
+from robotics_runtime_contracts._mcap_crc import verify_extra_crcs
+from robotics_runtime_contracts._mcap_observations import Observations
 from robotics_runtime_contracts.writers import WriterError
 
 
@@ -35,36 +37,12 @@ def _statistics(summary: Summary) -> dict[str, int]:
     }
 
 
-def _observed_statistics(stream: IO[bytes]) -> tuple[dict[str, int], Counter[int]]:
-    counts: Counter[str] = Counter()
-    messages: Counter[int] = Counter()
-    schema_ids: set[int] = set()
-    channel_ids: set[int] = set()
-    start: int | None = None
-    end = 0
+def _observed_statistics(stream: IO[bytes]) -> Observations:
+    observed = Observations()
     stream.seek(0)
     for record in StreamReader(stream, validate_crcs=True).records:
-        if isinstance(record, Message):
-            messages[record.channel_id] += 1
-            start = record.log_time if start is None else min(start, record.log_time)
-            end = max(end, record.log_time)
-        elif isinstance(record, Schema):
-            schema_ids.add(record.id)
-        elif isinstance(record, Channel):
-            channel_ids.add(record.id)
-        elif isinstance(record, Attachment):
-            counts["attachment_count"] += 1
-        elif isinstance(record, Metadata):
-            counts["metadata_count"] += 1
-    return {
-        "message_count": sum(messages.values()),
-        "schema_count": len(schema_ids),
-        "channel_count": len(channel_ids),
-        "attachment_count": counts["attachment_count"],
-        "metadata_count": counts["metadata_count"],
-        "message_start_time_ns": 0 if start is None else start,
-        "message_end_time_ns": end,
-    }, messages
+        observed.observe(record)
+    return observed
 
 
 def _compressions(stream: IO[bytes]) -> tuple[list[str], int]:
@@ -78,41 +56,50 @@ def _compressions(stream: IO[bytes]) -> tuple[list[str], int]:
     return sorted(compressions or {"none"}), chunks
 
 
-def _channels(summary: Summary, counts: Counter[int]) -> list[dict[str, Any]]:
+def _channels(observed: Observations) -> list[dict[str, Any]]:
     channels = []
-    for channel in sorted(summary.channels.values(), key=lambda item: (item.topic, item.id)):
-        schema = summary.schemas.get(channel.schema_id)
-        if schema is None:
-            raise WriterError("recording-summary.v1 requires a named schema for every channel")
+    for channel in sorted(observed.channels.values(), key=lambda item: (item.topic, item.id)):
+        schema = observed.schemas[channel.schema_id]
         channels.append(
             {
                 "topic": channel.topic,
                 "message_encoding": channel.message_encoding,
                 "schema_name": schema.name,
-                "message_count": counts[channel.id],
+                "message_count": observed.messages[channel.id],
             }
         )
     return channels
 
 
+def _check_channel_counts(statistics: Statistics, observed: Observations) -> None:
+    counts = statistics.channel_message_counts
+    if counts and (
+        +Counter(counts) != observed.messages or not counts.keys() <= observed.channels.keys()
+    ):
+        raise WriterError(
+            "MCAP per-channel Statistics contradict its messages", error_id="writer.invalid_mcap"
+        )
+
+
 def _summarize_stream(stream: IO[bytes], digest: str) -> dict[str, Any]:
+    verify_extra_crcs(stream)
     summary = make_reader(stream, validate_crcs=True).get_summary()
     if summary is None:
         raise WriterError("MCAP requires a finalized summary", error_id="writer.invalid_mcap")
     expected = _statistics(summary)
-    observed, counts = _observed_statistics(stream)
-    compressions, observed["chunk_count"] = _compressions(stream)
-    if expected != observed:
+    observed = _observed_statistics(stream)
+    statistics = observed.statistics()
+    compressions, statistics["chunk_count"] = _compressions(stream)
+    if expected != statistics:
         raise WriterError("MCAP Statistics contradict its records", error_id="writer.invalid_mcap")
     assert summary.statistics is not None
-    if +Counter(summary.statistics.channel_message_counts) != counts:
-        raise WriterError("MCAP per-channel Statistics contradict its messages")
+    _check_channel_counts(summary.statistics, observed)
     return {
         "schema_version": "recording-summary.v1",
         "source_sha256": digest,
-        "statistics": observed,
+        "statistics": statistics,
         "compressions": compressions,
-        "channels": _channels(summary, counts),
+        "channels": _channels(observed),
     }
 
 

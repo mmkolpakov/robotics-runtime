@@ -81,6 +81,19 @@ Missing Statistics, truncated files, mismatched statistics, schemaless channels,
 and channels that cannot fit `recording-summary.v1` are rejected. Temporary disk
 space up to the source recording size is required.
 
+Streamed data-section channel/schema definitions are authoritative. Definitions
+must precede their uses, and repeated definitions must agree, including summary
+copies. Optional summary copies and unavailable per-channel Statistics do not
+prevent extraction: the producer counts the actual messages. Nonempty per-channel
+Statistics are checked against those counts.
+
+MCAP 1.4's public reader validates data-section and chunk CRCs. A separate narrow
+check verifies nonzero attachment and footer-summary CRCs over original snapshot
+bytes, in 64 KiB blocks. It reads record envelopes and checksum field locations;
+MCAP decoding and decompression remain with the upstream library. A zero CRC
+means unavailable. All producer commands protect supplied extension-schema files
+from output replacement, including path aliases and in-place draft updates.
+
 Upstream references: [MCAP Python 1.4.0](https://pypi.org/project/mcap/1.4.0/),
 [reader API](https://mcap.dev/docs/python/mcap-apidoc/mcap.reader),
 [stream reader API](https://mcap.dev/docs/python/mcap-apidoc/mcap.stream_reader).
@@ -116,7 +129,8 @@ The result is an unsigned [in-toto Statement v1](https://github.com/in-toto/atte
 `_type`, `subject`, `predicateType`, `predicate`. Each subject's SHA-256 comes
 directly from the bytes consumed by qualification validation. The writer does
 not reserialize or reread subjects to construct their digests. The run ID and
-timestamp come from the validated bundle; subject/kind lists sort by subject name.
+timestamp come from the validated run and aggregate respectively; subject/kind
+lists sort by subject name.
 Reordering command arguments therefore leaves output bytes unchanged.
 
 This constructs an unsigned bundle statement, not a signature or a passed-verdict

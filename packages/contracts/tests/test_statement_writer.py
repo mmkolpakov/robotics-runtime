@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,26 @@ from robotics_runtime_contracts.statements import (
 )
 from robotics_runtime_contracts.writers import WriterError
 from tests.support import qualification_specifications
+
+
+def test_statement_timestamp_is_the_aggregates_exact_timestamp(tmp_path: Path) -> None:
+    specifications = qualification_specifications("transport")
+    aggregate_spec = next(
+        item for item in specifications if item.startswith("acceptance_aggregate:")
+    )
+    label, _, path = aggregate_spec.partition("=")
+    aggregate = load_mapping(path)
+    timestamp = aggregate["generated_at"].removesuffix("Z") + ".123456789Z"
+    aggregate["generated_at"] = timestamp
+    changed = tmp_path / "aggregate.json"
+    changed.write_bytes((json.dumps(aggregate, indent=3) + "\r\n").encode())
+    specifications[specifications.index(aggregate_spec)] = f"{label}={changed}"
+    statement = create_qualification_statement(specifications)
+    assert statement["predicate"]["generated_at"] == timestamp
+    subject = next(item for item in statement["subject"] if item["name"] == label.partition(":")[2])
+    assert subject["digest"]["sha256"] == file_sha256(changed)
+    output = write_qualification_statement(specifications, tmp_path / "statement.json")
+    assert load_mapping(output)["predicate"]["generated_at"] == timestamp
 
 
 @pytest.mark.parametrize("case", ["transport", "inference", "physical"])

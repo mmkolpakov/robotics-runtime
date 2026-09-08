@@ -125,15 +125,16 @@ def _recording(arguments: argparse.Namespace, _extensions: Mapping[str, bytes]) 
 def _qualification_statement(
     arguments: argparse.Namespace, extensions: Mapping[str, bytes]
 ) -> Path:
-    protect_inputs(
-        arguments.output, [item.partition("=")[2] for item in arguments.extension_schema]
-    )
     return write_qualification_statement(
         arguments.artifact, arguments.output, extension_schemas=extensions
     )
 
 
 def run_writer(arguments: argparse.Namespace, extensions: Mapping[str, bytes]) -> Path:
+    output = arguments.output
+    if arguments.writer_operation == "evidence_add" and not output:
+        output = arguments.draft
+    protect_inputs(output, [item.partition("=")[2] for item in arguments.extension_schema])
     operations = {
         "runtime": _runtime,
         "evidence_init": _evidence_init,
