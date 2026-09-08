@@ -140,6 +140,93 @@ validate_document(
 Promote an extension into the common catalog only after it has reusable
 semantics and evidence from more than one domain.
 
+## Merge patches and semantic diff
+
+Scenario overlays use the native, typed implementation of
+[RFC 7396 section 2](https://www.rfc-editor.org/rfc/rfc7396#section-2).
+Object members merge recursively, `null` removes a member, and arrays replace
+as a whole. Inputs and outputs do not share mutable containers. Overlays apply
+in the given order, followed by contract validation.
+
+`semantic_diff` compares parsed values recursively without Python's scalar
+coercions: booleans differ from numbers, and integer/float representations such
+as `1` and `1.0` also produce a patch. Object key order and source formatting are
+ignored. A round-trip check rejects targets that require introducing an object
+member with value `null`, using `diff.unrepresentable`; an unchanged existing
+`null` and nulls inside replaced arrays are representable. This distinction is
+part of the diff API; RFC 7396 specifies patch application, not diff generation.
+The implementation is checked against the RFC's 15 Appendix A vectors and
+generated round-trip cases. It has no third-party merge-patch dependency.
+
+## JSON and YAML input
+
+Documents are UTF-8 mappings with string keys and finite JSON values. Files
+ending in `.json` are parsed strictly as JSON, without a YAML fallback;
+`.yaml`/`.yml` select YAML. For unnamed input, standard input, and other suffixes,
+a leading `{` or `[` selects strict JSON and other input selects YAML. Pass a
+YAML `source_name` to `loads_mapping` when using YAML flow syntax such as
+`{key: value}`. Duplicate keys are rejected in both formats, including nested
+objects and escaped spellings of the same JSON key. Digest-pinned extension
+schemas use the same strict JSON parser.
+
+The YAML loader uses the [YAML 1.2 core scalar rules](https://yaml.org/spec/1.2.2/#1032-tag-resolution):
+dates and timestamps stay strings; `yes`, `no`, `on`, `off`, `1:30`, `0b10` and
+`1_000` stay strings; only the core `true`/`false` spellings become booleans.
+`010` is decimal 10; `0o10` is octal 8 and `0x10` is hexadecimal 16. `1.10` and
+`1e2` are numbers; quote them when they represent textual versions or IDs.
+Non-finite numbers, non-string keys, non-core tags, aliases (including recursive
+and merge aliases), and multiple YAML documents are rejected. `<<` has no merge
+semantics. YAML output quotes strings using the same scalar rules and emits no
+aliases, so reading a written document preserves its JSON values.
+
+Each contract document or extension schema is limited to 8 MiB of UTF-8 input,
+64 node levels (root at level 1), and 100,000 nodes, counting mapping keys and
+values. File and stdin reads stop at the byte limit plus one sentinel byte.
+These bounds apply to document loaders, not retained raw evidence files.
+Limit failures use `input.limit_exceeded`, duplicates use `input.duplicate_key`
+with the member path, and aliases use `input.yaml_alias`. Other malformed input
+uses `input.parse_failed`; non-finite values use `input.non_finite_number`.
+
+## Errors and resource paths
+
+Expected validation and document-operation failures inherit from the public
+`ContractError`, which remains a `ValueError`. Existing specialized exception
+classes and their constructor signatures remain available. Every contract
+error has an `error_id` and a `json_path` (`None` when no document location
+applies). The CLI keeps its JSON diagnostic envelope
+`{"error": {"error_id": "...", "message": "...", "path": "..."}}`; `path` is
+omitted when unavailable. Schema diagnostics use jsonschema's `best_match`,
+including nested `anyOf`/`oneOf` errors, so the chosen message can change. See
+[jsonschema's selection rules](https://python-jsonschema.readthedocs.io/en/stable/errors/#best-match-and-relevance).
+
+CLI exit codes are 0 for success, 1 for invalid input, I/O failures or internal
+errors, and 2 for invalid arguments (including conflicting paths and malformed
+artifact/extension options). I/O errors use `input.io_error`; unexpected
+exceptions use `internal.error` without a traceback. Python I/O APIs retain
+their normal `OSError` behavior. Library programming errors are not converted
+to validation failures. `--help` and process interrupts retain normal behavior.
+All CLI file inputs and outputs expand `~` before accessing the filesystem.
+
+Error families include `schema.validation_failed`, `schema.unknown`,
+`schema.role_unknown`, `schema.reference_invalid`, `semantic.validation_failed`,
+`extension.validation_failed`, `qualification.invalid`,
+`qualification.unknown_domain`, `qualification.unknown_channel`,
+`provider.requirements_unsatisfied`, `receipt.validation_failed`,
+`clock.evidence_invalid`, `status.invalid`, `input.parse_failed`,
+`input.non_finite_number`, `input.invalid_timestamp`, `input.invalid`,
+and `cli.arguments_invalid`. Extension references resolve offline; dangling or
+non-terminating references encountered during validation are extension errors.
+Timestamp comparisons share one offset-aware parser; timestamp format
+validation remains the responsibility of the contract schema.
+
+`schema_dir()` and `schema_path()` still return `pathlib.Path` objects. For
+zip imports, `importlib.resources.as_file` extracts the schema directory once
+and its context stays open until process exit; an `atexit` handler removes the
+temporary directory, following the
+[resource context lifetime](https://docs.python.org/3/library/importlib.resources.html#importlib.resources.as_file).
+Callers can retain these paths within the process without
+adopting a context-manager API. Paths must not be persisted for another process.
+
 ## Version Policy
 
 Known consumers include the acceptance harness and runtime infra. They use

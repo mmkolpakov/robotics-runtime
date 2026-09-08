@@ -7,14 +7,21 @@ from secrets import token_hex
 from typing import Any
 from uuid import uuid4
 
-from json_merge_patch import create_patch, merge  # type: ignore[import-untyped]
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
+from referencing.exceptions import Unresolvable
+from referencing.jsonschema import DRAFT202012
 
 from robotics_runtime_contracts import (
     load_schema,
     resolve_schema_name,
     schema_digest,
+    schema_registry,
     validate_document,
 )
+from robotics_runtime_contracts._merge_patch import JSONValue, create_patch, json_equal, merge_patch
+from robotics_runtime_contracts.errors import ContractError
+from robotics_runtime_contracts.serialization import ensure_finite_numbers
 
 
 def _resolve_property(
@@ -23,26 +30,35 @@ def _resolve_property(
     current_schema: Mapping[str, Any],
 ) -> Mapping[str, Any]:
     resolved = value
-    schema = current_schema
-    visited: set[str] = set()
+    resolver = schema_registry().resolver_with_root(
+        DRAFT202012.create_resource(dict(current_schema))
+    )
+    resolver = resolver.in_subresource(DRAFT202012.create_resource(dict(value)))
+    visited: set[int] = set()
     while "$ref" in resolved:
         reference = str(resolved["$ref"])
-        if reference in visited:
-            raise ValueError(f"cyclic schema reference: {reference}")
-        visited.add(reference)
-        schema_id, _, fragment = reference.partition("#")
-        if schema_id:
-            schema = load_schema(schema_id)
-        target: Any = schema
-        if fragment:
-            if not fragment.startswith("/"):
-                raise ValueError(f"unsupported schema fragment: {reference}")
-            for token in fragment[1:].split("/"):
-                key = token.replace("~1", "/").replace("~0", "~")
-                target = target[key]
+        if id(resolved) in visited:
+            raise ContractError(
+                f"cyclic schema reference: {reference}", error_id="schema.reference_invalid"
+            )
+        visited.add(id(resolved))
+        try:
+            lookup = resolver.lookup(reference)
+            Draft202012Validator.check_schema(lookup.contents)
+        except (Unresolvable, ValueError, SchemaError) as error:
+            raise ContractError(
+                f"unresolvable schema reference: {reference}", error_id="schema.reference_invalid"
+            ) from error
+        target = lookup.contents
+        if isinstance(target, bool):
+            return {}
         if not isinstance(target, Mapping):
-            raise ValueError(f"schema reference does not resolve to an object: {reference}")
+            raise ContractError(
+                f"schema reference does not resolve to a schema: {reference}",
+                error_id="schema.reference_invalid",
+            )
         resolved = target
+        resolver = lookup.resolver
     return resolved
 
 
@@ -79,9 +95,13 @@ def resolve_merge_patches(
 ) -> dict[str, Any]:
     """Materialize RFC 7396 overlays and validate the resulting document."""
 
-    resolved: dict[str, Any] = deepcopy(dict(base))
+    ensure_finite_numbers(base)
+    resolved: dict[str, JSONValue] = deepcopy(dict(base))
     for overlay in overlays:
-        resolved = merge(resolved, deepcopy(dict(overlay)))
+        ensure_finite_numbers(overlay)
+        merged = merge_patch(resolved, dict(overlay))
+        assert isinstance(merged, dict)  # An object patch always produces an object.
+        resolved = merged
     validate_document(resolved, extension_schemas=extension_schemas)
     return resolved
 
@@ -90,14 +110,15 @@ def semantic_diff(
     source: Mapping[str, Any],
     target: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Return the minimal RFC 7396 patch from source to target."""
+    """Return an RFC 7396 patch preserving parsed JSON scalar types."""
 
+    ensure_finite_numbers(source)
+    ensure_finite_numbers(target)
     patch = create_patch(dict(source), dict(target))
-    if not isinstance(patch, dict):
-        raise ValueError("document roots must remain objects")
-    if merge(deepcopy(dict(source)), deepcopy(patch)) != dict(target):
-        raise ValueError(
-            "target cannot be represented by RFC 7396 because null denotes member removal"
+    if not json_equal(merge_patch(dict(source), patch), dict(target)):
+        raise ContractError(
+            "target cannot be represented by RFC 7396 because null denotes member removal",
+            error_id="diff.unrepresentable",
         )
     return patch
 
@@ -122,7 +143,7 @@ def create_execution_permit(
     """Create a validated, unsigned physical-execution permit predicate."""
 
     if not 1 <= validity_sec <= 1800:
-        raise ValueError("validity_sec must be between 1 and 1800")
+        raise ContractError("validity_sec must be between 1 and 1800")
     issued_at = (now or datetime.now(UTC)).astimezone(UTC)
     expires_at = issued_at + timedelta(seconds=validity_sec)
     document = {

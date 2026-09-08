@@ -192,7 +192,7 @@ def write_evidence_index(
     upload_mode: str = "local_only",
 ) -> Path:
     path.write_text(
-        yaml.safe_dump(
+        json.dumps(
             evidence_index(
                 run_id,
                 artifacts,
@@ -200,6 +200,7 @@ def write_evidence_index(
                 upload_mode=upload_mode,
             ),
             sort_keys=False,
+            allow_nan=False,
         ),
         encoding="utf-8",
     )

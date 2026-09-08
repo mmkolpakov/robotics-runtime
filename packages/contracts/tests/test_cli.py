@@ -86,7 +86,7 @@ def test_cli_rejects_schema_override_for_a_batch(
                 str(FIXTURE),
             ]
         )
-        == 1
+        == 2
     )
 
     captured = capsys.readouterr()
@@ -147,7 +147,7 @@ def test_cli_rejects_a_noncanonical_qualification_subject(
                 "--quiet",
             ]
         )
-        == 1
+        == 2
     )
 
     assert "non-canonical qualification subject name" in capsys.readouterr().err
@@ -247,7 +247,7 @@ def test_cli_rejects_destructive_resolve_paths(
                 str(overlay),
             ]
         )
-        == 1
+        == 2
     )
     assert overlay.read_bytes() == original
     assert "must not overwrite" in capsys.readouterr().err
@@ -267,7 +267,7 @@ def test_cli_rejects_destructive_resolve_paths(
                 str(output),
             ]
         )
-        == 1
+        == 2
     )
     assert not output.exists()
 

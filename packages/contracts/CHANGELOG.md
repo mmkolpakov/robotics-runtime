@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Replace `json-merge-patch` with a typed RFC 7396 implementation. Semantic diff
+  distinguishes booleans, integers and floats recursively, preserves input
+  containers, and reports `diff.unrepresentable` for unrepresentable null members.
+- Load YAML with 1.2 core scalar rules and matching output quoting; reject
+  duplicate JSON/YAML keys, aliases, non-JSON values and oversized/deep input.
+  JSON files and extension schemas no longer fall back to YAML parsing.
+- Unify expected failures under `ContractError`; report relevant schema errors,
+  argument exit code 2 and `internal.error` for unexpected CLI failures. Expand
+  home paths consistently, resolve schema references offline, retain extracted
+  schema paths until process exit, and share timestamp comparison parsing.
+- Reject foreign qualification domains and hop channels with explicit error IDs
+  and JSON paths, including failed, incomplete and error chains.
 - Add the CPython 3.12-3.14 CI matrix and declare `>=3.12,<3.15` support.
 - Allow `referencing>=0.37,<1` while retaining the locked resolution; enable
   Renovate hook updates and group duplicate tool pins. Hosted bot onboarding

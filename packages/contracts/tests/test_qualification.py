@@ -127,14 +127,14 @@ def test_canonical_loader_reads_every_artifact_once(monkeypatch: pytest.MonkeyPa
     specifications = qualification_specifications("inference")
     fixture_paths = {Path(value.partition("=")[2]) for value in specifications}
     reads: Counter[Path] = Counter()
-    original = Path.read_bytes
+    original = Path.open
 
-    def tracked(path: Path) -> bytes:
+    def tracked(path: Path, *args: Any, **kwargs: Any) -> Any:
         if path in fixture_paths:
             reads[path] += 1
-        return original(path)
+        return original(path, *args, **kwargs)
 
-    monkeypatch.setattr(Path, "read_bytes", tracked)
+    monkeypatch.setattr(Path, "open", tracked)
 
     validate_qualification_artifacts(specifications)
 
@@ -362,6 +362,58 @@ def test_qualification_binds_clock_relation_to_scenario_policy() -> None:
 
     with pytest.raises(QualificationError, match="clock relation .* policy"):
         _validate_links(items)
+
+
+@pytest.mark.parametrize("field", ["source_domain_id", "destination_domain_id"])
+def test_clock_relation_rejects_foreign_domain(field: str) -> None:
+    items = artifacts("transport")
+    relation = document(items, "evidence/control-worker-clock.json")
+    relation[field] = "ghost"
+    validate_document(relation)
+
+    with pytest.raises(QualificationError, match="ghost") as caught:
+        _validate_links(items)
+    assert caught.value.error_id == "qualification.unknown_domain"
+    assert caught.value.json_path == f"$.{field}"
+
+
+@pytest.mark.parametrize("endpoint", ["source", "destination"])
+def test_channel_rejects_foreign_endpoint_domain(endpoint: str) -> None:
+    items = artifacts("transport")
+    channel = document(items, "evidence/control-commands.json")
+    channel[endpoint]["domain_id"] = "ghost"
+    validate_document(channel)
+
+    with pytest.raises(QualificationError, match="ghost") as caught:
+        _validate_links(items)
+    assert caught.value.error_id == "qualification.unknown_domain"
+    assert caught.value.json_path == f"$.{endpoint}.domain_id"
+
+
+@pytest.mark.parametrize("status", ["passed", "failed", "incomplete", "error"])
+def test_every_chain_status_rejects_foreign_hop_channel(status: str) -> None:
+    items = artifacts("transport")
+    transport = document(items, "transport-qualification.json")
+    chain = transport["causal_chains"][0]
+    chain["status"] = status
+    if status != "passed":
+        chain["violations"] = [{"code": "missing_span", "message": "missing span"}]
+    chain["hops"][0]["channel_id"] = "ghost-channel"
+    transport["verdict"].update(status=status, passed_chain_count=0)
+    transport["verdict"][f"{status}_chain_count"] = 1
+    aggregate = document(items, "acceptance-aggregate.json")
+    aggregate["cross_domain_e2e"]["status"] = status
+    aggregate["cross_domain_e2e"]["transport_qualification"]["status"] = status
+
+    with pytest.raises(SemanticValidationError, match="ghost-channel") as caught_semantic:
+        validate_document(transport)
+    assert caught_semantic.value.error_id == "semantic.validation_failed"
+    assert caught_semantic.value.json_path == "$.causal_chains[0].hops[0].channel_id"
+
+    with pytest.raises(QualificationError, match="ghost-channel") as caught_link:
+        _validate_links(items)
+    assert caught_link.value.error_id == "qualification.unknown_channel"
+    assert caught_link.value.json_path == "$.causal_chains[0].hops[0].channel_id"
 
 
 def test_shared_clock_observations_belong_to_their_endpoint_domains() -> None:

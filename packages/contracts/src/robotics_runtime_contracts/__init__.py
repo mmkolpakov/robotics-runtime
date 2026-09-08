@@ -5,15 +5,16 @@ from collections.abc import Mapping
 from copy import deepcopy
 from functools import cache
 from hashlib import sha256
-from importlib.resources import files
 from pathlib import Path
 from typing import Any, cast
 
 from jsonschema import Draft202012Validator, FormatChecker
-from jsonschema.exceptions import ValidationError
+from jsonschema.exceptions import ValidationError, best_match
 from referencing import Registry
+from referencing.exceptions import Unresolvable
 from referencing.jsonschema import DRAFT202012, SchemaRegistry
 
+from robotics_runtime_contracts._resources import schema_directory
 from robotics_runtime_contracts.catalog import (
     UnknownContractRoleError,
     contract_roles,
@@ -22,6 +23,7 @@ from robotics_runtime_contracts.catalog import (
     role_schemas,
     schema_for_role,
 )
+from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.extensions import (
     ExtensionValidationError,
 )
@@ -69,7 +71,7 @@ _INTERNAL_SCHEMA_FILES = {name: f"{name}.schema.json" for name in internal_schem
 _SCHEMA_FILES = _PUBLIC_SCHEMA_FILES | _INTERNAL_SCHEMA_FILES
 
 
-class ContractValidationError(ValueError):
+class ContractValidationError(ContractError):
     """Raised when a document does not satisfy a public contract."""
 
     error_id = "schema.validation_failed"
@@ -78,10 +80,10 @@ class ContractValidationError(ValueError):
         self.schema_name = schema_name
         self.json_path = error.json_path
         self.validation_message = error.message
-        super().__init__(f"{self.json_path}: {self.validation_message}")
+        super().__init__(f"{self.json_path}: {self.validation_message}", json_path=error.json_path)
 
 
-class UnknownSchemaError(ValueError):
+class UnknownSchemaError(ContractError):
     """Raised when a requested schema version or identifier is not published."""
 
     error_id = "schema.unknown"
@@ -121,7 +123,9 @@ def resolve_schema_name(schema: str) -> str:
 
 
 def schema_dir() -> Path:
-    return Path(str(files("robotics_runtime_contracts").joinpath("schemas")))
+    """Return a resource directory that remains available until process exit."""
+
+    return schema_directory()
 
 
 def schema_path(schema: str) -> Path:
@@ -204,13 +208,15 @@ def validate_document(
     if not isinstance(selected_schema, str):
         raise UnknownSchemaError("Document must declare schema_version")
     schema_name = resolve_schema_name(selected_schema)
-    errors = sorted(
-        _validator(schema_name).iter_errors(document),
-        key=lambda error: tuple(str(part) for part in error.path),
-    )
-    if errors:
-        first_error = errors[0]
-        raise ContractValidationError(schema_name, first_error) from first_error
+    try:
+        error = best_match(_validator(schema_name).iter_errors(document))
+    except Unresolvable as cause:
+        raise ContractError(
+            f"unresolvable schema reference: {cause.ref}",
+            error_id="schema.reference_invalid",
+        ) from cause
+    if error is not None:
+        raise ContractValidationError(schema_name, error) from error
     _validate_semantics(schema_name, document)
     _validate_extensions(schema_name, document, extension_schemas)
 
@@ -235,6 +241,7 @@ __all__ = [
     "ChannelObservationStatus",
     "ClockEvidenceValidationError",
     "ContractValidationError",
+    "ContractError",
     "ArtifactReceiptValidationError",
     "DocumentParseError",
     "ExtensionValidationError",

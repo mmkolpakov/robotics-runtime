@@ -5,7 +5,6 @@ import re
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -20,11 +19,14 @@ from robotics_runtime_contracts import (
     validate_document,
     validate_provider_requirements,
 )
+from robotics_runtime_contracts._timestamps import parse_timestamp as _timestamp
+from robotics_runtime_contracts.errors import CLIArgumentError, ContractError
 from robotics_runtime_contracts.qualification_policy import (
     channel_observation_status,
     derive_channel_violations,
     hardware_clock_within_policy,
 )
+from robotics_runtime_contracts.serialization import read_document_bytes
 
 _ARTIFACT_ROLES = {
     "scenario": "acceptance_scenario",
@@ -75,22 +77,10 @@ _EXECUTION_FIELDS = (
 )
 
 
-class QualificationError(ValueError):
+class QualificationError(ContractError):
     """Raised when individually valid qualification documents contradict each other."""
 
     error_id = "qualification.invalid"
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        error_id: str | None = None,
-        json_path: str | None = None,
-    ) -> None:
-        if error_id is not None:
-            self.error_id = error_id
-        self.json_path = json_path
-        super().__init__(message)
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,19 +92,19 @@ class _Artifact:
     document: Mapping[str, Any] | None
 
 
-def _fail(message: str) -> NoReturn:
-    raise QualificationError(message)
+def _fail(
+    message: str,
+    *,
+    error_id: str = "qualification.invalid",
+    json_path: str | None = None,
+) -> NoReturn:
+    raise QualificationError(message, error_id=error_id, json_path=json_path)
 
 
 def _document(artifact: _Artifact) -> Mapping[str, Any]:
     if artifact.document is None:
         _fail(f"{artifact.kind} requires a contract document")
     return artifact.document
-
-
-def _timestamp(value: str) -> datetime:
-    normalized = f"{value[:-1]}+00:00" if value.endswith(("Z", "z")) else value
-    return datetime.fromisoformat(normalized)
 
 
 def _require_time_order(label: str, *values: str) -> None:
@@ -889,6 +879,42 @@ def _validate_channel_delivery(channel: Mapping[str, Any], observation: Mapping[
         _fail(f"channel observation {observation['observation_id']} contradicts its contract")
 
 
+def _require_known_domain(
+    artifact: _Artifact,
+    domain_id: str,
+    results: Mapping[str, _Artifact],
+    json_path: str,
+) -> None:
+    if domain_id not in results:
+        _fail(
+            f"{artifact.subject_name}: unknown acceptance run domain {domain_id!r}",
+            error_id="qualification.unknown_domain",
+            json_path=json_path,
+        )
+
+
+def _validate_transport_references(
+    transport: _Artifact,
+    transport_document: Mapping[str, Any],
+    channels: Mapping[str, _Artifact],
+    results: Mapping[str, _Artifact],
+) -> None:
+    for artifact in channels.values():
+        channel = _document(artifact)
+        for endpoint in ("source", "destination"):
+            _require_known_domain(
+                artifact, channel[endpoint]["domain_id"], results, f"$.{endpoint}.domain_id"
+            )
+    for chain_index, chain in enumerate(transport_document["causal_chains"]):
+        for hop_index, hop in enumerate(chain["hops"]):
+            if hop["channel_id"] not in channels:
+                _fail(
+                    f"{transport.subject_name}: unknown channel {hop['channel_id']!r}",
+                    error_id="qualification.unknown_channel",
+                    json_path=f"$.causal_chains[{chain_index}].hops[{hop_index}].channel_id",
+                )
+
+
 def _validate_transport(
     grouped: Mapping[str, Sequence[_Artifact]],
     run_id: str,
@@ -948,6 +974,7 @@ def _validate_transport(
         _fail("aggregate transport qualification pointer does not match local result")
 
     chains, channels, observations = _transport_sources(grouped, run_id)
+    _validate_transport_references(transport, transport_document, channels, results)
     relation_artifacts = grouped.get("clock_relation", ())
     scenario = _document(scenario_artifact)
     _require_equal(
@@ -977,7 +1004,9 @@ def _validate_transport(
             relation["finished_at"],
             evaluated_at,
         )
-        for domain_id in (relation["source_domain_id"], relation["destination_domain_id"]):
+        for field in ("source_domain_id", "destination_domain_id"):
+            domain_id = relation[field]
+            _require_known_domain(artifact, domain_id, results, f"$.{field}")
             domain_result = _document(results[domain_id])
             _require_time_order(
                 f"clock relation {relation_id} domain {domain_id} window",
@@ -1355,20 +1384,22 @@ def _load_artifact(
     kind, kind_separator, remainder = specification.partition(":")
     subject_name, path_separator, path_value = remainder.partition("=")
     if not kind_separator or not path_separator or not kind or not subject_name or not path_value:
-        _fail("--artifact must use KIND:SUBJECT=PATH")
+        raise CLIArgumentError("--artifact must use KIND:SUBJECT=PATH")
     if kind not in _CONTRACT_SCHEMAS and kind not in _RAW_ARTIFACT_KINDS:
-        _fail(f"unsupported qualification artifact kind: {kind}")
+        raise CLIArgumentError(f"unsupported qualification artifact kind: {kind}")
     if not _SUBJECT_NAME.fullmatch(subject_name) or ".." in subject_name or "//" in subject_name:
-        _fail(f"non-canonical qualification subject name: {subject_name}")
+        raise CLIArgumentError(f"non-canonical qualification subject name: {subject_name}")
 
-    path = Path(path_value)
-    raw = path.read_bytes()
+    path = Path(path_value).expanduser()
+    raw = read_document_bytes(path) if kind in _CONTRACT_SCHEMAS else path.read_bytes()
     document = None
     if kind in _CONTRACT_SCHEMAS:
         try:
             document = loads_mapping(raw, source_name=str(path))
-        except ValueError as error:
-            _fail(str(error))
+        except ContractError as error:
+            raise QualificationError(
+                str(error), error_id=error.error_id, json_path=error.json_path
+            ) from error
         schema = document.get("schema_version")
         if not isinstance(schema, str) or schema not in _CONTRACT_SCHEMAS[kind]:
             _fail(
@@ -1381,11 +1412,11 @@ def _load_artifact(
                 schema=schema,
                 extension_schemas=((extension_schemas or None) if kind == "scenario" else None),
             )
-        except ValueError as error:
+        except ContractError as error:
             raise QualificationError(
                 f"{path} does not satisfy {schema}: {error}",
-                error_id=getattr(error, "error_id", None),
-                json_path=getattr(error, "json_path", None),
+                error_id=error.error_id,
+                json_path=error.json_path,
             ) from error
     return _Artifact(kind, subject_name, hashlib.sha256(raw).hexdigest(), len(raw), document)
 

@@ -4,6 +4,8 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from typing import Any, NoReturn
 
+from robotics_runtime_contracts._timestamps import parse_timestamp
+from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.qualification_policy import (
     RESERVED_ASSERTION_IDS,
     RESERVED_METRIC_NAMES,
@@ -12,7 +14,7 @@ from robotics_runtime_contracts.qualification_policy import (
 from robotics_runtime_contracts.status import worst_status
 
 
-class SemanticValidationError(ValueError):
+class SemanticValidationError(ContractError):
     """Raised when structurally valid contract fields contradict each other."""
 
     error_id = "semantic.validation_failed"
@@ -21,7 +23,7 @@ class SemanticValidationError(ValueError):
         self.schema_name = schema_name
         self.json_path = json_path
         self.validation_message = message
-        super().__init__(f"{json_path}: {message}")
+        super().__init__(f"{json_path}: {message}", json_path=json_path)
 
 
 def _fail(schema_name: str, path: str, message: str) -> NoReturn:
@@ -30,9 +32,8 @@ def _fail(schema_name: str, path: str, message: str) -> NoReturn:
 
 def _timestamp(schema_name: str, path: str, value: str) -> datetime:
     try:
-        normalized = f"{value[:-1]}+00:00" if value.endswith(("Z", "z")) else value
-        return datetime.fromisoformat(normalized)
-    except (TypeError, ValueError) as error:
+        return parse_timestamp(value, json_path=path)
+    except ContractError as error:
         _fail(schema_name, path, f"must be a valid date-time: {error}")
 
 
@@ -690,6 +691,21 @@ def _validate_acceptance_aggregate(document: Mapping[str, Any]) -> None:
         )
 
 
+def _require_known_hop_channels(
+    schema_name: str,
+    chain_index: int,
+    hop_ids: Sequence[str],
+    contract_ids: set[str],
+) -> None:
+    for hop_index, hop_id in enumerate(hop_ids):
+        if hop_id not in contract_ids:
+            _fail(
+                schema_name,
+                f"$.causal_chains[{chain_index}].hops[{hop_index}].channel_id",
+                f"unknown channel contract: {hop_id!r}",
+            )
+
+
 def _validate_transport_qualification(document: Mapping[str, Any]) -> None:
     schema_name = document["schema_version"]
     result_domains = {
@@ -791,6 +807,7 @@ def _validate_transport_qualification(document: Mapping[str, Any]) -> None:
                     "must continue from the preceding channel destination",
                 )
         hop_ids = [hop["channel_id"] for hop in chain["hops"]]
+        _require_known_hop_channels(schema_name, index, hop_ids, contract_ids)
         if len(hop_ids) != len(set(hop_ids)):
             _fail(
                 schema_name,

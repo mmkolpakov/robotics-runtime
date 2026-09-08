@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, replace
 from hashlib import sha256
-from typing import Any, NoReturn
+from typing import Any, NoReturn, Protocol, cast
 
 from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema.exceptions import SchemaError, ValidationError, best_match
+from jsonschema.protocols import Validator
+from jsonschema.validators import validator_for
+from referencing import Registry
+from referencing.exceptions import Unresolvable
+from referencing.jsonschema import DRAFT202012, Schema, SchemaRegistry, SchemaResource
 
+from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.semantics import SemanticValidationError
-from robotics_runtime_contracts.serialization import (
-    NonFiniteNumberError,
-    ensure_finite_numbers,
-)
+from robotics_runtime_contracts.serialization import loads_mapping
 
 
 class ExtensionValidationError(SemanticValidationError):
@@ -83,6 +88,101 @@ def _reject_external_references(schema_name: str, schema: object, path: str = "$
                 )
 
 
+class _ReferenceResolver(Protocol):
+    def lookup(self, ref: str) -> _ResolvedReference: ...
+
+    def in_subresource(self, subresource: SchemaResource) -> _ReferenceResolver: ...
+
+    def dynamic_scope(self) -> Iterable[tuple[str, SchemaRegistry]]: ...
+
+
+class _ResolvedReference(Protocol):
+    @property
+    def contents(self) -> Schema: ...
+
+    @property
+    def resolver(self) -> _ReferenceResolver: ...
+
+
+class _ResolverValidatorFactory(Protocol):
+    def __call__(
+        self,
+        schema: Schema,
+        *,
+        format_checker: FormatChecker,
+        registry: SchemaRegistry,
+        _resolver: _ReferenceResolver,
+    ) -> Validator: ...
+
+
+@dataclass(frozen=True)
+class _CheckedReference:
+    contents: Schema
+    resolver: _ReferenceResolver
+
+
+@dataclass(frozen=True)
+class _CheckedResolver:
+    resolver: _ReferenceResolver
+    schema_name: str
+    declaration_path: str
+
+    def lookup(self, ref: str) -> _ResolvedReference:
+        try:
+            resolved = self.resolver.lookup(ref)
+        except (Unresolvable, ValueError, TypeError) as error:
+            _fail(
+                self.schema_name,
+                self.declaration_path,
+                f"schema reference cannot be evaluated: {error}",
+            )
+        try:
+            if isinstance(resolved.contents, Mapping):
+                validator_for(resolved.contents, default=Draft202012Validator).check_schema(
+                    dict(resolved.contents)
+                )
+            else:
+                Draft202012Validator.check_schema(resolved.contents)
+        except SchemaError as error:
+            _fail(
+                self.schema_name,
+                self.declaration_path,
+                f"schema reference cannot be evaluated: {error}",
+            )
+        return _CheckedReference(resolved.contents, replace(self, resolver=resolved.resolver))
+
+    def in_subresource(self, subresource: SchemaResource) -> _CheckedResolver:
+        resolver = self.resolver.in_subresource(subresource)
+        return self if resolver is self.resolver else replace(self, resolver=resolver)
+
+    def dynamic_scope(self) -> Iterable[tuple[str, SchemaRegistry]]:
+        return self.resolver.dynamic_scope()
+
+
+def _extension_validation_error(
+    schema_name: str,
+    schema: Mapping[str, Any],
+    instance: Any,
+    declaration_path: str,
+) -> ValidationError | None:
+    resource = DRAFT202012.create_resource(schema)
+    registry = Registry().with_resource(resource.id() or "", resource)
+    resolver = _CheckedResolver(
+        registry.resolver_with_root(resource), schema_name, declaration_path
+    )
+    # jsonschema 4.26 has no public per-lookup hook for local references. Keep its
+    # private resolver injection here; evolve/descend retain this adapter even
+    # across $schema dialect changes. All resolution stays in referencing.
+    validator = cast(_ResolverValidatorFactory, Draft202012Validator)(
+        schema, format_checker=FormatChecker(), registry=registry, _resolver=resolver
+    )
+    try:
+        validation_error: ValidationError | None = best_match(validator.iter_errors(instance))
+        return validation_error
+    except RecursionError as error:
+        _fail(schema_name, declaration_path, f"schema reference cannot be evaluated: {error}")
+
+
 def validate_extensions(
     schema_name: str,
     document: Mapping[str, Any],
@@ -142,16 +242,13 @@ def validate_extensions(
             )
 
         try:
-            extension_schema = json.loads(raw_bytes)
-            ensure_finite_numbers(extension_schema)
-        except (UnicodeDecodeError, json.JSONDecodeError, NonFiniteNumberError) as error:
+            extension_schema = loads_mapping(raw_bytes, source_name="extension-schema.json")
+        except ContractError as error:
             _fail(
                 schema_name,
                 f"$.extension_schemas[{index}]",
                 f"schema must be UTF-8 JSON: {error}",
             )
-        if not isinstance(extension_schema, dict):
-            _fail(schema_name, f"$.extension_schemas[{index}]", "schema root must be an object")
         if extension_schema.get("$id") != uri:
             _fail(
                 schema_name,
@@ -162,26 +259,21 @@ def validate_extensions(
         _reject_external_references(schema_name, extension_schema)
         try:
             Draft202012Validator.check_schema(extension_schema)
-        except Exception as error:
+        except SchemaError as error:
             _fail(
                 schema_name,
                 f"$.extension_schemas[{index}]",
                 f"invalid Draft 2020-12 schema: {error}",
             )
 
-        errors = sorted(
-            Draft202012Validator(
-                extension_schema,
-                format_checker=FormatChecker(),
-            ).iter_errors(extensions[namespace]),
-            key=lambda error: tuple(str(part) for part in error.path),
+        validation_error = _extension_validation_error(
+            schema_name, extension_schema, extensions[namespace], f"$.extension_schemas[{index}]"
         )
-        if errors:
-            validation_error = errors[0]
+        if validation_error is not None:
             suffix = validation_error.json_path.removeprefix("$")
             _fail(
                 schema_name,
-                f"$.extensions.{namespace}{suffix}",
+                f"$.extensions[{json.dumps(namespace, ensure_ascii=False)}]{suffix}",
                 validation_error.message,
             )
 

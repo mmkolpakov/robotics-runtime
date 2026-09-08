@@ -6,8 +6,10 @@ from importlib.resources import files
 from types import MappingProxyType
 from typing import Any, cast
 
+from robotics_runtime_contracts.errors import ContractError
 
-class UnknownContractRoleError(ValueError):
+
+class UnknownContractRoleError(ContractError):
     """Raised when a caller requests an unpublished document role."""
 
     error_id = "schema.role_unknown"

@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping
-from datetime import datetime
 from typing import Any
 
+from robotics_runtime_contracts._timestamps import parse_timestamp
+from robotics_runtime_contracts.errors import ContractError
 
-class ArtifactReceiptValidationError(ValueError):
+
+class ArtifactReceiptValidationError(ContractError):
     """Raised when an artifact receipt contradicts its external verification."""
 
-
-def _timestamp(value: str) -> datetime:
-    normalized = f"{value[:-1]}+00:00" if value.endswith(("Z", "z")) else value
-    return datetime.fromisoformat(normalized)
+    error_id = "receipt.validation_failed"
 
 
 def validate_artifact_receipt(
@@ -34,7 +33,9 @@ def validate_artifact_receipt(
     for label, expected, observed in comparisons:
         if observed != expected:
             raise ArtifactReceiptValidationError(f"{label} does not match the receipt")
-    if _timestamp(verification["verified_at"]) > _timestamp(receipt["created_at"]):
+    if parse_timestamp(verification["verified_at"], json_path="$.verified_at") > parse_timestamp(
+        receipt["created_at"], json_path="$.created_at"
+    ):
         raise ArtifactReceiptValidationError("receipt was created before its verification")
 
     dependencies = {

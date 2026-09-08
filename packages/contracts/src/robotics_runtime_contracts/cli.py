@@ -8,8 +8,6 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, NoReturn
 
-import yaml
-
 from robotics_runtime_contracts import (
     ensure_finite_numbers,
     loads_mapping,
@@ -23,12 +21,13 @@ from robotics_runtime_contracts.document_ops import (
     resolve_merge_patches,
     semantic_diff,
 )
-
-
-class CLIArgumentError(ValueError):
-    """Raised for stable machine-readable command-line parsing failures."""
-
-    error_id = "cli.arguments_invalid"
+from robotics_runtime_contracts.errors import CLIArgumentError as CLIArgumentError
+from robotics_runtime_contracts.errors import ContractError
+from robotics_runtime_contracts.serialization import (
+    dumps_yaml,
+    read_document_bytes,
+    read_document_stream,
+)
 
 
 class ContractArgumentParser(argparse.ArgumentParser):
@@ -143,7 +142,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _read_document_source(path: str) -> tuple[Mapping[str, Any], bytes]:
-    source = sys.stdin.buffer.read() if path == "-" else Path(path).read_bytes()
+    source = read_document_stream(sys.stdin.buffer) if path == "-" else read_document_bytes(path)
     document = loads_mapping(source, source_name=path)
     return document, source
 
@@ -154,10 +153,10 @@ def _read_document(path: str) -> Mapping[str, Any]:
 
 def _write_document(path: str | Path, document: Mapping[str, Any]) -> Path:
     ensure_finite_numbers(document)
-    output = Path(path)
+    output = Path(path).expanduser()
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.suffix.lower() in {".yaml", ".yml"}:
-        content = yaml.safe_dump(dict(document), sort_keys=False)
+        content = dumps_yaml(document)
     else:
         content = json.dumps(document, allow_nan=False, indent=2, sort_keys=True) + "\n"
     output.write_text(content, encoding="utf-8")
@@ -169,10 +168,10 @@ def _read_extension_schemas(values: Sequence[str]) -> dict[str, bytes]:
     for value in values:
         uri, separator, path = value.partition("=")
         if not separator or not uri or not path:
-            raise ValueError("--extension-schema must use URI=PATH")
+            raise CLIArgumentError("--extension-schema must use URI=PATH")
         if uri in schemas:
-            raise ValueError(f"duplicate extension schema URI: {uri}")
-        schemas[uri] = Path(path).read_bytes()
+            raise CLIArgumentError(f"duplicate extension schema URI: {uri}")
+        schemas[uri] = read_document_bytes(path)
     return schemas
 
 
@@ -183,12 +182,12 @@ def _emit(payload: Mapping[str, Any], *, output_format: str) -> None:
         print(str(payload.get("message", json.dumps(payload, allow_nan=False, sort_keys=True))))
 
 
-def _emit_error(error: Exception, *, output_format: str) -> None:
+def _emit_error(error: ContractError, *, output_format: str) -> None:
     payload: dict[str, Any] = {
-        "error_id": getattr(error, "error_id", "input.invalid"),
+        "error_id": error.error_id,
         "message": str(error),
     }
-    json_path = getattr(error, "json_path", None)
+    json_path = error.json_path
     if json_path is not None:
         payload["path"] = json_path
     if output_format == "json":
@@ -215,9 +214,9 @@ def _scenario_resolve(arguments: argparse.Namespace) -> None:
         Path(arguments.trace_output).expanduser().resolve() if arguments.trace_output else None
     )
     if output_path in inputs or trace_path in inputs:
-        raise ValueError("scenario outputs must not overwrite an input document")
+        raise CLIArgumentError("scenario outputs must not overwrite an input document")
     if trace_path is not None and trace_path == output_path:
-        raise ValueError("--output and --trace-output must identify different files")
+        raise CLIArgumentError("--output and --trace-output must identify different files")
     resolved = resolve_merge_patches(
         base,
         overlays,
@@ -249,6 +248,8 @@ def _scenario_resolve(arguments: argparse.Namespace) -> None:
 
 
 def _permit_init(arguments: argparse.Namespace) -> None:
+    if not 1 <= arguments.validity_sec <= 1800:
+        raise CLIArgumentError("--validity-sec must be between 1 and 1800")
     permit = create_execution_permit(
         scenario_sha256=arguments.scenario_sha256,
         subject_digest=arguments.subject_digest,
@@ -284,73 +285,92 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif token.startswith("--format="):
             output_format = token.partition("=")[2]
     try:
-        arguments = _parser().parse_args(tokens)
+        return _run(_parser().parse_args(tokens))
     except CLIArgumentError as error:
-        _emit_error(
-            error,
-            output_format=output_format if output_format in {"text", "json"} else "text",
-        )
+        _emit_error(error, output_format=output_format)
         return 2
-    documents: list[tuple[str, str]] = []
-    try:
-        if arguments.command == "validate":
-            extension_schemas = _read_extension_schemas(arguments.extension_schema)
-            if arguments.schema is not None and len(arguments.documents) != 1:
-                raise ValueError("--schema requires exactly one document")
-            if arguments.documents.count("-") > 1:
-                raise ValueError("standard input may be selected only once")
-            for path in arguments.documents:
-                document = _read_document(path)
-                validate_document(
-                    document,
-                    schema=arguments.schema,
-                    extension_schemas=extension_schemas or None,
-                )
-                selected = arguments.schema or document.get("schema_version")
-                if not isinstance(selected, str):
-                    raise ValueError("document must declare schema_version")
-                documents.append((path, resolve_schema_name(selected)))
-        elif arguments.command == "validate-qualification":
-            result = validate_qualification_artifacts(
-                arguments.artifact,
-                _read_extension_schemas(arguments.extension_schema),
-            )
-            if arguments.output:
-                _write_document(arguments.output, result)
-        elif arguments.command == "describe":
-            print(
-                json.dumps(
-                    describe_schema(arguments.schema),
-                    allow_nan=False,
-                    indent=2,
-                    sort_keys=True,
-                )
-            )
-            return 0
-        elif arguments.command == "diff":
-            patch = semantic_diff(
-                _read_document(arguments.source),
-                _read_document(arguments.target),
-            )
-            if arguments.output:
-                _write_document(arguments.output, patch)
-            else:
-                print(json.dumps(patch, allow_nan=False, indent=2, sort_keys=True))
-            return 0
-        elif arguments.command == "scenario":
-            _scenario_resolve(arguments)
-            return 0
-        elif arguments.command == "permit":
-            _permit_init(arguments)
-            return 0
-        else:
-            raise AssertionError(f"unhandled command: {arguments.command}")
-    except (OSError, ValueError, yaml.YAMLError) as error:
-        _emit_error(error, output_format=arguments.format)
-        return 1
+    except ContractError as error:
+        _emit_error(error, output_format=output_format)
+    except OSError as error:
+        _emit_error(
+            ContractError(str(error), error_id="input.io_error"), output_format=output_format
+        )
+    except Exception as error:
+        _emit_error(
+            ContractError(f"{type(error).__name__}: {error}", error_id="internal.error"),
+            output_format=output_format,
+        )
+    return 1
 
-    if arguments.quiet:
+
+def _validate_documents(arguments: argparse.Namespace) -> list[tuple[str, str]]:
+    documents: list[tuple[str, str]] = []
+    extension_schemas = _read_extension_schemas(arguments.extension_schema)
+    if arguments.schema is not None and len(arguments.documents) != 1:
+        raise CLIArgumentError("--schema requires exactly one document")
+    if arguments.documents.count("-") > 1:
+        raise CLIArgumentError("standard input may be selected only once")
+    for path in arguments.documents:
+        document = _read_document(path)
+        validate_document(
+            document,
+            schema=arguments.schema,
+            extension_schemas=extension_schemas or None,
+        )
+        selected = arguments.schema or document.get("schema_version")
+        if not isinstance(selected, str):
+            raise ContractError("document must declare schema_version")
+        documents.append((path, resolve_schema_name(selected)))
+    return documents
+
+
+def _run(arguments: argparse.Namespace) -> int:
+    documents: list[tuple[str, str]] = []
+    if arguments.command == "validate":
+        documents = _validate_documents(arguments)
+    elif arguments.command == "validate-qualification":
+        result = validate_qualification_artifacts(
+            arguments.artifact,
+            _read_extension_schemas(arguments.extension_schema),
+        )
+        if arguments.output:
+            _write_document(arguments.output, result)
+    elif arguments.command == "describe":
+        print(
+            json.dumps(
+                describe_schema(arguments.schema),
+                allow_nan=False,
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return 0
+    elif arguments.command == "diff":
+        patch = semantic_diff(
+            _read_document(arguments.source),
+            _read_document(arguments.target),
+        )
+        if arguments.output:
+            _write_document(arguments.output, patch)
+        else:
+            print(json.dumps(patch, allow_nan=False, indent=2, sort_keys=True))
+        return 0
+    elif arguments.command == "scenario":
+        _scenario_resolve(arguments)
+        return 0
+    elif arguments.command == "permit":
+        _permit_init(arguments)
+        return 0
+    else:
+        raise AssertionError(f"unhandled command: {arguments.command}")
+
+    _emit_validation(arguments, documents)
+    return 0
+
+
+def _emit_validation(arguments: argparse.Namespace, documents: Sequence[tuple[str, str]]) -> None:
+    if arguments.quiet:
+        return
     if arguments.command == "validate-qualification":
         _emit(
             {"message": "valid: qualification artifact set", "status": "valid"},
@@ -371,7 +391,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 },
                 output_format=arguments.format,
             )
-    return 0
 
 
 if __name__ == "__main__":
