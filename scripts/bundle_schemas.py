@@ -60,9 +60,9 @@ def subschemas(schema: Schema) -> Iterator[Schema]:
         )
 
 
-def check_dialect(schema: Schema, *, require_declaration: bool = True) -> None:
+def check_dialect(schema: Schema) -> None:
     """Require the one supported root dialect; nested declarations are unsupported."""
-    if schema.get("$schema", None if require_declaration else DIALECT) != DIALECT:
+    if schema.get("$schema") != DIALECT:
         raise ValueError(f"Schema must declare Draft 2020-12: {schema.get('$id')}")
     for node in subschemas(schema):
         if node is not schema and "$schema" in node:
@@ -71,10 +71,23 @@ def check_dialect(schema: Schema, *, require_declaration: bool = True) -> None:
             )
 
 
+def schema_locations(registry: Registry[Any]) -> set[int]:
+    """Identify schema objects by location, never by equality with instance data."""
+    return {id(node) for resource in registry.values() for node in subschemas(resource.contents)}
+
+
+def check_target(target: Any, locations: set[int], reference: str) -> None:
+    """Reject objects outside the dialect's schema locations, including chained refs."""
+    Draft202012Validator.check_schema(target)
+    if isinstance(target, dict) and id(target) not in locations:
+        raise ValueError(f"Reference target is not a known schema location: {reference}")
+
+
 def check_references(schemas: dict[str, Schema]) -> None:
     for schema in schemas.values():
         Draft202012Validator.check_schema(schema)
     registry = registry_for(schemas)
+    locations = schema_locations(registry)
     for name, schema in schemas.items():
         resolver = registry.resolver(schema["$id"])
         for node in subschemas(schema):
@@ -85,12 +98,8 @@ def check_references(schemas: dict[str, Schema]) -> None:
             if "$dynamicRef" in node or "$dynamicAnchor" in node:
                 raise ValueError(f"Dynamic references are outside the core source format: {name}")
             if "$ref" in node:
-                # Lookup alone may return a string, array, or malformed object.
-                # The metaschema accepts only valid object/boolean schema targets.
                 target = resolver.lookup(node["$ref"]).contents
-                Draft202012Validator.check_schema(target)
-                if isinstance(target, dict):
-                    check_dialect(target, require_declaration=False)
+                check_target(target, locations, node["$ref"])
 
 
 def assemble(schema: Schema, registry: Registry[Any]) -> Schema:
@@ -101,6 +110,7 @@ def assemble(schema: Schema, registry: Registry[Any]) -> Schema:
     sibling constraints or accidentally changing JSON Schema evaluation scope.
     """
     result = deepcopy(schema)
+    locations = schema_locations(registry)
     for name, definition in result.get("$defs", {}).items():
         if not isinstance(definition, dict):
             raise ValueError(f"Core definitions must be schema objects: {name}")
@@ -109,6 +119,7 @@ def assemble(schema: Schema, registry: Registry[Any]) -> Schema:
             if set(definition) != {"$ref"}:
                 raise ValueError(f"Definition import must contain only $ref: {name}")
             resolved = registry.resolver(schema["$id"]).lookup(reference).contents
+            check_target(resolved, locations, reference)
             if not isinstance(resolved, dict):
                 raise ValueError(f"Definition import must resolve to a schema object: {name}")
             result["$defs"][name] = deepcopy(resolved)

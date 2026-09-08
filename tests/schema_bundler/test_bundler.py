@@ -173,9 +173,9 @@ def test_a_reference_cannot_introduce_an_unsupported_target_dialect(
         "const": target,
         "$ref": "#/const",
     }
-    # Const is normally instance data, but lookup makes it a validation target.
+    # Const remains instance data and cannot become an object-schema target.
     bundler.registry_for({"core": schema})
-    with pytest.raises(ValueError, match=r"must declare Draft 2020-12|Nested \$schema"):
+    with pytest.raises(ValueError, match="not a known schema location"):
         bundler.check_references({"core": schema})
 
 
@@ -200,6 +200,87 @@ def test_invalid_target_fails_even_with_matching_output_bytes(
     assert bundler.main(args) == 1
     assert "Schema bundling failed:" in capsys.readouterr().err
     assert all(path.read_bytes() == content for path in paths)
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        pytest.param({"$ref": "#/examples/0"}, id="chained-string-target"),
+        pytest.param({"$id": "urn:example:hidden"}, id="hidden-id"),
+        pytest.param({"$dynamicRef": "#hidden"}, id="hidden-dynamic-ref"),
+        pytest.param({"$dynamicAnchor": "hidden"}, id="hidden-dynamic-anchor"),
+        pytest.param({"type": "object"}, id="equal-but-distinct-schema"),
+        pytest.param({}, id="empty-instance-object"),
+    ],
+)
+def test_refs_into_instance_objects_fail_check_with_matching_bytes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], target: dict[str, Any]
+) -> None:
+    schema = {
+        "$schema": bundler.DIALECT,
+        "$id": "urn:example:core",
+        "$defs": {"same": {"type": "object"}, "empty": {}},
+        "const": target,
+        "examples": ["object"],
+        "$ref": "#/const",
+    }
+    # Both the root and the first target pass the metaschema. The target is
+    # instance data, even when it is equal to a real definition elsewhere.
+    Draft202012Validator.check_schema(schema)
+    Draft202012Validator.check_schema(target)
+    content = bundler.render(schema)
+    paths = [tmp_path / group / "example-core.v1.schema.json" for group in ("src", "out")]
+    for path in paths:
+        path.parent.mkdir()
+        path.write_bytes(content)
+    args = ["--sources", str(paths[0].parent), "--resources", str(paths[1].parent), "--check"]
+    assert bundler.main(args) == 1
+    assert "not a known schema location" in capsys.readouterr().err
+    assert all(path.read_bytes() == content for path in paths)
+
+
+def test_build_imports_cannot_materialize_instance_objects(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fragment = {
+        "$schema": bundler.DIALECT,
+        "$id": bundler.SOURCE_PREFIX + "fragment",
+        "const": {"type": "string"},
+    }
+    source = {
+        "$schema": bundler.DIALECT,
+        "$id": "urn:example:core",
+        "$defs": {"imported": {"$ref": f"{fragment['$id']}#/const"}},
+    }
+    output = {**source, "$defs": {"imported": fragment["const"]}}
+    for group, schema in (("src", source), ("out", output)):
+        directory = tmp_path / group
+        directory.mkdir()
+        (directory / "example-core.v1.schema.json").write_bytes(bundler.render(schema))
+    fragments = tmp_path / "src/fragments"
+    fragments.mkdir()
+    (fragments / "fragment.schema.json").write_bytes(bundler.render(fragment))
+    args = ["--sources", str(tmp_path / "src"), "--resources", str(tmp_path / "out"), "--check"]
+    assert bundler.main(args) == 1
+    assert "not a known schema location" in capsys.readouterr().err
+    assert (tmp_path / "out/example-core.v1.schema.json").read_bytes() == bundler.render(output)
+
+
+@pytest.mark.parametrize("target", [True, False])
+def test_boolean_targets_do_not_need_object_schema_locations(tmp_path: Path, target: bool) -> None:
+    schema = {
+        "$schema": bundler.DIALECT,
+        "$id": "urn:example:core",
+        "const": target,
+        "$ref": "#/const",
+    }
+    content = bundler.render(schema)
+    for group in ("src", "out"):
+        directory = tmp_path / group
+        directory.mkdir()
+        (directory / "example-core.v1.schema.json").write_bytes(content)
+    args = ["--sources", str(tmp_path / "src"), "--resources", str(tmp_path / "out"), "--check"]
+    assert bundler.main(args) == 0
 
 
 @pytest.mark.parametrize(
