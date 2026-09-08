@@ -106,12 +106,15 @@ must verify them before enabling publication:
 
 1. Register a GitHub Trusted Publisher separately for **both PyPI projects**, with
    owner `mmkolpakov`, repository `robotics-runtime`, workflow filename `release.yml`, and
-   environment `pypi`. Follow [PyPI's publisher registration guide][publisher], or configure
+   environment `pypi` for contracts and `pypi-harness` for harness. Pending publishers
+   for two new projects cannot share the same repository/workflow/environment tuple.
+   Follow [PyPI's publisher registration guide][publisher], or configure
    a [pending publisher][pending] if the project does not exist yet. Registration itself
    does not establish that a version is available from PyPI. Do not add
    a long-lived PyPI API token to this workflow.
-2. Create the GitHub `pypi` environment and configure its reviewers and permitted tag
-   patterns for the two release prefixes. Check required branch/tag protection independently;
+2. Create the GitHub `pypi` and `pypi-harness` environments, each with required reviewers.
+   Permit only `contracts-v*` tags in `pypi` and `harness-v*` tags in `pypi-harness`.
+   Check required branch/tag protection independently;
    this workflow does not change rules or the stable `validate` CI context.
 3. Enable immutable GitHub releases. The final job deliberately fails if
    [`gh release verify`][verify-release] or [`gh release verify-asset`][verify-asset]
@@ -121,7 +124,8 @@ must verify them before enabling publication:
    publication jobs are skipped. A green build alone does not mean anything was published.
 
 All actions are pinned to full commit SHAs. Build jobs have only `contents: read`; the PyPI
-job alone uses the `pypi` environment with `id-token: write`. The separate GitHub release
+job uses the environment selected by the validated release plan with `id-token: write`.
+There is no user-supplied environment input. The separate GitHub release
 job has the contents, attestation and OIDC permissions it needs, and runs only after PyPI
 succeeds. Failed, cancelled or skipped prerequisites cannot publish a GitHub release.
 Both jobs consume the exact uploaded distributions; neither rebuilds them.

@@ -30,6 +30,7 @@ jobs:
       contents: read
     outputs:
       package: ${{ steps.plan.outputs.package }}
+      pypi_environment: ${{ steps.plan.outputs.pypi_environment }}
       candidate: ${{ steps.plan.outputs.candidate }}
       prerelease: ${{ steps.plan.outputs.prerelease }}
     env:
@@ -105,7 +106,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:
-      name: pypi
+      name: ${{ needs.build.outputs.pypi_environment }}
       url: https://pypi.org/p/${{ needs.build.outputs.package }}
     permissions:
       contents: read
