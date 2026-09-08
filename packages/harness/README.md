@@ -103,6 +103,14 @@ Run `robotics-acceptance COMMAND --help` for the complete option set.
 Successful acceptance returns `0`, a completed non-passing verdict returns `1`,
 and invalid input or an observation failure returns `2`.
 
+`campaign` emits `incomplete` when passed runs are below the required minimum
+and no failed/error runs were observed. This writer requires the corresponding
+contracts reader update, which also accepts legacy `campaign-summary.v1` files
+that reported an all-passed shortage as `failed`. Campaign acceptance thresholds
+and failure/error precedence remain unchanged: tolerated failed/error runs can
+still produce `passed` when every threshold is met, and retain their severity
+when the campaign policy is not met.
+
 ## Live Observation
 
 Runtime infrastructure starts the workload, recorder, and telemetry collector.
