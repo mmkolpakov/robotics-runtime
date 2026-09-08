@@ -125,6 +125,8 @@ def test_schema_validation_selects_the_relevant_anyof_child(
     assert "integer" in caught.value.validation_message
 
 
+@pytest.mark.parametrize("reference_keyword", ["$ref", "$dynamicRef"])
+@pytest.mark.parametrize("via_annotation", [False, True])
 @pytest.mark.parametrize(
     "reference",
     [
@@ -135,15 +137,25 @@ def test_schema_validation_selects_the_relevant_anyof_child(
         "#/type",
         "#/required",
         "#/properties/item_id/minLength",
+        "#/properties/item_id/minLength/nope",
     ],
 )
 def test_extension_reference_failures_are_contract_errors(
-    reference: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    reference: str,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    reference_keyword: str,
+    via_annotation: bool,
 ) -> None:
     scenario = scenario_with_extension()
     schema = json.loads(extension_schema())
     schema["allOf"] = [{}]
-    schema["properties"]["item_id"]["$ref"] = reference
+    schema["properties"]["item_id"][reference_keyword] = reference
+    if via_annotation:
+        schema["examples"] = [
+            {"$schema": Draft202012Validator.META_SCHEMA["$id"], reference_keyword: reference}
+        ]
+        schema["properties"]["item_id"][reference_keyword] = "#/examples/0"
     if reference == "#":
         schema["$ref"] = "#"
     raw = json.dumps(schema).encode()
@@ -201,19 +213,134 @@ def test_unused_extension_reference_keeps_existing_validation_behavior() -> None
     contracts.validate_document(scenario, extension_schemas={SCHEMA_URI: raw})
 
 
-def test_unrelated_validator_fault_is_not_reclassified(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("error_type", [AttributeError, TypeError, ValueError])
+@pytest.mark.parametrize("unused_reference", [False, True])
+def test_unrelated_validator_fault_is_not_reclassified(
+    monkeypatch: pytest.MonkeyPatch, error_type: type[Exception], unused_reference: bool
+) -> None:
     original = Draft202012Validator.iter_errors
+    fault = error_type("unexpected validator implementation failure")
 
     def fail_on_payload(validator: Any, instance: Any) -> Iterator[ValidationError]:
         if validator.schema.get("$id") == SCHEMA_URI:
-            raise TypeError("unexpected validator implementation failure")
+            raise fault
         yield from original(validator, instance)
 
     monkeypatch.setattr(Draft202012Validator, "iter_errors", fail_on_payload)
-    with pytest.raises(TypeError, match="unexpected validator implementation failure"):
-        contracts.validate_document(
-            scenario_with_extension(), extension_schemas={SCHEMA_URI: extension_schema()}
-        )
+    schema = json.loads(extension_schema())
+    if unused_reference:
+        schema["$defs"] = {"unused": {"$ref": "#/type"}}
+    with pytest.raises(error_type) as caught:
+        _validate_extension_schema(schema)
+    assert caught.value is fault
+
+
+def _validate_extension_schema(
+    schema: dict[str, Any], payload: dict[str, Any] | None = None
+) -> None:
+    scenario = scenario_with_extension()
+    if payload is not None:
+        scenario["extensions"] = {"org.example.sorting": payload}
+    raw = json.dumps(schema).encode()
+    declarations: Any = scenario["extension_schemas"]
+    declarations[0]["sha256"] = sha256(raw).hexdigest()
+    contracts.validate_document(scenario, extension_schemas={SCHEMA_URI: raw})
+
+
+@pytest.mark.parametrize("reference_keyword", ["$ref", "$dynamicRef"])
+def test_extension_annotation_reference_preserves_returned_scope(reference_keyword: str) -> None:
+    schema = json.loads(extension_schema())
+    schema["$defs"] = {
+        "leaf": {"type": "integer"},
+        "scoped": {
+            "$id": "scoped/",
+            "$defs": {"leaf": {"type": "string", "minLength": 1}},
+            "examples": [
+                {
+                    "$schema": Draft202012Validator.META_SCHEMA["$id"],
+                    reference_keyword: "#/$defs/leaf",
+                }
+            ],
+            reference_keyword: "#/examples/0",
+        },
+    }
+    schema["properties"]["item_id"] = {reference_keyword: "#/$defs/scoped"}
+    _validate_extension_schema(schema)
+
+
+@pytest.mark.parametrize("reference_keyword", ["$ref", "$dynamicRef"])
+def test_extension_annotation_reference_cycle_is_a_contract_error(reference_keyword: str) -> None:
+    schema = json.loads(extension_schema())
+    schema["examples"] = [{reference_keyword: "#/examples/0"}]
+    schema["properties"]["item_id"] = {reference_keyword: "#/examples/0"}
+    with pytest.raises(contracts.ExtensionValidationError) as caught:
+        _validate_extension_schema(schema)
+    assert caught.value.error_id == "extension.validation_failed"
+    assert caught.value.json_path == "$.extension_schemas[0]"
+
+
+@pytest.mark.parametrize("target", [True, False])
+def test_extension_reference_boolean_targets_keep_validation_semantics(target: bool) -> None:
+    schema = json.loads(extension_schema())
+    schema["examples"] = [target]
+    schema["properties"]["item_id"] = {"$ref": "#/examples/0"}
+    if target:
+        _validate_extension_schema(schema)
+    else:
+        with pytest.raises(contracts.ExtensionValidationError) as caught:
+            _validate_extension_schema(schema)
+        assert caught.value.json_path == '$.extensions["org.example.sorting"].item_id'
+
+
+def test_extension_root_keeps_draft_202012_validation_with_another_declared_dialect() -> None:
+    schema = json.loads(extension_schema())
+    schema["$schema"] = "http://json-schema.org/draft-07/schema#"
+    schema["$ref"] = "#/$defs/anything"
+    schema["$defs"] = {"anything": {}}
+    schema["properties"]["item_id"]["minLength"] = 100
+    with pytest.raises(contracts.ExtensionValidationError) as caught:
+        _validate_extension_schema(schema)
+    assert caught.value.json_path == '$.extensions["org.example.sorting"].item_id'
+
+
+def test_extension_reference_target_uses_its_declared_dialect() -> None:
+    schema = json.loads(extension_schema())
+    schema["examples"] = [
+        {
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMinimum": True,
+        }
+    ]
+    schema["properties"]["item_id"] = {"$ref": "#/examples/0"}
+    _validate_extension_schema(schema, {"item_id": 1})
+    with pytest.raises(contracts.ExtensionValidationError) as caught:
+        _validate_extension_schema(schema, {"item_id": 0})
+    assert caught.value.json_path == '$.extensions["org.example.sorting"].item_id'
+
+
+@pytest.mark.parametrize("valid_child", [False, True])
+def test_extension_dynamic_reference_preserves_outer_anchor_scope(valid_child: bool) -> None:
+    schema = json.loads(extension_schema())
+    schema["$dynamicAnchor"] = "node"
+    schema["$ref"] = "#/$defs/tree"
+    schema["properties"]["children"] = {}
+    schema["$defs"] = {
+        "tree": {
+            "$id": "tree",
+            "$dynamicAnchor": "node",
+            "type": "object",
+            "properties": {"children": {"type": "array", "items": {"$dynamicRef": "#node"}}},
+        }
+    }
+    payload = {"item_id": "root", "children": [{"item_id": "child"} if valid_child else {}]}
+    if valid_child:
+        _validate_extension_schema(schema, payload)
+    else:
+        with pytest.raises(contracts.ExtensionValidationError) as caught:
+            _validate_extension_schema(schema, payload)
+        assert caught.value.json_path == '$.extensions["org.example.sorting"].children[0]'
 
 
 @pytest.mark.parametrize("reference", ["#absent", "#/$defs/absent", "#"])
