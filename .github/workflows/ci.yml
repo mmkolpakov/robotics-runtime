@@ -83,7 +83,27 @@ jobs:
           cache-dependency-glob: uv.lock
       - run: uv sync --locked --all-packages --all-groups
       - run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure
-      - run: uv run --no-sync pytest tests/ci
+      - run: uv run --no-sync python -m pytest tests/ci tests/release
+      - run: uv run --no-sync mypy --explicit-package-bases scripts/release tests/release tests/workspace
+        env:
+          MYPYPATH: packages/contracts/src:packages/harness/src
+
+  consumers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+        with:
+          version: "0.11.28"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked --all-packages --all-groups
+      - name: Validate producer examples and consumer fixtures together
+        run: uv run --no-sync pytest tests/workspace
 
   live-ros:
     runs-on: ubuntu-24.04
@@ -115,7 +135,7 @@ jobs:
 
   required-validation:
     name: ci
-    needs: [package, quality, live-ros]
+    needs: [package, quality, consumers, live-ros]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -124,8 +144,10 @@ jobs:
         env:
           PACKAGE_RESULT: ${{ needs.package.result }}
           QUALITY_RESULT: ${{ needs.quality.result }}
+          CONSUMERS_RESULT: ${{ needs.consumers.result }}
           ROS_RESULT: ${{ needs.live-ros.result }}
         run: |
           test "$PACKAGE_RESULT" = success
           test "$QUALITY_RESULT" = success
+          test "$CONSUMERS_RESULT" = success
           test "$ROS_RESULT" = success
