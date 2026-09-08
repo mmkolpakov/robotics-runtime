@@ -15,6 +15,7 @@ from robotics_runtime_contracts import (
     validate_document,
 )
 from robotics_runtime_contracts._qualification import validate_qualification_artifacts
+from robotics_runtime_contracts._writer_cli import add_writer_commands, run_writer
 from robotics_runtime_contracts.document_ops import (
     create_execution_permit,
     describe_schema,
@@ -138,6 +139,7 @@ def _parser() -> argparse.ArgumentParser:
     permit_init.add_argument("--interlock-sha256", required=True)
     permit_init.add_argument("--validity-sec", type=int, default=900)
     permit_init.add_argument("--output", required=True, metavar="PATH")
+    add_writer_commands(subparsers, _add_extension_schemas)
     return parser
 
 
@@ -325,6 +327,12 @@ def _validate_documents(arguments: argparse.Namespace) -> list[tuple[str, str]]:
 
 
 def _run(arguments: argparse.Namespace) -> int:
+    if hasattr(arguments, "writer_operation"):
+        output = run_writer(arguments, _read_extension_schemas(arguments.extension_schema))
+        _emit(
+            {"message": f"written: {output}", "output": str(output)}, output_format=arguments.format
+        )
+        return 0
     documents: list[tuple[str, str]] = []
     if arguments.command == "validate":
         documents = _validate_documents(arguments)
