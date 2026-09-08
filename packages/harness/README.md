@@ -187,6 +187,40 @@ revision, media type, size, and SHA-256. The harness needs no storage
 credentials. Upload, signing, and retention lifecycle remain infrastructure
 responsibilities. OTLP file-exporter streams use `application/x-ndjson`.
 
+For recordings whose receipts appear after observation starts, pass
+`--receipt-inventory /evidence/receipt-inventory.json` to `verify`, `evaluate`,
+or `timing-check`. Use `--receipt-inventory DOMAIN=PATH` with
+`transport-evaluate`. The inventory contains exactly these three file lists:
+
+```json
+{
+  "receipts": ["receipts/recording-0.json"],
+  "verifications": ["provenance/recording-0/artifact-verification.json"],
+  "dependencies": [
+    "provenance/recording-0/statement.json",
+    "provenance/recording-0/trust-policy.pem",
+    "provenance/recording-0/verification-evidence.sigstore.json"
+  ]
+}
+```
+
+Publish the inventory atomically before publishing the finalized evidence index.
+The live observer reads it during its existing evidence wait, after measurement;
+it need not exist when the observer starts. Missing or invalid files retain the
+same evidence timeout and diagnostic behavior. Paths use canonical relative
+POSIX notation below the inventory's directory. Absolute paths, traversal,
+directory links escaping that root, duplicate paths and unused provenance are
+rejected. The inventory uses the contract parser's document size limit and a
+maximum of 4,096 files. A shared dependency occurs once in the list. Every
+referenced receipt, verification and dependency still passes the same role and
+byte-digest checks. Inventory and explicit receipt inputs cannot be mixed for
+the same domain.
+
+Python callers can pass `ReceiptInventory(path)` as `receipt_paths` to
+`load_evidence_index`, or as `artifact_receipt_paths` to `run_verification`
+and `evaluate_from_evidence`. Existing sequences of explicit file paths remain
+supported. The inventory is a CLI input list, not a new contract document.
+
 ## Histogram windows
 
 Explicit-bucket histogram counts and recorded sums are aggregated over their

@@ -43,7 +43,7 @@ from robotics_acceptance_harness.readiness import (
     ReadinessResult,
     wait_for_readiness,
 )
-from robotics_acceptance_harness.receipts import VerifiedReceiptSet
+from robotics_acceptance_harness.receipts import ReceiptSource, VerifiedReceiptSet
 from robotics_acceptance_harness.result import (
     build_acceptance_result,
     write_contract_json,
@@ -188,7 +188,7 @@ def _wait_for_evidence(
     path: str | Path,
     *,
     run_id: str,
-    receipt_paths: Sequence[str | Path],
+    receipt_paths: ReceiptSource,
     verification_paths: Sequence[str | Path],
     receipt_dependency_paths: Sequence[str | Path],
     timeout_sec: float,
@@ -227,7 +227,7 @@ def run_verification(
     domain_id: str,
     run_context_path: str | Path,
     evidence_index_path: str | Path,
-    artifact_receipt_paths: Sequence[str | Path] = (),
+    artifact_receipt_paths: ReceiptSource = (),
     artifact_verification_paths: Sequence[str | Path] = (),
     receipt_dependency_paths: Sequence[str | Path] = (),
     evaluator_receipts: VerifiedReceiptSet | None = None,
@@ -487,7 +487,7 @@ def evaluate_from_evidence(
     domain_id: str,
     run_context_path: str | Path,
     evidence_index_path: str | Path,
-    artifact_receipt_paths: Sequence[str | Path] = (),
+    artifact_receipt_paths: ReceiptSource = (),
     artifact_verification_paths: Sequence[str | Path] = (),
     receipt_dependency_paths: Sequence[str | Path] = (),
     evaluator_receipts: VerifiedReceiptSet | None = None,

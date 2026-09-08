@@ -17,6 +17,7 @@ from robotics_acceptance_harness import __version__
 from robotics_acceptance_harness.documents import BundleValidationError, load_document
 from robotics_acceptance_harness.evidence import load_evidence_index
 from robotics_acceptance_harness.otel import OTLP_JSON_LINES_MEDIA_TYPE
+from robotics_acceptance_harness.receipts import ReceiptSource
 from robotics_acceptance_harness.result import format_utc_datetime, write_contract_json
 from robotics_acceptance_harness.timing import utc_datetime_from_unix_ns
 from robotics_acceptance_harness.traces import (
@@ -255,7 +256,7 @@ def evaluate_transport_qualification(
     channel_contract_paths: Sequence[str | Path],
     trace_paths: Mapping[str, str | Path],
     evidence_index_paths: Mapping[str, str | Path],
-    artifact_receipt_paths: Mapping[str, Sequence[str | Path]] | None = None,
+    artifact_receipt_paths: Mapping[str, ReceiptSource] | None = None,
     artifact_verification_paths: Mapping[str, Sequence[str | Path]] | None = None,
     receipt_dependency_paths: Mapping[str, Sequence[str | Path]] | None = None,
     clock_relation_paths: Sequence[str | Path] = (),

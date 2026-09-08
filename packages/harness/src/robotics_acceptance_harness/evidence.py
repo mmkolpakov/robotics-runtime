@@ -20,6 +20,7 @@ from robotics_acceptance_harness.documents import (
     load_document_bytes,
 )
 from robotics_acceptance_harness.receipts import (
+    ReceiptSource,
     ReceiptValidationError,
     VerifiedReceiptSet,
     load_verified_receipts,
@@ -200,7 +201,7 @@ def load_evidence_index(
     path: str | Path,
     *,
     expected_run_id: str | None = None,
-    receipt_paths: Sequence[str | Path] = (),
+    receipt_paths: ReceiptSource = (),
     verification_paths: Sequence[str | Path] = (),
     receipt_dependency_paths: Sequence[str | Path] = (),
 ) -> VerifiedEvidence:
