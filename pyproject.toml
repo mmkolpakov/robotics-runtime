@@ -33,10 +33,6 @@ strict = true
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = ["junitparser.*", "opentelemetry.*"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
 module = [
   "rclpy.*",
   "action_tutorials_interfaces.action",
