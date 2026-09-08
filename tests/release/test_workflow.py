@@ -42,7 +42,12 @@ def test_actions_are_pinned_and_oidc_is_limited_to_publication_jobs() -> None:
     assert data["permissions"] == {"contents": "read"}
     jobs = data["jobs"]
     assert jobs["build"]["permissions"] == {"contents": "read"}
-    assert jobs["publish-pypi"]["environment"]["name"] == "pypi"
+    assert (
+        jobs["publish-pypi"]["environment"]["name"] == "${{ needs.build.outputs.pypi_environment }}"
+    )
+    assert (
+        jobs["build"]["outputs"]["pypi_environment"] == "${{ steps.plan.outputs.pypi_environment }}"
+    )
     assert jobs["publish-pypi"]["permissions"] == {"contents": "read", "id-token": "write"}
     assert jobs["github-release"]["permissions"] == {
         "contents": "write",

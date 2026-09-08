@@ -19,6 +19,7 @@ PACKAGES = {
     "contracts": "robotics-runtime-contracts",
     "harness": "robotics-acceptance-harness",
 }
+PYPI_ENVIRONMENTS = {"contracts": "pypi", "harness": "pypi-harness"}
 MODULES = {
     "contracts": "robotics_runtime_contracts",
     "harness": "robotics_acceptance_harness",
@@ -255,6 +256,7 @@ def main() -> int:
     if args.github_output:
         outputs = {
             "package": plan.package,
+            "pypi_environment": PYPI_ENVIRONMENTS[plan.key],
             "candidate": plan.candidate,
             "version": plan.version,
             "prerelease": str(Version(plan.version).is_prerelease).lower(),
