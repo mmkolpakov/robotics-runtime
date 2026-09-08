@@ -9,21 +9,26 @@ from typing import Any
 
 import pytest
 
-from robotics_acceptance_harness.documents import BundleValidationError, load_bundle
+from robotics_acceptance_harness.documents import BundleValidationError, DocumentBundle, load_bundle
 
 FIXTURES = Path(__file__).parent / "fixtures" / "physical"
 NOW = datetime(2026, 7, 12, 10, 0, tzinfo=UTC)
 
 
-def _valid_bundle(**overrides: Any) -> Any:
-    arguments = {
-        "runtime_path": FIXTURES / "hil-runtime.json",
-        "permit_path": FIXTURES / "hil-permit.json",
-        "verification_path": FIXTURES / "hil-verification.json",
-        "now": NOW,
-    }
-    arguments.update(overrides)
-    return load_bundle(FIXTURES / "hil-scenario.yaml", **arguments)
+def _valid_bundle(
+    *,
+    runtime_path: Path = FIXTURES / "hil-runtime.json",
+    permit_path: Path | None = FIXTURES / "hil-permit.json",
+    verification_path: Path | None = FIXTURES / "hil-verification.json",
+    now: datetime = NOW,
+) -> DocumentBundle:
+    return load_bundle(
+        FIXTURES / "hil-scenario.yaml",
+        runtime_path=runtime_path,
+        permit_path=permit_path,
+        verification_path=verification_path,
+        now=now,
+    )
 
 
 def _write_json(path: Path, document: dict[str, Any]) -> str:
@@ -35,7 +40,7 @@ def _write_json(path: Path, document: dict[str, Any]) -> str:
 def _mutated_verification_bundle(
     tmp_path: Path,
     mutation: Callable[[dict[str, Any]], None],
-) -> Any:
+) -> DocumentBundle:
     verification = json.loads((FIXTURES / "hil-verification.json").read_bytes())
     mutation(verification)
     verification_path = tmp_path / "verification.json"

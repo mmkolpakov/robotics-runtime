@@ -14,7 +14,7 @@ from tests.support import write_extended_scenario
 FIXTURES = Path(__file__).parent / "fixtures" / "simulation"
 
 
-def test_explain_validates_bundle_without_ros(capsys) -> None:
+def test_explain_validates_bundle_without_ros(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(
         [
             "explain",
@@ -65,7 +65,7 @@ def test_create_run_derives_identity_and_digest_from_scenario(
     assert document["domains"] == [{"domain_id": "primary", "role": "observer"}]
 
 
-def test_explain_rejects_invalid_extension_argument(capsys) -> None:
+def test_explain_rejects_invalid_extension_argument(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(
         [
             "explain",
@@ -134,7 +134,7 @@ def test_create_run_loads_extension_schema_by_canonical_uri(
     assert capsys.readouterr().out.startswith("run-")
 
 
-def test_verify_requires_run_id(capsys) -> None:
+def test_verify_requires_run_id(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as caught:
         main(
             [

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from threading import Thread
 from time import time_ns
+from typing import Protocol
 from uuid import uuid4
 
 import rclpy
@@ -15,6 +16,28 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.serialization import serialize_message
 from rosgraph_msgs.msg import Clock
 from std_msgs.msg import String
+
+from tests.graph_types import ExpectedGraph
+
+
+class AddRequest(Protocol):
+    a: int
+    b: int
+
+
+class AddResponse(Protocol):
+    sum: int
+
+
+class FibonacciRequest(Protocol):
+    order: int
+
+
+class FibonacciGoalHandle(Protocol):
+    @property
+    def request(self) -> FibonacciRequest: ...
+
+    def succeed(self) -> None: ...
 
 
 class LiveGraph:
@@ -67,12 +90,12 @@ class LiveGraph:
         self.thread.start()
 
     @staticmethod
-    def add(request, response):
+    def add(request: AddRequest, response: AddResponse) -> AddResponse:
         response.sum = request.a + request.b
         return response
 
     @staticmethod
-    def fibonacci(goal_handle):
+    def fibonacci(goal_handle: FibonacciGoalHandle) -> Fibonacci.Result:
         sequence = [0, 1]
         for _ in range(max(0, goal_handle.request.order - 2)):
             sequence.append(sequence[-1] + sequence[-2])
@@ -95,7 +118,7 @@ class LiveGraph:
         except Exception as error:
             self.errors.append(error)
 
-    def expected(self) -> dict:
+    def expected(self) -> ExpectedGraph:
         # /clock is deliberately absent: this exercises the implicit clock subscription.
         return {
             "topics": [
@@ -134,7 +157,7 @@ class LiveGraph:
     def __enter__(self) -> LiveGraph:
         return self
 
-    def __exit__(self, *_args) -> None:
+    def __exit__(self, *_args: object) -> None:
         try:
             assert self.executor.shutdown(timeout_sec=5), "test ROS executor did not stop"
             self.thread.join(timeout=5)

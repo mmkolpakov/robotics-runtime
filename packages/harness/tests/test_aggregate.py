@@ -4,7 +4,7 @@ import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, NotRequired, TypedDict, cast
 
 import pytest
 import yaml
@@ -32,6 +32,38 @@ FIXTURES = Path(__file__).parent / "fixtures" / "simulation"
 RUN_ID = "run-01234567-89ab-4def-8123-456789abcdef"
 TRACE_ID = "01" * 16
 TYPE_HASH = f"RIHS01_{'1' * 64}"
+
+
+class TransportVerdict(TypedDict):
+    status: str
+    chain_count: int
+    passed_chain_count: int
+
+
+class ChainHop(TypedDict):
+    relationship: str
+
+
+class ChainViolation(TypedDict):
+    code: str
+
+
+class CausalChainResult(TypedDict):
+    status: str
+    root_trace_id: NotRequired[str]
+    hops: list[ChainHop]
+    violations: list[ChainViolation]
+
+
+class TransportQualification(TypedDict):
+    """Fields inspected in the contract-validated transport result."""
+
+    schema_version: str
+    verdict: TransportVerdict
+    causal_chains: list[CausalChainResult]
+    channel_observations: list[dict[str, str]]
+    channel_contracts: list[dict[str, str]]
+    causal_chain_contracts: list[dict[str, str]]
 
 
 def write_json(path: Path, value: object) -> Path:
@@ -86,7 +118,7 @@ def result(
     domain_id: str,
     suffix: str,
     *,
-    assertion_status: str = "passed",
+    assertion_status: Literal["passed", "failed", "error", "skipped"] = "passed",
     unevaluated: tuple[str, ...] = (),
     time_authority_within_policy: bool = True,
 ) -> Path:
@@ -389,7 +421,7 @@ def transport_qualification(
     producer_span_name: str = "observation publish",
     consumer_span_name: str = "observation receive",
     chain_count: int = 1,
-) -> dict[str, object]:
+) -> TransportQualification:
     scenario_path = transport_scenario(tmp_path)
     producer = trace_file(
         tmp_path,
@@ -437,7 +469,7 @@ def transport_qualification(
         qualification_id="qualification-01234567-89ab-4def-8123-456789abcdef",
         generated_at=datetime(2026, 7, 26, 12, 3, tzinfo=UTC),
     )
-    return json.loads(output.read_text(encoding="utf-8"))
+    return cast(TransportQualification, json.loads(output.read_text(encoding="utf-8")))
 
 
 def transport_aggregate_inputs(
@@ -650,7 +682,7 @@ def test_aggregate_fails_when_registered_domain_has_no_result(tmp_path: Path) ->
 @pytest.mark.parametrize("assertion_status", ["error", "failed"])
 def test_unevaluated_does_not_mask_known_failure(
     tmp_path: Path,
-    assertion_status: str,
+    assertion_status: Literal["error", "failed"],
 ) -> None:
     result_path = result(
         tmp_path,

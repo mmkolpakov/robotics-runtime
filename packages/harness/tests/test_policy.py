@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from robotics_acceptance_harness.evidence import load_evidence_index
+from robotics_acceptance_harness.evidence import VerifiedEvidence, load_evidence_index
 from robotics_acceptance_harness.metrics import (
     AssertionEvaluation,
     HistogramSample,
@@ -24,7 +24,7 @@ from tests.support import local_recording_artifact, write_evidence_index
 RUN_ID = "run-01234567-89ab-4def-8123-456789abcdef"
 
 
-def evidence(tmp_path: Path, *, topic: str = "/camera/image"):
+def evidence(tmp_path: Path, *, topic: str = "/camera/image") -> VerifiedEvidence:
     index = write_evidence_index(
         tmp_path / "evidence-index.json",
         run_id=RUN_ID,
@@ -175,7 +175,7 @@ def test_data_plane_policy_checks_static_transport_and_attributed_metrics() -> N
             "middleware_configuration_sha256": "a" * 64,
         }
     }
-    samples = [
+    samples: list[MetricPoint] = [
         message_age(20, 2),
         counter("robotics.message.received", 100, 2),
         counter("robotics.message.lost", 0, 2),
@@ -206,7 +206,7 @@ def test_data_plane_loss_is_derived_from_delta_counters() -> None:
     policy = data_plane_policy(max_loss_ratio=0.1)
     midpoint_ns = 5_000_000_000
     resumed_ns = midpoint_ns + 349_000_000
-    samples = [
+    samples: list[MetricPoint] = [
         message_age(5, midpoint_ns),
         message_age(5, 10_000_000_000, start_time_ns=resumed_ns),
         counter("robotics.message.received", 40, midpoint_ns),
@@ -230,7 +230,7 @@ def test_data_plane_loss_is_derived_from_delta_counters() -> None:
 
 def test_data_plane_rejects_invalid_counter_intervals_or_temporalities() -> None:
     policy = data_plane_policy(max_loss_ratio=0.1)
-    common = [
+    common: list[MetricPoint] = [
         message_age(5, 2),
         counter("robotics.message.lost", 1, 2, start_time_ns=0),
         counter("robotics.message.sequence_error", 0, 1, start_time_ns=0),
@@ -288,7 +288,7 @@ def test_data_plane_rejects_invalid_counter_intervals_or_temporalities() -> None
 def test_data_plane_rejects_a_short_sample_inside_a_long_measurement_window() -> None:
     start_ns = 20_000_000_000
     end_ns = 21_000_000_000
-    samples = [
+    samples: list[MetricPoint] = [
         message_age(5, end_ns, start_time_ns=start_ns),
         counter(
             "robotics.message.received",
@@ -329,7 +329,7 @@ def test_data_plane_rejects_a_short_sample_inside_a_long_measurement_window() ->
 
 def test_data_plane_loss_uses_cumulative_counter_baselines() -> None:
     policy = data_plane_policy(max_loss_ratio=0.1)
-    samples = [
+    samples: list[MetricPoint] = [
         message_age(5, 3, start_time_ns=2),
         counter(
             "robotics.message.received",
@@ -395,7 +395,7 @@ def test_data_plane_cumulative_counters_require_continuity_across_reset(
     reset_start_ns: int, expected_status: str
 ) -> None:
     policy = data_plane_policy(max_loss_ratio=0.1)
-    samples = [
+    samples: list[MetricPoint] = [
         message_age(5, 5),
         counter(
             "robotics.message.received",
@@ -454,7 +454,7 @@ def test_data_plane_cumulative_counters_require_continuity_across_reset(
 
 
 def test_data_plane_rejects_last_value_ratio_and_empty_counters() -> None:
-    common = [
+    common: list[MetricPoint] = [
         message_age(5, 1),
         MetricSample(
             "robotics.message.loss_ratio",
@@ -486,7 +486,7 @@ def test_data_plane_rejects_last_value_ratio_and_empty_counters() -> None:
 
 
 def test_data_plane_rejects_ambiguous_channels_and_wrong_counter_units() -> None:
-    base = [
+    base: list[MetricPoint] = [
         message_age(5, 1),
         counter("robotics.message.received", 10, 1),
         counter("robotics.message.lost", 0, 1),

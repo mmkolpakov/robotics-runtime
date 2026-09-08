@@ -3,13 +3,15 @@ from __future__ import annotations
 from importlib.metadata import EntryPoint
 from pathlib import Path
 
+import pytest
+
 from robotics_acceptance_harness.diagnostics import doctor_report, why_report
 from robotics_acceptance_harness.result import build_acceptance_result, write_contract_json
 from robotics_acceptance_harness.time_authority import TimeAuthorityObservation
 from tests.test_result import result_inputs
 
 
-def test_doctor_checks_every_live_ros_dependency(monkeypatch) -> None:
+def test_doctor_checks_every_live_ros_dependency(monkeypatch: pytest.MonkeyPatch) -> None:
     def import_module(name: str) -> object:
         if name == "rclpy":
             return object()
@@ -29,7 +31,7 @@ def test_doctor_checks_every_live_ros_dependency(monkeypatch) -> None:
     assert "python-module-rosgraph-msgs" in failed
 
 
-def test_doctor_rejects_module_with_broken_native_import(monkeypatch) -> None:
+def test_doctor_rejects_module_with_broken_native_import(monkeypatch: pytest.MonkeyPatch) -> None:
     def import_module(name: str) -> object:
         if name == "rclpy":
             raise ImportError("native extension is unavailable")
@@ -47,7 +49,7 @@ def test_doctor_rejects_module_with_broken_native_import(monkeypatch) -> None:
     assert "native extension is unavailable" in check["message"]
 
 
-def test_doctor_does_not_import_evaluator_targets(monkeypatch) -> None:
+def test_doctor_does_not_import_evaluator_targets(monkeypatch: pytest.MonkeyPatch) -> None:
     entry_point = EntryPoint(
         "org.example.broken",
         "missing_evaluator_package:evaluate",

@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from hashlib import sha256
 from pathlib import Path
+from typing import Literal, cast
 
 from robotics_runtime_contracts import validate_document
 
+from tests.live.types import DataPoint, Instrument, Metric, QualificationGolden
 from tests.support import local_evidence_artifact
 
-QUALIFICATION_GOLDEN = json.loads(
-    (Path(__file__).parent / "fixtures" / "qualification-golden.json").read_text(encoding="utf-8")
+QUALIFICATION_GOLDEN = cast(
+    QualificationGolden,
+    json.loads(
+        (Path(__file__).parent / "fixtures" / "qualification-golden.json").read_text(
+            encoding="utf-8"
+        )
+    ),
 )
 
-QUALIFICATION_METRICS = {
+QUALIFICATION_METRICS: dict[str, tuple[str, Literal["histogram", "sum"]]] = {
     "robotics.message.age": ("ms", "histogram"),
     "robotics.message.received": ("{message}", "sum"),
     "robotics.message.lost": ("{message}", "sum"),
@@ -21,7 +29,7 @@ QUALIFICATION_METRICS = {
 }
 
 
-def qualification_metrics(start_ns: int, end_ns: int) -> list[dict]:
+def qualification_metrics(start_ns: int, end_ns: int) -> list[Metric]:
     """Synthetic delta fixtures, covering the real CLI window at 10 ms resolution.
 
     These values test aggregation and attribution, not DDS performance. The
@@ -32,17 +40,19 @@ def qualification_metrics(start_ns: int, end_ns: int) -> list[dict]:
     count = QUALIFICATION_GOLDEN["histogram_count"]
     bounds = QUALIFICATION_GOLDEN["explicit_bounds_ms"]
     intervals = tuple(range(start_ns, end_ns - interval_ns, interval_ns))
-    metrics = []
+    metrics: list[Metric] = []
     for name, (unit, kind) in QUALIFICATION_METRICS.items():
-        points = []
+        points: list[DataPoint] = []
         for beginning in intervals:
-            point = {
+            point: DataPoint = {
                 "startTimeUnixNano": str(beginning),
                 "timeUnixNano": str(beginning + interval_ns),
             }
             if kind == "histogram":
                 # Three explicit synthetic observations per delta interval.
-                key = "message_age_ms" if name == "robotics.message.age" else "delivery_latency_ms"
+                key: Literal["message_age_ms", "delivery_latency_ms"] = (
+                    "message_age_ms" if name == "robotics.message.age" else "delivery_latency_ms"
+                )
                 value = QUALIFICATION_GOLDEN[key]
                 buckets = [0] * (len(bounds) + 1)
                 bucket_index = next(
@@ -50,32 +60,42 @@ def qualification_metrics(start_ns: int, end_ns: int) -> list[dict]:
                 )
                 buckets[bucket_index] = count
                 point.update(
-                    count=str(count),
-                    sum=value * count,
-                    min=value,
-                    max=value,
-                    explicitBounds=bounds,
-                    bucketCounts=[str(bucket) for bucket in buckets],
+                    {
+                        "count": str(count),
+                        "sum": value * count,
+                        "min": value,
+                        "max": value,
+                        "explicitBounds": bounds,
+                        "bucketCounts": [str(bucket) for bucket in buckets],
+                    }
                 )
             else:
                 point.update(
-                    asInt=str(QUALIFICATION_GOLDEN["counters"][name]),
-                    attributes=[
-                        {
-                            "key": "sequence.measurement.method",
-                            "value": {"stringValue": "rmw_publication_sequence_single_publisher"},
-                        }
-                    ],
+                    {
+                        "asInt": str(QUALIFICATION_GOLDEN["counters"][name]),
+                        "attributes": [
+                            {
+                                "key": "sequence.measurement.method",
+                                "value": {
+                                    "stringValue": "rmw_publication_sequence_single_publisher"
+                                },
+                            }
+                        ],
+                    }
                 )
             points.append(point)
-        instrument = {"aggregationTemporality": 1, "dataPoints": points}
+        instrument: Instrument = {"aggregationTemporality": 1, "dataPoints": points}
+        metric: Metric = {"name": name, "unit": unit}
         if kind == "sum":
             instrument["isMonotonic"] = True
-        metrics.append({"name": name, "unit": unit, kind: instrument})
+            metric["sum"] = instrument
+        else:
+            metric["histogram"] = instrument
+        metrics.append(metric)
     return metrics
 
 
-def clock_recording(directory: Path, samples: tuple[tuple[int, bytes], ...]) -> dict:
+def clock_recording(directory: Path, samples: tuple[tuple[int, bytes], ...]) -> dict[str, object]:
     """Write actual received CDR Clock messages and derive the summary from MCAP."""
     from mcap.reader import make_reader
     from mcap.writer import CompressionType, Writer
@@ -99,7 +119,9 @@ def clock_recording(directory: Path, samples: tuple[tuple[int, bytes], ...]) -> 
             writer.add_message(
                 channel, log_time=timestamp, publish_time=timestamp, data=data, sequence=sequence
             )
-        writer.finish()
+        # MCAP 1.3.0 leaves this no-argument method unannotated.
+        finish: Callable[[], None] = writer.finish
+        finish()
     with path.open("rb") as source:
         reader = make_reader(source, validate_crcs=True)
         observed = reader.get_summary()
