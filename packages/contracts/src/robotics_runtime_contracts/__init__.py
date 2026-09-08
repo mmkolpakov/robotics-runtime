@@ -15,6 +15,7 @@ from referencing.exceptions import Unresolvable
 from referencing.jsonschema import DRAFT202012, SchemaRegistry
 
 from robotics_runtime_contracts._resources import schema_directory
+from robotics_runtime_contracts.canonical import dumps_canonical, file_sha256
 from robotics_runtime_contracts.catalog import (
     UnknownContractRoleError,
     contract_roles,
@@ -252,7 +253,9 @@ __all__ = [
     "UnknownSchemaError",
     "contract_roles",
     "contract_set",
+    "dumps_canonical",
     "ensure_finite_numbers",
+    "file_sha256",
     "load_schema",
     "load_mapping",
     "loads_mapping",

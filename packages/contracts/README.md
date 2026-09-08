@@ -187,6 +187,58 @@ Limit failures use `input.limit_exceeded`, duplicates use `input.duplicate_key`
 with the member path, and aliases use `input.yaml_alias`. Other malformed input
 uses `input.parse_failed`; non-finite values use `input.non_finite_number`.
 
+## Deterministic JSON and artifact hashes
+
+`dumps_canonical(document) -> bytes` implements this project's deterministic
+JSON profile. **It is not RFC 8785/JCS.** Existing contract integers, including
+nanoseconds beyond 2**53, remain exact JSON number tokens. No schemas or wire
+types change to satisfy JCS's binary64 domain. This is an explicit compatibility
+choice, not a fallback from a strict JCS implementation.
+
+The profile accepts built-in `dict`, `list`, `str`, `int`, `float`, `bool` and
+`None` values. Object keys must be strings. It emits UTF-8 without a BOM or
+trailing newline, with compact `,`/`:` separators. Object keys sort recursively
+by Unicode code point, which differs from JCS's UTF-16 ordering; array order
+is preserved. Unicode is not normalized, non-ASCII characters remain UTF-8,
+and JSON control/quote/backslash escaping uses the native Python JSON encoder.
+Surrogate code points in Python strings are rejected. A valid JSON surrogate
+escape pair parsed into a Unicode scalar is supported.
+
+Integers have no 53-bit or 64-bit cap and are never converted to float or string
+values. Booleans stay distinct from integers. Finite floats use native Python
+JSON spelling: `1.0`, `1e-06`, and `-0.0` remain those spellings, including the
+negative-zero sign. This preserves the supplied float; it cannot recover
+decimal precision already lost before the call. Tuples, sets, bytes, Decimal,
+custom objects and subclasses of the accepted built-ins are not coerced.
+
+The input tree uses the same 64-level and 100,000-node limits as the loaders,
+counting keys and values with the root at level 1. Encoded output is limited to
+8 MiB, including escaping and UTF-8 expansion. Individual oversized strings
+and integers are rejected before assembling output. The interpreter's integer
+decimal-conversion limit also applies and is never changed process-wide.
+Shared containers are expanded within the node budget; cycles fail the depth
+limit. Errors inherit `ContractError`: `input.invalid_type`,
+`input.invalid_unicode`, `input.non_finite_number`, or `input.limit_exceeded`.
+Paths identify the invalid value, the object containing a non-string key, or
+`$` for the total output-byte limit. Serialization does not mutate the input.
+
+```python
+from robotics_runtime_contracts import dumps_canonical, file_sha256
+
+encoded = dumps_canonical({"ns": 1785067200123456789, "ready": True})
+assert encoded == b'{"ns":1785067200123456789,"ready":true}'
+digest = file_sha256("existing-evidence.bin")
+```
+
+`file_sha256(path) -> str` returns the lowercase SHA-256 hex digest of the
+**original file bytes**, read in 1 MiB chunks. It expands home paths, propagates
+normal file I/O errors and does not apply the document-size limit to artifacts.
+It never parses or serializes the file, even for JSON, and works on binary data.
+There is no `document_digest` API. Existing receipts and signatures continue
+to refer to original bytes. Re-serializing a separate copy can change its hash;
+replacing an existing artifact requires rebuilding its dependent hash/signature
+chain. Hash new files only after their exact bytes have been written.
+
 ## Errors and resource paths
 
 Expected validation and document-operation failures inherit from the public
