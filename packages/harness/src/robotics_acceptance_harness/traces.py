@@ -431,12 +431,15 @@ def evaluate_causal_chain(
         relationship_pairs = [
             pair for pair in message_pairs if _relationship_matches(relationship, pair[0], pair[1])
         ]
-        if not relationship_pairs:
+        if len(relationship_pairs) != len(message_pairs):
             violations.append(
                 ChainViolation(
                     code="relationship_mismatch",
                     channel_id=channel_id,
-                    message=f"no producer-consumer pair satisfies {relationship!r}",
+                    message=(
+                        f"{len(message_pairs) - len(relationship_pairs)} correlated "
+                        f"producer-consumer pairs violate {relationship!r}"
+                    ),
                 )
             )
             continue
@@ -445,12 +448,12 @@ def evaluate_causal_chain(
             for pair in relationship_pairs
             if pair[1].start_time_unix_nano >= pair[0].start_time_unix_nano
         ]
-        if not valid_pairs:
+        if len(valid_pairs) != len(relationship_pairs):
             violations.append(
                 ChainViolation(
                     code="temporal_order_mismatch",
                     channel_id=channel_id,
-                    message="consumer span starts before its producer span",
+                    message="a consumer span starts before its producer span",
                 )
             )
             continue
