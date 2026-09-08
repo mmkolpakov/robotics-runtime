@@ -332,10 +332,15 @@ class RosGraphObserver:
 
         services = self._service_observations()
         actions = self._action_observations()
+        node_names = frozenset(
+            f"{namespace.rstrip('/')}/{name}" for name, namespace in self._external_nodes()
+        )
         lifecycle = {
             name: tracker.observation
             for name, tracker in self._lifecycle.items()
             if tracker.observation is not None
+            and name in node_names
+            and tracker.client.service_is_ready()
         }
         return GraphSnapshot(
             observed_at_ns=observed_at_ns,
@@ -343,6 +348,7 @@ class RosGraphObserver:
             services=services,
             actions=actions,
             lifecycle_nodes=lifecycle,
+            node_names=node_names,
         )
 
     def close(self) -> None:

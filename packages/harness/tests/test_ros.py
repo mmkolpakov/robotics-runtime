@@ -83,7 +83,7 @@ class FakeNode:
         return "/"
 
     def get_node_names_and_namespaces(self) -> list[tuple[str, str]]:
-        return [("application", "/"), ("robotics_acceptance_observer", "/")]
+        return [("camera", "/"), ("robotics_acceptance_observer", "/")]
 
     def get_client_names_and_types_by_node(
         self,
@@ -284,6 +284,58 @@ def test_ros_observer_bounds_unique_clock_samples() -> None:
     with pytest.raises(RosObserverError, match="exceeded the configured limit"):
         observer.stop_clock_observation()
     observer.close()
+
+
+@pytest.mark.parametrize("node_present, status", [(False, "failed"), (True, "error")])
+def test_lifecycle_cache_cannot_hide_disappearance_or_unavailable_service(
+    monkeypatch: pytest.MonkeyPatch,
+    node_present: bool,
+    status: str,
+) -> None:
+    node = FakeNode()
+    with RosGraphObserver(
+        expected_graph(),
+        observe_clock=False,
+        module_loader=fake_modules(node).__getitem__,
+    ) as observer:
+        assert node.executor_started.wait(timeout=1.0)
+        observer.snapshot()
+        assert observer.snapshot().lifecycle_nodes["/camera"].state == "active"
+
+        # Node and service discovery may disagree while DDS propagates disappearance.
+        monkeypatch.setattr(FakeClient, "service_is_ready", lambda _self: not node_present)
+        nodes = [("camera", "/")] if node_present else []
+        monkeypatch.setattr(node, "get_node_names_and_namespaces", lambda: nodes)
+        snapshot = observer.snapshot()
+
+        assert snapshot.node_names == (frozenset({"/camera"}) if node_present else frozenset())
+        assert "/camera" not in snapshot.lifecycle_nodes
+        issues = [
+            issue
+            for issue in evaluate_graph(expected_graph(), snapshot)
+            if "lifecycle_nodes" in issue.json_path
+        ]
+        (issue,) = issues
+        assert issue.status == status
+        assert ("unavailable" if node_present else "absent") in issue.message
+
+
+def test_lifecycle_presence_uses_fully_qualified_names(monkeypatch: pytest.MonkeyPatch) -> None:
+    node = FakeNode()
+    graph = expected_graph()
+    graph["lifecycle_nodes"][0]["name"] = "/robot/camera"
+    monkeypatch.setattr(node, "get_node_names_and_namespaces", lambda: [("camera", "/robot")])
+    with RosGraphObserver(
+        graph,
+        observe_clock=False,
+        module_loader=fake_modules(node).__getitem__,
+    ) as observer:
+        assert node.executor_started.wait(timeout=1.0)
+        observer.snapshot()
+        snapshot = observer.snapshot()
+        assert snapshot.node_names == frozenset({"/robot/camera"})
+        assert snapshot.lifecycle_nodes["/robot/camera"].state == "active"
+        assert evaluate_graph(graph, snapshot) == ()
 
 
 def test_ros_observer_keeps_failed_shutdown_terminal_but_retryable() -> None:

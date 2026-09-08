@@ -15,6 +15,7 @@ from robotics_acceptance_harness.forbidden_graph import (
     ForbiddenGraphMonitor,
     ForbiddenGraphObservation,
 )
+from robotics_acceptance_harness.graph_window import ExpectedGraphMonitor
 from robotics_acceptance_harness.hardware_timing import (
     HardwareTimingObservation,
     evaluate_hardware_timing,
@@ -281,9 +282,13 @@ def run_verification(
         deadline_ns = measurement_started_monotonic_ns + int(
             float(scenario["timeouts"]["execution_sec"]) * 1_000_000_000
         )
+        graph_monitor = ExpectedGraphMonitor(
+            scenario["expected_ros_graph"], measurement_started_monotonic_ns, deadline_ns
+        )
         last_snapshot = readiness.snapshot
         while now_ns() < deadline_ns:
             last_snapshot = observer.snapshot()
+            graph_monitor.observe(last_snapshot)
             forbidden_monitor.observe(last_snapshot)
             remaining_sec = max(0.0, (deadline_ns - now_ns()) / 1_000_000_000)
             sleep_fn(min(poll_interval_sec, remaining_sec))
@@ -399,6 +404,7 @@ def run_verification(
     )
     if timing_failure is not None:
         assertions.append(timing_failure)
+    assertions.extend(graph_monitor.assertions(assertions))
     forbidden_observation: ForbiddenGraphObservation = forbidden_monitor.result()
     finished_at = utc_now()
     evidence_finalized = evidence.index.data.get("finalized") is True
