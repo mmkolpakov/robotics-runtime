@@ -140,6 +140,24 @@ validate_document(
 Promote an extension into the common catalog only after it has reusable
 semantics and evidence from more than one domain.
 
+## Merge patches and semantic diff
+
+Scenario overlays use the native, typed implementation of
+[RFC 7396 section 2](https://www.rfc-editor.org/rfc/rfc7396#section-2).
+Object members merge recursively, `null` removes a member, and arrays replace
+as a whole. Inputs and outputs do not share mutable containers. Overlays apply
+in the given order, followed by contract validation.
+
+`semantic_diff` compares parsed values recursively without Python's scalar
+coercions: booleans differ from numbers, and integer/float representations such
+as `1` and `1.0` also produce a patch. Object key order and source formatting are
+ignored. A round-trip check rejects targets that require introducing an object
+member with value `null`, using `diff.unrepresentable`; an unchanged existing
+`null` and nulls inside replaced arrays are representable. This distinction is
+part of the diff API; RFC 7396 specifies patch application, not diff generation.
+The implementation is checked against the RFC's 15 Appendix A vectors and
+generated round-trip cases. It has no third-party merge-patch dependency.
+
 ## JSON and YAML input
 
 Documents are UTF-8 mappings with string keys and finite JSON values. Files

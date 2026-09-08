@@ -7,7 +7,6 @@ from secrets import token_hex
 from typing import Any
 from uuid import uuid4
 
-from json_merge_patch import create_patch, merge  # type: ignore[import-untyped]
 from referencing.exceptions import Unresolvable
 from referencing.jsonschema import DRAFT202012
 
@@ -18,7 +17,9 @@ from robotics_runtime_contracts import (
     schema_registry,
     validate_document,
 )
+from robotics_runtime_contracts._merge_patch import JSONValue, create_patch, json_equal, merge_patch
 from robotics_runtime_contracts.errors import ContractError
+from robotics_runtime_contracts.serialization import ensure_finite_numbers
 
 
 def _resolve_property(
@@ -91,9 +92,13 @@ def resolve_merge_patches(
 ) -> dict[str, Any]:
     """Materialize RFC 7396 overlays and validate the resulting document."""
 
-    resolved: dict[str, Any] = deepcopy(dict(base))
+    ensure_finite_numbers(base)
+    resolved: dict[str, JSONValue] = deepcopy(dict(base))
     for overlay in overlays:
-        resolved = merge(resolved, deepcopy(dict(overlay)))
+        ensure_finite_numbers(overlay)
+        merged = merge_patch(resolved, dict(overlay))
+        assert isinstance(merged, dict)  # An object patch always produces an object.
+        resolved = merged
     validate_document(resolved, extension_schemas=extension_schemas)
     return resolved
 
@@ -102,14 +107,15 @@ def semantic_diff(
     source: Mapping[str, Any],
     target: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Return the minimal RFC 7396 patch from source to target."""
+    """Return an RFC 7396 patch preserving parsed JSON scalar types."""
 
+    ensure_finite_numbers(source)
+    ensure_finite_numbers(target)
     patch = create_patch(dict(source), dict(target))
-    if not isinstance(patch, dict):
-        raise ContractError("document roots must remain objects")
-    if merge(deepcopy(dict(source)), deepcopy(patch)) != dict(target):
+    if not json_equal(merge_patch(dict(source), patch), dict(target)):
         raise ContractError(
-            "target cannot be represented by RFC 7396 because null denotes member removal"
+            "target cannot be represented by RFC 7396 because null denotes member removal",
+            error_id="diff.unrepresentable",
         )
     return patch
 

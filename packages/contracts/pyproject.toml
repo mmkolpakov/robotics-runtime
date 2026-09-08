@@ -15,7 +15,6 @@ classifiers = [
   "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-  "json-merge-patch==0.3.0",
   "jsonschema[format-nongpl]>=4.26,<5",
   "PyYAML>=6.0.3,<7",
   "referencing>=0.37,<1",
