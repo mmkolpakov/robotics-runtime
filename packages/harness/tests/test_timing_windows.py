@@ -5,6 +5,7 @@ from collections.abc import Sequence
 import pytest
 
 from robotics_acceptance_harness.timing import (
+    ClockMeasurementWindow,
     ClockSample,
     TimingObservation,
     TimingValidationError,
@@ -152,3 +153,71 @@ def test_missing_deadline_evidence_does_not_pass_with_valid_rtf() -> None:
 
     assert caught.value.observation.real_time_factor == 1
     assert caught.value.issues[0].json_path == "$.time_policy.max_deadline_miss_ratio"
+
+
+@pytest.mark.parametrize("bad", [-0.1, 1.1, float("nan"), float("inf"), float("-inf")])
+@pytest.mark.parametrize("last", [False, True])
+def test_every_deadline_ratio_is_checked_before_taking_the_maximum(bad: float, last: bool) -> None:
+    values = [0.0, bad] if last else [bad, 0.0]
+    samples = [
+        ClockSample(index * SECOND, index * SECOND, deadline_miss_ratio=value)
+        for index, value in enumerate(values)
+    ]
+    with pytest.raises(TimingValidationError, match="finite and in") as caught:
+        realtime(samples)
+    assert caught.value.observation.deadline_miss_ratio == 0
+    assert caught.value.observation.real_time_factor == 1
+
+
+def test_boundary_allowance_does_not_extrapolate_progress_or_relax_minimum_rtf() -> None:
+    samples = [
+        ClockSample(wall, wall, deadline_miss_ratio=0)
+        for wall in range(0, 30 * SECOND, SECOND // 20)
+    ]
+    with pytest.raises(TimingValidationError) as caught:
+        evaluate_timing(
+            {"time_mode": "simulation_realtime"},
+            {"min_realtime_factor": 1.0, "max_deadline_miss_ratio": 0.01},
+            samples,
+            measurement_window=ClockMeasurementWindow(0, 30 * SECOND),
+        )
+    # The final 50 ms fit the coverage allowance, but have no observed progress.
+    assert caught.value.observation.real_time_factor == 0.95
+    assert all("coverage gap" not in issue.message for issue in caught.value.issues)
+
+
+@pytest.mark.parametrize("bounds", [(-1, SECOND), (0, 0), (SECOND, 0)])
+def test_measurement_bounds_must_be_nonnegative_and_increase(bounds: tuple[int, int]) -> None:
+    with pytest.raises(ValueError, match="increasing nonnegative"):
+        ClockMeasurementWindow(*bounds)
+
+
+@pytest.mark.parametrize("gap_ns", [0, -1])
+def test_callback_gap_allowance_must_be_positive(gap_ns: int) -> None:
+    with pytest.raises(ValueError, match="allowance must be positive"):
+        ClockMeasurementWindow(0, SECOND, max_sample_gap_ns=gap_ns)
+
+
+def test_out_of_window_clock_points_cannot_supply_extra_progress() -> None:
+    samples = [
+        ClockSample(-1, 0, deadline_miss_ratio=0),
+        ClockSample(SECOND, SECOND, deadline_miss_ratio=0),
+    ]
+    with pytest.raises(TimingValidationError, match="outside measurement bounds"):
+        evaluate_timing(
+            {"time_mode": "simulation_realtime"},
+            {"min_realtime_factor": 0.8, "max_deadline_miss_ratio": 0.01},
+            samples,
+            measurement_window=ClockMeasurementWindow(0, SECOND),
+        )
+
+
+def test_repeated_callbacks_do_not_inflate_playback_progress_frequency() -> None:
+    samples = [
+        ClockSample(0, 0),
+        ClockSample(SECOND // 2, 0),
+        ClockSample(SECOND, SECOND),
+    ]
+    with pytest.raises(TimingValidationError, match="clock frequency") as caught:
+        evaluate_timing({"time_mode": "playback_clocked"}, {"min_clock_hz": 1.5}, samples)
+    assert caught.value.observation.clock_hz == 1
