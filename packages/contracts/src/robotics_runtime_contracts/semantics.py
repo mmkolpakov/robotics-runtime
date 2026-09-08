@@ -1044,11 +1044,19 @@ def _validate_campaign_summary(document: Mapping[str, Any]) -> None:
     expected_status = "passed" if passed else worst_status(item["status"] for item in runs)
     if expected_status == "passed" and not passed:
         expected_status = "failed"
-    if verdict["status"] != expected_status:
+    allowed_statuses = {expected_status}
+    if (
+        counts["passed"] < acceptance["minimum_passed_runs"]
+        and counts["failed"] == counts["error"] == 0
+    ):
+        # Retain legacy v1 failed documents while allowing an honest shortfall verdict.
+        allowed_statuses.add("incomplete")
+    if verdict["status"] not in allowed_statuses:
         _fail(
             schema_name,
             "$.verdict.status",
-            f"must equal campaign policy verdict {expected_status!r}",
+            "must equal campaign policy verdict "
+            + " or ".join(repr(status) for status in sorted(allowed_statuses)),
         )
 
 

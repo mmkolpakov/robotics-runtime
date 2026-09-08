@@ -15,6 +15,11 @@
   constraints in `common.v1`, preserving resolved assertions and fixture outcomes.
   Intentionally update schema digest snapshots; see the baseline reproduction and
   equivalence evidence in [schema bundling](docs/schema-bundling.md).
+- Accept `incomplete` campaign summaries when passed runs are below the minimum
+  and no failed/error runs exist. Preserve legacy all-passed-shortfall `failed`
+  documents under `campaign-summary.v1`; schema bytes and policy limits do not
+  change. New harness writers require this reader update before emitting the
+  more precise verdict. See [compatibility policy](COMPATIBILITY.md).
 - Replace `json-merge-patch` with a typed RFC 7396 implementation. Semantic diff
   distinguishes booleans, integers and floats recursively, preserves input
   containers, and reports `diff.unrepresentable` for unrepresentable null members.
