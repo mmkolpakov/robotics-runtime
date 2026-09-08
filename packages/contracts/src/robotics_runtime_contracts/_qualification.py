@@ -879,6 +879,42 @@ def _validate_channel_delivery(channel: Mapping[str, Any], observation: Mapping[
         _fail(f"channel observation {observation['observation_id']} contradicts its contract")
 
 
+def _require_known_domain(
+    artifact: _Artifact,
+    domain_id: str,
+    results: Mapping[str, _Artifact],
+    json_path: str,
+) -> None:
+    if domain_id not in results:
+        _fail(
+            f"{artifact.subject_name}: unknown acceptance run domain {domain_id!r}",
+            error_id="qualification.unknown_domain",
+            json_path=json_path,
+        )
+
+
+def _validate_transport_references(
+    transport: _Artifact,
+    transport_document: Mapping[str, Any],
+    channels: Mapping[str, _Artifact],
+    results: Mapping[str, _Artifact],
+) -> None:
+    for artifact in channels.values():
+        channel = _document(artifact)
+        for endpoint in ("source", "destination"):
+            _require_known_domain(
+                artifact, channel[endpoint]["domain_id"], results, f"$.{endpoint}.domain_id"
+            )
+    for chain_index, chain in enumerate(transport_document["causal_chains"]):
+        for hop_index, hop in enumerate(chain["hops"]):
+            if hop["channel_id"] not in channels:
+                _fail(
+                    f"{transport.subject_name}: unknown channel {hop['channel_id']!r}",
+                    error_id="qualification.unknown_channel",
+                    json_path=f"$.causal_chains[{chain_index}].hops[{hop_index}].channel_id",
+                )
+
+
 def _validate_transport(
     grouped: Mapping[str, Sequence[_Artifact]],
     run_id: str,
@@ -938,24 +974,7 @@ def _validate_transport(
         _fail("aggregate transport qualification pointer does not match local result")
 
     chains, channels, observations = _transport_sources(grouped, run_id)
-    for artifact in channels.values():
-        channel = _document(artifact)
-        for endpoint in ("source", "destination"):
-            domain_id = channel[endpoint]["domain_id"]
-            if domain_id not in results:
-                _fail(
-                    f"{artifact.subject_name}: unknown acceptance run domain {domain_id!r}",
-                    error_id="qualification.unknown_domain",
-                    json_path=f"$.{endpoint}.domain_id",
-                )
-    for chain_index, chain in enumerate(transport_document["causal_chains"]):
-        for hop_index, hop in enumerate(chain["hops"]):
-            if hop["channel_id"] not in channels:
-                _fail(
-                    f"{transport.subject_name}: unknown channel {hop['channel_id']!r}",
-                    error_id="qualification.unknown_channel",
-                    json_path=f"$.causal_chains[{chain_index}].hops[{hop_index}].channel_id",
-                )
+    _validate_transport_references(transport, transport_document, channels, results)
     relation_artifacts = grouped.get("clock_relation", ())
     scenario = _document(scenario_artifact)
     _require_equal(
@@ -987,12 +1006,7 @@ def _validate_transport(
         )
         for field in ("source_domain_id", "destination_domain_id"):
             domain_id = relation[field]
-            if domain_id not in results:
-                _fail(
-                    f"{artifact.subject_name}: unknown acceptance run domain {domain_id!r}",
-                    error_id="qualification.unknown_domain",
-                    json_path=f"$.{field}",
-                )
+            _require_known_domain(artifact, domain_id, results, f"$.{field}")
             domain_result = _document(results[domain_id])
             _require_time_order(
                 f"clock relation {relation_id} domain {domain_id} window",

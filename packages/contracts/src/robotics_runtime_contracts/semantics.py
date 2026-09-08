@@ -691,6 +691,21 @@ def _validate_acceptance_aggregate(document: Mapping[str, Any]) -> None:
         )
 
 
+def _require_known_hop_channels(
+    schema_name: str,
+    chain_index: int,
+    hop_ids: Sequence[str],
+    contract_ids: set[str],
+) -> None:
+    for hop_index, hop_id in enumerate(hop_ids):
+        if hop_id not in contract_ids:
+            _fail(
+                schema_name,
+                f"$.causal_chains[{chain_index}].hops[{hop_index}].channel_id",
+                f"unknown channel contract: {hop_id!r}",
+            )
+
+
 def _validate_transport_qualification(document: Mapping[str, Any]) -> None:
     schema_name = document["schema_version"]
     result_domains = {
@@ -792,13 +807,7 @@ def _validate_transport_qualification(document: Mapping[str, Any]) -> None:
                     "must continue from the preceding channel destination",
                 )
         hop_ids = [hop["channel_id"] for hop in chain["hops"]]
-        for hop_index, hop_id in enumerate(hop_ids):
-            if hop_id not in contract_ids:
-                _fail(
-                    schema_name,
-                    f"$.causal_chains[{index}].hops[{hop_index}].channel_id",
-                    f"unknown channel contract: {hop_id!r}",
-                )
+        _require_known_hop_channels(schema_name, index, hop_ids, contract_ids)
         if len(hop_ids) != len(set(hop_ids)):
             _fail(
                 schema_name,
