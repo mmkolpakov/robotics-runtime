@@ -154,6 +154,50 @@ def test_declared_reset_preserves_adjacent_intervals() -> None:
     assert merged.sum == pytest.approx(0.6)
 
 
+@pytest.mark.parametrize("events", [[], [1.5, 1.8]])
+def test_unknown_start_marker_removes_historical_population(events: list[float]) -> None:
+    history = [0.1, 100.0] * 50
+    merged = histogram_window_aggregate(
+        [point(history, 10, start=10), point(history + events, 40, start=10)],
+        window_start_ns=10,
+        window_end_ns=40,
+    )
+    assert merged.count == len(events)
+    assert merged.sum == pytest.approx(sum(events))
+    assert merged.min is None and merged.max is None
+
+
+def test_unknown_start_reset_inside_window_counts_only_new_events() -> None:
+    history = [0.1, 100.0] * 50
+    merged = histogram_window_aggregate(
+        [point([0.4], 10), point(history, 10, start=10), point(history + [1.5], 40, start=10)],
+        window_start_ns=0,
+        window_end_ns=40,
+    )
+    assert merged.count == 2
+    assert merged.sum == pytest.approx(1.9)
+
+
+def test_unknown_start_marker_cannot_satisfy_minimum_sample_count(tmp_path: Path) -> None:
+    history = [0.4] * 100
+    observation = evaluate_time_authority(
+        policy(),
+        [point(history, 10, start=10), point(history, 40, start=10)],
+        run_id=RUN_ID,
+        domain_id="camera-domain",
+        source_id="simulation-clock",
+        window_start_ns=10,
+        window_end_ns=40,
+    )
+    assert observation.sample_count == 0 and not observation.within_policy
+    inputs = result_inputs(tmp_path)
+    inputs["time_authority"] = observation
+    result = build_acceptance_result(**inputs)
+    assert result["status"] == "failed"
+    junit = JUnitXml.fromfile(str(write_junit_xml(result, tmp_path / "result.xml")))
+    assert junit.failures >= 1 and junit.errors == 0
+
+
 def test_duplicate_cumulative_timestamp_is_malformed() -> None:
     with pytest.raises(MetricAggregationError, match="duplicate cumulative"):
         histogram_window_aggregate(

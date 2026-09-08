@@ -175,6 +175,9 @@ after the boundary proves that the intervening interval contained no events.
 Otherwise event timestamps cannot be recovered and the window is unevaluated.
 A changed start timestamp delimits a reset; a decreasing count without a new
 start timestamp leaves the reset boundary unknown.
+A cumulative point whose start equals its observation timestamp is an
+[unknown-start marker](https://opentelemetry.io/docs/specs/otel/metrics/data-model/#cumulative-streams-handling-unknown-start-time).
+Its existing population is subtracted before counting subsequent window events.
 
 After baseline subtraction, lifetime minima and maxima are discarded unless
 the baseline was empty. Quantiles use the inverse empirical CDF (integer rank

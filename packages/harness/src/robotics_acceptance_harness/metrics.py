@@ -384,6 +384,10 @@ def _cumulative_window_sample(
     if latest.observed_at_ns <= window_start_ns:
         return None
     if latest.start_time_ns >= window_start_ns:
+        if ordered[0].start_time_ns == ordered[0].observed_at_ns:
+            # OTLP's unknown-start marker carries historical population, not
+            # events observed since this start timestamp.
+            return _subtract_histograms(latest, ordered[0])
         return latest
     baselines = [sample for sample in ordered if sample.observed_at_ns <= window_start_ns]
     if not baselines:
