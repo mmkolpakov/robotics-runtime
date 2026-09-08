@@ -76,6 +76,10 @@ def violations(actual: dict[str, int], baseline: dict[str, int]) -> list[str]:
             failures.append(f"New violation: {key} = {value}")
         elif value > limit:
             failures.append(f"Budget increased: {key} = {value}, allowed {limit}")
+        elif value < limit:
+            failures.append(f"Lower stale budget: {key} from {limit} to {value}")
+    for key in sorted(set(baseline) - set(actual)):
+        failures.append(f"Remove resolved budget: {key}")
     return failures
 
 

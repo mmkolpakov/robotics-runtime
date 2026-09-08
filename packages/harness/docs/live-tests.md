@@ -74,10 +74,10 @@ docker run --rm \
 PowerShell:
 
 ```powershell
-docker build --file tests/live/Dockerfile --tag harness-live:step2 .
+docker build --file packages/harness/tests/live/Dockerfile --tag harness-live:step2 .
 New-Item -ItemType Directory -Force artifacts/live | Out-Null
 docker run --rm `
-  --mount "type=bind,source=$((Get-Location).Path)/artifacts/live,target=/harness/artifacts/live" `
+  --mount "type=bind,source=$((Get-Location).Path)/artifacts/live,target=/workspace/artifacts/live" `
   harness-live:step2
 ```
 
@@ -107,9 +107,10 @@ plugins still load, while real ROS bindings and the Collector remain available.
 The container uses ROS domain 121 and localhost discovery. Run the tests serially
 in an isolated domain; another `/clock` publisher would invalidate the fixture.
 On an existing Jazzy host with the same dependencies and a Collector binary on
-`PATH`, source `/opt/ros/jazzy/setup.bash`, then run:
+`PATH`, source `/opt/ros/jazzy/setup.bash`, then run from the workspace root:
 
 ```bash
+cd packages/harness
 ROBOTICS_LIVE_ROS=1 ROS_DOMAIN_ID=121 \
   PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
   RMW_IMPLEMENTATION=rmw_fastrtps_cpp \

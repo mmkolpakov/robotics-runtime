@@ -33,3 +33,25 @@ def test_new_function_cannot_reuse_another_functions_budget(tmp_path: Path) -> N
     assert gate.violations(gate.measure(tmp_path, ["sample.py"]), baseline) == [
         "New violation: sample.py::added::PLR0913 = 6"
     ]
+
+
+def test_reduced_or_resolved_budget_cannot_allow_regrowth(tmp_path: Path) -> None:
+    path = tmp_path / "sample.py"
+
+    def measure(branches: int) -> dict[str, int]:
+        path.write_text(
+            "def calculate(x):\n"
+            + "".join(f"    if x == {value}:\n        x += 1\n" for value in range(branches)),
+            encoding="utf-8",
+        )
+        return gate.measure(tmp_path, ["sample.py"])
+
+    original = measure(11)
+    improved = measure(10)
+    key = "sample.py::calculate::C901"
+    assert gate.violations(improved, original) == [f"Lower stale budget: {key} from 12 to 11"]
+    assert gate.violations(original, improved) == [f"Budget increased: {key} = 12, allowed 11"]
+    resolved = measure(9)
+    assert resolved == {}
+    assert gate.violations(resolved, improved) == [f"Remove resolved budget: {key}"]
+    assert gate.violations(original, resolved) == [f"New violation: {key} = 12"]
