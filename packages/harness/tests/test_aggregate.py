@@ -135,7 +135,7 @@ def result(
         media_type="application/x-ndjson",
     )
     evidence_path = write_evidence_index(
-        tmp_path / f"evidence-{suffix}.json",
+        tmp_path / f"evidence-{suffix}.yaml",
         run_id=RUN_ID,
         artifacts=[artifact],
         recording_mode="bounded",
