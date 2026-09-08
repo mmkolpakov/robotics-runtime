@@ -1,6 +1,6 @@
 # Robotics Acceptance Harness
 
-[![CI](https://github.com/mmkolpakov/robotics-acceptance-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/mmkolpakov/robotics-acceptance-harness/actions/workflows/ci.yml)
+[![CI](https://github.com/mmkolpakov/robotics-runtime/actions/workflows/ci.yml/badge.svg)](https://github.com/mmkolpakov/robotics-runtime/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Attach-only acceptance testing for existing ROS 2 executions.
@@ -41,23 +41,26 @@ version.
 
 | Component | Baseline |
 | --- | --- |
-| Python | 3.12 or 3.13 |
-| Contracts | `robotics-runtime-contracts>=0.16,<0.17` |
+| Python | 3.12 through 3.14 |
+| Contracts | Workspace candidate `robotics-runtime-contracts>=0.17.0rc1,<0.18` |
 | ROS observation | ROS 2 Jazzy packages in the observer environment |
 | Metrics | OTLP JSON Lines exported by OpenTelemetry Collector |
 
-All public contract families currently use one canonical `v1`. This is a
-pre-1.0 line; compatibility starts with the first stable release.
+All public contract families currently use one canonical `v1`. Published
+schemas are checked for compatible changes against the release baseline.
+The contracts candidate above is under development; its preparation does not
+mean it is available on PyPI.
 
 ## Install
 
 Development uses the exact contracts revision recorded in `uv.lock`:
 
 ```bash
-git clone https://github.com/mmkolpakov/robotics-acceptance-harness.git
-cd robotics-acceptance-harness
-uv sync --locked --all-groups
+git clone https://github.com/mmkolpakov/robotics-runtime.git
+cd robotics-runtime
+uv sync --locked --all-packages --all-groups
 uv run robotics-acceptance --version
+cd packages/harness
 ```
 
 Release consumers should install the published wheel together with the locked
@@ -103,8 +106,10 @@ Run `robotics-acceptance COMMAND --help` for the complete option set.
 | `timing-check` | Check verified clock metrics against scenario policy | No |
 | `otel-summary` | Summarize normalized OTLP metric points | No |
 
-Successful acceptance returns `0`, a completed non-passing verdict returns `1`,
-and invalid input or an observation failure returns `2`.
+Verdict-producing commands return `0` for `passed` and `1` for a completed
+non-passing verdict, including `failed`, `incomplete`, or `error`. An input,
+observation, or execution exception handled by the CLI returns `2` with a
+diagnostic. A result whose status is `error` is distinct from such an exception.
 
 `campaign` emits `incomplete` when passed runs are below the required minimum
 and no failed/error runs were observed. This writer requires the corresponding
@@ -137,12 +142,25 @@ observer inherits standard ROS variables such as `ROS_DOMAIN_ID`,
 `RMW_IMPLEMENTATION`, and the SROS2 environment. It has no private fallback for
 document paths or execution identity.
 
+An expected topic's `qos_profile` selects the observer subscription's QoS.
+The compatibility check compares discovered publishers with that subscription;
+it does not compare every application publisher/subscriber pair. The harness
+excludes its own subscriptions from the observed subscriber count. When the
+scenario does not declare `/clock`, its observation subscription uses depth 1,
+best-effort reliability, and volatile durability.
+
 ## Offline Evaluation
 
 `evaluate` runs the same metric, evidence, and product evaluators without
 joining ROS. Live graph, clock, safety-boundary, and shutdown observations are
 marked `unevaluated`, so an offline result cannot silently claim complete live
 acceptance.
+
+If every available offline check passes, the result is still `incomplete` and
+`evaluate` exits `1`. JUnit marks the missing live coverage as skipped. Evidence
+of a failure or error can raise the result's severity; malformed input or an
+execution exception exits `2`. A successful offline invocation therefore does
+not establish the `passed` verdict required for exit `0`.
 
 Local evidence is verified by URI, path, size, and SHA-256. Retained evidence
 also requires a receipt, its typed external-verification record, and the
