@@ -64,7 +64,7 @@ def _observed_graph(readiness: ReadinessResult) -> dict[str, Any]:
         "topics": [
             {
                 "name": name,
-                "type": observation.types[0],
+                "type": min(observation.types),
                 "publishers": observation.publishers,
                 "subscribers": observation.subscribers,
                 "first_message_at_ns": observation.first_message_at_ns,
@@ -75,7 +75,7 @@ def _observed_graph(readiness: ReadinessResult) -> dict[str, Any]:
         "services": [
             {
                 "name": name,
-                "type": observation.types[0],
+                "type": min(observation.types),
                 "server_nodes": observation.server_nodes,
                 "client_nodes": observation.client_nodes,
             }
@@ -85,7 +85,7 @@ def _observed_graph(readiness: ReadinessResult) -> dict[str, Any]:
         "actions": [
             {
                 "name": name,
-                "type": observation.types[0],
+                "type": min(observation.types),
                 "server_nodes": observation.server_nodes,
                 "client_nodes": observation.client_nodes,
             }
@@ -321,6 +321,7 @@ def write_contract_json(document: Mapping[str, Any], path: str | Path) -> Path:
             json.dump(document, temporary, indent=2, sort_keys=True, allow_nan=False)
             temporary.write("\n")
             temporary.flush()
+            os.chmod(temporary_path, 0o644)
             os.fsync(temporary.fileno())
         os.replace(temporary_path, destination)
     except Exception:
@@ -402,6 +403,7 @@ def write_junit_xml(result: Mapping[str, Any], path: str | Path) -> Path:
         xml = JUnitXml()
         xml.add_testsuite(suite)
         xml.write(str(temporary_path), pretty=True)
+        os.chmod(temporary_path, 0o644)
         os.replace(temporary_path, destination)
     except Exception:
         temporary_path.unlink(missing_ok=True)
