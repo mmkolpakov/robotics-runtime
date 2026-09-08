@@ -68,7 +68,8 @@ Public role schemas and internal reusable resources have disjoint IDs. Schema
 digests are derived from packaged bytes with `schema_digest()`.
 
 [`docs/schema-digests.json`](docs/schema-digests.json) records SHA-256 for all
-29 schema resources and the catalog, including reviewed bundler byte changes
+31 schema resources and the catalog, including the two new public roles and
+reviewed bundler byte changes
 since `v0.16.0` (`0c2c0f4`). The test compares
 raw packaged bytes and the complete file inventory with this checked-in
 snapshot. Whitespace changes, modified internal cores, missing files and new
