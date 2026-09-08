@@ -13,6 +13,7 @@ from google.protobuf.message import Message
 from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import (
     ExportMetricsServiceRequest,
 )
+from opentelemetry.proto.metrics.v1.metrics_pb2 import AggregationTemporality, DataPointFlags
 
 from robotics_acceptance_harness._evidence_files import EvidenceReadError, open_evidence
 from robotics_acceptance_harness.metrics import (
@@ -105,9 +106,9 @@ def _number_value(point: Any) -> float | None:
 
 
 def _temporality(value: int) -> MetricTemporality:
-    if value == 1:
+    if value == AggregationTemporality.AGGREGATION_TEMPORALITY_DELTA:
         return "delta"
-    if value == 2:
+    if value == AggregationTemporality.AGGREGATION_TEMPORALITY_CUMULATIVE:
         return "cumulative"
     return "unspecified"
 
@@ -121,7 +122,7 @@ def _optional_number(point: Any, field_name: str) -> float | None:
 
 
 def _has_recorded_value(point: Any) -> bool:
-    return int(point.flags) & 1 == 0
+    return int(point.flags) & DataPointFlags.DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK == 0
 
 
 def otlp_attribute_value(value: Any) -> MetricAttribute | None:

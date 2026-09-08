@@ -5,6 +5,7 @@ import json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -473,7 +474,7 @@ def evaluate_causal_chain(
 
     if len(hops) == len(channel_contracts):
         graph = _trace_graph(spans_by_domain)
-        for previous, current in zip(hops, hops[1:], strict=False):
+        for previous, current in pairwise(hops):
             previous_consumer = (
                 previous.consumer.trace_id,
                 previous.consumer.span_id,

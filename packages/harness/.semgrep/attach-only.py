@@ -5,11 +5,24 @@ import os
 # ruleid: attach-only-no-process-control
 import subprocess
 
+# ok: attach-only-no-network-client
+# ruleid: attach-only-no-network-client
+from urllib.request import url2pathname, urlopen
+
+# ruleid: attach-only-no-network-client
+from urllib.request import urlretrieve as retrieve
+
 # ruleid: attach-only-no-orchestrator-sdk
 import docker
 
 # ruleid: attach-only-no-network-client
 import requests
+
+
+def forbidden_mixed_import():
+    # ruleid: attach-only-no-network-client
+    from urllib.request import build_opener
+
 
 # ruleid: attach-only-no-mutation-service-types
 from lifecycle_msgs.srv import ChangeState

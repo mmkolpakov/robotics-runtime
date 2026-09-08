@@ -4,6 +4,7 @@ from bisect import bisect_left, bisect_right
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 from math import isfinite
 from typing import Any
 
@@ -97,10 +98,7 @@ def _clock_coverage(
         first - window.start_ns,
         window.end_ns - last,
         max(
-            (
-                b.observed_at_ns - a.observed_at_ns
-                for a, b in zip(samples, samples[1:], strict=False)
-            ),
+            (b.observed_at_ns - a.observed_at_ns for a, b in pairwise(samples)),
             default=0,
         ),
     )
@@ -176,8 +174,7 @@ def _windowed_realtime_factor(
         issues.append(ReadinessIssue("$.time_policy.min_realtime_factor", "need two clock samples"))
         return 0.0
     if any(
-        current.observed_at_ns <= previous.observed_at_ns
-        for previous, current in zip(samples, samples[1:], strict=False)
+        current.observed_at_ns <= previous.observed_at_ns for previous, current in pairwise(samples)
     ):
         issues.append(ReadinessIssue("$.time_policy", "clock observation times must increase"))
         return 0.0
@@ -263,16 +260,14 @@ def evaluate_timing(
 
     issues: list[ReadinessIssue] = []
     monotonic = all(
-        current.source_time_ns >= previous.source_time_ns
-        for previous, current in zip(samples, samples[1:], strict=False)
+        current.source_time_ns >= previous.source_time_ns for previous, current in pairwise(samples)
     )
     if not monotonic:
         issues.append(ReadinessIssue("$.time_policy", "source clock moved backwards"))
 
     elapsed_ns = samples[-1].observed_at_ns - samples[0].observed_at_ns
     transitions = sum(
-        current.source_time_ns != previous.source_time_ns
-        for previous, current in zip(samples, samples[1:], strict=False)
+        current.source_time_ns != previous.source_time_ns for previous, current in pairwise(samples)
     )
     clock_hz = transitions * 1_000_000_000 / elapsed_ns if elapsed_ns > 0 else 0.0
     mode = execution["time_mode"]
@@ -302,17 +297,13 @@ def evaluate_timing(
         max_skipped_steps = int(time_policy["max_skipped_steps"])
         step_transitions = [
             current
-            for previous, current in zip(samples, samples[1:], strict=False)
+            for previous, current in pairwise(samples)
             if current.source_time_ns != previous.source_time_ns
         ]
         transition_sources = [samples[0], *step_transitions]
         deltas = [
             current.source_time_ns - previous.source_time_ns
-            for previous, current in zip(
-                transition_sources,
-                transition_sources[1:],
-                strict=False,
-            )
+            for previous, current in pairwise(transition_sources)
         ]
         if not deltas or samples[-1].source_time_ns <= samples[0].source_time_ns:
             issues.append(ReadinessIssue("$.time_policy", "stepped clock did not advance"))

@@ -39,7 +39,13 @@ rules:
       - pattern: import aiohttp
       - pattern: from aiohttp import $X
       - pattern: import urllib.request
-      - pattern: from urllib.request import $X
+      - patterns:
+          - pattern: from urllib.request import $X
+          - metavariable-regex:
+              metavariable: $X
+              regex: '^(?!url2pathname$)'
+      - pattern: urllib.request.urlopen(...)
+      - pattern: urllib.request.urlretrieve(...)
       - pattern: import socket
       - pattern: from socket import $X
 

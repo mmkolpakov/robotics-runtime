@@ -4,6 +4,7 @@ import math
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from itertools import pairwise
 from statistics import fmean
 from types import MappingProxyType
 from typing import Any, Literal
@@ -79,14 +80,7 @@ class HistogramSample:
             raise ValueError("histogram bucket counts must add up to count")
         if any(not math.isfinite(bound) for bound in self.explicit_bounds):
             raise ValueError("histogram explicit bounds must be finite")
-        if any(
-            current >= following
-            for current, following in zip(
-                self.explicit_bounds,
-                self.explicit_bounds[1:],
-                strict=False,
-            )
-        ):
+        if any(current >= following for current, following in pairwise(self.explicit_bounds)):
             raise ValueError("histogram explicit bounds must be strictly increasing")
         if any(
             value is not None and not math.isfinite(value)
@@ -390,7 +384,7 @@ def _subtract_histograms(
 
 def _checked_cumulative_series(samples: Sequence[HistogramSample]) -> list[HistogramSample]:
     ordered = sorted(samples, key=lambda sample: sample.observed_at_ns)
-    for previous, current in zip(ordered, ordered[1:], strict=False):
+    for previous, current in pairwise(ordered):
         if (current.name, current.unit) != (previous.name, previous.unit):
             raise MetricAggregationError("cumulative histogram identity changed")
         if current.observed_at_ns == previous.observed_at_ns:
@@ -676,7 +670,7 @@ def counter_window_aggregate(
     cumulative_coverage: list[tuple[MetricSeriesKey, int, int]] = []
     for (series_key, _), series in grouped.items():
         ordered = sorted(series, key=lambda sample: sample.observed_at_ns)
-        for previous, current in zip(ordered, ordered[1:], strict=False):
+        for previous, current in pairwise(ordered):
             if current.observed_at_ns == previous.observed_at_ns:
                 raise MetricAggregationError(
                     f"{metric_name} contains duplicate cumulative observations"
@@ -852,7 +846,7 @@ def _duration_evaluation(
         gap
         for gap in (
             timestamps[0] - window_start_ns,
-            *(right - left for left, right in zip(timestamps, timestamps[1:], strict=False)),
+            *(right - left for left, right in pairwise(timestamps)),
             window_end_ns - timestamps[-1],
         )
         if gap > max_gap_ns
