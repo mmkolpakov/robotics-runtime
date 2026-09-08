@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
 from referencing.exceptions import Unresolvable
 
 from scripts import bundle_schemas as bundler
@@ -127,3 +129,183 @@ def test_unsupported_reference_scope_fails_explicitly(extra: dict[str, str]) -> 
     }
     with pytest.raises(ValueError, match="outside the core source format"):
         bundler.check_references({"core": core})
+
+
+@pytest.mark.parametrize("target", ["object", None, 1, 1.0, ["integer"], {"type": 5}])
+def test_existing_reference_target_must_itself_be_a_schema(target: Any) -> None:
+    schema = {
+        "$schema": bundler.DIALECT,
+        "$id": "urn:example:core",
+        "const": target,
+        "$ref": "#/const",
+    }
+    # A valid outer schema does not establish that the resolved target is valid.
+    Draft202012Validator.check_schema(schema)
+    with pytest.raises(SchemaError):
+        bundler.check_references({"core": schema})
+
+
+@pytest.mark.parametrize("target", [True, False, {"type": "object"}])
+def test_boolean_and_object_reference_targets_are_supported(target: Any) -> None:
+    schema = {
+        "$schema": bundler.DIALECT,
+        "$id": "urn:example:core",
+        "$defs": {"value": target},
+        "$ref": "#/$defs/value",
+    }
+    bundler.check_references({"core": schema})
+    assert Draft202012Validator(schema).is_valid({}) is (target is not False)
+
+
+@pytest.mark.parametrize(
+    "dialect", ["http://json-schema.org/draft-07/schema#", "urn:unsupported:dialect"]
+)
+@pytest.mark.parametrize("nested", [False, True])
+def test_a_reference_cannot_introduce_an_unsupported_target_dialect(
+    dialect: str, nested: bool
+) -> None:
+    target: dict[str, Any] = {"$schema": dialect, "type": "object"}
+    if nested:
+        target = {"$defs": {"nested": target}}
+    schema = {
+        "$schema": bundler.DIALECT,
+        "$id": "urn:example:core",
+        "const": target,
+        "$ref": "#/const",
+    }
+    # Const is normally instance data, but lookup makes it a validation target.
+    bundler.registry_for({"core": schema})
+    with pytest.raises(ValueError, match=r"must declare Draft 2020-12|Nested \$schema"):
+        bundler.check_references({"core": schema})
+
+
+@pytest.mark.parametrize("reference", ["#/type", "#/const"])
+def test_invalid_target_fails_even_with_matching_output_bytes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], reference: str
+) -> None:
+    schema = {
+        "$schema": bundler.DIALECT,
+        "$id": "urn:example:core",
+        "type": "object",
+        "const": {"type": 5},
+        "$defs": {"unused": {"$ref": reference}},
+    }
+    content = bundler.render(schema)
+    paths = [tmp_path / group / "example-core.v1.schema.json" for group in ("src", "out")]
+    for path in paths:
+        path.parent.mkdir()
+        path.write_bytes(content)
+    args = ["--sources", str(paths[0].parent), "--resources", str(paths[1].parent)]
+    assert bundler.main([*args, "--check"]) == 1
+    assert bundler.main(args) == 1
+    assert "Schema bundling failed:" in capsys.readouterr().err
+    assert all(path.read_bytes() == content for path in paths)
+
+
+@pytest.mark.parametrize(
+    "dialect", [None, "http://json-schema.org/draft-07/schema#", "urn:unsupported:dialect"]
+)
+def test_registry_requires_explicit_supported_root_dialect(dialect: str | None) -> None:
+    schema: dict[str, Any] = {"$id": "urn:example:core"}
+    if dialect is not None:
+        schema["$schema"] = dialect
+    with pytest.raises(ValueError, match="must declare Draft 2020-12"):
+        bundler.registry_for({"core": schema})
+
+
+@pytest.mark.parametrize(
+    "dialect",
+    [bundler.DIALECT, "http://json-schema.org/draft-07/schema#", "urn:unsupported:dialect"],
+)
+def test_registry_rejects_nested_dialect_declarations(dialect: str) -> None:
+    schema = {
+        "$schema": bundler.DIALECT,
+        "$id": "urn:example:core",
+        "$defs": {"unused": {"allOf": [{"$schema": dialect}]}},
+    }
+    with pytest.raises(ValueError, match=r"Nested \$schema"):
+        bundler.registry_for({"core": schema})
+
+
+def test_literal_dialect_declarations_are_instance_data() -> None:
+    schema = {
+        "$schema": bundler.DIALECT,
+        "$id": "urn:example:core",
+        "const": {"$schema": "urn:literal:dialect", "$ref": "urn:literal:reference"},
+        "examples": [{"$schema": "urn:literal:dialect"}],
+    }
+    bundler.check_references({"core": schema})
+    assert Draft202012Validator(schema).is_valid(schema["const"])
+
+
+@pytest.mark.parametrize("nested", [False, True])
+def test_unused_source_fragment_dialect_is_checked_before_assembly(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], nested: bool
+) -> None:
+    core = {"$schema": bundler.DIALECT, "$id": "urn:example:core"}
+    for group in ("src", "out"):
+        directory = tmp_path / group
+        directory.mkdir()
+        (directory / "example-core.v1.schema.json").write_bytes(bundler.render(core))
+    fragment: dict[str, Any] = {
+        "$schema": bundler.DIALECT,
+        "$id": bundler.SOURCE_PREFIX + "unused",
+    }
+    if nested:
+        fragment["$defs"] = {"unused": {"$schema": "urn:unsupported:dialect"}}
+    else:
+        fragment["$schema"] = "http://json-schema.org/draft-07/schema#"
+    fragments = tmp_path / "src/fragments"
+    fragments.mkdir()
+    (fragments / "unused.schema.json").write_bytes(bundler.render(fragment))
+    assert (
+        bundler.main(
+            ["--sources", str(tmp_path / "src"), "--resources", str(tmp_path / "out"), "--check"]
+        )
+        == 1
+    )
+    assert "Schema bundling failed:" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "instance,valid",
+    [
+        ({"kind": "a", "payload": 1}, True),
+        ({"kind": "b", "payload": 1}, False),
+        ({"kind": "a", "payload": "bad"}, False),
+        ({"kind": "a", "payload": 1, "extra": 0}, False),
+        ({"kind": "a"}, True),
+        ({"kind": "b"}, True),
+    ],
+)
+def test_named_conditional_import_preserves_evaluated_properties(
+    instance: dict[str, Any], valid: bool
+) -> None:
+    rule = {
+        "if": {"properties": {"kind": {"const": "a"}}, "required": ["kind"]},
+        "then": {"properties": {"payload": {"type": "integer"}}},
+    }
+    original: dict[str, Any] = {
+        "$schema": bundler.DIALECT,
+        "$id": "urn:example:core",
+        "type": "object",
+        "properties": {"kind": {"type": "string"}},
+        "allOf": [rule],
+        "unevaluatedProperties": False,
+    }
+    fragment = {
+        "$schema": bundler.DIALECT,
+        "$id": bundler.SOURCE_PREFIX + "fragment",
+        "$defs": {"payloadWhenA": rule},
+    }
+    source = deepcopy(original)
+    source["allOf"] = [{"$ref": "#/$defs/payloadWhenA"}]
+    source["$defs"] = {
+        "payloadWhenA": {"$ref": f"{fragment['$id']}#/$defs/payloadWhenA"},
+    }
+    assembled = bundler.assemble(
+        source, bundler.registry_for({"core": source, "fragment": fragment})
+    )
+    bundler.check_references({"core": assembled})
+    assert Draft202012Validator(original).is_valid(instance) is valid
+    assert Draft202012Validator(assembled).is_valid(instance) is valid
