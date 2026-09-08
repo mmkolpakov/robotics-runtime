@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from time import monotonic, sleep
+from time import monotonic, monotonic_ns, sleep
 from typing import TYPE_CHECKING
 
 import pytest
 
+from robotics_acceptance_harness.graph_window import ExpectedGraphMonitor
 from robotics_acceptance_harness.readiness import evaluate_graph, wait_for_readiness
 from robotics_acceptance_harness.ros import RosGraphObserver
 from tests.graph_types import ExpectedGraph
@@ -70,3 +71,49 @@ def test_observes_topic_service_action_and_lifecycle(live_graph: LiveGraph) -> N
         assert (action.server_nodes, action.client_nodes) == (1, 1)
         assert snapshot.lifecycle_nodes[live_graph.lifecycle].state == "active"
         assert observer.clock_samples == ()
+
+
+def _observe_lifecycle_state(
+    observer: RosGraphObserver,
+    monitor: ExpectedGraphMonitor,
+    name: str,
+    state: str,
+) -> None:
+    deadline = monotonic() + 15
+    while monotonic() < deadline:
+        snapshot = observer.snapshot()
+        monitor.observe(snapshot)
+        observed = snapshot.lifecycle_nodes.get(name)
+        if observed is not None and observed.state == state:
+            return
+        sleep(0.05)
+    pytest.fail(f"real ROS lifecycle node {name} never reported {state}")
+
+
+def test_measurement_retains_real_lifecycle_deactivation_after_recovery(
+    live_graph: LiveGraph,
+) -> None:
+    from rclpy.lifecycle import TransitionCallbackReturn
+
+    graph = live_graph.expected()
+    with RosGraphObserver(graph, observe_clock=False) as observer:
+        wait_for_readiness(
+            graph,
+            observer,
+            timeout_sec=20,
+            stable_for_sec=0.3,
+            poll_interval_sec=0.05,
+        )
+        start_ns = monotonic_ns()
+        monitor = ExpectedGraphMonitor(graph, start_ns, start_ns + 40_000_000_000)
+        monitor.observe(observer.snapshot())
+        # Only test-owned nodes change state; the production observer remains read-only.
+        assert live_graph.managed.trigger_deactivate() == TransitionCallbackReturn.SUCCESS
+        _observe_lifecycle_state(observer, monitor, live_graph.lifecycle, "inactive")
+        assert live_graph.managed.trigger_activate() == TransitionCallbackReturn.SUCCESS
+        _observe_lifecycle_state(observer, monitor, live_graph.lifecycle, "active")
+
+        (assertion,) = monitor.assertions(())
+        assert assertion.status == "failed"
+        assert "observed inactive" in assertion.message
+        assert live_graph.lifecycle in assertion.message
