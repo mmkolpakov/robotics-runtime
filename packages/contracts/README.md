@@ -219,8 +219,13 @@ decimal-conversion limit also applies and is never changed process-wide.
 Shared containers are expanded within the node budget; cycles fail the depth
 limit. Errors inherit `ContractError`: `input.invalid_type`,
 `input.invalid_unicode`, `input.non_finite_number`, or `input.limit_exceeded`.
-Paths identify the invalid value, the object containing a non-string key, or
-`$` for the total output-byte limit. Serialization does not mutate the input.
+Paths identify the invalid value, the object containing a non-string or oversized
+key, or `$` for the total output-byte limit. Diagnostic paths also have an 8 MiB
+UTF-8 budget: when a member or index would exceed it, errors in that subtree use
+the nearest enclosing path that fits. Key sizes are checked before constructing
+their paths, and diagnostic escaping uses bounded chunks. This does not narrow
+the accepted keys or change serialized bytes. Serialization does not mutate the
+input.
 
 ```python
 from robotics_runtime_contracts import dumps_canonical, file_sha256
