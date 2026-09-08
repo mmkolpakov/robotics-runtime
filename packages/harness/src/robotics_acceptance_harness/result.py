@@ -193,26 +193,12 @@ def build_acceptance_result(
         for evaluation in assertions
         if evaluation.status == "skipped"
     )
-    if assertions:
-        result_status = worst_status({evaluation.status for evaluation in assertions})
-    else:
-        result_status = "incomplete"
+    if not assertions:
         effective_unevaluated.add("$.assertions")
-    if result_status == "skipped" or (
-        result_status == "passed"
-        and any(evaluation.status == "skipped" for evaluation in assertions)
-    ):
-        result_status = "incomplete"
-    if result_status == "passed" and (
-        not forbidden_graph.passed
-        or (hardware_timing is not None and not hardware_timing.within_policy)
-    ):
-        result_status = "failed"
-    evaluated = "$.time_authority_observation" not in effective_unevaluated
-    if result_status != "error" and evaluated and not time_authority.within_policy:
-        result_status = "failed"
-    elif result_status == "passed" and effective_unevaluated:
-        result_status = "incomplete"
+    if physical:
+        effective_unevaluated.update(
+            ("$.clock_observation.real_time_factor", "$.clock_observation.deadline_miss_ratio")
+        )
 
     result: dict[str, Any] = {
         "schema_version": "acceptance-result.v1",
@@ -228,7 +214,6 @@ def build_acceptance_result(
         "started_at": format_utc_datetime(started_at),
         "finished_at": format_utc_datetime(finished_at),
         "monotonic_duration_sec": monotonic_duration_sec,
-        "status": result_status,
         "assertion_results": [
             {
                 "assertion_id": evaluation.assertion_id,
@@ -289,6 +274,10 @@ def build_acceptance_result(
         result["model_manifest_sha256"] = bundle.model.sha256
     if bundle.dataset is not None:
         result["dataset_manifest_sha256"] = bundle.dataset.sha256
+    result["status"] = worst_status(
+        "incomplete" if assertion["status"] == "skipped" else assertion["status"]
+        for assertion in _result_assertions(result)
+    )
     validate_document(result)
     return result
 
@@ -323,6 +312,55 @@ def write_contract_json(document: Mapping[str, Any], path: str | Path) -> Path:
     return destination
 
 
+def _result_assertions(result: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """Share assertion and observation outcomes between the verdict and JUnit."""
+
+    assertion_results = list(result["assertion_results"])
+    unevaluated = result.get("unevaluated", [])
+    checks = (
+        (
+            "forbidden-ros-graph",
+            "forbidden_graph_observation",
+            "passed",
+            "forbidden ROS interface observed",
+        ),
+        (
+            "hardware-clock-policy",
+            "hardware_clock_observation",
+            "within_policy",
+            "hardware timing out of policy",
+        ),
+        (
+            "time-authority-policy",
+            "time_authority_observation",
+            "within_policy",
+            "time-authority evidence is out of policy",
+        ),
+    )
+    for assertion_id, field, passed_key, failure_message in checks:
+        observation = result.get(field)
+        if observation is None:
+            continue
+        if f"$.{field}" in unevaluated:
+            status = "skipped"
+            message = f"unevaluated observation: $.{field}"
+        else:
+            status = "passed" if observation[passed_key] else "failed"
+            message = "" if observation[passed_key] else failure_message
+        assertion_results.append(
+            {"assertion_id": assertion_id, "status": status, "message": message}
+        )
+    if unevaluated:
+        assertion_results.append(
+            {
+                "assertion_id": "evaluation-coverage",
+                "status": "skipped",
+                "message": f"unevaluated declarations: {', '.join(unevaluated)}",
+            }
+        )
+    return assertion_results
+
+
 def write_junit_xml(result: Mapping[str, Any], path: str | Path) -> Path:
     """Write assertion outcomes in standard JUnit XML using junitparser."""
 
@@ -330,47 +368,7 @@ def write_junit_xml(result: Mapping[str, Any], path: str | Path) -> Path:
     suite = TestSuite("robotics-acceptance")
     suite.add_property("scenario_sha256", result["scenario_sha256"])
     suite.add_property("runtime_manifest_sha256", result["runtime_manifest_sha256"])
-    assertion_results = list(result["assertion_results"])
-    forbidden = result["forbidden_graph_observation"]
-    assertion_results.append(
-        {
-            "assertion_id": "forbidden-ros-graph",
-            "status": "passed" if forbidden["passed"] else "failed",
-            "message": "" if forbidden["passed"] else "forbidden ROS interface observed",
-        }
-    )
-    hardware = result.get("hardware_clock_observation")
-    if hardware is not None:
-        assertion_results.append(
-            {
-                "assertion_id": "hardware-clock-policy",
-                "status": "passed" if hardware["within_policy"] else "failed",
-                "message": "" if hardware["within_policy"] else "hardware timing out of policy",
-            }
-        )
-    time_authority = result.get("time_authority_observation")
-    if time_authority is not None:
-        assertion_results.append(
-            {
-                "assertion_id": "time-authority-policy",
-                "status": "passed" if time_authority["within_policy"] else "failed",
-                "message": (
-                    ""
-                    if time_authority["within_policy"]
-                    else "time-authority evidence is out of policy"
-                ),
-            }
-        )
-    unevaluated = result.get("unevaluated", [])
-    if unevaluated:
-        assertion_results.append(
-            {
-                "assertion_id": "evaluation-coverage",
-                "status": "failed",
-                "message": f"unevaluated declarations: {', '.join(unevaluated)}",
-            }
-        )
-    for assertion in assertion_results:
+    for assertion in _result_assertions(result):
         case = TestCase(assertion["assertion_id"], classname="robotics.acceptance")
         message = assertion.get("message", "")
         if assertion["status"] == "failed":
