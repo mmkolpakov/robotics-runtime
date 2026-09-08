@@ -88,13 +88,23 @@ def comparison_key(schema: Schema, schemas: dict[str, Schema]) -> str:
     return json.dumps(assertions(schema, schemas), sort_keys=True, allow_nan=False)
 
 
-def test_resource_and_catalog_identities_are_unchanged() -> None:
-    assert set(BEFORE) == set(AFTER)
-    assert (RESOURCES / "catalog.v1.json").read_bytes() == SNAPSHOT["resources"][
-        "catalog.v1.json"
-    ].encode()
+def test_original_identities_survive_the_two_spec23_role_additions() -> None:
+    additions = {
+        "execution_trust_policy": "execution-trust-policy.v1",
+        "robot_description": "robot-description.v1",
+    }
+    assert set(AFTER) - set(BEFORE) == {f"{name}.schema.json" for name in additions.values()}
+    catalog = json.loads((RESOURCES / "catalog.v1.json").read_bytes())
+    for role, name in additions.items():
+        assert catalog["roles"].pop(role) == name
+        assert AFTER[f"{name}.schema.json"]["$id"] == (
+            f"urn:robotics-runtime-contracts:v1:{name.removesuffix('.v1')}"
+        )
+    # Removing only the reviewed additions must recover every original catalog
+    # byte, including role order and the unchanged internal resource inventory.
+    assert json.dumps(catalog, indent=2) + "\n" == SNAPSHOT["resources"]["catalog.v1.json"]
     assert {name: value["$id"] for name, value in BEFORE.items()} == {
-        name: value["$id"] for name, value in AFTER.items()
+        name: AFTER[name]["$id"] for name in BEFORE
     }
 
 

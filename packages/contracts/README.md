@@ -107,16 +107,22 @@ machine-readable source of truth is
 | Area | Public roles |
 | --- | --- |
 | Execution | scenario, run, observation, result, aggregate, campaign |
-| Runtime | runtime manifest, model manifest, dataset manifest |
+| Runtime | runtime manifest, model manifest, dataset manifest, robot description |
 | Evidence | evidence index, recording summary, artifact receipt |
 | Qualification | profile, conformance result, bundle, policy |
-| Physical safety | execution permit and verification |
+| Physical safety | execution permit, verification, trust policy |
 | Cross-domain transport | channel, observation, clock relation, causal chain, qualification result |
 
 Every public document uses JSON Schema Draft 2020-12, declares a
 `schema_version` ending in `.v1`, rejects unknown root fields, and has an ID in
 the `urn:robotics-runtime-contracts:v1:*` namespace. Internal schema resources
 exist only to remove duplication and are not document roles.
+
+The working catalog adds `execution_trust_policy` and `robot_description` for
+the next release; these roles were not published in 0.16. See
+[product artifact roles](docs/product-artifact-roles.md) for their field and
+path conventions and [consumer examples](consumer-examples/README.md) for
+complete documents with real artifact byte digests.
 
 ## Extensions
 

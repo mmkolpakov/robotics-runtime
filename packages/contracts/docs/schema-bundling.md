@@ -84,9 +84,11 @@ transport ROS names/types retain their stricter patterns and length limits;
 normalize or widen those constraints.
 
 The refactor-specific equivalence suite expands references through `referencing`
-and compares every assertion tree for all 29 schemas. It separately checks IDs
-and catalog bytes, and requires the supported dialect in both historical and
-current schemas. Comparison uses JSON tokens to distinguish booleans from
+and compares every assertion tree for the original 29 schemas. It separately
+checks their IDs and recovers the exact original catalog bytes after removing
+only the two explicitly allowed SPEC 23 role additions (`execution_trust_policy`
+and `robot_description`). It requires the supported dialect in both historical
+and current schemas. Comparison uses JSON tokens to distinguish booleans from
 numbers. A resolved `$ref` with sibling assertions remains a distinct token
 containing both in the same scope; it is not converted into an `allOf` branch,
 which could change `unevaluatedProperties` behavior. It fails on recursive
@@ -99,6 +101,8 @@ for those cases. Resource hashes are updated consciously only after these checks
 
 This is evidence for a constraint-preserving reorganization under D10. It is not
 the planned SPEC 25 general additive-compatibility checker against the last
-release. No package version, canonical serialization, consumer behavior, new
-role, or external release is introduced here. Future assertion changes still
+release. The original bundler refactor introduced no package version, canonical
+serialization, consumer behavior, new role, or external release. SPEC 23 adds
+two independent public resources without changing existing schema bytes or
+assertions. Future assertion changes still
 require the compatibility or new-major path in ADR 0007.
