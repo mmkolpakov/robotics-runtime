@@ -13,6 +13,9 @@ roles retain compatible assertions; the 0.15 generation still requires migration
 - Add an artifact-receipt writer that binds source bytes to an externally
   produced verification and its complete provenance dependency set. It preserves
   raw-byte verification digests and does not perform signature verification.
+- Match decoded qualification statements to validated local artifact sets with
+  `validate-qualification --statement`. Keep original signed bytes unchanged;
+  object formatting is immaterial and mismatches have a typed diagnostic.
 - Add execution trust policy and robot description roles, with byte-bound
   consumer examples. Trust-policy principals are unique by role and identity.
 - Expose public qualification inspection with typed accumulated diagnostics and
