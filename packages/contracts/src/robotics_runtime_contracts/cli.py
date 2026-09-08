@@ -303,25 +303,31 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 1
 
 
+def _validate_documents(arguments: argparse.Namespace) -> list[tuple[str, str]]:
+    documents: list[tuple[str, str]] = []
+    extension_schemas = _read_extension_schemas(arguments.extension_schema)
+    if arguments.schema is not None and len(arguments.documents) != 1:
+        raise CLIArgumentError("--schema requires exactly one document")
+    if arguments.documents.count("-") > 1:
+        raise CLIArgumentError("standard input may be selected only once")
+    for path in arguments.documents:
+        document = _read_document(path)
+        validate_document(
+            document,
+            schema=arguments.schema,
+            extension_schemas=extension_schemas or None,
+        )
+        selected = arguments.schema or document.get("schema_version")
+        if not isinstance(selected, str):
+            raise ContractError("document must declare schema_version")
+        documents.append((path, resolve_schema_name(selected)))
+    return documents
+
+
 def _run(arguments: argparse.Namespace) -> int:
     documents: list[tuple[str, str]] = []
     if arguments.command == "validate":
-        extension_schemas = _read_extension_schemas(arguments.extension_schema)
-        if arguments.schema is not None and len(arguments.documents) != 1:
-            raise CLIArgumentError("--schema requires exactly one document")
-        if arguments.documents.count("-") > 1:
-            raise CLIArgumentError("standard input may be selected only once")
-        for path in arguments.documents:
-            document = _read_document(path)
-            validate_document(
-                document,
-                schema=arguments.schema,
-                extension_schemas=extension_schemas or None,
-            )
-            selected = arguments.schema or document.get("schema_version")
-            if not isinstance(selected, str):
-                raise ContractError("document must declare schema_version")
-            documents.append((path, resolve_schema_name(selected)))
+        documents = _validate_documents(arguments)
     elif arguments.command == "validate-qualification":
         result = validate_qualification_artifacts(
             arguments.artifact,
@@ -358,8 +364,13 @@ def _run(arguments: argparse.Namespace) -> int:
     else:
         raise AssertionError(f"unhandled command: {arguments.command}")
 
+    _emit_validation(arguments, documents)
+    return 0
+
+
+def _emit_validation(arguments: argparse.Namespace, documents: Sequence[tuple[str, str]]) -> None:
     if arguments.quiet:
-        return 0
+        return
     if arguments.command == "validate-qualification":
         _emit(
             {"message": "valid: qualification artifact set", "status": "valid"},
@@ -380,7 +391,6 @@ def _run(arguments: argparse.Namespace) -> int:
                 },
                 output_format=arguments.format,
             )
-    return 0
 
 
 if __name__ == "__main__":

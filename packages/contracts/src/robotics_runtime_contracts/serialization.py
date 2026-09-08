@@ -153,39 +153,46 @@ def dumps_yaml(document: Mapping[str, Any]) -> str:
     return yaml.dump(dict(document), Dumper=_CoreDumper, sort_keys=False)
 
 
+def _yaml_mapping(node: MappingNode, path: str) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key_node, value_node in node.value:
+        key = _yaml_value(key_node, path)
+        if not isinstance(key, str):
+            raise DocumentParseError("object keys must be strings", json_path=path)
+        child_path = _member_path(path, key)
+        if key in result:
+            _duplicate(key, child_path)
+        result[key] = _yaml_value(value_node, child_path)
+    return result
+
+
+def _yaml_scalar(node: ScalarNode, path: str) -> Any:
+    tag = node.tag.removeprefix(_TAG_PREFIX)
+    text = node.value
+    if tag == "str":
+        return text
+    if tag in _CORE_PATTERNS and _CORE_PATTERNS[tag].fullmatch(text):
+        if tag == "null":
+            return None
+        if tag == "bool":
+            return text.lower() == "true"
+        if tag == "int":
+            return int(text, 8 if text.startswith("0o") else 16 if text.startswith("0x") else 10)
+        number = float(text.lower().replace(".inf", "inf").replace(".nan", "nan"))
+        ensure_finite_numbers(number, path)
+        return number
+    raise DocumentParseError(f"unsupported or invalid YAML core tag: {node.tag}", json_path=path)
+
+
 def _yaml_value(node: Node, path: str = "$") -> Any:
     # Construct only the JSON data model. PyYAML's constructors would accept
     # YAML 1.1 explicit tags, merge keys, non-string keys and Python dates.
     if isinstance(node, MappingNode) and node.tag == _TAG_PREFIX + "map":
-        result: dict[str, Any] = {}
-        for key_node, value_node in node.value:
-            key = _yaml_value(key_node, path)
-            if not isinstance(key, str):
-                raise DocumentParseError("object keys must be strings", json_path=path)
-            child_path = _member_path(path, key)
-            if key in result:
-                _duplicate(key, child_path)
-            result[key] = _yaml_value(value_node, child_path)
-        return result
+        return _yaml_mapping(node, path)
     if isinstance(node, SequenceNode) and node.tag == _TAG_PREFIX + "seq":
         return [_yaml_value(item, f"{path}[{i}]") for i, item in enumerate(node.value)]
     if isinstance(node, ScalarNode) and node.tag.startswith(_TAG_PREFIX):
-        tag = node.tag.removeprefix(_TAG_PREFIX)
-        text = node.value
-        if tag == "str":
-            return text
-        if tag in _CORE_PATTERNS and _CORE_PATTERNS[tag].fullmatch(text):
-            if tag == "null":
-                return None
-            if tag == "bool":
-                return text.lower() == "true"
-            if tag == "int":
-                return int(
-                    text, 8 if text.startswith("0o") else 16 if text.startswith("0x") else 10
-                )
-            number = float(text.lower().replace(".inf", "inf").replace(".nan", "nan"))
-            ensure_finite_numbers(number, path)
-            return number
+        return _yaml_scalar(node, path)
     raise DocumentParseError(f"unsupported or invalid YAML core tag: {node.tag}", json_path=path)
 
 
