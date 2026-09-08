@@ -83,7 +83,7 @@ jobs:
           cache-dependency-glob: uv.lock
       - run: uv sync --locked --all-packages --all-groups
       - run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure
-      - run: uv run --no-sync pytest tests/ci tests/release
+      - run: uv run --no-sync python -m pytest tests/ci tests/release
       - run: uv run --no-sync mypy --explicit-package-bases scripts/release tests/release tests/workspace
         env:
           MYPYPATH: packages/contracts/src:packages/harness/src
