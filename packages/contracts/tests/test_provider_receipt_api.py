@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from typing import cast
 
 import pytest
 
@@ -74,6 +75,6 @@ def test_artifact_receipt_binds_the_complete_descriptor() -> None:
 
     assert validate_artifact_receipt(receipt, verification, dependencies) == dependencies
 
-    verification["artifact"]["immutable_revision"] = "version-id:2"
+    cast(dict[str, str | int], verification["artifact"])["immutable_revision"] = "version-id:2"
     with pytest.raises(ArtifactReceiptValidationError, match="artifact descriptor"):
         validate_artifact_receipt(receipt, verification, dependencies)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from typing import TypedDict, cast
 
 import pytest
 
@@ -12,6 +13,42 @@ from robotics_runtime_contracts import (
 
 SHA = "a" * 64
 TYPE_HASH = f"RIHS01_{'1' * 64}"
+
+
+class _TraceHop(TypedDict):
+    channel_id: str
+    relationship: str
+    producer: dict[str, str]
+    consumer: dict[str, str]
+    status: str
+    violations: list[dict[str, str]]
+
+
+class _CausalChainResult(TypedDict):
+    chain_id: str
+    expected_contract_sha256: str
+    root_trace_id: str
+    trace_ids: list[str]
+    channel_ids: list[str]
+    status: str
+    hops: list[_TraceHop]
+    violations: list[dict[str, str]]
+
+
+class _TransportQualification(TypedDict):
+    schema_version: str
+    qualification_id: str
+    run_id: str
+    scenario_sha256: str
+    generated_at: str
+    evaluator: dict[str, str]
+    trace_evidence: list[dict[str, str | int]]
+    clock_relations: list[dict[str, str]]
+    causal_chain_contracts: list[dict[str, str]]
+    channel_contracts: list[dict[str, str]]
+    channel_observations: list[dict[str, str]]
+    causal_chains: list[_CausalChainResult]
+    verdict: dict[str, str | int]
 
 
 def transport_channel() -> dict[str, object]:
@@ -104,7 +141,7 @@ def causal_chain() -> dict[str, object]:
     }
 
 
-def transport_qualification() -> dict[str, object]:
+def transport_qualification() -> _TransportQualification:
     trace_id = "1" * 32
     message_id = "message-1"
     return {
@@ -423,7 +460,7 @@ def test_cross_domain_aggregate_is_valid() -> None:
 
 def test_cross_domain_aggregate_rejects_incorrect_domain_status() -> None:
     document = acceptance_aggregate()
-    document["per_domain_results"][0]["status"] = "failed"
+    cast(list[dict[str, str]], document["per_domain_results"])[0]["status"] = "failed"
 
     with pytest.raises(SemanticValidationError, match="aggregate domain status"):
         validate_document(document)
@@ -431,7 +468,8 @@ def test_cross_domain_aggregate_rejects_incorrect_domain_status() -> None:
 
 def test_cross_domain_aggregate_rejects_incorrect_combined_status() -> None:
     document = acceptance_aggregate()
-    document["cross_domain_e2e"]["transport_qualification"]["status"] = "failed"
+    cross_domain = cast(dict[str, object], document["cross_domain_e2e"])
+    cast(dict[str, str], cross_domain["transport_qualification"])["status"] = "failed"
 
     with pytest.raises(SemanticValidationError, match="combined domain and transport status"):
         validate_document(document)
@@ -731,7 +769,7 @@ def test_transport_qualification_rejects_incorrect_verdict() -> None:
 
 def test_transport_qualification_rejects_domain_acceptance_fields() -> None:
     document = transport_qualification()
-    document["per_domain_aggregate"] = "passed"
+    cast(dict[str, object], document)["per_domain_aggregate"] = "passed"
 
     with pytest.raises(ContractValidationError):
         validate_document(document)

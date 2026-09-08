@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -71,6 +72,6 @@ def test_recording_summary_requires_a_consistent_channel_count() -> None:
     validate_document(summary)
 
     invalid = deepcopy(summary)
-    invalid["statistics"]["channel_count"] = 2
+    cast(dict[str, int], invalid["statistics"])["channel_count"] = 2
     with pytest.raises(SemanticValidationError, match="summarized channels"):
         validate_document(invalid)
