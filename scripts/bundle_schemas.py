@@ -21,6 +21,7 @@ PACKAGE = ROOT / "packages/contracts"
 SOURCES = PACKAGE / "schemas/src"
 RESOURCES = PACKAGE / "src/robotics_runtime_contracts/schemas"
 SOURCE_PREFIX = "urn:robotics-runtime-contracts:build:"
+DIALECT = "https://json-schema.org/draft/2020-12/schema"
 Schema = dict[str, Any]
 
 
@@ -38,6 +39,8 @@ def read_schemas(directory: Path) -> dict[str, Schema]:
 
 
 def registry_for(schemas: dict[str, Schema]) -> Registry[Any]:
+    for schema in schemas.values():
+        check_dialect(schema)
     resources = [(value["$id"], Resource.from_contents(value)) for value in schemas.values()]
     if len({uri for uri, _ in resources}) != len(resources):
         raise ValueError("Duplicate schema $id")
@@ -45,19 +48,34 @@ def registry_for(schemas: dict[str, Schema]) -> Registry[Any]:
 
 
 def subschemas(schema: Schema) -> Iterator[Schema]:
-    """Visit schema locations using the dialect, never instance/example dictionaries."""
+    """Visit Draft 2020-12 schema locations without guessing nested dialects."""
     pending = [DRAFT202012.create_resource(schema)]
     while pending:
         resource = pending.pop()
         if isinstance(resource.contents, dict):
             yield resource.contents
-        pending.extend(resource.subresources())
+        pending.extend(
+            DRAFT202012.create_resource(child)
+            for child in DRAFT202012.subresources_of(resource.contents)
+        )
+
+
+def check_dialect(schema: Schema, *, require_declaration: bool = True) -> None:
+    """Require the one supported root dialect; nested declarations are unsupported."""
+    if schema.get("$schema", None if require_declaration else DIALECT) != DIALECT:
+        raise ValueError(f"Schema must declare Draft 2020-12: {schema.get('$id')}")
+    for node in subschemas(schema):
+        if node is not schema and "$schema" in node:
+            raise ValueError(
+                f"Nested $schema is outside the core source format: {schema.get('$id')}"
+            )
 
 
 def check_references(schemas: dict[str, Schema]) -> None:
+    for schema in schemas.values():
+        Draft202012Validator.check_schema(schema)
     registry = registry_for(schemas)
     for name, schema in schemas.items():
-        Draft202012Validator.check_schema(schema)
         resolver = registry.resolver(schema["$id"])
         for node in subschemas(schema):
             # This assembler's sources use absolute resource IDs and static refs.
@@ -67,7 +85,12 @@ def check_references(schemas: dict[str, Schema]) -> None:
             if "$dynamicRef" in node or "$dynamicAnchor" in node:
                 raise ValueError(f"Dynamic references are outside the core source format: {name}")
             if "$ref" in node:
-                resolver.lookup(node["$ref"])
+                # Lookup alone may return a string, array, or malformed object.
+                # The metaschema accepts only valid object/boolean schema targets.
+                target = resolver.lookup(node["$ref"]).contents
+                Draft202012Validator.check_schema(target)
+                if isinstance(target, dict):
+                    check_dialect(target, require_declaration=False)
 
 
 def assemble(schema: Schema, registry: Registry[Any]) -> Schema:

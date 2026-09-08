@@ -13,6 +13,7 @@ from typing import Any, Protocol
 
 import pytest
 from jsonschema import Draft202012Validator
+from jsonschema.validators import validator_for
 from referencing import Registry
 from robotics_runtime_contracts import load_mapping
 
@@ -36,10 +37,12 @@ class Resolver(Protocol):
 def assertions(schema: Schema, schemas: dict[str, Schema]) -> Any:
     """Expand static refs with their resolver context; retain every assertion keyword.
 
-    $defs and IDs only address schemas; annotations do not constrain instances.
-    A ref's siblings remain a conjunction, never a dict update. Cycles fail closed
-    because this finite-tree comparison is intentionally limited to these schemas.
+    $defs and IDs address schemas; descriptive metadata is ignored.
+    A resolved ref keeps its siblings in the same token, not in an allOf branch:
+    annotation-dependent keywords observe their adjacent applicators. Cycles fail
+    closed because this finite-tree comparison is limited to these schemas.
     """
+    registry = registry_for(schemas)
     locations = {id(node) for document in schemas.values() for node in subschemas(document)}
 
     def visit(value: Any, resolver: Resolver, active: frozenset[int]) -> Any:
@@ -71,9 +74,11 @@ def assertions(schema: Schema, schemas: dict[str, Schema]) -> Any:
             return own
         resolved = resolver.lookup(value["$ref"])
         target = visit(resolved.contents, resolved.resolver, active)
-        return {"allOf": [target, own]} if own else target
+        # This token is not a JSON Schema: its $ref holds a schema, not a URI.
+        # Keeping the reserved key avoids collisions with authored allOf trees.
+        return {"$ref": target, **own} if own else target
 
-    return visit(schema, registry_for(schemas).resolver(schema["$id"]), frozenset())
+    return visit(schema, registry.resolver(schema["$id"]), frozenset())
 
 
 def comparison_key(schema: Schema, schemas: dict[str, Schema]) -> str:
@@ -215,10 +220,9 @@ def test_ref_siblings_are_not_dropped_and_literal_refs_are_not_resolved() -> Non
     }
     result = assertions(schema, {"schema": schema})
     assert result == {
-        "allOf": [
-            {"type": "string", "maxLength": 10},
-            {"maxLength": 3, "const": {"$ref": "this-is-instance-data"}},
-        ]
+        "$ref": {"type": "string", "maxLength": 10},
+        "maxLength": 3,
+        "const": {"$ref": "this-is-instance-data"},
     }
 
 
@@ -230,3 +234,51 @@ def test_recursive_ref_comparison_fails_closed() -> None:
     }
     with pytest.raises(ValueError, match="Recursive schema"):
         assertions(schema, {"schema": schema})
+
+
+def test_comparison_preserves_ref_sibling_annotation_scope() -> None:
+    original: Schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "urn:example",
+        "$defs": {"properties": {"properties": {"x": {"type": "integer"}}}},
+        "$ref": "#/$defs/properties",
+        "unevaluatedProperties": False,
+    }
+    changed: Schema = {
+        "$schema": original["$schema"],
+        "$id": original["$id"],
+        "allOf": [
+            {"properties": {"x": {"type": "integer"}}},
+            {"unevaluatedProperties": False},
+        ],
+    }
+    assert Draft202012Validator(original).is_valid({"x": 1})
+    assert not Draft202012Validator(changed).is_valid({"x": 1})
+    assert comparison_key(original, {"schema": original}) != comparison_key(
+        changed, {"schema": changed}
+    )
+
+
+def test_comparison_rejects_a_dialect_change_with_different_validation() -> None:
+    original: Schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "urn:example",
+        "type": "object",
+        "unevaluatedProperties": False,
+    }
+    changed = {**original, "$schema": "http://json-schema.org/draft-07/schema#"}
+    assert not validator_for(original)(original).is_valid({"x": 1})
+    assert validator_for(changed)(changed).is_valid({"x": 1})
+    comparison_key(original, {"schema": original})
+    with pytest.raises(ValueError, match="must declare Draft 2020-12"):
+        comparison_key(changed, {"schema": changed})
+
+
+def test_comparison_rejects_a_nested_dialect_in_unused_definitions() -> None:
+    schema: Schema = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "urn:example",
+        "$defs": {"unused": {"$schema": "http://json-schema.org/draft-07/schema#"}},
+    }
+    with pytest.raises(ValueError, match=r"Nested \$schema"):
+        comparison_key(schema, {"schema": schema})
