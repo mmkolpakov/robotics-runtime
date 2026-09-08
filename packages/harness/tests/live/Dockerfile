@@ -13,24 +13,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=collector /otelcol-contrib /usr/local/bin/otelcol-contrib
 COPY --from=uv /uv /usr/local/bin/uv
 
-WORKDIR /harness
+WORKDIR /workspace
 COPY pyproject.toml uv.lock README.md LICENSE ./
-COPY src ./src
-COPY tests ./tests
+COPY packages ./packages
 # Jazzy's apt-installed rclpy is built for Ubuntu's /usr/bin/python3 (3.12).
 # Use a new venv, never an uv-managed Python or the host's .venv.
 RUN /usr/bin/python3 -m venv --system-site-packages /opt/live-venv \
-    && uv export --locked --all-groups --no-emit-project \
+    && uv export --locked --all-packages --all-groups --no-emit-workspace \
         --format requirements.txt --output-file /tmp/live-requirements.txt \
     && uv pip install --python /opt/live-venv/bin/python \
         --requirement /tmp/live-requirements.txt \
     && uv pip install --python /opt/live-venv/bin/python mcap==1.3.0 \
-    && uv pip install --python /opt/live-venv/bin/python --no-deps .
+    && uv build --all-packages --no-sources --python /usr/bin/python3 --out-dir /tmp/dist \
+    && uv pip install --python /opt/live-venv/bin/python --no-deps /tmp/dist/*.whl
 
 ENV PATH="/opt/live-venv/bin:${PATH}" \
     ROBOTICS_LIVE_ROS=1 \
     ROS_DOMAIN_ID=121 \
     ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST \
     RMW_IMPLEMENTATION=rmw_fastrtps_cpp \
-    ROBOTICS_LIVE_ARTIFACTS=/harness/artifacts/live
-ENTRYPOINT ["/bin/bash", "/harness/tests/live/run.sh"]
+    ROBOTICS_LIVE_ARTIFACTS=/workspace/artifacts/live
+WORKDIR /workspace/packages/harness
+ENTRYPOINT ["/bin/bash", "/workspace/packages/harness/tests/live/run.sh"]

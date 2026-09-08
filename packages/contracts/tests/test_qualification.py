@@ -4,7 +4,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -424,8 +424,8 @@ def test_qualification_accepts_custom_evidence_media_type() -> None:
         _Artifact(
             kind="other_evidence",
             subject_name="evidence/controller.vendor",
-            sha256=evidence["sha256"],
-            size_bytes=evidence["size_bytes"],
+            sha256=cast(str, evidence["sha256"]),
+            size_bytes=cast(int, evidence["size_bytes"]),
             document=None,
         )
     )

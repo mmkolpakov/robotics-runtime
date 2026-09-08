@@ -36,6 +36,18 @@ warn_unused_ignores = true
 module = ["junitparser.*", "opentelemetry.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = [
+  "rclpy.*",
+  "action_tutorials_interfaces.action",
+  "example_interfaces.srv",
+  "rosgraph_msgs.msg",
+  "std_msgs.msg",
+  "mcap.reader",
+  "mcap.writer",
+]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests/workspace"]
 addopts = ["--strict-config", "--strict-markers"]

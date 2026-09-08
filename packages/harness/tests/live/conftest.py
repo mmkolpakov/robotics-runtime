@@ -4,8 +4,13 @@ import importlib
 import os
 from collections.abc import Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from tests.live.collector import Collector
+    from tests.live.graph import LiveGraph
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -35,7 +40,7 @@ def require_live_ros() -> None:
 
 
 @pytest.fixture
-def live_graph(require_live_ros: None):
+def live_graph(require_live_ros: None) -> Iterator[LiveGraph]:
     # Import only after the opt-in check; ordinary unit collection needs no ROS.
     from tests.live.graph import LiveGraph
 
@@ -52,7 +57,7 @@ def live_output(tmp_path: Path, request: pytest.FixtureRequest) -> Path:
 
 
 @pytest.fixture
-def collector(live_output: Path, require_live_ros: None) -> Iterator:
+def collector(live_output: Path, require_live_ros: None) -> Iterator[Collector]:
     from tests.live.collector import Collector
 
     with Collector(live_output) as instance:

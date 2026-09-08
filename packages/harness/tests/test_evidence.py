@@ -68,24 +68,23 @@ def test_verified_local_evidence_becomes_result_link(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("field", "value", "message"),
+    ("digest", "size", "message"),
     [
-        ("digest", "0" * 64, "sha256"),
-        ("size", 1, "size_bytes"),
+        ("0" * 64, None, "sha256"),
+        (None, 1, "size_bytes"),
     ],
 )
 def test_tampered_local_evidence_is_rejected(
     tmp_path: Path,
-    field: str,
-    value: str | int,
+    digest: str | None,
+    size: int | None,
     message: str,
 ) -> None:
     artifact = tmp_path / "run.json"
     artifact.write_bytes(b"verified evidence")
-    options = {field: value}
 
     with pytest.raises(EvidenceValidationError, match=message):
-        load_evidence_index(_write_index(tmp_path, _index(artifact, **options)))
+        load_evidence_index(_write_index(tmp_path, _index(artifact, digest=digest, size=size)))
 
 
 def test_missing_local_evidence_is_rejected(tmp_path: Path) -> None:

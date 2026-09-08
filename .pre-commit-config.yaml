@@ -61,11 +61,16 @@ repos:
         files: ^packages/contracts/tests/fixtures/scenario/valid/.*\.(json|ya?ml)$
       - id: mypy-contracts
         name: mypy contracts
-        entry: uv run --no-sync --directory packages/contracts python -m mypy src
+        entry: uv run --no-sync --directory packages/contracts python -m mypy src tests
         language: system
         pass_filenames: false
       - id: mypy-harness
         name: mypy harness
-        entry: uv run --no-sync --directory packages/harness python -m mypy src
+        entry: uv run --no-sync --directory packages/harness python -m mypy src tests
+        language: system
+        pass_filenames: false
+      - id: complexity-budget
+        name: Check existing function complexity budgets
+        entry: uv run --no-sync python scripts/ci/check_complexity.py
         language: system
         pass_filenames: false

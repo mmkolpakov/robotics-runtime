@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -65,7 +67,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 )
 def test_cross_field_invariants(
     fixture: str,
-    mutation: object,
+    mutation: Callable[[dict[str, Any]], None],
     expected_path: str,
 ) -> None:
     document = load_fixture(FIXTURES / fixture)
@@ -124,7 +126,7 @@ def test_semantic_timestamp_parser_accepts_rfc3339_lowercase_utc_designator() ->
 )
 def test_schema_owned_invariants_remain_enforced(
     fixture: str,
-    mutation: object,
+    mutation: Callable[[dict[str, Any]], None],
     expected_path: str,
 ) -> None:
     document = load_fixture(FIXTURES / fixture)
