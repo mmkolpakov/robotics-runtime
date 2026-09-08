@@ -173,6 +173,118 @@ def test_byte_limit_counts_utf8_and_escaped_output(monkeypatch: pytest.MonkeyPat
         assert member.value.json_path == "$.a"
 
 
+def _guard_diagnostic_chunks(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    original = json.dumps
+    chunks: list[int] = []
+
+    def bounded_dumps(value: object, *, ensure_ascii: bool = True) -> str:
+        assert type(value) is str
+        assert len(value) <= 4096, "diagnostics must not escape an entire large key"
+        chunks.append(len(value))
+        return original(value, ensure_ascii=ensure_ascii)
+
+    monkeypatch.setattr(json, "dumps", bounded_dumps)
+    return chunks
+
+
+@pytest.mark.parametrize("character", ["a", "\x00", "é"])
+def test_oversized_keys_fail_at_the_containing_object_before_path_escaping(
+    character: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Use the real 8 MiB limit: both oversized character count and UTF-8 size.
+    key = character * (ser.MAX_DOCUMENT_BYTES // len(character.encode("utf-8")) + 1)
+    chunks = _guard_diagnostic_chunks(monkeypatch)
+    with pytest.raises(ContractError) as caught:
+        dumps_canonical({"outer": {key: None}})
+    assert caught.value.error_id == "input.limit_exceeded"
+    assert caught.value.json_path == "$.outer"
+    assert chunks == []
+
+
+@pytest.mark.parametrize(
+    ("character", "escape_size", "error_id"),
+    [
+        ("\x00", 6, "input.invalid_type"),
+        ("\ud800", 6, "input.invalid_unicode"),
+        ("\U0001f600", 12, "input.invalid_type"),
+    ],
+)
+def test_large_escaped_key_diagnostics_keep_the_enclosing_path(
+    character: str, escape_size: int, error_id: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    key = character * (ser.MAX_DOCUMENT_BYTES // escape_size + 1)
+    chunks = _guard_diagnostic_chunks(monkeypatch)
+    with pytest.raises(ContractError) as caught:
+        dumps_canonical({"outer": {key: {"nested": [object()]}}})
+    assert caught.value.error_id == error_id
+    # Descendants must not append misleading names/indexes after an omitted key.
+    assert caught.value.json_path == "$.outer"
+    assert len(chunks) > 1
+    if character == "\x00":
+        with pytest.raises(ContractError) as output_error:
+            dumps_canonical({key: None})
+        assert output_error.value.error_id == "input.limit_exceeded"
+        assert output_error.value.json_path == "$"
+
+
+@pytest.mark.parametrize("character", ["a", "é", "\U0001f600"])
+def test_legitimate_keys_near_eight_mib_keep_exact_bytes_without_rendering_paths(
+    character: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    overhead = len(b'{"outer":{"":[0.0]}}')
+    key = character * ((ser.MAX_DOCUMENT_BYTES - overhead) // len(character.encode("utf-8")))
+    document = {"outer": {key: [0.0]}}
+    expected = json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    assert ser.MAX_DOCUMENT_BYTES - 4 < len(expected) <= ser.MAX_DOCUMENT_BYTES
+    chunks = _guard_diagnostic_chunks(monkeypatch)
+    assert dumps_canonical(document) == expected
+    assert chunks == []
+    assert document == {"outer": {key: [0.0]}}
+
+
+@pytest.mark.parametrize("prefix_size", [4095, 4096, 4097])
+def test_chunk_boundaries_preserve_standard_json_path_escaping(
+    prefix_size: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    key = "x" * prefix_size + ('"\\\n\t\b\r\f\x00\x1f\x7fé\U0001f600' * 400)
+    expected = f"$.outer[{json.dumps(key)}]"
+    chunks = _guard_diagnostic_chunks(monkeypatch)
+    with pytest.raises(ContractError) as caught:
+        dumps_canonical({"outer": {key: object()}})
+    assert caught.value.error_id == "input.invalid_type"
+    assert caught.value.json_path == expected
+    assert len(chunks) > 1
+
+
+@pytest.mark.parametrize("extra", [-1, 0])
+def test_path_budget_counts_utf8_prefix_and_accepts_the_exact_boundary(
+    extra: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    outer, key = "ééé", "\U0001f600\U0001f600"
+    expected = f"$.{outer}[{json.dumps(key)}]"
+    byte_limit = len(expected.encode("utf-8")) + extra
+    monkeypatch.setattr(ser, "MAX_DOCUMENT_BYTES", byte_limit)
+    assert json.loads(dumps_canonical({outer: {key: 0}})) == {outer: {key: 0}}
+    with pytest.raises(ContractError) as caught:
+        dumps_canonical({outer: {key: object()}})
+    assert caught.value.error_id == "input.invalid_type"
+    assert caught.value.json_path == (f"$.{outer}" if extra < 0 else expected)
+
+
+@pytest.mark.parametrize("extra", [2, 3])
+def test_index_path_budget_retains_the_last_complete_ancestor(
+    extra: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    key = "\U0001f600\U0001f600"
+    expected = f"$[{json.dumps(key)}]"
+    monkeypatch.setattr(ser, "MAX_DOCUMENT_BYTES", len(expected) + extra)
+    assert json.loads(dumps_canonical({key: [[0]]})) == {key: [[0]]}
+    with pytest.raises(ContractError) as caught:
+        dumps_canonical({key: [[object()]]})
+    assert caught.value.error_id == "input.invalid_type"
+    assert caught.value.json_path == (expected + "[0]" if extra == 3 else expected)
+
+
 def test_interpreter_integer_conversion_limit_is_not_changed() -> None:
     limit = sys.get_int_max_str_digits()
     if limit == 0:

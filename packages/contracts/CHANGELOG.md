@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Check canonical object-key size before constructing diagnostic paths. Bound
+  path escaping by the document byte budget and retain the enclosing path when
+  needed, without rejecting otherwise valid keys or changing serialized bytes.
 - Add `dumps_canonical` using the project's deterministic JSON profile, explicitly
   not RFC 8785/JCS: retain exact integer number tokens, including nanoseconds beyond
   2**53, and native finite float spelling. Apply the input depth/node/byte bounds
