@@ -1,0 +1,1 @@
+{"resourceMetrics":[{"scopeMetrics":[{"metrics":[{"name":"robotics.time_authority.delivery_latency","unit":"ms","histogram":{"aggregationTemporality":1,"dataPoints":[{"startTimeUnixNano":"10","timeUnixNano":"40","count":"30","bucketCounts":["15","14","1","0"],"explicitBounds":[0.5,1,2],"sum":20.4,"min":0.4,"max":1.8}]}}]}]}]}
