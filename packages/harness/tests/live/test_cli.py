@@ -4,7 +4,7 @@ import json
 import os
 import subprocess
 import sys
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from hashlib import sha256
 from pathlib import Path
 from time import monotonic, sleep, time_ns
@@ -17,7 +17,7 @@ import yaml
 from robotics_runtime_contracts import validate_document
 
 from robotics_acceptance_harness.documents import load_bundle
-from robotics_acceptance_harness.metrics import HistogramSample, MetricSample
+from robotics_acceptance_harness.metrics import HistogramSample, MetricPoint, MetricSample
 from robotics_acceptance_harness.otel import load_otlp_json_metrics, select_metric_points
 from tests.graph_types import ExpectedGraph
 from tests.live.collector import Collector
@@ -73,6 +73,18 @@ def _payload(golden: MetricGolden, run_id: str, domain_id: str) -> MetricsPayloa
             }
         ]
     }
+
+
+def _assert_golden_gauges(points: Sequence[MetricPoint], golden: MetricGolden) -> None:
+    gauges = [point for point in points if point.name == golden["name"]]
+    assert len(gauges) >= 10
+    for gauge in gauges:
+        assert isinstance(gauge, MetricSample)
+        assert (gauge.name, gauge.unit, gauge.value) == (
+            golden["name"],
+            golden["unit"],
+            golden["value"],
+        )
 
 
 def _write_bundle(
@@ -231,15 +243,7 @@ def _verify(
             points = select_metric_points(
                 load_otlp_json_metrics(collector.metrics), run_id=run_id, domain_id=domain_id
             )
-            gauges = [p for p in points if p.name == golden["name"]]
-            assert len(gauges) >= 10
-            for gauge in gauges:
-                assert isinstance(gauge, MetricSample)
-                assert (gauge.name, gauge.unit, gauge.value) == (
-                    golden["name"],
-                    golden["unit"],
-                    golden["value"],
-                )
+            _assert_golden_gauges(points, golden)
             assert all(
                 all(p.attributes.get(k) == v for k, v in golden["resource_attributes"].items())
                 for p in points
