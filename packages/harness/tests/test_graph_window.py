@@ -48,7 +48,10 @@ TOPIC = ready_snapshot().topics["/camera/image"]
             topic_snapshot(replace(TOPIC, types=("sensor_msgs/msg/CompressedImage",))),
             "CompressedImage",
         ),
-        (topic_snapshot(replace(TOPIC, qos_compatible=False)), "QoS policies are incompatible"),
+        (
+            topic_snapshot(replace(TOPIC, qos_compatible=False)),
+            "publisher QoS is incompatible with the observer subscription",
+        ),
         (replace(ready_snapshot(), services={}), "service server /camera/get_parameters is absent"),
         (replace(ready_snapshot(), actions={}), "action server /takeoff is absent"),
     ],

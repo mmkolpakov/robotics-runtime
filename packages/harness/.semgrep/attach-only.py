@@ -5,13 +5,6 @@ import os
 # ruleid: attach-only-no-process-control
 import subprocess
 
-# ok: attach-only-no-network-client
-# ruleid: attach-only-no-network-client
-from urllib.request import url2pathname, urlopen
-
-# ruleid: attach-only-no-network-client
-from urllib.request import urlretrieve as retrieve
-
 # ruleid: attach-only-no-orchestrator-sdk
 import docker
 
@@ -19,9 +12,39 @@ import docker
 import requests
 
 
+def allowed_helper():
+    # ok: attach-only-no-network-client
+    from urllib.request import url2pathname
+
+
+def allowed_helper_alias():
+    # ok: attach-only-no-network-client
+    from urllib.request import url2pathname as to_path
+
+
 def forbidden_mixed_import():
     # ruleid: attach-only-no-network-client
-    from urllib.request import build_opener
+    from urllib.request import build_opener, url2pathname
+
+
+def forbidden_client_import():
+    # ruleid: attach-only-no-network-client
+    from urllib.request import urlopen
+
+
+def forbidden_client_alias():
+    # ruleid: attach-only-no-network-client
+    from urllib.request import urlretrieve as retrieve
+
+
+def forbidden_module_import():
+    # ruleid: attach-only-no-network-client
+    import urllib.request
+
+
+def forbidden_module_alias():
+    # ruleid: attach-only-no-network-client
+    import urllib.request as client
 
 
 # ruleid: attach-only-no-mutation-service-types
