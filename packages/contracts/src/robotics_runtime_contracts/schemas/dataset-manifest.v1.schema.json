@@ -22,7 +22,7 @@
       "const": "dataset-manifest.v1"
     },
     "dataset_id": {
-      "$ref": "#/$defs/identifier"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "version": {
       "type": "string",
@@ -69,21 +69,16 @@
   },
   "$defs": {
     "identifier": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
-      "maxLength": 128
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "sha256": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     },
     "rosName": {
-      "type": "string",
-      "pattern": "^/[^\\s]+$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/rosName"
     },
     "rosMessageType": {
-      "type": "string",
-      "pattern": "^[A-Za-z][A-Za-z0-9_]*/msg/[A-Za-z][A-Za-z0-9_]*$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/rosMessageType"
     },
     "artifact": {
       "type": "object",
@@ -112,7 +107,7 @@
           "minimum": 1
         },
         "sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
         },
         "media_type": {
           "type": "string",
@@ -120,9 +115,7 @@
           "maxLength": 255
         },
         "storage_id": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
-          "maxLength": 128
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
         }
       }
     },
@@ -137,10 +130,10 @@
       ],
       "properties": {
         "topic": {
-          "$ref": "#/$defs/rosName"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/rosName"
         },
         "type": {
-          "$ref": "#/$defs/rosMessageType"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/rosMessageType"
         },
         "type_hash": {
           "type": "string",
@@ -156,7 +149,7 @@
           ]
         },
         "qos_profile_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
         }
       },
       "allOf": [
@@ -226,7 +219,7 @@
           }
         },
         "qos_overrides_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
         }
       }
     },
@@ -242,25 +235,23 @@
       ],
       "properties": {
         "producer": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/spanName"
         },
         "captured_at": {
           "type": "string",
           "format": "date-time"
         },
         "scenario_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
         },
         "runtime_manifest_sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
         },
         "source_revisions": {
           "type": "object",
           "minProperties": 1,
           "propertyNames": {
-            "$ref": "#/$defs/identifier"
+            "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
           },
           "additionalProperties": {
             "type": "string",
@@ -312,12 +303,10 @@
           "maxLength": 2048
         },
         "sha256": {
-          "$ref": "#/$defs/sha256"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
         },
         "media_type": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/spanName"
         }
       }
     },
@@ -330,10 +319,10 @@
       ],
       "properties": {
         "from": {
-          "$ref": "#/$defs/rosName"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/rosName"
         },
         "to": {
-          "$ref": "#/$defs/rosName"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/rosName"
         }
       }
     },

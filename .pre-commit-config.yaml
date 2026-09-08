@@ -15,7 +15,7 @@ repos:
     rev: 0.37.4
     hooks:
       - id: check-metaschema
-        files: ^packages/contracts/src/robotics_runtime_contracts/schemas/.*\.schema\.json$
+        files: ^packages/contracts/(src/robotics_runtime_contracts/schemas|schemas/src)/.*\.schema\.json$
       - id: check-github-workflows
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.21
@@ -54,6 +54,13 @@ repos:
         pass_filenames: false
   - repo: local
     hooks:
+      - id: bundle-core-schemas
+        name: Check generated core schema bytes
+        entry: uv run --no-sync python scripts/bundle_schemas.py --check
+        language: system
+        pass_filenames: false
+        files: >-
+          ^(packages/contracts/(schemas/|src/robotics_runtime_contracts/schemas/)|scripts/bundle_schemas\.py|tests/schema_bundler/)
       - id: validate-contract-examples
         name: Validate contract examples
         entry: uv run --no-sync robotics-contracts validate --quiet

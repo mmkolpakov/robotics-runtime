@@ -1,166 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:robotics-runtime-contracts:v1:internal:acceptance-result-core",
-  "title": "Robotics acceptance result v1",
-  "description": "Per-domain acceptance result with distinct run, scenario, domain, and result identities, explicit evaluation coverage, measured time-authority delivery latency, and verified streaming trace evidence.",
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "schema_version",
-    "result_id",
-    "run_id",
-    "scenario_id",
-    "domain_id",
-    "verdict_scope",
-    "unevaluated",
-    "time_authority_observation",
-    "scenario_sha256",
-    "runtime_manifest_sha256",
-    "started_at",
-    "finished_at",
-    "monotonic_duration_sec",
-    "status",
-    "assertion_results",
-    "observed_ros_graph",
-    "forbidden_graph_observation",
-    "execution",
-    "authorization",
-    "workload",
-    "lifecycle_states",
-    "clock_observation",
-    "shutdown",
-    "evidence"
-  ],
-  "properties": {
-    "schema_version": {
-      "const": "acceptance-result.v1"
-    },
-    "result_id": {
-      "type": "string",
-      "pattern": "^result-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-    },
-    "run_id": {
-      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runId"
-    },
-    "scenario_id": {
-      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
-    },
-    "domain_id": {
-      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
-    },
-    "verdict_scope": {
-      "const": "domain"
-    },
-    "unevaluated": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "pattern": "^\\$\\.[A-Za-z0-9_.\\[\\]-]+$"
-      },
-      "uniqueItems": true
-    },
-    "time_authority_observation": {
-      "$ref": "#/$defs/timeAuthorityObservation"
-    },
-    "scenario_sha256": {
-      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
-    },
-    "runtime_manifest_sha256": {
-      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
-    },
-    "model_manifest_sha256": {
-      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
-    },
-    "dataset_manifest_sha256": {
-      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
-    },
-    "started_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "finished_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "monotonic_duration_sec": {
-      "type": "number",
-      "minimum": 0
-    },
-    "status": {
-      "enum": [
-        "passed",
-        "failed",
-        "incomplete",
-        "error",
-        "cancelled"
-      ]
-    },
-    "assertion_results": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/assertionResult"
-      }
-    },
-    "observed_ros_graph": {
-      "$ref": "#/$defs/observedRosGraph"
-    },
-    "forbidden_graph_observation": {
-      "$ref": "#/$defs/forbiddenGraphObservation"
-    },
-    "execution": {
-      "$ref": "#/$defs/execution"
-    },
-    "authorization": {
-      "$ref": "#/$defs/authorization"
-    },
-    "workload": {
-      "$ref": "#/$defs/workload"
-    },
-    "lifecycle_states": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/lifecycleState"
-      }
-    },
-    "clock_observation": {
-      "$ref": "#/$defs/clockObservation"
-    },
-    "hardware_clock_observation": {
-      "$ref": "#/$defs/hardwareClockObservation"
-    },
-    "shutdown": {
-      "$ref": "#/$defs/shutdown"
-    },
-    "evidence": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/evidence"
-      }
-    },
-    "extensions": {
-      "$ref": "#/$defs/extensions"
-    }
-  },
-  "allOf": [
-    {
-      "$ref": "#/$defs/passedEvidenceConstraints"
-    },
-    {
-      "$ref": "#/$defs/incompleteConstraints"
-    },
-    {
-      "$ref": "#/$defs/passedAssertionsConstraints"
-    },
-    {
-      "$ref": "#/$defs/simulationConstraints"
-    },
-    {
-      "$ref": "#/$defs/physicalConstraints"
-    },
-    {
-      "$ref": "#/$defs/inferenceConstraints"
-    }
-  ],
+  "$id": "urn:robotics-runtime-contracts:build:acceptance-result-core",
   "$defs": {
     "timeAuthorityObservation": {
       "type": "object",
@@ -290,7 +130,7 @@
               "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
             },
             "target": {
-              "$ref": "#/$defs/target"
+              "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-result-core#/$defs/target"
             }
           }
         }
@@ -484,19 +324,19 @@
         "topics": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/observedTopic"
+            "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-result-core#/$defs/observedTopic"
           }
         },
         "services": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/observedEndpoint"
+            "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-result-core#/$defs/observedEndpoint"
           }
         },
         "actions": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/observedEndpoint"
+            "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-result-core#/$defs/observedEndpoint"
           }
         }
       }

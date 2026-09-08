@@ -30,17 +30,16 @@
       "const": "https://robotics-runtime-contracts.dev/attestations/execution-permit/v1"
     },
     "permit_id": {
-      "$ref": "#/$defs/imported__execution-permit__identifier"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
     "scenario_sha256": {
-      "$ref": "#/$defs/imported__execution-permit__sha256"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     },
     "subject_digest": {
-      "type": "string",
-      "pattern": "^sha256:[a-f0-9]{64}$"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/subjectDigest"
     },
     "trust_policy_sha256": {
-      "$ref": "#/$defs/imported__execution-permit__sha256"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     },
     "target": {
       "$ref": "#/$defs/target"
@@ -76,16 +75,16 @@
       "pattern": "^[a-f0-9]{32,128}$"
     },
     "operator_id": {
-      "$ref": "#/$defs/imported__execution-permit__principal"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/principal"
     },
     "approver_id": {
-      "$ref": "#/$defs/imported__execution-permit__principal"
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/principal"
     },
     "interlock_check": {
-      "$ref": "#/$defs/imported__execution-permit__interlockCheck"
+      "$ref": "#/$defs/interlockCheck"
     },
     "extensions": {
-      "$ref": "#/$defs/imported__execution-permit__extensions"
+      "$ref": "#/$defs/extensions"
     }
   },
   "allOf": [
@@ -160,7 +159,7 @@
           ]
         },
         "target_id": {
-          "$ref": "#/$defs/imported__execution-permit__identifier"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
         },
         "identity_kind": {
           "enum": [
@@ -173,24 +172,20 @@
           ]
         },
         "identity_sha256": {
-          "$ref": "#/$defs/imported__execution-permit__sha256"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
         }
       }
     },
-    "imported__execution-permit__identifier": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
-      "maxLength": 128
+    "identifier": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
     },
-    "imported__execution-permit__sha256": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+    "sha256": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
     },
-    "imported__execution-permit__principal": {
-      "type": "string",
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9@._:/-]{2,255}$"
+    "principal": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/principal"
     },
-    "imported__execution-permit__interlockCheck": {
+    "interlockCheck": {
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -206,7 +201,7 @@
           "maxLength": 2048
         },
         "sha256": {
-          "$ref": "#/$defs/imported__execution-permit__sha256"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
         },
         "status": {
           "const": "passed"
@@ -217,7 +212,7 @@
         }
       }
     },
-    "imported__execution-permit__extensions": {
+    "extensions": {
       "type": "object",
       "default": {},
       "propertyNames": {

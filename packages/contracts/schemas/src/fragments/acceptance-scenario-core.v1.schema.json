@@ -1,121 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:robotics-runtime-contracts:v1:internal:acceptance-scenario-core",
-  "title": "Robotics acceptance scenario v1",
-  "description": "Acceptance contract with attributed metrics, measured time-authority delivery latency, separate hardware clock synchronization limits, explicit authorization, forbidden ROS interfaces, and an explicit stepped-simulation skip budget.",
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "schema_version",
-    "scenario_id",
-    "execution",
-    "authorization",
-    "forbidden_ros_graph",
-    "seed",
-    "timeouts",
-    "expected_ros_graph",
-    "assertions",
-    "time_policy",
-    "data_plane_policy",
-    "evidence_policy"
-  ],
-  "properties": {
-    "schema_version": {
-      "const": "acceptance-scenario.v1"
-    },
-    "scenario_id": {
-      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
-    },
-    "execution": {
-      "$ref": "#/$defs/execution"
-    },
-    "authorization": {
-      "$ref": "#/$defs/authorization"
-    },
-    "forbidden_ros_graph": {
-      "$ref": "#/$defs/forbiddenRosGraph"
-    },
-    "seed": {
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 4294967295
-    },
-    "dataset_manifest_sha256": {
-      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
-    },
-    "model_manifest_sha256": {
-      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
-    },
-    "timeouts": {
-      "$ref": "#/$defs/timeouts"
-    },
-    "expected_ros_graph": {
-      "$ref": "#/$defs/expectedRosGraph"
-    },
-    "assertions": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/assertion"
-      }
-    },
-    "time_policy": {
-      "$ref": "#/$defs/timePolicy"
-    },
-    "data_plane_policy": {
-      "$ref": "#/$defs/dataPlanePolicy"
-    },
-    "evidence_policy": {
-      "$ref": "#/$defs/evidencePolicy"
-    },
-    "extension_schemas": {
-      "type": "array",
-      "default": [],
-      "items": {
-        "$ref": "#/$defs/extensionSchema"
-      }
-    },
-    "extensions": {
-      "$ref": "#/$defs/extensions"
-    }
-  },
-  "allOf": [
-    {
-      "$ref": "#/$defs/interfaceMockConstraints"
-    },
-    {
-      "$ref": "#/$defs/simulatorConstraints"
-    },
-    {
-      "$ref": "#/$defs/playbackConstraints"
-    },
-    {
-      "$ref": "#/$defs/steppedTimeConstraints"
-    },
-    {
-      "$ref": "#/$defs/simulationRealtimeConstraints"
-    },
-    {
-      "$ref": "#/$defs/hardwareRealtimeConstraints"
-    },
-    {
-      "$ref": "#/$defs/performanceConstraints"
-    },
-    {
-      "$ref": "#/$defs/highThroughputConstraints"
-    },
-    {
-      "$ref": "#/$defs/secureSharedMemoryConstraints"
-    },
-    {
-      "$ref": "#/$defs/simulationConstraints"
-    },
-    {
-      "$ref": "#/$defs/hilConstraints"
-    },
-    {
-      "$ref": "#/$defs/realRobotConstraints"
-    }
-  ],
+  "$id": "urn:robotics-runtime-contracts:build:acceptance-scenario-core",
   "$defs": {
     "authorization": {
       "oneOf": [
@@ -409,25 +294,25 @@
         "topics": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/topicExpectation"
+            "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-scenario-core#/$defs/topicExpectation"
           }
         },
         "services": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/graphEndpoint"
+            "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-scenario-core#/$defs/graphEndpoint"
           }
         },
         "actions": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/graphEndpoint"
+            "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-scenario-core#/$defs/graphEndpoint"
           }
         },
         "lifecycle_nodes": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/lifecycleNode"
+            "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-scenario-core#/$defs/lifecycleNode"
           }
         }
       }
@@ -540,7 +425,7 @@
     "assertion": {
       "oneOf": [
         {
-          "$ref": "#/$defs/metricAssertion"
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-scenario-core#/$defs/metricAssertion"
         }
       ]
     },
@@ -1179,7 +1064,7 @@
         }
       },
       "then": {
-        "$ref": "#/$defs/physicalHilConstraints"
+        "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-scenario-core#/$defs/physicalHilConstraints"
       }
     },
     "realRobotConstraints": {
@@ -1195,7 +1080,7 @@
         }
       },
       "then": {
-        "$ref": "#/$defs/realObservationConstraints"
+        "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-scenario-core#/$defs/realObservationConstraints"
       }
     }
   }
