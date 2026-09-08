@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Replace `json-merge-patch` with a typed RFC 7396 implementation. Semantic diff
+  distinguishes booleans, integers and floats recursively, preserves input
+  containers, and reports `diff.unrepresentable` for unrepresentable null members.
 - Load YAML with 1.2 core scalar rules and matching output quoting; reject
   duplicate JSON/YAML keys, aliases, non-JSON values and oversized/deep input.
   JSON files and extension schemas no longer fall back to YAML parsing.

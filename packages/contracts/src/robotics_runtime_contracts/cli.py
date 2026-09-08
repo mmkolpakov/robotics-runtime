@@ -21,7 +21,8 @@ from robotics_runtime_contracts.document_ops import (
     resolve_merge_patches,
     semantic_diff,
 )
-from robotics_runtime_contracts.errors import CLIArgumentError, ContractError
+from robotics_runtime_contracts.errors import CLIArgumentError as CLIArgumentError
+from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.serialization import (
     dumps_yaml,
     read_document_bytes,
