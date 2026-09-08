@@ -10,6 +10,9 @@ roles retain compatible assertions; the 0.15 generation still requires migration
   with optional MCAP decoding, and an in-toto qualification statement builder.
   Artifact digests continue to identify exact retained bytes. Producer outputs
   cannot replace their artifact or extension-schema inputs.
+- Add an artifact-receipt writer that binds source bytes to an externally
+  produced verification and its complete provenance dependency set. It preserves
+  raw-byte verification digests and does not perform signature verification.
 - Add execution trust policy and robot description roles, with byte-bound
   consumer examples. Trust-policy principals are unique by role and identity.
 - Expose public qualification inspection with typed accumulated diagnostics and
