@@ -23,9 +23,8 @@ classifiers = [
 ]
 dependencies = [
   "junitparser>=5.0.1,<6",
-  "opentelemetry-proto==1.43.0",
-  "packaging>=24,<27",
-  "pyyaml>=6.0.3,<7",
+  "opentelemetry-proto>=1.43,<2",
+  "packaging>=24",
   "robotics-runtime-contracts>=0.17.0rc1,<0.18",
 ]
 
