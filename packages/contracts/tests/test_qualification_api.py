@@ -4,6 +4,7 @@ import io
 import json
 from dataclasses import replace
 from hashlib import sha256
+from itertools import permutations
 from pathlib import Path
 from typing import Any
 
@@ -233,3 +234,37 @@ def test_metadata_output_cannot_replace_a_validated_input(
         "output must not replace input" in json.loads(capsys.readouterr().err)["error"]["message"]
     )
     assert all(path.read_bytes() == data for path, data in originals.items())
+
+
+@pytest.mark.parametrize(
+    ("case", "replacement_case"), list(permutations(("physical", "transport", "inference"), 2))
+)
+@pytest.mark.parametrize("kind", ["runtime_manifest", "domain_result"])
+def test_incompatible_execution_documents_block_binding_shapes(
+    case: str,
+    replacement_case: str,
+    kind: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    specifications = qualification_specifications(case)
+    original = next(item for item in specifications if item.startswith(f"{kind}:"))
+    replacement = next(
+        item
+        for item in qualification_specifications(replacement_case)
+        if item.startswith(f"{kind}:")
+    )
+    specifications[specifications.index(original)] = (
+        original.partition("=")[0] + "=" + replacement.partition("=")[2]
+    )
+    report = inspect_qualification_artifacts(specifications)
+    assert not report.valid
+    assert any(item.check == "domain.execution" for item in report.diagnostics)
+    assert "authorization" in report.blocked_checks
+    arguments = ["--format", "json", "validate-qualification"]
+    for specification in specifications:
+        arguments.extend(("--artifact", specification))
+    assert main(arguments) == 1
+    error = json.loads(capsys.readouterr().err)["error"]
+    assert error["error_id"] != "internal.error"
+    assert "authorization" in error["blocked_checks"]
+    assert len(error["diagnostics"]) >= 2

@@ -342,6 +342,15 @@ def _binding_checks(context: _Context) -> Iterator[_Check]:
     )
 
 
+def _inspect_domains(context: _Context, diagnostics: list[QualificationDiagnostic]) -> bool:
+    execution_valid = True
+    for check in _domain_checks(context):
+        passed = _run_check(check, diagnostics)
+        if check.name == "domain.execution" and not passed:
+            execution_valid = False
+    return execution_valid
+
+
 def inspect_links(artifacts: Sequence[QualificationArtifact]) -> QualificationReport:
     diagnostics: list[QualificationDiagnostic] = []
     names = [item.subject_name for item in artifacts]
@@ -359,9 +368,7 @@ def inspect_links(artifacts: Sequence[QualificationArtifact]) -> QualificationRe
     for check in _identity_checks(context):
         _run_check(check, diagnostics)
     domains_valid = _run_check(_Check("domains", partial(_domain_sets, context)), diagnostics)
-    if domains_valid:
-        for check in _domain_checks(context):
-            _run_check(check, diagnostics)
+    execution_valid = domains_valid and _inspect_domains(context, diagnostics)
     _run_check(_Check("aggregate.results", partial(_aggregate_results, context)), diagnostics)
     for domain, artifact in context.evidence_indexes.items():
         _run_check(
@@ -378,10 +385,12 @@ def inspect_links(artifacts: Sequence[QualificationArtifact]) -> QualificationRe
             diagnostics,
         )
     bindings = tuple(_binding_checks(context))
-    if domains_valid:
+    if execution_valid:
         for check in bindings:
             _run_check(check, diagnostics)
-    blocked = () if domains_valid else ("domain.links", *(check.name for check in bindings))
+    blocked: tuple[str, ...] = () if domains_valid else ("domain.links",)
+    if not execution_valid:
+        blocked += tuple(check.name for check in bindings)
     return QualificationReport(
         tuple(artifacts),
         tuple(diagnostics),

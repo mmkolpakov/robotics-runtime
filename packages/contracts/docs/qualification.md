@@ -60,8 +60,10 @@ Inspection collects failures from every independently loaded document. If any
 load or document validation fails, link checks are blocked. With valid documents,
 it collects independent run, domain and binding failures. Each individual document
 validator or binding family stops at its first dependent failure. A missing domain
-set blocks checks that index those domains; aggregate bindings and available
-evidence identities can still be checked. This report is not a list of every
+set blocks checks that index those domains. An execution-alignment failure also
+blocks the binding families, whose authorization and workload shapes depend on
+that alignment. Aggregate bindings and available evidence identities can still
+be checked. This report is not a list of every
 possible consequence of malformed input.
 
 `QualificationError` retains the first error's message, identifier and optional
