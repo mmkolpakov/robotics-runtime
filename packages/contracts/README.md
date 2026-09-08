@@ -59,7 +59,9 @@ robotics-contracts scenario resolve base.yaml \
   --trace-output resolution-trace.json
 ```
 
-Validate a complete, digest-linked qualification set:
+Qualification subjects use the following naming pattern. Add the evidence index,
+retained raw artifacts, and other bindings required by the scenario to make the set
+complete; see [qualification validation](docs/qualification.md).
 
 ```bash
 robotics-contracts validate-qualification \
@@ -92,8 +94,10 @@ registry = schema_registry()
 ```
 
 Validation is offline, does not mutate inputs, and rejects non-finite numbers.
-It reports the first failure; structural and semantic document errors normally
-include a JSON path, while qualification-link and some input errors do not.
+Individual document validation reports its first failure; structural and semantic
+errors normally include a JSON path. The public `qualification` module accumulates
+independent document and link failures in `QualificationReport`, with explicit
+blocked checks when prerequisites are invalid. Link errors can have no JSON path.
 The package exports `worst_status()` for consumers to share status-folding
 rules; this does not mean every consumer already uses it.
 

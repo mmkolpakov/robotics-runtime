@@ -18,8 +18,8 @@ from robotics_runtime_contracts import (
     validate_document,
 )
 from robotics_runtime_contracts import serialization as ser
-from robotics_runtime_contracts._qualification import QualificationError, _load_artifact
 from robotics_runtime_contracts.cli import _write_document, main
+from robotics_runtime_contracts.qualification import QualificationError, load_qualification_artifact
 from tests.test_extensions import SCHEMA_URI, extension_schema, scenario_with_extension
 
 
@@ -240,7 +240,7 @@ def test_qualification_preserves_parse_diagnostics(tmp_path: Path) -> None:
     path = tmp_path / "scenario.json"
     path.write_text('{"schema_version": "x", "schema_version": "y"}', encoding="utf-8")
     with pytest.raises(QualificationError) as caught:
-        _load_artifact(f"scenario:scenario.json={path}", {})
+        load_qualification_artifact(f"scenario:scenario.json={path}", {})
     assert caught.value.error_id == "input.duplicate_key"
     assert caught.value.json_path == "$.schema_version"
 

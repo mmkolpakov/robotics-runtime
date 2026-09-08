@@ -14,29 +14,30 @@ from robotics_runtime_contracts import (
     load_schema,
     validate_document,
 )
-from robotics_runtime_contracts._qualification import (
-    _ARTIFACT_ROLES,
-    _RAW_ARTIFACT_KINDS,
+from robotics_runtime_contracts.qualification import (
+    ARTIFACT_ROLES,
+    RAW_ARTIFACT_KINDS,
+    QualificationArtifact,
     QualificationError,
-    _Artifact,
-    _load_artifact,
-    _validate_links,
+    load_qualification_artifact,
     validate_qualification_artifacts,
+    validate_qualification_documents,
 )
 from tests.support import qualification_specifications
 
 
-def artifacts(case: str) -> list[_Artifact]:
+def artifacts(case: str) -> list[QualificationArtifact]:
     return [
-        _load_artifact(specification, {}) for specification in qualification_specifications(case)
+        load_qualification_artifact(specification, {})
+        for specification in qualification_specifications(case)
     ]
 
 
-def artifact(items: list[_Artifact], subject_name: str) -> _Artifact:
+def artifact(items: list[QualificationArtifact], subject_name: str) -> QualificationArtifact:
     return next(item for item in items if item.subject_name == subject_name)
 
 
-def document(items: list[_Artifact], subject_name: str) -> dict[str, Any]:
+def document(items: list[QualificationArtifact], subject_name: str) -> dict[str, Any]:
     value = artifact(items, subject_name).document
     assert isinstance(value, dict)
     return value
@@ -51,7 +52,7 @@ _DELETE = object()
 Change = tuple[str, tuple[str | int, ...], Any]
 
 
-def apply_changes(items: list[_Artifact], changes: Sequence[Change]) -> None:
+def apply_changes(items: list[QualificationArtifact], changes: Sequence[Change]) -> None:
     touched: dict[str, dict[str, Any]] = {}
     for subject_name, path, value in changes:
         root = document(items, subject_name)
@@ -314,7 +315,7 @@ def test_schema_valid_cross_link_contradictions_are_rejected(
     apply_changes(items, changes)
 
     with pytest.raises(QualificationError, match=message):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_result_evidence_segment_index_is_optional() -> None:
@@ -323,7 +324,7 @@ def test_result_evidence_segment_index_is_optional() -> None:
     del result["evidence"][0]["segment_index"]
     validate_mutation(result)
 
-    _validate_links(items)
+    validate_qualification_documents(items)
 
 
 def test_qualification_requires_every_scenario_assertion() -> None:
@@ -335,7 +336,7 @@ def test_qualification_requires_every_scenario_assertion() -> None:
     validate_mutation(scenario)
 
     with pytest.raises(QualificationError, match="omits scenario assertions"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_qualification_requires_clock_relation_for_every_channel_pair() -> None:
@@ -351,7 +352,7 @@ def test_qualification_requires_clock_relation_for_every_channel_pair() -> None:
     aggregate["cross_domain_e2e"]["transport_qualification"]["status"] = "incomplete"
     aggregate["cross_domain_e2e"]["status"] = "incomplete"
     validate_mutation(transport, aggregate)
-    _validate_links(items)
+    validate_qualification_documents(items)
 
 
 def test_qualification_binds_clock_relation_to_scenario_policy() -> None:
@@ -361,7 +362,7 @@ def test_qualification_binds_clock_relation_to_scenario_policy() -> None:
     validate_mutation(relation)
 
     with pytest.raises(QualificationError, match="clock relation .* policy"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 @pytest.mark.parametrize("field", ["source_domain_id", "destination_domain_id"])
@@ -372,7 +373,7 @@ def test_clock_relation_rejects_foreign_domain(field: str) -> None:
     validate_document(relation)
 
     with pytest.raises(QualificationError, match="ghost") as caught:
-        _validate_links(items)
+        validate_qualification_documents(items)
     assert caught.value.error_id == "qualification.unknown_domain"
     assert caught.value.json_path == f"$.{field}"
 
@@ -385,7 +386,7 @@ def test_channel_rejects_foreign_endpoint_domain(endpoint: str) -> None:
     validate_document(channel)
 
     with pytest.raises(QualificationError, match="ghost") as caught:
-        _validate_links(items)
+        validate_qualification_documents(items)
     assert caught.value.error_id == "qualification.unknown_domain"
     assert caught.value.json_path == f"$.{endpoint}.domain_id"
 
@@ -411,9 +412,10 @@ def test_every_chain_status_rejects_foreign_hop_channel(status: str) -> None:
     assert caught_semantic.value.json_path == "$.causal_chains[0].hops[0].channel_id"
 
     with pytest.raises(QualificationError, match="ghost-channel") as caught_link:
-        _validate_links(items)
-    assert caught_link.value.error_id == "qualification.unknown_channel"
+        validate_qualification_documents(items)
+    assert caught_link.value.error_id == "semantic.validation_failed"
     assert caught_link.value.json_path == "$.causal_chains[0].hops[0].channel_id"
+    assert caught_link.value.blocked_checks == ("links",)
 
 
 def test_shared_clock_observations_belong_to_their_endpoint_domains() -> None:
@@ -440,14 +442,14 @@ def test_shared_clock_observations_belong_to_their_endpoint_domains() -> None:
     del relation["sample_count"]
     del relation["max_absolute_skew_ms"]
     validate_mutation(scenario, relation)
-    _validate_links(items)
+    validate_qualification_documents(items)
 
     identity = relation["shared_clock_identity"]
     identity["source_observation_sha256"] = destination_digest
     identity["destination_observation_sha256"] = source_digest
     validate_mutation(relation)
     with pytest.raises(QualificationError, match="source_observation.*domain control"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_qualification_accepts_custom_evidence_media_type() -> None:
@@ -473,7 +475,7 @@ def test_qualification_accepts_custom_evidence_media_type() -> None:
         }
     )
     items.append(
-        _Artifact(
+        QualificationArtifact(
             kind="other_evidence",
             subject_name="evidence/controller.vendor",
             sha256=cast(str, evidence["sha256"]),
@@ -486,7 +488,7 @@ def test_qualification_accepts_custom_evidence_media_type() -> None:
         document(items, "results/control.json"),
     )
 
-    _validate_links(items)
+    validate_qualification_documents(items)
 
 
 @pytest.mark.parametrize(
@@ -526,7 +528,7 @@ def test_complete_transport_qualification_accepts_every_canonical_observation_st
     aggregate["cross_domain_e2e"]["status"] = status
     validate_mutation(observation, transport, aggregate)
 
-    _validate_links(items)
+    validate_qualification_documents(items)
 
 
 def test_runtime_configuration_artifact_is_digest_linked() -> None:
@@ -540,7 +542,7 @@ def test_runtime_configuration_artifact_is_digest_linked() -> None:
     ]
     validate_mutation(runtime)
 
-    _validate_links(items)
+    validate_qualification_documents(items)
 
 
 def test_runtime_configuration_artifact_requires_retained_bytes() -> None:
@@ -550,7 +552,7 @@ def test_runtime_configuration_artifact_requires_retained_bytes() -> None:
     validate_mutation(runtime)
 
     with pytest.raises(QualificationError, match="host_topology configuration"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_recording_summary_cannot_cover_different_sources() -> None:
@@ -564,7 +566,7 @@ def test_recording_summary_cannot_cover_different_sources() -> None:
     validate_mutation(worker_index)
 
     with pytest.raises(QualificationError, match="multiple evidence sources"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_provider_conformance_is_bound_to_runtime_capabilities() -> None:
@@ -574,7 +576,7 @@ def test_provider_conformance_is_bound_to_runtime_capabilities() -> None:
     validate_mutation(runtime)
 
     with pytest.raises(QualificationError, match="capabilities does not match"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 @pytest.mark.parametrize("case", ["inference", "physical"])
@@ -611,7 +613,7 @@ def test_qualification_rejects_events_before_run_creation() -> None:
     validate_mutation(run)
 
     with pytest.raises(QualificationError, match="chronologically ordered"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 @pytest.mark.parametrize(
@@ -632,7 +634,7 @@ def test_transport_observations_must_occur_during_the_run(
     validate_mutation(observation)
 
     with pytest.raises(QualificationError, match=message):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 @pytest.mark.parametrize(
@@ -650,7 +652,7 @@ def test_transport_observations_must_fit_both_domain_windows(subject_name: str) 
     validate_mutation(observation)
 
     with pytest.raises(QualificationError, match="domain .* window"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_run_bound_receipt_must_be_created_during_the_run() -> None:
@@ -662,7 +664,7 @@ def test_run_bound_receipt_must_be_created_during_the_run() -> None:
     validate_mutation(receipt, verification)
 
     with pytest.raises(QualificationError, match="receipt timeline"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_scenario_provider_capabilities_are_not_replaced_by_profile_requirements() -> None:
@@ -672,7 +674,7 @@ def test_scenario_provider_capabilities_are_not_replaced_by_profile_requirements
     validate_mutation(scenario)
 
     with pytest.raises(QualificationError, match="do not satisfy capabilities"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_provider_capabilities_are_derived_from_passing_checks() -> None:
@@ -693,7 +695,7 @@ def test_scene_requirements_are_checked_against_provider_observation() -> None:
     validate_mutation(runtime, conformance)
 
     with pytest.raises(QualificationError, match="satisfy the scene"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_scene_physical_parameters_distinguish_boolean_from_number() -> None:
@@ -707,7 +709,7 @@ def test_scene_physical_parameters_distinguish_boolean_from_number() -> None:
     validate_mutation(scenario, runtime, conformance)
 
     with pytest.raises(QualificationError, match="do not satisfy the scene"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_evaluator_receipt_requires_a_matching_verified_producer() -> None:
@@ -717,7 +719,7 @@ def test_evaluator_receipt_requires_a_matching_verified_producer() -> None:
     validate_mutation(verification)
 
     with pytest.raises(QualificationError, match="producer does not match"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_evaluator_content_manifest_must_be_retained() -> None:
@@ -727,7 +729,7 @@ def test_evaluator_content_manifest_must_be_retained() -> None:
     validate_mutation(verification)
 
     with pytest.raises(QualificationError, match="content manifest"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_retained_evidence_receipt_is_bound_to_the_run() -> None:
@@ -737,7 +739,7 @@ def test_retained_evidence_receipt_is_bound_to_the_run() -> None:
     validate_mutation(receipt)
 
     with pytest.raises(QualificationError, match="belongs to another run"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_retained_evidence_verification_is_bound_to_its_statement() -> None:
@@ -747,7 +749,7 @@ def test_retained_evidence_verification_is_bound_to_its_statement() -> None:
     validate_mutation(verification)
 
     with pytest.raises(QualificationError, match="statement does not match"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_retained_evidence_must_be_verified_before_its_receipt() -> None:
@@ -757,7 +759,7 @@ def test_retained_evidence_must_be_verified_before_its_receipt() -> None:
     validate_mutation(verification)
 
     with pytest.raises(QualificationError, match="created before its verification"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_retained_evidence_receipt_describes_the_indexed_revision() -> None:
@@ -769,7 +771,7 @@ def test_retained_evidence_receipt_describes_the_indexed_revision() -> None:
     validate_mutation(index, result)
 
     with pytest.raises(QualificationError, match="describes different bytes"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_verified_descriptor_prevents_relabeling_remote_evidence() -> None:
@@ -782,7 +784,7 @@ def test_verified_descriptor_prevents_relabeling_remote_evidence() -> None:
     validate_mutation(index, result, receipt)
 
     with pytest.raises(QualificationError, match="artifact descriptor does not match"):
-        _validate_links(items)
+        validate_qualification_documents(items)
 
 
 def test_transport_trace_uses_artifact_identity_without_segment_index() -> None:
@@ -792,7 +794,7 @@ def test_transport_trace_uses_artifact_identity_without_segment_index() -> None:
         evidence.pop("segment_index")
     validate_mutation(transport)
 
-    _validate_links(items)
+    validate_qualification_documents(items)
 
 
 def test_result_rejects_duplicate_artifact_identity_without_a_segment() -> None:
@@ -810,7 +812,7 @@ def test_qualification_artifact_kinds_have_one_schema_catalog() -> None:
     common = load_schema("common.v1")
 
     assert set(common["$defs"]["qualificationArtifactKind"]["enum"]) == (
-        set(_ARTIFACT_ROLES) | set(_RAW_ARTIFACT_KINDS)
+        set(ARTIFACT_ROLES) | set(RAW_ARTIFACT_KINDS)
     )
 
 
@@ -834,4 +836,4 @@ def test_referenced_raw_artifact_is_required(
     items = [item for item in artifacts(case) if item.subject_name != subject_name]
 
     with pytest.raises(QualificationError, match=message):
-        _validate_links(items)
+        validate_qualification_documents(items)

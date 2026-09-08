@@ -8,8 +8,8 @@ import pytest
 import yaml
 
 from robotics_runtime_contracts import validate_document
-from robotics_runtime_contracts._qualification import validate_qualification_artifacts
 from robotics_runtime_contracts.cli import main
+from robotics_runtime_contracts.qualification import validate_qualification_artifacts
 from tests.support import qualification_specifications
 
 FIXTURES = Path(__file__).parent / "fixtures"
