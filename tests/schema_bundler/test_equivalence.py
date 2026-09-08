@@ -1,6 +1,7 @@
-"""Compare resolved assertions and fixture outcomes with the frozen pre-refactor schemas.
+"""Refactor proof regressions and forward compatibility of the frozen schemas.
 
-This is a refactor-specific equality gate, not the future additive-release checker.
+The D10 gate owns forward compatibility; exact equality remains a test oracle
+for the refactor's normalization bugs, not a ban on later additive releases.
 URI, pointer and anchor resolution belongs entirely to referencing.
 """
 
@@ -18,6 +19,7 @@ from referencing import Registry
 from robotics_runtime_contracts import load_mapping
 
 from scripts.bundle_schemas import RESOURCES, ROOT, Schema, read_schemas, registry_for, subschemas
+from scripts.schema_compatibility.structure import check_structure
 
 SNAPSHOT = json.loads(
     gzip.decompress((Path(__file__).parent / "fixtures/baseline.json.gz").read_bytes())
@@ -88,29 +90,13 @@ def comparison_key(schema: Schema, schemas: dict[str, Schema]) -> str:
     return json.dumps(assertions(schema, schemas), sort_keys=True, allow_nan=False)
 
 
-def test_original_identities_survive_the_two_spec23_role_additions() -> None:
-    additions = {
-        "execution_trust_policy": "execution-trust-policy.v1",
-        "robot_description": "robot-description.v1",
-    }
-    assert set(AFTER) - set(BEFORE) == {f"{name}.schema.json" for name in additions.values()}
-    catalog = json.loads((RESOURCES / "catalog.v1.json").read_bytes())
-    for role, name in additions.items():
-        assert catalog["roles"].pop(role) == name
-        assert AFTER[f"{name}.schema.json"]["$id"] == (
-            f"urn:robotics-runtime-contracts:v1:{name.removesuffix('.v1')}"
-        )
-    # Removing only the reviewed additions must recover every original catalog
-    # byte, including role order and the unchanged internal resource inventory.
-    assert json.dumps(catalog, indent=2) + "\n" == SNAPSHOT["resources"]["catalog.v1.json"]
-    assert {name: value["$id"] for name, value in BEFORE.items()} == {
-        name: AFTER[name]["$id"] for name in BEFORE
-    }
-
-
-@pytest.mark.parametrize("name", sorted(BEFORE))
-def test_every_resolved_schema_assertion_is_identical(name: str) -> None:
-    assert comparison_key(BEFORE[name], BEFORE) == comparison_key(AFTER[name], AFTER)
+def test_published_resources_and_catalog_remain_compatible() -> None:
+    assert check_structure(
+        BEFORE,
+        AFTER,
+        json.loads(SNAPSHOT["resources"]["catalog.v1.json"]),
+        json.loads((RESOURCES / "catalog.v1.json").read_bytes()),
+    ) == len(BEFORE)
 
 
 def test_cores_use_named_conditionals_and_common_owns_named_primitives() -> None:
@@ -167,13 +153,12 @@ def test_fixture_comparison_is_not_empty_or_single_package() -> None:
 
 
 @pytest.mark.parametrize("path,value", CASES, ids=[path for path, _ in CASES])
-def test_fixture_validation_and_instance_diagnostics_are_unchanged(
-    path: str, value: Schema
-) -> None:
+def test_previously_schema_valid_fixture_remains_valid(path: str, value: Schema) -> None:
     name = f"{value['schema_version']}.schema.json"
-    assert validation_errors(value, BEFORE[name], registry_for(BEFORE)) == validation_errors(
-        value, AFTER[name], registry_for(AFTER)
-    ), path
+    old_errors = validation_errors(value, BEFORE[name], registry_for(BEFORE))
+    new_errors = validation_errors(value, AFTER[name], registry_for(AFTER))
+    if not old_errors:
+        assert not new_errors, path
 
 
 @pytest.mark.parametrize(

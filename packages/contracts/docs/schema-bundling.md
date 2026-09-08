@@ -83,26 +83,24 @@ transport ROS names/types retain their stricter patterns and length limits;
 `runSha256` retains the acceptance-run pattern spelling. This refactor does not
 normalize or widen those constraints.
 
-The refactor-specific equivalence suite expands references through `referencing`
-and compares every assertion tree for the original 29 schemas. It separately
-checks their IDs and recovers the exact original catalog bytes after removing
-only the two explicitly allowed SPEC 23 role additions (`execution_trust_policy`
-and `robot_description`). It requires the supported dialect in both historical
-and current schemas. Comparison uses JSON tokens to distinguish booleans from
+The original refactor proof compared every resolved assertion tree for all 29
+schemas, IDs, catalog bytes and fixture diagnostics. The forward gate now uses
+the [bounded D10 compatibility rules](schema-compatibility.md) against actual
+released Git blobs, so new roles and permitted additions do not fail an obsolete
+equality test. Historical source-to-byte reproduction remains unchanged.
+Comparison uses JSON tokens to distinguish booleans from
 numbers. A resolved `$ref` with sibling assertions remains a distinct token
 containing both in the same scope; it is not converted into an `allOf` branch,
 which could change `unevaluatedProperties` behavior. It fails on recursive
-reference graphs, and verifies that changed constraints are detected. It also
-compares validation outcomes and instance diagnostics for parsable, registered
-contract fixtures from both packages, including negative fixtures. Malformed
+reference graphs, and the refactor regression tests verify that changed
+constraints are detected. Previously schema-valid registered fixtures from both
+packages must remain valid. Previously invalid fixtures may become valid under
+permitted additions; their error messages are not a frozen schema interface. Malformed
 serialization and unknown schema declarations cannot supply an instance for
 this comparison; existing parser and schema-selection tests remain responsible
 for those cases. Resource hashes are updated consciously only after these checks.
 
-This is evidence for a constraint-preserving reorganization under D10. It is not
-the planned SPEC 25 general additive-compatibility checker against the last
-release. The original bundler refactor introduced no package version, canonical
-serialization, consumer behavior, new role, or external release. SPEC 23 adds
-two independent public resources without changing existing schema bytes or
-assertions. Future assertion changes still
-require the compatibility or new-major path in ADR 0007.
+The refactor remains evidence for a constraint-preserving reorganization under
+D10. The release gate adds bounded structural checks and public API semantic
+regressions; it does not claim general implication between arbitrary schemas.
+Future assertion changes require the compatibility or new-major path in ADR 0007.
