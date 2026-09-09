@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
-import yaml
+from robotics_runtime_contracts import load_mapping
 
 
 def load_fixture(path: Path) -> dict[str, Any]:
-    return cast(dict[str, Any], yaml.safe_load(path.read_text(encoding="utf-8")))
+    return load_mapping(path)
 
 
 def qualification_specifications(case: str) -> list[str]:
