@@ -299,7 +299,8 @@ def _write_metrics(
 def _simulation_bundle(tmp_path: Path) -> DocumentBundle:
     scenario = yaml.safe_load((FIXTURES / "scenario.yaml").read_text(encoding="utf-8"))
     scenario["timeouts"]["stable_for_sec"] = 0
-    scenario["timeouts"]["execution_sec"] = 0.2
+    # Match the one-second wall-clock evidence window used by these fixtures.
+    scenario["timeouts"]["execution_sec"] = 1
     scenario_path = tmp_path / "scenario.yaml"
     scenario_path.write_text(yaml.safe_dump(scenario, sort_keys=False), encoding="utf-8")
     return load_bundle(scenario_path, runtime_path=FIXTURES / "runtime.yaml")
@@ -526,7 +527,11 @@ def test_verification_accepts_legacy_observer_factory(tmp_path: Path) -> None:
     assert outputs.result["status"] == "passed"
 
 
-def test_verification_finalizes_measurement_before_reading_evidence(tmp_path: Path) -> None:
+@pytest.mark.parametrize("initial_index", [None, b'{"artifacts":', b"{}"])
+def test_verification_finalizes_measurement_before_reading_evidence(
+    tmp_path: Path,
+    initial_index: bytes | None,
+) -> None:
     bundle = _simulation_bundle(tmp_path)
     metrics_path = tmp_path / "metrics.otlp.json"
     _write_metrics(
@@ -543,6 +548,8 @@ def test_verification_finalizes_measurement_before_reading_evidence(tmp_path: Pa
         run_id=SIMULATION_RUN_ID,
     )
     evidence_path = tmp_path / "evidence.yaml"
+    if initial_index is not None:
+        evidence_path.write_bytes(initial_index)
     marker = tmp_path / "measurement-complete"
     context = _write_run_context(
         tmp_path / "run.yaml",
@@ -664,7 +671,13 @@ def test_verification_ignores_metrics_from_another_run(tmp_path: Path) -> None:
 
 
 def test_valid_latency_does_not_hide_a_frozen_simulation_clock(tmp_path: Path) -> None:
-    outputs = _simulation_case(tmp_path, source_scale=0)
+    class CompleteWindowObserver(FakeObserver):
+        def stop_clock_observation(self) -> tuple[ClockSample, ...]:
+            samples = super().stop_clock_observation()
+            # Prove the freeze over the full policy window, including its end.
+            return (*samples, ClockSample(self.clock.value_ns, 0))
+
+    outputs = _simulation_case(tmp_path, source_scale=0, observer_type=CompleteWindowObserver)
 
     timing = next(
         item
@@ -683,7 +696,11 @@ def test_physical_verification_emits_authorized_result(tmp_path: Path) -> None:
 
     assert result["schema_version"] == "acceptance-result.v1"
     assert result["evaluation_mode"] == "live"
-    assert result["status"] == "passed"
+    assert result["status"] == "incomplete"
+    assert result["unevaluated"] == [
+        "$.clock_observation.deadline_miss_ratio",
+        "$.clock_observation.real_time_factor",
+    ]
     assert result["authorization"]["mode"] == "verified_execution_permit"
     assert result["hardware_clock_observation"]["within_policy"] is True
     assert JUnitXml.fromfile(str(outputs.junit_path)).failures == 0

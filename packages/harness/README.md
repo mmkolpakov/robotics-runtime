@@ -1,6 +1,6 @@
 # Robotics Acceptance Harness
 
-[![CI](https://github.com/mmkolpakov/robotics-acceptance-harness/actions/workflows/ci.yml/badge.svg)](https://github.com/mmkolpakov/robotics-acceptance-harness/actions/workflows/ci.yml)
+[![CI](https://github.com/mmkolpakov/robotics-runtime/actions/workflows/ci.yml/badge.svg)](https://github.com/mmkolpakov/robotics-runtime/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Attach-only acceptance testing for existing ROS 2 executions.
@@ -11,6 +11,9 @@ and JUnit results. It does not launch workloads, control simulators, change node
 lifecycle states, execute cryptographic signature tools, or publish commands to equipment.
 It verifies externally produced signature results and their digest chain; the
 signature tool itself remains an infrastructure responsibility.
+
+See [local evidence and timestamps](docs/evidence-files.md) for filesystem
+containment, finalized-file reads and the distinction between Unix and monotonic time.
 
 ## Architecture
 
@@ -38,23 +41,24 @@ version.
 
 | Component | Baseline |
 | --- | --- |
-| Python | 3.12 or 3.13 |
-| Contracts | `robotics-runtime-contracts>=0.16,<0.17` |
+| Python | 3.12 through 3.14 |
+| Contracts | `robotics-runtime-contracts>=0.17,<0.18` |
 | ROS observation | ROS 2 Jazzy packages in the observer environment |
 | Metrics | OTLP JSON Lines exported by OpenTelemetry Collector |
 
-All public contract families currently use one canonical `v1`. This is a
-pre-1.0 line; compatibility starts with the first stable release.
+All public contract families currently use one canonical `v1`. Published
+schemas are checked for compatible changes against the release baseline.
 
 ## Install
 
 Development uses the exact contracts revision recorded in `uv.lock`:
 
 ```bash
-git clone https://github.com/mmkolpakov/robotics-acceptance-harness.git
-cd robotics-acceptance-harness
-uv sync --locked --all-groups
+git clone https://github.com/mmkolpakov/robotics-runtime.git
+cd robotics-runtime
+uv sync --locked --all-packages --all-groups
 uv run robotics-acceptance --version
+cd packages/harness
 ```
 
 Release consumers should install the published wheel together with the locked
@@ -100,8 +104,18 @@ Run `robotics-acceptance COMMAND --help` for the complete option set.
 | `timing-check` | Check verified clock metrics against scenario policy | No |
 | `otel-summary` | Summarize normalized OTLP metric points | No |
 
-Successful acceptance returns `0`, a completed non-passing verdict returns `1`,
-and invalid input or an observation failure returns `2`.
+Verdict-producing commands return `0` for `passed` and `1` for a completed
+non-passing verdict, including `failed`, `incomplete`, or `error`. An input,
+observation, or execution exception handled by the CLI returns `2` with a
+diagnostic. A result whose status is `error` is distinct from such an exception.
+
+`campaign` emits `incomplete` when passed runs are below the required minimum
+and no failed/error runs were observed. This writer requires the corresponding
+contracts reader update, which also accepts legacy `campaign-summary.v1` files
+that reported an all-passed shortage as `failed`. Campaign acceptance thresholds
+and failure/error precedence remain unchanged: tolerated failed/error runs can
+still produce `passed` when every threshold is met, and retain their severity
+when the campaign policy is not met.
 
 ## Live Observation
 
@@ -126,12 +140,25 @@ observer inherits standard ROS variables such as `ROS_DOMAIN_ID`,
 `RMW_IMPLEMENTATION`, and the SROS2 environment. It has no private fallback for
 document paths or execution identity.
 
+An expected topic's `qos_profile` selects the observer subscription's QoS.
+The compatibility check compares discovered publishers with that subscription;
+it does not compare every application publisher/subscriber pair. The harness
+excludes its own subscriptions from the observed subscriber count. When the
+scenario does not declare `/clock`, its observation subscription uses depth 1,
+best-effort reliability, and volatile durability.
+
 ## Offline Evaluation
 
 `evaluate` runs the same metric, evidence, and product evaluators without
 joining ROS. Live graph, clock, safety-boundary, and shutdown observations are
 marked `unevaluated`, so an offline result cannot silently claim complete live
 acceptance.
+
+If every available offline check passes, the result is still `incomplete` and
+`evaluate` exits `1`. JUnit marks the missing live coverage as skipped. Evidence
+of a failure or error can raise the result's severity; malformed input or an
+execution exception exits `2`. A successful offline invocation therefore does
+not establish the `passed` verdict required for exit `0`.
 
 Local evidence is verified by URI, path, size, and SHA-256. Retained evidence
 also requires a receipt, its typed external-verification record, and the
@@ -157,6 +184,83 @@ The external verification binds the full artifact descriptor: URI, immutable
 revision, media type, size, and SHA-256. The harness needs no storage
 credentials. Upload, signing, and retention lifecycle remain infrastructure
 responsibilities. OTLP file-exporter streams use `application/x-ndjson`.
+
+For recordings whose receipts appear after observation starts, pass
+`--receipt-inventory /evidence/receipt-inventory.json` to `verify`, `evaluate`,
+or `timing-check`. Use `--receipt-inventory DOMAIN=PATH` with
+`transport-evaluate`. The inventory contains exactly these three file lists:
+
+```json
+{
+  "receipts": ["receipts/recording-0.json"],
+  "verifications": ["provenance/recording-0/artifact-verification.json"],
+  "dependencies": [
+    "provenance/recording-0/statement.json",
+    "provenance/recording-0/trust-policy.pem",
+    "provenance/recording-0/verification-evidence.sigstore.json"
+  ]
+}
+```
+
+Publish the inventory atomically before publishing the finalized evidence index.
+The live observer reads it during its existing evidence wait, after measurement;
+it need not exist when the observer starts. Missing or invalid files retain the
+same evidence timeout and diagnostic behavior. Paths use canonical relative
+POSIX notation below the inventory's directory. Absolute paths, traversal,
+directory links escaping that root, duplicate paths and unused provenance are
+rejected. The inventory uses the contract parser's document size limit and a
+maximum of 4,096 files. A shared dependency occurs once in the list. Every
+referenced receipt, verification and dependency still passes the same role and
+byte-digest checks. Inventory and explicit receipt inputs cannot be mixed for
+the same domain.
+
+Python callers can pass `ReceiptInventory(path)` as `receipt_paths` to
+`load_evidence_index`, or as `artifact_receipt_paths` to `run_verification`
+and `evaluate_from_evidence`. Existing sequences of explicit file paths remain
+supported. The inventory is a CLI input list, not a new contract document.
+
+## Histogram windows
+
+Explicit-bucket histogram counts and recorded sums are aggregated over their
+actual contribution intervals. Cumulative evidence needs a baseline at the
+window boundary. An earlier baseline is usable only when an unchanged point
+after the boundary proves that the intervening interval contained no events.
+Otherwise event timestamps cannot be recovered and the window is unevaluated.
+A changed start timestamp delimits a reset; a decreasing count without a new
+start timestamp leaves the reset boundary unknown.
+A cumulative point whose start equals its observation timestamp is an
+[unknown-start marker](https://opentelemetry.io/docs/specs/otel/metrics/data-model/#cumulative-streams-handling-unknown-start-time).
+Its existing population is subtracted before counting subsequent window events.
+
+After baseline subtraction, lifetime minima and maxima are discarded unless
+the baseline was empty. Quantiles use the inverse empirical CDF (integer rank
+`ceil(p * count)`) and report conservative bucket intervals. A threshold passes
+or fails only when the entire interval proves that outcome. A straddling or
+unbounded interval produces a skipped assertion and an incomplete result.
+Delta histograms can also lack recorded extrema; the same bound rules apply.
+
+Time-authority results keep the measured event count when only latency bounds
+are uncertain. Their required numeric fields contain finite bound endpoints;
+the `time-authority-evidence` assertion records the full intervals and outcome.
+Missing statistics use explicit unevaluated markers and diagnostic placeholders,
+never proof of a measured zero or a threshold breach. JUnit preserves these
+skipped outcomes. Artifact digests and existing result schema fields are unchanged.
+
+## Realtime timing windows
+
+Live verification evaluates the complete measurement interval and overlapping
+windows of at least one second. Clock callbacks bound source-clock progress;
+the recorded `real_time_factor` is a conservative lower bound. A lower bound
+below the policy threshold alone does not prove a violation. If the upper bound
+also lies below the threshold, the time-policy assertion fails. When the bounds
+straddle the threshold or clock coverage is missing, it is skipped and the
+corresponding clock fields are listed as unevaluated, producing `incomplete`
+unless another observation proves a failure.
+
+Deadline ratios are independent evidence: the greatest observed value is checked
+even when clock callbacks or other deadline samples are missing. A known deadline
+exceedance or a clock stall proved by recorded endpoints remains a failure.
+`why` preserves the distinction between unobserved and violated clock properties.
 
 ## Contract Inputs
 
@@ -192,6 +296,22 @@ that installation belongs to the observed execution-subject image. PEP 610
 metadata and an installed `RECORD` are not treated as proof of released wheel
 identity. Unhashed bytecode and module origins outside that `RECORD` fail
 closed; evaluator images should install with bytecode generation disabled.
+Evaluator loading also refuses `sys.pycache_prefix` (including
+`PYTHONPYCACHEPREFIX`), symlinked installed paths, and evaluator modules already
+imported by an unverified loader. Start the harness in a fresh interpreter.
+
+The harness compiles the Python source bytes checked against `RECORD` using an
+explicit source loader, without reading or writing bytecode caches. This covers
+the evaluator's parent packages and imports within the distribution's module
+namespaces, including imports deferred until evaluation. Regular packages,
+namespace packages, relative imports, and dotted entry-point attributes are
+supported. Wheels sharing a namespace must each be qualified for the current
+evaluation; every entry point is still checked against its own distribution's
+RECORD. Evaluator-owned modules require hashed Python source; native and
+sourceless evaluator modules are rejected. Dependencies outside those namespaces
+use Python's normal import machinery and remain part of the execution image's
+trust boundary. This loading check is not a sandbox for malicious Python code,
+and a locally editable `RECORD` does not authenticate the released wheel.
 
 An evaluator receives an immutable `EvaluationContext` and returns
 `AssertionEvaluation` objects in its own namespace. Every product assertion

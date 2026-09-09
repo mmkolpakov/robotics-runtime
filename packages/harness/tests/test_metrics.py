@@ -224,7 +224,7 @@ def test_cumulative_histogram_uses_window_baseline() -> None:
     result = evaluate_metric_assertions(
         [assertion(aggregation="count", threshold=3, operator="eq")],
         points,
-        window_start_ns=2,
+        window_start_ns=1,
         window_end_ns=3,
     )[0]
 
@@ -234,7 +234,7 @@ def test_cumulative_histogram_uses_window_baseline() -> None:
 
 @pytest.mark.parametrize(
     ("reset_start_ns", "expected_status"),
-    [(2, "passed"), (3, "error")],
+    [(2, "passed"), (3, "skipped")],
 )
 def test_cumulative_histogram_requires_continuity_across_reset(
     reset_start_ns: int, expected_status: str
@@ -349,8 +349,9 @@ def test_histogram_quantile_does_not_use_upper_bound_to_prove_gte() -> None:
         window_end_ns=1,
     )[0]
 
-    assert result.status == "failed"
-    assert result.observed_value == 1.1
+    assert result.status == "skipped"
+    assert result.observed_value is None
+    assert "[1.1, 2]" in result.message
 
 
 def test_histogram_quantile_equality_requires_an_exact_bucket() -> None:
@@ -371,8 +372,8 @@ def test_histogram_quantile_equality_requires_an_exact_bucket() -> None:
         window_end_ns=1,
     )[0]
 
-    assert result.status == "error"
-    assert "equality cannot be proven" in result.message
+    assert result.status == "skipped"
+    assert "[1.1, 2]" in result.message
 
 
 def test_delta_histogram_rejects_interval_crossing_window_start() -> None:
@@ -391,7 +392,7 @@ def test_delta_histogram_rejects_interval_crossing_window_start() -> None:
         window_end_ns=120,
     )[0]
 
-    assert result.status == "error"
+    assert result.status == "skipped"
     assert "no histogram events" in result.message
 
 
@@ -489,7 +490,7 @@ def test_generic_histogram_assertion_requires_full_window_coverage() -> None:
         window_end_ns=10_000_000_000,
     )[0]
 
-    assert result.status == "error"
+    assert result.status == "skipped"
     assert "coverage tolerance" in result.message
 
 
@@ -509,11 +510,11 @@ def test_histogram_window_limits_total_uncovered_edges() -> None:
         window_end_ns=10_000_000_000,
     )[0]
 
-    assert result.status == "error"
+    assert result.status == "skipped"
     assert "does not cover enough" in result.message
 
 
-def test_delta_histogram_accepts_gaps_between_recorded_intervals() -> None:
+def test_delta_histogram_rejects_total_gaps_exceeding_window_tolerance() -> None:
     result = evaluate_metric_assertions(
         [assertion(aggregation="count", operator="eq", threshold=2)],
         [
@@ -536,7 +537,9 @@ def test_delta_histogram_accepts_gaps_between_recorded_intervals() -> None:
         window_end_ns=10_000_000_000,
     )[0]
 
-    assert result.status == "passed"
+    assert result.status == "skipped"
+    assert result.observed_value is None
+    assert "does not cover enough" in result.message
 
 
 def test_generic_metric_assertion_rejects_otlp_sum() -> None:

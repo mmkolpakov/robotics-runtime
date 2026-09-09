@@ -104,7 +104,7 @@ jobs:
           tests/test_schema_compatibility.py
       - run: >-
           uv run --no-sync mypy --explicit-package-bases
-          scripts/release scripts/bundle_schemas.py tests/release tests/workspace tests/schema_bundler
+          scripts/release scripts/bundle_schemas.py tests/release tests/workspace tests/infra tests/schema_bundler
           scripts/check_schema_compatibility.py scripts/schema_compatibility
           tests/test_schema_compatibility.py
         env:
@@ -113,6 +113,9 @@ jobs:
   consumers:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      INFRA_CONSUMER_ROOT: artifacts/infra-consumer
+      INFRA_CONSUMER_REVISION: d4762f5c7a5027d46d3bcfe1f77cf8429e0df3f6
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
@@ -126,6 +129,15 @@ jobs:
       - run: uv sync --locked --all-packages --all-groups
       - name: Validate producer examples and consumer fixtures together
         run: uv run --no-sync pytest tests/workspace
+      - name: Check out the infra generation that consumes these contracts
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          repository: mmkolpakov/robotics-runtime-infra
+          ref: ${{ env.INFRA_CONSUMER_REVISION }}
+          path: ${{ env.INFRA_CONSUMER_ROOT }}
+          persist-credentials: false
+      - name: Validate complete infra bundles and entrypoint documents
+        run: uv run --no-sync pytest tests/infra
 
   live-ros:
     runs-on: ubuntu-24.04

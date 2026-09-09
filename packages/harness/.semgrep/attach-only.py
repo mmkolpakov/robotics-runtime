@@ -11,6 +11,42 @@ import docker
 # ruleid: attach-only-no-network-client
 import requests
 
+
+def allowed_helper():
+    # ok: attach-only-no-network-client
+    from urllib.request import url2pathname
+
+
+def allowed_helper_alias():
+    # ok: attach-only-no-network-client
+    from urllib.request import url2pathname as to_path
+
+
+def forbidden_mixed_import():
+    # ruleid: attach-only-no-network-client
+    from urllib.request import build_opener, url2pathname
+
+
+def forbidden_client_import():
+    # ruleid: attach-only-no-network-client
+    from urllib.request import urlopen
+
+
+def forbidden_client_alias():
+    # ruleid: attach-only-no-network-client
+    from urllib.request import urlretrieve as retrieve
+
+
+def forbidden_module_import():
+    # ruleid: attach-only-no-network-client
+    import urllib.request
+
+
+def forbidden_module_alias():
+    # ruleid: attach-only-no-network-client
+    import urllib.request as client
+
+
 # ruleid: attach-only-no-mutation-service-types
 from lifecycle_msgs.srv import ChangeState
 

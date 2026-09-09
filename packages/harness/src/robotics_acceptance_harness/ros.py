@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from importlib import import_module
 from threading import Lock, Thread
-from time import monotonic_ns
+from time import monotonic_ns, time_ns
 from typing import Any, Literal
 
 from robotics_acceptance_harness.readiness import (
@@ -131,7 +131,7 @@ class RosGraphObserver:
         if overflow:
             raise RosObserverError(
                 "clock observation exceeded the configured limit of "
-                f"{self._max_clock_samples} unique samples"
+                f"{self._max_clock_samples} clock samples"
             )
         return samples
 
@@ -164,7 +164,7 @@ class RosGraphObserver:
     def _message_callback(self, topic: str) -> Callable[[Any], None]:
         def callback(_message: Any) -> None:
             with self._observation_lock:
-                self._first_messages.setdefault(topic, monotonic_ns())
+                self._first_messages.setdefault(topic, time_ns())
 
         return callback
 
@@ -172,11 +172,10 @@ class RosGraphObserver:
         observed_at_ns = monotonic_ns()
         source_time_ns = int(message.clock.sec) * 1_000_000_000 + int(message.clock.nanosec)
         with self._observation_lock:
-            self._first_messages.setdefault("/clock", observed_at_ns)
-            changed = (
-                not self._clock_samples or self._clock_samples[-1].source_time_ns != source_time_ns
-            )
-            if self._record_clock and changed:
+            self._first_messages.setdefault("/clock", time_ns())
+            # Repeated source times are evidence of a pause, including before
+            # catch-up and at the measurement tail. Never silently discard them.
+            if self._record_clock:
                 if len(self._clock_samples) >= self._max_clock_samples:
                     self._clock_sample_overflow = True
                     return
@@ -311,7 +310,7 @@ class RosGraphObserver:
     def snapshot(self) -> GraphSnapshot:
         self._require_running()
         observed_at_ns = monotonic_ns()
-        self._poll_lifecycle(observed_at_ns)
+        self._poll_lifecycle(time_ns())
         with self._observation_lock:
             first_messages = dict(self._first_messages)
 
@@ -323,7 +322,7 @@ class RosGraphObserver:
                 self._node.count_subscribers(name) - self._own_subscription_counts.get(name, 0),
             )
             topics[name] = TopicObservation(
-                types=tuple(topic_types.get(name, ())),
+                types=tuple(sorted(topic_types.get(name, ()))),
                 publishers=self._node.count_publishers(name),
                 subscribers=subscribers,
                 first_message_at_ns=first_messages.get(name),
@@ -332,10 +331,15 @@ class RosGraphObserver:
 
         services = self._service_observations()
         actions = self._action_observations()
+        node_names = frozenset(
+            f"{namespace.rstrip('/')}/{name}" for name, namespace in self._external_nodes()
+        )
         lifecycle = {
             name: tracker.observation
             for name, tracker in self._lifecycle.items()
             if tracker.observation is not None
+            and name in node_names
+            and tracker.client.service_is_ready()
         }
         return GraphSnapshot(
             observed_at_ns=observed_at_ns,
@@ -343,6 +347,7 @@ class RosGraphObserver:
             services=services,
             actions=actions,
             lifecycle_nodes=lifecycle,
+            node_names=node_names,
         )
 
     def close(self) -> None:

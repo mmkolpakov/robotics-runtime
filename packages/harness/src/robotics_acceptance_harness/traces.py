@@ -5,6 +5,7 @@ import json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -148,10 +149,11 @@ def load_otlp_json_traces(
     expected_run_id: str,
     expected_domain_id: str,
     expected_sha256: str | None = None,
+    evidence_root: Path | None = None,
 ) -> tuple[TraceSpan, ...]:
     """Read official newline-delimited OTLP/JSON Collector trace output."""
 
-    source, lines = read_otlp_json_lines(path, expected_sha256, TraceInputError)
+    source, lines = read_otlp_json_lines(path, expected_sha256, TraceInputError, evidence_root)
 
     spans: list[TraceSpan] = []
     seen: set[tuple[str, str]] = set()
@@ -429,12 +431,15 @@ def evaluate_causal_chain(
         relationship_pairs = [
             pair for pair in message_pairs if _relationship_matches(relationship, pair[0], pair[1])
         ]
-        if not relationship_pairs:
+        if len(relationship_pairs) != len(message_pairs):
             violations.append(
                 ChainViolation(
                     code="relationship_mismatch",
                     channel_id=channel_id,
-                    message=f"no producer-consumer pair satisfies {relationship!r}",
+                    message=(
+                        f"{len(message_pairs) - len(relationship_pairs)} correlated "
+                        f"producer-consumer pairs violate {relationship!r}"
+                    ),
                 )
             )
             continue
@@ -443,12 +448,12 @@ def evaluate_causal_chain(
             for pair in relationship_pairs
             if pair[1].start_time_unix_nano >= pair[0].start_time_unix_nano
         ]
-        if not valid_pairs:
+        if len(valid_pairs) != len(relationship_pairs):
             violations.append(
                 ChainViolation(
                     code="temporal_order_mismatch",
                     channel_id=channel_id,
-                    message="consumer span starts before its producer span",
+                    message="a consumer span starts before its producer span",
                 )
             )
             continue
@@ -472,7 +477,7 @@ def evaluate_causal_chain(
 
     if len(hops) == len(channel_contracts):
         graph = _trace_graph(spans_by_domain)
-        for previous, current in zip(hops, hops[1:], strict=False):
+        for previous, current in pairwise(hops):
             previous_consumer = (
                 previous.consumer.trace_id,
                 previous.consumer.span_id,

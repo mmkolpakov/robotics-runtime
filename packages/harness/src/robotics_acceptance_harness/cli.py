@@ -7,6 +7,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 from pathlib import Path
+from typing import cast
 
 from robotics_acceptance_harness import __version__
 from robotics_acceptance_harness.aggregate import (
@@ -35,7 +36,12 @@ from robotics_acceptance_harness.otel import (
     load_otlp_json_metrics,
     select_metric_points,
 )
-from robotics_acceptance_harness.receipts import VerifiedReceiptSet, load_verified_receipts
+from robotics_acceptance_harness.receipts import (
+    ReceiptInventory,
+    ReceiptSource,
+    VerifiedReceiptSet,
+    load_verified_receipts,
+)
 from robotics_acceptance_harness.run_context import create_run_context, load_run_context
 
 
@@ -76,6 +82,13 @@ def _add_evidence_receipt_arguments(
     parser.add_argument("--artifact-receipt", action="append", default=[], metavar=metavar)
     parser.add_argument("--artifact-verification", action="append", default=[], metavar=metavar)
     parser.add_argument("--receipt-dependency", action="append", default=[], metavar=metavar)
+    parser.add_argument(
+        "--receipt-inventory",
+        action="append" if grouped else "store",
+        default=[] if grouped else None,
+        metavar=metavar,
+        help="Receipt file list read when evidence is ready; paths are relative to its directory.",
+    )
 
 
 def _add_trace_arguments(parser: argparse.ArgumentParser) -> None:
@@ -326,6 +339,36 @@ def _bundle(arguments: argparse.Namespace) -> DocumentBundle:
     )
 
 
+def _receipt_source(arguments: argparse.Namespace) -> ReceiptSource:
+    if arguments.receipt_inventory is None:
+        return cast(Sequence[str], arguments.artifact_receipt)
+    if (
+        arguments.artifact_receipt
+        or arguments.artifact_verification
+        or arguments.receipt_dependency
+    ):
+        raise ValueError("--receipt-inventory cannot be combined with explicit receipt inputs")
+    return ReceiptInventory(arguments.receipt_inventory)
+
+
+def _domain_receipt_sources(arguments: argparse.Namespace) -> Mapping[str, ReceiptSource]:
+    receipts: dict[str, ReceiptSource] = dict(
+        _grouped_values(arguments.artifact_receipt, "--artifact-receipt")
+    )
+    verifications = _grouped_values(arguments.artifact_verification, "--artifact-verification")
+    dependencies = _grouped_values(arguments.receipt_dependency, "--receipt-dependency")
+    domains = _keyed_values(arguments.evidence_index, "--evidence-index")
+    for domain, path in _keyed_values(arguments.receipt_inventory, "--receipt-inventory").items():
+        if domain not in domains:
+            raise ValueError(f"--receipt-inventory references an unknown evidence domain: {domain}")
+        if domain in receipts or domain in verifications or domain in dependencies:
+            raise ValueError(
+                f"--receipt-inventory cannot be combined with explicit receipt inputs: {domain}"
+            )
+        receipts[domain] = ReceiptInventory(path)
+    return receipts
+
+
 def _evaluator_receipts(arguments: argparse.Namespace) -> VerifiedReceiptSet:
     return load_verified_receipts(
         receipt_paths=arguments.evaluator_receipt,
@@ -413,7 +456,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             evidence = load_evidence_index(
                 arguments.evidence_index,
                 expected_run_id=arguments.run_id,
-                receipt_paths=arguments.artifact_receipt,
+                receipt_paths=_receipt_source(arguments),
                 verification_paths=arguments.artifact_verification,
                 receipt_dependency_paths=arguments.receipt_dependency,
             )
@@ -427,6 +470,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 load_otlp_json_metrics(
                     metrics_path,
                     expected_sha256=str(metric_link["sha256"]),
+                    evidence_root=evidence.index.path.parent,
                 ),
                 run_id=arguments.run_id,
                 domain_id=arguments.domain_id,
@@ -483,10 +527,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     arguments.evidence_index,
                     "--evidence-index",
                 ),
-                artifact_receipt_paths=_grouped_values(
-                    arguments.artifact_receipt,
-                    "--artifact-receipt",
-                ),
+                artifact_receipt_paths=_domain_receipt_sources(arguments),
                 artifact_verification_paths=_grouped_values(
                     arguments.artifact_verification,
                     "--artifact-verification",
@@ -517,7 +558,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 run_context_path=arguments.run_context,
                 bundle=bundle,
                 evidence_index_path=arguments.evidence_index,
-                artifact_receipt_paths=arguments.artifact_receipt,
+                artifact_receipt_paths=_receipt_source(arguments),
                 artifact_verification_paths=arguments.artifact_verification,
                 receipt_dependency_paths=arguments.receipt_dependency,
                 evaluator_receipts=evaluator_receipts,
@@ -533,7 +574,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 run_context_path=arguments.run_context,
                 bundle=bundle,
                 evidence_index_path=arguments.evidence_index,
-                artifact_receipt_paths=arguments.artifact_receipt,
+                artifact_receipt_paths=_receipt_source(arguments),
                 artifact_verification_paths=arguments.artifact_verification,
                 receipt_dependency_paths=arguments.receipt_dependency,
                 evaluator_receipts=evaluator_receipts,

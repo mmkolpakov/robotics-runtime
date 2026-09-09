@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from itertools import pairwise
+from math import isfinite
 from pathlib import Path
 from time import monotonic_ns, sleep, time_ns
 from typing import Any, Protocol, cast
@@ -10,11 +12,16 @@ from uuid import uuid4
 
 from robotics_acceptance_harness.documents import DocumentBundle
 from robotics_acceptance_harness.evaluation import EvaluationContext, evaluate_acceptance
-from robotics_acceptance_harness.evidence import VerifiedEvidence, load_evidence_index
+from robotics_acceptance_harness.evidence import (
+    EvidenceValidationError,
+    VerifiedEvidence,
+    load_evidence_index,
+)
 from robotics_acceptance_harness.forbidden_graph import (
     ForbiddenGraphMonitor,
     ForbiddenGraphObservation,
 )
+from robotics_acceptance_harness.graph_window import ExpectedGraphMonitor
 from robotics_acceptance_harness.hardware_timing import (
     HardwareTimingObservation,
     evaluate_hardware_timing,
@@ -36,7 +43,7 @@ from robotics_acceptance_harness.readiness import (
     ReadinessResult,
     wait_for_readiness,
 )
-from robotics_acceptance_harness.receipts import VerifiedReceiptSet
+from robotics_acceptance_harness.receipts import ReceiptSource, VerifiedReceiptSet
 from robotics_acceptance_harness.result import (
     build_acceptance_result,
     write_contract_json,
@@ -46,6 +53,7 @@ from robotics_acceptance_harness.ros import RosGraphObserver
 from robotics_acceptance_harness.run_context import load_run_context
 from robotics_acceptance_harness.time_authority import evaluate_time_authority
 from robotics_acceptance_harness.timing import (
+    ClockMeasurementWindow,
     ClockSample,
     TimingObservation,
     TimingValidationError,
@@ -116,13 +124,17 @@ def explain_bundle(bundle: DocumentBundle) -> dict[str, Any]:
     }
 
 
-def _latest_metric(samples: Sequence[MetricPoint], name: str) -> float | None:
+def _maximum_deadline_ratio(samples: Sequence[MetricPoint]) -> float | None:
     matches = [
-        sample for sample in samples if isinstance(sample, MetricSample) and sample.name == name
+        sample.value
+        for sample in samples
+        if isinstance(sample, MetricSample)
+        and sample.instrument_kind == "gauge"
+        and sample.name == "robotics.simulation.deadline_miss_ratio"
     ]
-    if not matches:
-        return None
-    return max(matches, key=lambda sample: sample.observed_at_ns).value
+    if any(not isfinite(value) or not 0 <= value <= 1 for value in matches):
+        raise VerificationError("all deadline gauges must be finite ratios in [0, 1]")
+    return max(matches, default=None)
 
 
 def _measurement_metrics(
@@ -152,20 +164,20 @@ def _enrich_clock_samples(
     samples: Sequence[ClockSample],
     metrics: Sequence[MetricPoint],
 ) -> tuple[ClockSample, ...]:
-    if mode != "simulation_realtime" or len(samples) < 2:
+    if mode != "simulation_realtime":
         return tuple(samples)
 
+    deadline_ratio = _maximum_deadline_ratio(metrics)
     ratios: list[float] = []
-    for previous, current in zip(samples, samples[1:], strict=False):
+    for previous, current in pairwise(samples):
         wall_delta = current.observed_at_ns - previous.observed_at_ns
         source_delta = current.source_time_ns - previous.source_time_ns
         ratios.append(source_delta / wall_delta if wall_delta > 0 else 0.0)
-    deadline_ratio = _latest_metric(metrics, "robotics.simulation.deadline_miss_ratio")
     return tuple(
         ClockSample(
             observed_at_ns=sample.observed_at_ns,
             source_time_ns=sample.source_time_ns,
-            real_time_factor=ratios[min(index, len(ratios) - 1)],
+            real_time_factor=ratios[min(index, len(ratios) - 1)] if ratios else None,
             deadline_miss_ratio=deadline_ratio,
         )
         for index, sample in enumerate(samples)
@@ -176,7 +188,7 @@ def _wait_for_evidence(
     path: str | Path,
     *,
     run_id: str,
-    receipt_paths: Sequence[str | Path],
+    receipt_paths: ReceiptSource,
     verification_paths: Sequence[str | Path],
     receipt_dependency_paths: Sequence[str | Path],
     timeout_sec: float,
@@ -184,20 +196,28 @@ def _wait_for_evidence(
     now_ns: Callable[[], int],
     sleep_fn: Callable[[float], None],
 ) -> VerifiedEvidence:
+    if not isfinite(timeout_sec) or timeout_sec < 0:
+        raise ValueError("evidence timeout must be finite and nonnegative")
+    if not isfinite(poll_interval_sec) or poll_interval_sec <= 0:
+        raise ValueError("evidence poll interval must be finite and positive")
     source = Path(path).expanduser().resolve()
     deadline_ns = now_ns() + int(timeout_sec * 1_000_000_000)
-    while not source.is_file():
-        if now_ns() >= deadline_ns:
-            raise VerificationError(f"finalized evidence index did not appear: {source}")
-        remaining_sec = max(0.0, (deadline_ns - now_ns()) / 1_000_000_000)
-        sleep_fn(min(poll_interval_sec, remaining_sec))
-    return load_evidence_index(
-        source,
-        expected_run_id=run_id,
-        receipt_paths=receipt_paths,
-        verification_paths=verification_paths,
-        receipt_dependency_paths=receipt_dependency_paths,
-    )
+    while True:
+        try:
+            return load_evidence_index(
+                source,
+                expected_run_id=run_id,
+                receipt_paths=receipt_paths,
+                verification_paths=verification_paths,
+                receipt_dependency_paths=receipt_dependency_paths,
+            )
+        except (EvidenceValidationError, OSError) as error:
+            remaining_sec = (deadline_ns - now_ns()) / 1_000_000_000
+            if remaining_sec <= 0:
+                raise VerificationError(
+                    f"finalized evidence index not ready before deadline: {source}: {error}"
+                ) from error
+            sleep_fn(min(poll_interval_sec, remaining_sec))
 
 
 def run_verification(
@@ -207,7 +227,7 @@ def run_verification(
     domain_id: str,
     run_context_path: str | Path,
     evidence_index_path: str | Path,
-    artifact_receipt_paths: Sequence[str | Path] = (),
+    artifact_receipt_paths: ReceiptSource = (),
     artifact_verification_paths: Sequence[str | Path] = (),
     receipt_dependency_paths: Sequence[str | Path] = (),
     evaluator_receipts: VerifiedReceiptSet | None = None,
@@ -281,9 +301,13 @@ def run_verification(
         deadline_ns = measurement_started_monotonic_ns + int(
             float(scenario["timeouts"]["execution_sec"]) * 1_000_000_000
         )
+        graph_monitor = ExpectedGraphMonitor(
+            scenario["expected_ros_graph"], measurement_started_monotonic_ns, deadline_ns
+        )
         last_snapshot = readiness.snapshot
         while now_ns() < deadline_ns:
             last_snapshot = observer.snapshot()
+            graph_monitor.observe(last_snapshot)
             forbidden_monitor.observe(last_snapshot)
             remaining_sec = max(0.0, (deadline_ns - now_ns()) / 1_000_000_000)
             sleep_fn(min(poll_interval_sec, remaining_sec))
@@ -336,6 +360,7 @@ def run_verification(
         load_otlp_json_metrics(
             metrics_path,
             expected_sha256=metrics_evidence_sha256,
+            evidence_root=evidence.index.path.parent,
         ),
         run_id=run_id,
         domain_id=domain_id,
@@ -352,6 +377,7 @@ def run_verification(
     )
     hardware_timing: HardwareTimingObservation | None = None
     timing_failure: AssertionEvaluation | None = None
+    timing_unevaluated: tuple[str, ...] = ()
     if physical:
         hardware_timing = evaluate_hardware_timing(
             scenario["time_policy"],
@@ -373,12 +399,26 @@ def run_verification(
             metric_samples,
         )
         try:
-            timing = evaluate_timing(execution, scenario["time_policy"], clock_samples)
+            timing = evaluate_timing(
+                execution,
+                scenario["time_policy"],
+                clock_samples,
+                measurement_window=ClockMeasurementWindow(
+                    measurement_started_monotonic_ns,
+                    measurement_finished_monotonic_ns,
+                    deadline_miss_ratio=(
+                        _maximum_deadline_ratio(metric_samples)
+                        if execution["time_mode"] == "simulation_realtime"
+                        else None
+                    ),
+                ),
+            )
         except TimingValidationError as error:
             timing = error.observation
+            timing_unevaluated = error.unevaluated
             timing_failure = AssertionEvaluation(
                 assertion_id="time-policy",
-                status="failed",
+                status="failed" if error.failed else "skipped",
                 observed_value=None,
                 unit="1",
                 message=str(error),
@@ -399,6 +439,7 @@ def run_verification(
     )
     if timing_failure is not None:
         assertions.append(timing_failure)
+    assertions.extend(graph_monitor.assertions(assertions))
     forbidden_observation: ForbiddenGraphObservation = forbidden_monitor.result()
     finished_at = utc_now()
     evidence_finalized = evidence.index.data.get("finalized") is True
@@ -429,7 +470,7 @@ def run_verification(
         time_authority=time_authority,
         time_authority_evidence_sha256=metrics_evidence_sha256,
         assertions=assertions,
-        unevaluated=[],
+        unevaluated=timing_unevaluated,
         started_at=started_at,
         finished_at=finished_at,
         monotonic_duration_sec=monotonic_duration_sec,
@@ -454,7 +495,7 @@ def evaluate_from_evidence(
     domain_id: str,
     run_context_path: str | Path,
     evidence_index_path: str | Path,
-    artifact_receipt_paths: Sequence[str | Path] = (),
+    artifact_receipt_paths: ReceiptSource = (),
     artifact_verification_paths: Sequence[str | Path] = (),
     receipt_dependency_paths: Sequence[str | Path] = (),
     evaluator_receipts: VerifiedReceiptSet | None = None,
@@ -492,6 +533,7 @@ def evaluate_from_evidence(
             load_otlp_json_metrics(
                 metrics_path,
                 expected_sha256=str(metric_link["sha256"]),
+                evidence_root=evidence.index.path.parent,
             ),
             run_id=run_id,
             domain_id=domain_id,

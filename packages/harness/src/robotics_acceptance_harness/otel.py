@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from hashlib import sha256
+from os import fstat
 from pathlib import Path
 from typing import Any, cast
 
@@ -12,7 +13,9 @@ from google.protobuf.message import Message
 from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import (
     ExportMetricsServiceRequest,
 )
+from opentelemetry.proto.metrics.v1.metrics_pb2 import AggregationTemporality, DataPointFlags
 
+from robotics_acceptance_harness._evidence_files import EvidenceReadError, open_evidence
 from robotics_acceptance_harness.metrics import (
     HistogramSample,
     MetricAttribute,
@@ -64,13 +67,23 @@ def read_otlp_json_lines(
     path: str | Path,
     expected_sha256: str | None,
     error_type: type[ValueError],
+    evidence_root: Path | None = None,
 ) -> tuple[Path, list[str]]:
     """Read and integrity-check newline-delimited OTLP JSON."""
 
     source = Path(path).expanduser().resolve()
     try:
-        payload_bytes = source.read_bytes()
-    except OSError as error:
+        with open_evidence(source, evidence_root or source.parent) as stream:
+            before = fstat(stream.fileno())
+            payload_bytes = stream.read(before.st_size + 1)
+            after = fstat(stream.fileno())
+        if len(payload_bytes) != before.st_size or (
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        ) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+            raise EvidenceReadError("OTLP evidence changed while being read")
+    except (OSError, EvidenceReadError) as error:
         raise error_type(f"cannot read {source}: {error}") from error
     observed_sha256 = sha256(payload_bytes).hexdigest()
     if expected_sha256 is not None and observed_sha256 != expected_sha256:
@@ -93,9 +106,9 @@ def _number_value(point: Any) -> float | None:
 
 
 def _temporality(value: int) -> MetricTemporality:
-    if value == 1:
+    if value == AggregationTemporality.AGGREGATION_TEMPORALITY_DELTA:
         return "delta"
-    if value == 2:
+    if value == AggregationTemporality.AGGREGATION_TEMPORALITY_CUMULATIVE:
         return "cumulative"
     return "unspecified"
 
@@ -109,7 +122,7 @@ def _optional_number(point: Any, field_name: str) -> float | None:
 
 
 def _has_recorded_value(point: Any) -> bool:
-    return int(point.flags) & 1 == 0
+    return int(point.flags) & DataPointFlags.DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK == 0
 
 
 def otlp_attribute_value(value: Any) -> MetricAttribute | None:
@@ -138,10 +151,11 @@ def load_otlp_json_metrics(
     path: str | Path,
     *,
     expected_sha256: str | None = None,
+    evidence_root: Path | None = None,
 ) -> tuple[MetricPoint, ...]:
     """Read newline-delimited OTLP JSON emitted by the Collector file exporter."""
 
-    source, lines = read_otlp_json_lines(path, expected_sha256, MetricInputError)
+    source, lines = read_otlp_json_lines(path, expected_sha256, MetricInputError, evidence_root)
     samples: list[MetricPoint] = []
 
     for line_number, line in enumerate(lines, start=1):

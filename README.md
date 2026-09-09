@@ -44,3 +44,10 @@ The shared CI checks both packages on Python 3.12, 3.13 and 3.14, and runs the
 [live ROS observer tests](packages/harness/docs/live-tests.md) on ROS 2 Jazzy.
 [Function complexity budgets](quality/README.md) keep existing debt visible
 and reject new violations or increases until the affected modules are refactored.
+
+The consumers job also checks complete infra qualification bundles and producer
+inputs at the immutable revision recorded in `.github/workflows/ci.yml`. To run
+that gate locally, set `INFRA_CONSUMER_ROOT` to the infra checkout and
+`INFRA_CONSUMER_REVISION` to its full commit SHA, then run
+`uv run pytest tests/infra`. The gate requires the checkout to match that revision
+and rejects documents supplied under the wrong contract role.

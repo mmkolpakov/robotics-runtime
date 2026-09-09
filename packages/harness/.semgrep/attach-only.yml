@@ -31,17 +31,24 @@ rules:
     message: The acceptance harness validates local inputs and must not fetch them over the network.
     severity: ERROR
     languages: [python]
-    pattern-either:
-      - pattern: import requests
-      - pattern: from requests import $X
-      - pattern: import httpx
-      - pattern: from httpx import $X
-      - pattern: import aiohttp
-      - pattern: from aiohttp import $X
-      - pattern: import urllib.request
-      - pattern: from urllib.request import $X
-      - pattern: import socket
-      - pattern: from socket import $X
+    patterns:
+      - pattern-either:
+          - pattern: import requests
+          - pattern: from requests import $X
+          - pattern: import httpx
+          - pattern: from httpx import $X
+          - pattern: import aiohttp
+          - pattern: from aiohttp import $X
+          - pattern: import urllib.request
+          - pattern: from urllib.request import $X
+          - pattern: urllib.request.urlopen(...)
+          - pattern: urllib.request.urlretrieve(...)
+          - pattern: import socket
+          - pattern: from socket import $X
+      # Import equivalence can also match the module-import pattern above.
+      # Exclude only a complete single-helper import, never a mixed import.
+      - pattern-not-regex: >-
+          (?m)^[ \t]*from urllib\.request import url2pathname(?: as [A-Za-z_]\w*)?[ \t]*$
 
   - id: attach-only-no-ros-publisher
     message: The acceptance harness may subscribe and query but must not publish ROS commands.

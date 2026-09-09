@@ -2,19 +2,25 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from hashlib import file_digest
-from os import name as os_name
+from hashlib import sha256
+from os import fstat
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
-from urllib.parse import unquote, urlsplit
+from urllib.parse import quote, urlsplit
+from urllib.request import url2pathname
 
+from robotics_runtime_contracts.serialization import MAX_DOCUMENT_BYTES
+
+from robotics_acceptance_harness._evidence_files import EvidenceReadError, open_evidence
 from robotics_acceptance_harness.documents import (
     BundleValidationError,
     LoadedDocument,
     load_document,
+    load_document_bytes,
 )
 from robotics_acceptance_harness.receipts import (
+    ReceiptSource,
     ReceiptValidationError,
     VerifiedReceiptSet,
     load_verified_receipts,
@@ -39,15 +45,76 @@ class VerifiedEvidence:
     receipts: tuple[LoadedDocument, ...] = ()
 
 
-def _local_path(value: str) -> Path:
-    decoded = unquote(value)
-    if os_name == "nt" and decoded.startswith("/") and decoded[2:3] == ":":
-        decoded = decoded[1:]
-    return Path(decoded)
+def _verified_payload(
+    path: Path,
+    reference: Mapping[str, Any],
+    root: Path,
+    *,
+    capture: bool = False,
+) -> bytes:
+    expected_size = int(reference["size_bytes"])
+    if capture and expected_size > MAX_DOCUMENT_BYTES:
+        raise EvidenceReadError(
+            "summary exceeds the contract document byte limit", field="size_bytes"
+        )
+    payload = bytearray()
+    digest, size = sha256(), 0
+    with open_evidence(path, root) as stream:
+        before = fstat(stream.fileno())
+        if before.st_size != expected_size:
+            raise EvidenceReadError(
+                f"expected {expected_size}; observed {before.st_size}",
+                field="size_bytes",
+            )
+        while chunk := stream.read(min(1024 * 1024, expected_size - size + 1)):
+            size += len(chunk)
+            if size > expected_size:
+                raise EvidenceReadError("evidence grew while being read", field="size_bytes")
+            digest.update(chunk)
+            if capture:
+                payload.extend(chunk)
+        after = fstat(stream.fileno())
+    if size != expected_size or (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    ):
+        raise EvidenceReadError("evidence changed while being read")
+    if digest.hexdigest() != reference["sha256"]:
+        raise EvidenceReadError(
+            f"expected {reference['sha256']}; observed {digest.hexdigest()}",
+            field="sha256",
+        )
+    return bytes(payload)
 
 
-def _local_link(artifact: Mapping[str, Any], index: int) -> tuple[Path, Mapping[str, Any]]:
-    path = _local_path(str(artifact["local_path"]))
+def _read_local(
+    path: Path,
+    reference: Mapping[str, Any],
+    root: Path,
+    json_path: str,
+    *,
+    capture: bool = False,
+) -> bytes:
+    try:
+        return _verified_payload(path, reference, root, capture=capture)
+    except FileNotFoundError as error:
+        raise EvidenceValidationError(json_path, f"file does not exist: {path}") from error
+    except EvidenceReadError as error:
+        location = f"{json_path}.{error.field}" if error.field else json_path
+        raise EvidenceValidationError(location, str(error)) from error
+    except OSError as error:
+        raise EvidenceValidationError(json_path, str(error)) from error
+
+
+def _local_link(
+    artifact: Mapping[str, Any],
+    index: int,
+    root: Path,
+) -> tuple[Path, Mapping[str, Any]]:
+    # Preserve the legacy /C:/ spelling used by Windows fixtures. Quote
+    # literal percent signs before conversion so filenames are not URI-decoded.
+    path = Path(url2pathname(quote(str(artifact["local_path"]), safe="/:")))
     json_path = f"$.artifacts[{index}]"
     uri = urlsplit(str(artifact["uri"]))
     if uri.scheme != "file" or uri.netloc not in {"", "localhost"}:
@@ -55,27 +122,13 @@ def _local_link(artifact: Mapping[str, Any], index: int) -> tuple[Path, Mapping[
             f"{json_path}.uri",
             "local evidence requires a local file URI",
         )
-    uri_path = _local_path(uri.path)
+    uri_path = Path(url2pathname(uri.path))
     if uri_path.resolve() != path.resolve():
         raise EvidenceValidationError(
             f"{json_path}.local_path",
             f"does not identify file URI {artifact['uri']}",
         )
-    if not path.is_file():
-        raise EvidenceValidationError(f"{json_path}.local_path", f"file does not exist: {path}")
-    observed_size = path.stat().st_size
-    if observed_size != artifact["size_bytes"]:
-        raise EvidenceValidationError(
-            f"{json_path}.size_bytes",
-            f"expected {artifact['size_bytes']}; observed {observed_size}",
-        )
-    with path.open("rb") as stream:
-        observed_digest = file_digest(stream, "sha256").hexdigest()
-    if observed_digest != artifact["sha256"]:
-        raise EvidenceValidationError(
-            f"{json_path}.sha256",
-            f"expected {artifact['sha256']}; observed {observed_digest}",
-        )
+    _read_local(path, artifact, root, json_path)
     return path.resolve(), _result_link(artifact)
 
 
@@ -120,6 +173,7 @@ def _result_link(artifact: Mapping[str, Any]) -> Mapping[str, Any]:
 def _local_summary(
     artifact: Mapping[str, Any],
     index: int,
+    root: Path,
 ) -> LoadedDocument:
     reference = artifact["recording_summary"]
     json_path = f"$.artifacts[{index}].recording_summary"
@@ -129,17 +183,12 @@ def _local_summary(
             f"{json_path}.uri",
             "acceptance verification requires a local recording summary",
         )
-    path = _local_path(uri.path).resolve()
-    if not path.is_file():
-        raise EvidenceValidationError(f"{json_path}.uri", f"file does not exist: {path}")
-    if path.stat().st_size != reference["size_bytes"]:
-        raise EvidenceValidationError(f"{json_path}.size_bytes", "summary size differs")
+    path = Path(url2pathname(uri.path)).absolute()
+    raw = _read_local(path, reference, root, json_path, capture=True)
     try:
-        summary = load_document(path, expected_role="recording_summary")
+        summary = load_document_bytes(raw, source=path, expected_role="recording_summary")
     except BundleValidationError as error:
         raise EvidenceValidationError(error.json_path, error.validation_message) from error
-    if summary.sha256 != reference["sha256"]:
-        raise EvidenceValidationError(f"{json_path}.sha256", "summary digest differs")
     if summary.data["source_sha256"] != artifact["sha256"]:
         raise EvidenceValidationError(
             f"{json_path}.source_sha256",
@@ -152,7 +201,7 @@ def load_evidence_index(
     path: str | Path,
     *,
     expected_run_id: str | None = None,
-    receipt_paths: Sequence[str | Path] = (),
+    receipt_paths: ReceiptSource = (),
     verification_paths: Sequence[str | Path] = (),
     receipt_dependency_paths: Sequence[str | Path] = (),
 ) -> VerifiedEvidence:
@@ -186,14 +235,14 @@ def load_evidence_index(
     run_id = str(document.data["run_id"])
     for index, artifact in enumerate(document.data["artifacts"]):
         if artifact["storage_state"] == "local":
-            local_path, link = _local_link(artifact, index)
+            local_path, link = _local_link(artifact, index, document.path.parent)
             local_files[local_path] = link
             links.append(link)
         else:
             links.append(_remote_link(artifact, index, receipts, run_id))
             used_receipts.add(str(artifact["receipt_sha256"]))
         if artifact["kind"] == "recording":
-            summaries.append(_local_summary(artifact, index))
+            summaries.append(_local_summary(artifact, index, document.path.parent))
     if used_receipts != set(receipts.by_digest):
         raise EvidenceValidationError("$.receipts", "unreferenced artifact receipt")
     return VerifiedEvidence(

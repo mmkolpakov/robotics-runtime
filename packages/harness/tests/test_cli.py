@@ -9,6 +9,7 @@ import pytest
 
 from robotics_acceptance_harness.cli import main
 from robotics_acceptance_harness.hardware_timing import HardwareTimingObservation
+from robotics_acceptance_harness.receipts import ReceiptInventory
 from tests.support import write_extended_scenario
 
 FIXTURES = Path(__file__).parent / "fixtures" / "simulation"
@@ -154,10 +155,12 @@ def test_verify_requires_run_id(capsys: pytest.CaptureFixture[str]) -> None:
     assert "--run-id" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("inventory", [False, True])
 def test_verify_forwards_canonical_run_inputs(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    inventory: bool,
 ) -> None:
     captured: dict[str, object] = {}
 
@@ -189,6 +192,7 @@ def test_verify_forwards_canonical_run_inputs(
             "acceptance-run.yaml",
             "--evidence-index",
             "evidence-index.yaml",
+            *(["--receipt-inventory", "future-receipts.json"] if inventory else []),
             "--otel-metrics",
             "metrics.otlp.json",
             "--measurement-complete",
@@ -203,6 +207,9 @@ def test_verify_forwards_canonical_run_inputs(
     assert captured["run_context_path"] == "acceptance-run.yaml"
     assert captured["otel_metrics_path"] == "metrics.otlp.json"
     assert captured["measurement_complete_path"] == str(tmp_path / "measurement-complete")
+    assert captured["artifact_receipt_paths"] == (
+        ReceiptInventory("future-receipts.json") if inventory else []
+    )
     assert json.loads(capsys.readouterr().out)["status"] == "passed"
 
 
@@ -254,10 +261,12 @@ def test_aggregate_forwards_transport_qualification(
     assert json.loads(capsys.readouterr().out)["status"] == "failed"
 
 
+@pytest.mark.parametrize("inventory", [False, True])
 def test_transport_evaluate_maps_domain_evidence_and_reports_verdict(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    inventory: bool,
 ) -> None:
     captured: dict[str, object] = {}
     output = tmp_path / "transport-qualification.json"
@@ -294,6 +303,7 @@ def test_transport_evaluate_maps_domain_evidence_and_reports_verdict(
             "source=source-evidence.json",
             "--evidence-index",
             "target=target-evidence.json",
+            *(["--receipt-inventory", "source=future-source-receipts.json"] if inventory else []),
             "--clock-relation",
             "clock-relation.json",
             "--observation-output",
@@ -313,6 +323,9 @@ def test_transport_evaluate_maps_domain_evidence_and_reports_verdict(
         "target": "target-evidence.json",
     }
     assert captured["clock_relation_paths"] == ["clock-relation.json"]
+    assert captured["artifact_receipt_paths"] == (
+        {"source": ReceiptInventory("future-source-receipts.json")} if inventory else {}
+    )
     assert captured["scenario_path"] == "scenario.yaml"
     assert json.loads(capsys.readouterr().out) == {
         "qualification": str(output),
@@ -327,6 +340,59 @@ def test_doctor_reports_extension_inventory(capsys: pytest.CaptureFixture[str]) 
     assert exit_code == 0
     assert report["status"] == "passed"
     assert isinstance(report["evaluators"], list)
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        (["--receipt-inventory", "unknown=inventory.json"], "unknown evidence domain"),
+        (
+            ["--receipt-inventory", "source=a.json", "--receipt-inventory", "source=b.json"],
+            "duplicate --receipt-inventory key",
+        ),
+        (
+            ["--receipt-inventory", "source=a.json", "--artifact-receipt", "source=b.json"],
+            "cannot be combined",
+        ),
+        (
+            ["--receipt-inventory", "source=a.json", "--artifact-verification", "source=b.json"],
+            "cannot be combined",
+        ),
+        (
+            ["--receipt-inventory", "source=a.json", "--receipt-dependency", "source=b.json"],
+            "cannot be combined",
+        ),
+    ],
+)
+def test_transport_inventory_rejects_unknown_or_mixed_domains(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], extra: list[str], message: str
+) -> None:
+    result = main(
+        [
+            "transport-evaluate",
+            "--run-id",
+            "run-01234567-89ab-4def-8123-456789abcdef",
+            "--scenario",
+            "scenario.json",
+            "--causal-chain",
+            "chain.json",
+            "--channel-contract",
+            "channel.json",
+            "--trace",
+            "source=trace.jsonl",
+            "--evidence-index",
+            "source=index.json",
+            "--clock-relation",
+            "clock.json",
+            "--observation-output",
+            str(tmp_path / "observations"),
+            "--output",
+            str(tmp_path / "result.json"),
+            *extra,
+        ]
+    )
+    assert result == 2
+    assert message in capsys.readouterr().err
 
 
 def test_doctor_fails_for_a_stale_measurement_marker(
@@ -414,12 +480,13 @@ def test_timing_check_exposes_policy_result(
     monkeypatch.setattr(
         "robotics_acceptance_harness.cli.load_evidence_index",
         lambda *_args, **_kwargs: SimpleNamespace(
+            index=SimpleNamespace(path=tmp_path / "evidence-index.json"),
             local_files={
                 metrics_path.resolve(): {
                     "media_type": "application/x-ndjson",
                     "sha256": "a" * 64,
                 }
-            }
+            },
         ),
     )
     monkeypatch.setattr(

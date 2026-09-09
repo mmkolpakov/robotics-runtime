@@ -3,10 +3,13 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from itertools import pairwise
 from statistics import fmean
 from types import MappingProxyType
 from typing import Any, Literal
+
+from robotics_acceptance_harness._histogram_estimates import Estimate, estimate_statistic
 
 MetricAttribute = str | bool | int | float
 MetricTemporality = Literal["delta", "cumulative", "unspecified"]
@@ -77,14 +80,7 @@ class HistogramSample:
             raise ValueError("histogram bucket counts must add up to count")
         if any(not math.isfinite(bound) for bound in self.explicit_bounds):
             raise ValueError("histogram explicit bounds must be finite")
-        if any(
-            current >= following
-            for current, following in zip(
-                self.explicit_bounds,
-                self.explicit_bounds[1:],
-                strict=False,
-            )
-        ):
+        if any(current >= following for current, following in pairwise(self.explicit_bounds)):
             raise ValueError("histogram explicit bounds must be strictly increasing")
         if any(
             value is not None and not math.isfinite(value)
@@ -100,6 +96,10 @@ type MetricPoint = MetricSample | HistogramSample
 
 class MetricAggregationError(ValueError):
     """Raised when metric points cannot form an unambiguous window aggregate."""
+
+
+class MetricInsufficientData(MetricAggregationError):
+    """Valid observations do not determine the requested window statistic."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,6 +210,37 @@ def _interval_coverage(samples: Sequence[MetricPoint]) -> MetricIntervalCoverage
     )
 
 
+def _interior_coverage_gap_ns(
+    intervals: Sequence[tuple[int, int]],
+    *,
+    metric_name: str,
+    temporality: MetricTemporality | None,
+    window_start_ns: int,
+    window_end_ns: int,
+) -> int:
+    """Validate ordered intervals and total their gaps inside the evaluation window."""
+
+    uncovered_ns = 0
+    previous_end_ns: int | None = None
+    for start_ns, end_ns in intervals:
+        if start_ns >= end_ns:
+            raise MetricAggregationError(
+                f"{metric_name} contains empty or reversed coverage intervals"
+            )
+        if previous_end_ns is not None:
+            if start_ns < previous_end_ns:
+                raise MetricAggregationError(
+                    f"{metric_name} contains overlapping coverage intervals"
+                )
+            if start_ns > previous_end_ns and temporality != "delta":
+                raise MetricAggregationError(f"{metric_name} contains gapped coverage intervals")
+            uncovered_ns += max(
+                0, min(start_ns, window_end_ns) - max(previous_end_ns, window_start_ns)
+            )
+        previous_end_ns = end_ns
+    return uncovered_ns
+
+
 def require_window_coverage(
     coverage: MetricIntervalCoverage,
     *,
@@ -219,7 +250,7 @@ def require_window_coverage(
     window_end_ns: int,
     tolerance_ns: int = METRIC_WINDOW_COVERAGE_TOLERANCE_NS,
 ) -> None:
-    """Require valid intervals that reach both boundaries of the declared window."""
+    """Require each series' total uncovered window time to stay within tolerance."""
 
     if tolerance_ns < 0:
         raise ValueError("metric coverage tolerance cannot be negative")
@@ -237,17 +268,13 @@ def require_window_coverage(
         by_series[series_key].append((start_ns, end_ns))
     for intervals in by_series.values():
         ordered = sorted(intervals)
-        for (_, previous_end_ns), (start_ns, _) in zip(
+        interior_gap_ns = _interior_coverage_gap_ns(
             ordered,
-            ordered[1:],
-            strict=False,
-        ):
-            if start_ns < previous_end_ns:
-                raise MetricAggregationError(
-                    f"{metric_name} contains overlapping coverage intervals"
-                )
-            if start_ns > previous_end_ns and temporality != "delta":
-                raise MetricAggregationError(f"{metric_name} contains gapped coverage intervals")
+            metric_name=metric_name,
+            temporality=temporality,
+            window_start_ns=window_start_ns,
+            window_end_ns=window_end_ns,
+        )
         first_start_ns = ordered[0][0]
         last_end_ns = ordered[-1][1]
         if abs(first_start_ns - window_start_ns) > effective_tolerance_ns:
@@ -258,8 +285,10 @@ def require_window_coverage(
             raise MetricAggregationError(
                 f"{metric_name} ends outside the evaluation-window coverage tolerance"
             )
-        uncovered_ns = max(0, first_start_ns - window_start_ns) + max(
-            0, window_end_ns - last_end_ns
+        uncovered_ns = (
+            max(0, first_start_ns - window_start_ns)
+            + interior_gap_ns
+            + max(0, window_end_ns - last_end_ns)
         )
         if uncovered_ns > effective_tolerance_ns:
             raise MetricAggregationError(
@@ -331,10 +360,11 @@ def _subtract_histograms(
     count = latest.count - baseline.count
     if count < 0 or any(value < 0 for value in bucket_counts):
         raise MetricAggregationError("cumulative histogram counters moved backwards")
-    if (latest.sum is None) != (baseline.sum is None):
+    if baseline.count and (latest.sum is None) != (baseline.sum is None):
         raise MetricAggregationError("cumulative histogram sum availability changed")
+    baseline_sum = 0.0 if baseline.count == 0 else baseline.sum
     sum_value = (
-        latest.sum - baseline.sum if latest.sum is not None and baseline.sum is not None else None
+        latest.sum - baseline_sum if latest.sum is not None and baseline_sum is not None else None
     )
     return HistogramSample(
         name=latest.name,
@@ -347,7 +377,56 @@ def _subtract_histograms(
         temporality="delta",
         start_time_ns=baseline.observed_at_ns,
         sum=sum_value,
+        min=latest.min if baseline.count == 0 else None,
+        max=latest.max if baseline.count == 0 else None,
     )
+
+
+def _checked_cumulative_series(samples: Sequence[HistogramSample]) -> list[HistogramSample]:
+    ordered = sorted(samples, key=lambda sample: sample.observed_at_ns)
+    for previous, current in pairwise(ordered):
+        if (current.name, current.unit) != (previous.name, previous.unit):
+            raise MetricAggregationError("cumulative histogram identity changed")
+        if current.observed_at_ns == previous.observed_at_ns:
+            raise MetricAggregationError("duplicate cumulative histogram observations")
+        if current.explicit_bounds != previous.explicit_bounds:
+            raise MetricAggregationError("cumulative histogram bucket boundaries changed")
+        if any(
+            right < left
+            for left, right in zip(previous.bucket_counts, current.bucket_counts, strict=True)
+        ):
+            raise MetricInsufficientData("cumulative histogram reset has no new start timestamp")
+    return ordered
+
+
+def _cumulative_window_sample(
+    samples: Sequence[HistogramSample], window_start_ns: int
+) -> HistogramSample | None:
+    ordered = _checked_cumulative_series(samples)
+    latest = ordered[-1]
+    if latest.observed_at_ns <= window_start_ns:
+        return None
+    if latest.start_time_ns >= window_start_ns:
+        if ordered[0].start_time_ns == ordered[0].observed_at_ns:
+            # OTLP's unknown-start marker carries historical population, not
+            # events observed since this start timestamp.
+            return _subtract_histograms(latest, ordered[0])
+        return latest
+    baselines = [sample for sample in ordered if sample.observed_at_ns <= window_start_ns]
+    if not baselines:
+        raise MetricInsufficientData(
+            "cumulative histogram has no baseline at the evaluation-window start"
+        )
+    baseline = baselines[-1]
+    if baseline.observed_at_ns < window_start_ns:
+        following = next(sample for sample in ordered if sample.observed_at_ns > window_start_ns)
+        if baseline.bucket_counts != following.bucket_counts:
+            raise MetricInsufficientData(
+                "cumulative histogram baseline precedes the window; event times are unknown"
+            )
+        # Equal monotonic bucket counts prove that no event straddled this boundary.
+        baseline = replace(baseline, observed_at_ns=window_start_ns)
+    return _subtract_histograms(latest, baseline)
 
 
 def _histogram_contributions(
@@ -356,6 +435,8 @@ def _histogram_contributions(
     window_start_ns: int,
     window_end_ns: int,
 ) -> list[HistogramSample]:
+    if not samples:
+        raise MetricInsufficientData("no histogram samples")
     temporalities = {sample.temporality for sample in samples}
     if len(temporalities) != 1:
         raise MetricAggregationError("mixed histogram aggregation temporalities")
@@ -384,31 +465,15 @@ def _histogram_contributions(
 
     contributions: list[HistogramSample] = []
     for series in grouped.values():
-        ordered = sorted(series, key=lambda sample: sample.observed_at_ns)
-        latest = ordered[-1]
-        if latest.observed_at_ns < window_start_ns:
-            continue
-        if latest.start_time_ns >= window_start_ns:
-            contributions.append(latest)
-            continue
-        baselines = [
-            sample
-            for sample in ordered
-            if sample.start_time_ns == latest.start_time_ns
-            and sample.observed_at_ns <= window_start_ns
-            and sample.observed_at_ns < latest.observed_at_ns
-        ]
-        if not baselines:
-            raise MetricAggregationError(
-                "cumulative histogram has no baseline at the evaluation-window start"
-            )
-        contributions.append(_subtract_histograms(latest, baselines[-1]))
+        contribution = _cumulative_window_sample(series, window_start_ns)
+        if contribution is not None:
+            contributions.append(contribution)
     return contributions
 
 
 def _merge_histograms(samples: Sequence[HistogramSample]) -> HistogramSample:
     if not samples:
-        raise MetricAggregationError("no histogram events in evaluation window")
+        raise MetricInsufficientData("no histogram events in evaluation window")
     names = {sample.name for sample in samples}
     units = {sample.unit for sample in samples}
     if len(names) != 1 or len(units) != 1:
@@ -419,9 +484,9 @@ def _merge_histograms(samples: Sequence[HistogramSample]) -> HistogramSample:
     bucket_counts = tuple(
         sum(sample.bucket_counts[index] for sample in samples) for index in range(len(bounds) + 1)
     )
-    sums = [sample.sum for sample in samples]
-    minima = [sample.min for sample in samples]
-    maxima = [sample.max for sample in samples]
+    sums = [sample.sum for sample in samples if sample.count]
+    minima = [sample.min for sample in samples if sample.count]
+    maxima = [sample.max for sample in samples if sample.count]
     return HistogramSample(
         name=samples[0].name,
         unit=samples[0].unit,
@@ -435,63 +500,50 @@ def _merge_histograms(samples: Sequence[HistogramSample]) -> HistogramSample:
         if all(value is not None for value in sums)
         else None,
         min=min(value for value in minima if value is not None)
-        if all(value is not None for value in minima)
+        if minima and all(value is not None for value in minima)
         else None,
         max=max(value for value in maxima if value is not None)
-        if all(value is not None for value in maxima)
+        if maxima and all(value is not None for value in maxima)
         else None,
     )
 
 
-def _histogram_quantile_bounds(
-    histogram: HistogramSample,
-    quantile: float,
-) -> tuple[float, float]:
-    if histogram.count == 0:
-        raise MetricAggregationError("histogram has no recorded events")
-    rank = max(1, math.ceil(histogram.count * quantile))
-    cumulative = 0
-    for index, count in enumerate(histogram.bucket_counts):
-        cumulative += count
-        if cumulative < rank:
-            continue
-        lower = histogram.explicit_bounds[index - 1] if index > 0 else histogram.min
-        upper = (
-            histogram.explicit_bounds[index]
-            if index < len(histogram.explicit_bounds)
-            else histogram.max
-        )
-        if lower is None or upper is None:
-            raise MetricAggregationError(
-                "histogram quantile bounds require recorded min and max values"
-            )
-        if histogram.min is not None:
-            lower = max(lower, histogram.min)
-        if histogram.max is not None:
-            upper = min(upper, histogram.max)
-        if lower > upper:
-            raise MetricAggregationError("histogram quantile bounds are inconsistent")
-        return lower, upper
-    raise MetricAggregationError("histogram bucket counts do not cover count")
-
-
-def _histogram_quantile(histogram: HistogramSample, quantile: float) -> float:
-    return _histogram_quantile_bounds(histogram, quantile)[1]
-
-
-def _merged_histogram(
+def histogram_window_aggregate(
     samples: Sequence[HistogramSample],
     *,
     window_start_ns: int,
     window_end_ns: int,
 ) -> HistogramSample:
-    return _merge_histograms(
-        _histogram_contributions(
-            samples,
+    """Merge each contribution once and verify the intervals actually counted."""
+    contributions = _histogram_contributions(
+        samples, window_start_ns=window_start_ns, window_end_ns=window_end_ns
+    )
+    merged = _merge_histograms(contributions)
+    try:
+        require_window_coverage(
+            _interval_coverage(contributions),
+            metric_name=merged.name,
+            temporality=samples[0].temporality,
             window_start_ns=window_start_ns,
             window_end_ns=window_end_ns,
         )
-    )
+    except MetricAggregationError as error:
+        raise MetricInsufficientData(str(error)) from error
+    return merged
+
+
+def histogram_statistic(
+    histogram: HistogramSample, aggregation: str, *, nonnegative: bool = False
+) -> Estimate:
+    """Return a bound; absence of events or a recorded sum is insufficient data."""
+    if aggregation != "count" and histogram.count == 0:
+        raise MetricInsufficientData("histogram has no recorded events")
+    if aggregation == "mean" and histogram.sum is None:
+        raise MetricInsufficientData("histogram mean requires a recorded sum")
+    try:
+        return estimate_statistic(histogram, aggregation, nonnegative=nonnegative)
+    except ValueError as error:
+        raise MetricAggregationError(str(error)) from error
 
 
 def aggregate_metric_points(
@@ -533,34 +585,15 @@ def aggregate_metric_points(
         raise MetricAggregationError("mixed scalar and histogram points")
 
     histograms = [sample for sample in samples if isinstance(sample, HistogramSample)]
-    merged = _merged_histogram(
+    merged = histogram_window_aggregate(
         histograms,
         window_start_ns=window_start_ns,
         window_end_ns=window_end_ns,
     )
-    if aggregation == "count":
-        return merged.count
-    if aggregation == "mean":
-        if merged.sum is None:
-            raise MetricAggregationError("histogram mean requires a recorded sum")
-        if merged.count == 0:
-            raise MetricAggregationError("histogram has no recorded events")
-        return merged.sum / merged.count
-    if aggregation == "min":
-        if merged.min is None:
-            raise MetricAggregationError("histogram min was not recorded")
-        return merged.min
-    if aggregation == "max":
-        if merged.max is None:
-            raise MetricAggregationError("histogram max was not recorded")
-        return merged.max
-    if aggregation == "p50":
-        return _histogram_quantile(merged, 0.50)
-    if aggregation == "p95":
-        return _histogram_quantile(merged, 0.95)
-    if aggregation == "p99":
-        return _histogram_quantile(merged, 0.99)
-    raise MetricAggregationError(f"unsupported aggregation: {aggregation}")
+    estimate = histogram_statistic(merged, aggregation)
+    if estimate.lower != estimate.upper:
+        raise MetricInsufficientData(f"{aggregation} is only bounded by {estimate.describe()}")
+    return estimate.lower
 
 
 def counter_window_aggregate(
@@ -637,7 +670,7 @@ def counter_window_aggregate(
     cumulative_coverage: list[tuple[MetricSeriesKey, int, int]] = []
     for (series_key, _), series in grouped.items():
         ordered = sorted(series, key=lambda sample: sample.observed_at_ns)
-        for previous, current in zip(ordered, ordered[1:], strict=False):
+        for previous, current in pairwise(ordered):
             if current.observed_at_ns == previous.observed_at_ns:
                 raise MetricAggregationError(
                     f"{metric_name} contains duplicate cumulative observations"
@@ -704,35 +737,33 @@ def _compare(operator: str, observed: float | int, threshold: float) -> bool:
     return comparisons[operator]
 
 
-def _histogram_quantile_evaluation(
-    samples: Sequence[MetricPoint],
-    aggregation: str,
-    operator: str,
-    threshold: float,
+def _histogram_assertion(
+    assertion: Mapping[str, Any],
+    samples: Sequence[HistogramSample],
     *,
     window_start_ns: int,
     window_end_ns: int,
-) -> tuple[float, bool]:
-    quantile = {
-        "p50": 0.50,
-        "p95": 0.95,
-        "p99": 0.99,
-    }[aggregation]
-    merged = _merged_histogram(
-        [sample for sample in samples if isinstance(sample, HistogramSample)],
+) -> AssertionEvaluation:
+    merged = histogram_window_aggregate(
+        samples,
         window_start_ns=window_start_ns,
         window_end_ns=window_end_ns,
     )
-    lower, upper = _histogram_quantile_bounds(merged, quantile)
-    if operator in {"lt", "lte"}:
-        return upper, _compare(operator, upper, threshold)
-    if operator in {"gt", "gte"}:
-        return lower, _compare(operator, lower, threshold)
-    if lower != upper:
-        raise MetricAggregationError(
-            "histogram quantile equality cannot be proven from a non-zero-width bucket"
-        )
-    return lower, _compare(operator, lower, threshold)
+    estimate = histogram_statistic(merged, assertion["aggregation"])
+    operator = assertion["operator"]
+    status = estimate.compare(operator, assertion["threshold"])
+    displayed_bound = estimate.lower if operator in {"gt", "gte"} else estimate.upper
+    observed = displayed_bound if math.isfinite(displayed_bound) and status != "skipped" else None
+    return AssertionEvaluation(
+        assertion_id=assertion["assertion_id"],
+        status=status,
+        observed_value=observed,
+        unit=assertion["unit"],
+        message=(
+            f"{assertion['aggregation']} bound {estimate.describe()}; threshold "
+            f"{operator} {assertion['threshold']}"
+        ),
+    )
 
 
 def validate_metric_definitions(
@@ -815,7 +846,7 @@ def _duration_evaluation(
         gap
         for gap in (
             timestamps[0] - window_start_ns,
-            *(right - left for left, right in zip(timestamps, timestamps[1:], strict=False)),
+            *(right - left for left, right in pairwise(timestamps)),
             window_end_ns - timestamps[-1],
         )
         if gap > max_gap_ns
@@ -962,50 +993,32 @@ def evaluate_metric_assertions(
                     )
                 )
                 continue
-            histogram_quantile = assertion["aggregation"] in {"p50", "p95", "p99"} and all(
-                isinstance(sample, HistogramSample) for sample in metric_samples
-            )
-            if histogram_quantile:
-                observed, passed = _histogram_quantile_evaluation(
-                    metric_samples,
-                    assertion["aggregation"],
-                    assertion["operator"],
-                    assertion["threshold"],
-                    window_start_ns=start_ns,
-                    window_end_ns=end_ns,
-                )
-            else:
-                observed = aggregate_metric_points(
-                    metric_samples,
-                    assertion["aggregation"],
-                    window_start_ns=start_ns,
-                    window_end_ns=end_ns,
-                )
-                passed = _compare(
-                    assertion["operator"],
-                    observed,
-                    assertion["threshold"],
-                )
             if all(isinstance(sample, HistogramSample) for sample in metric_samples):
-                histogram_samples = [
-                    sample for sample in metric_samples if isinstance(sample, HistogramSample)
-                ]
-                require_window_coverage(
-                    histogram_window_coverage(
-                        histogram_samples,
+                evaluations.append(
+                    _histogram_assertion(
+                        assertion,
+                        [
+                            sample
+                            for sample in metric_samples
+                            if isinstance(sample, HistogramSample)
+                        ],
                         window_start_ns=start_ns,
                         window_end_ns=end_ns,
-                    ),
-                    metric_name=metric_name,
-                    temporality=histogram_samples[0].temporality,
-                    window_start_ns=start_ns,
-                    window_end_ns=end_ns,
+                    )
                 )
+                continue
+            observed = aggregate_metric_points(
+                metric_samples,
+                assertion["aggregation"],
+                window_start_ns=start_ns,
+                window_end_ns=end_ns,
+            )
+            passed = _compare(assertion["operator"], observed, assertion["threshold"])
         except MetricAggregationError as error:
             evaluations.append(
                 AssertionEvaluation(
                     assertion_id=assertion_id,
-                    status="error",
+                    status="skipped" if isinstance(error, MetricInsufficientData) else "error",
                     observed_value=None,
                     unit=assertion["unit"],
                     message=str(error),
