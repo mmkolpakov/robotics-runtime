@@ -4,7 +4,7 @@ import base64
 import hashlib
 import os
 import sys
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib import import_module
@@ -12,7 +12,7 @@ from importlib.abc import MetaPathFinder
 from importlib.machinery import ModuleSpec, PathFinder, SourceFileLoader
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path, PurePosixPath
-from types import CodeType, ModuleType
+from types import CodeType, MappingProxyType, ModuleType
 from typing import Any, cast
 
 from packaging.utils import canonicalize_name
@@ -111,32 +111,50 @@ def _check_namespace(name: str, locations: Sequence[str], paths: frozenset[Path]
 
 
 def _record_spec(
-    name: str, search_path: Sequence[str] | None, paths: frozenset[Path]
+    name: str,
+    search_path: Sequence[str] | None,
+    paths: frozenset[Path],
+    *,
+    namespace_paths: frozenset[Path] | None = None,
 ) -> ModuleSpec:
     spec = PathFinder.find_spec(name, search_path)
     if spec is None:
         raise EvaluationError(f"cannot resolve evaluator module {name!r}")
     if spec.origin is None and spec.submodule_search_locations:
         # Namespace packages execute no code, but every search location must be owned.
-        _check_namespace(name, spec.submodule_search_locations, paths)
+        _check_namespace(
+            name,
+            spec.submodule_search_locations,
+            paths if namespace_paths is None else namespace_paths,
+        )
     elif spec.origin is None or _installed_path(Path(spec.origin)) not in paths:
         raise EvaluationError(f"evaluator module {name!r} resolves outside its verified RECORD")
     return spec
 
 
 class _VerifiedImports(MetaPathFinder):
-    """Constrain this distribution's Python imports, leaving dependencies to Python."""
+    """Admit only source verified for the current set of qualified distributions."""
 
-    def __init__(self, entry_point: EntryPoint, record: _VerifiedRecord) -> None:
-        assert entry_point.dist is not None
-        root = _installed_path(Path(str(entry_point.dist.locate_file(""))))
-        self.roots = {entry_point.module.split(".")[0]}
-        self.roots.update(
-            path.relative_to(root).parts[0].split(".")[0]
-            for path in record.paths
-            if path.is_relative_to(root)
-        )
-        self.record = record
+    def __init__(self, qualified: Sequence[tuple[EntryPoint, _VerifiedRecord]]) -> None:
+        self.roots: set[str] = set()
+        paths: set[Path] = set()
+        sources: dict[Path, bytes] = {}
+        for entry_point, record in qualified:
+            assert entry_point.dist is not None
+            root = _installed_path(Path(str(entry_point.dist.locate_file(""))))
+            self.roots.add(entry_point.module.split(".")[0])
+            self.roots.update(
+                path.relative_to(root).parts[0].split(".")[0]
+                for path in record.paths
+                if path.is_relative_to(root)
+            )
+            paths.update(record.paths)
+            for path, source in record.sources.items():
+                if path in sources and sources[path] != source:
+                    raise EvaluationError(f"qualified evaluators disagree on source bytes: {path}")
+                sources[path] = source
+        self.paths = frozenset(paths)
+        self.sources = MappingProxyType(sources)
 
     def owns(self, name: str) -> bool:
         return name.split(".")[0] in self.roots
@@ -146,27 +164,25 @@ class _VerifiedImports(MetaPathFinder):
     ) -> ModuleSpec | None:
         if not self.owns(fullname):
             return None
-        spec = _record_spec(fullname, path, self.record.paths)
+        spec = _record_spec(fullname, path, self.paths)
         if spec.origin is not None:
             source_path = _installed_path(Path(spec.origin))
-            if source_path not in self.record.sources:
+            if source_path not in self.sources:
                 raise EvaluationError(
                     f"evaluator module {fullname!r} requires RECORD-hashed source"
                 )
-            spec.loader = _VerifiedSourceLoader(
-                fullname, source_path, self.record.sources[source_path]
-            )
+            spec.loader = _VerifiedSourceLoader(fullname, source_path, self.sources[source_path])
         return spec
 
     def check_loaded(self, name: str, module: ModuleType) -> None:
         spec = module.__spec__
         if spec is not None and spec.origin is None and spec.submodule_search_locations:
-            _check_namespace(name, module.__path__, self.record.paths)
+            _check_namespace(name, module.__path__, self.paths)
             return
         loader = getattr(spec, "loader", None)
         if (
             not isinstance(loader, _VerifiedSourceLoader)
-            or self.record.sources.get(Path(loader.path)) != loader.source
+            or self.sources.get(Path(loader.path)) != loader.source
         ):
             raise EvaluationError(
                 f"evaluator module {name!r} was already imported without verification"
@@ -189,8 +205,13 @@ def _verified_imports(finder: _VerifiedImports) -> Iterator[None]:
         sys.dont_write_bytecode = previous
 
 
-def _load_evaluator(entry_point: EntryPoint, record: _VerifiedRecord) -> ProductEvaluator:
-    finder = _VerifiedImports(entry_point, record)
+def _load_evaluator(
+    entry_point: EntryPoint,
+    record: _VerifiedRecord,
+    *,
+    imports: _VerifiedImports | None = None,
+) -> ProductEvaluator:
+    finder = _VerifiedImports(((entry_point, record),)) if imports is None else imports
     try:
         with _verified_imports(finder):
             evaluator = import_module(entry_point.module)
@@ -276,12 +297,19 @@ def _verify_installed_record(entry_point: EntryPoint) -> _VerifiedRecord:
     return _VerifiedRecord(frozenset(hashed_paths), sources)
 
 
-def _verify_entry_point_origin(entry_point: EntryPoint, hashed_paths: frozenset[Path]) -> None:
+def _verify_entry_point_origin(
+    entry_point: EntryPoint,
+    hashed_paths: frozenset[Path],
+    *,
+    namespace_paths: frozenset[Path] | None = None,
+) -> None:
     search_path: Sequence[str] | None = None
     qualified_name = ""
     for part in entry_point.module.split("."):
         qualified_name = f"{qualified_name}.{part}" if qualified_name else part
-        spec = _record_spec(qualified_name, search_path, hashed_paths)
+        spec = _record_spec(
+            qualified_name, search_path, hashed_paths, namespace_paths=namespace_paths
+        )
         search_path = spec.submodule_search_locations
 
 
@@ -319,10 +347,14 @@ def _qualified_entry_points(
             {"sha256": requirement["artifact_sha256"]},
         )
         record = _verify_installed_record(entry_point)
-        _verify_entry_point_origin(entry_point, record.paths)
         qualified.append((entry_point, record))
     if {str(item["receipt_sha256"]) for item in requirements} != set(receipts.by_digest):
         raise EvaluationError("evaluator qualification contains unreferenced receipts")
+    namespace_paths = frozenset(path for _, record in qualified for path in record.paths)
+    for entry_point, record in qualified:
+        # Namespace portions may be shared, but executable parents and the
+        # entry-point module must still belong to this particular distribution.
+        _verify_entry_point_origin(entry_point, record.paths, namespace_paths=namespace_paths)
     return tuple(qualified)
 
 
@@ -330,10 +362,26 @@ def _installed_evaluators(
     requirements: Sequence[Mapping[str, Any]],
     receipts: VerifiedReceiptSet,
 ) -> tuple[tuple[str, ProductEvaluator], ...]:
+    qualified = _qualified_entry_points(requirements, receipts)
+    imports = _VerifiedImports(qualified)
     return tuple(
-        (entry_point.name, _load_evaluator(entry_point, record))
-        for entry_point, record in _qualified_entry_points(requirements, receipts)
+        (entry_point.name, _load_evaluator(entry_point, record, imports=imports))
+        for entry_point, record in qualified
     )
+
+
+@contextmanager
+def _evaluator_results(
+    evaluator: ProductEvaluator, context: EvaluationContext
+) -> Iterator[Iterator[AssertionEvaluation]]:
+    results = iter(evaluator(context))
+    try:
+        yield results
+    finally:
+        # Consumer validation can fail while the verified wrapper is suspended
+        # at a yield. Close it before an exception's traceback can retain it.
+        if isinstance(results, Generator):
+            results.close()
 
 
 def _product_evaluations(
@@ -347,33 +395,35 @@ def _product_evaluations(
                 f"evaluator namespace {namespace!r} must be a reverse-domain name"
             )
         try:
-            produced = evaluator(context)
-            for evaluation in produced:
-                if not isinstance(evaluation, AssertionEvaluation):
-                    raise EvaluationError(
-                        f"evaluator {namespace!r} returned {type(evaluation).__name__}; "
-                        "expected AssertionEvaluation"
-                    )
-                if evaluation.source != "product" or evaluation.namespace != namespace:
-                    raise EvaluationError(
-                        f"evaluator {namespace!r} must mark every result as its product namespace"
-                    )
-                if not evaluation.assertion_id.startswith(f"{namespace}."):
-                    raise EvaluationError(
-                        f"assertion {evaluation.assertion_id!r} is outside namespace {namespace!r}"
-                    )
-                if not evaluation.evidence_sha256:
-                    raise EvaluationError(
-                        f"product assertion {evaluation.assertion_id!r} has no evidence digest"
-                    )
-                missing = set(evaluation.evidence_sha256) - context.evidence_sha256
-                if missing:
-                    raise EvaluationError(
-                        "product assertion "
-                        f"{evaluation.assertion_id!r} references unknown evidence "
-                        f"{sorted(missing)}"
-                    )
-                evaluations.append(evaluation)
+            with _evaluator_results(evaluator, context) as produced:
+                for evaluation in produced:
+                    if not isinstance(evaluation, AssertionEvaluation):
+                        raise EvaluationError(
+                            f"evaluator {namespace!r} returned {type(evaluation).__name__}; "
+                            "expected AssertionEvaluation"
+                        )
+                    if evaluation.source != "product" or evaluation.namespace != namespace:
+                        raise EvaluationError(
+                            f"evaluator {namespace!r} must mark every result "
+                            "as its product namespace"
+                        )
+                    if not evaluation.assertion_id.startswith(f"{namespace}."):
+                        raise EvaluationError(
+                            f"assertion {evaluation.assertion_id!r} "
+                            f"is outside namespace {namespace!r}"
+                        )
+                    if not evaluation.evidence_sha256:
+                        raise EvaluationError(
+                            f"product assertion {evaluation.assertion_id!r} has no evidence digest"
+                        )
+                    missing = set(evaluation.evidence_sha256) - context.evidence_sha256
+                    if missing:
+                        raise EvaluationError(
+                            "product assertion "
+                            f"{evaluation.assertion_id!r} references unknown evidence "
+                            f"{sorted(missing)}"
+                        )
+                    evaluations.append(evaluation)
         except EvaluationError:
             raise
         except Exception as error:

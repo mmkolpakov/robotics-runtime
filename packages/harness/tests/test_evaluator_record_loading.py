@@ -39,36 +39,44 @@ print(json.dumps([item.observed_value for item in evaluator(context())]))
 """
 
 
-def _wheel_files(sources: Mapping[str, str], target: str) -> dict[str, bytes]:
+def _wheel_files(
+    sources: Mapping[str, str], target: str, distribution_name: str, namespace: str
+) -> dict[str, bytes]:
+    dist_info = f"{distribution_name}-1.0.dist-info"
     files = {name: source.encode() for name, source in sources.items()}
-    files[f"{DIST_INFO}/METADATA"] = (
-        b"Metadata-Version: 2.1\nName: spec33-evaluator\nVersion: 1.0\n"
-    )
-    files[f"{DIST_INFO}/WHEEL"] = (
+    files[f"{dist_info}/METADATA"] = (
+        f"Metadata-Version: 2.1\nName: {distribution_name.replace('_', '-')}\nVersion: 1.0\n"
+    ).encode()
+    files[f"{dist_info}/WHEEL"] = (
         b"Wheel-Version: 1.0\nGenerator: spec33-test\nRoot-Is-Purelib: true\nTag: py3-none-any\n"
     )
-    files[f"{DIST_INFO}/entry_points.txt"] = (
-        f"[robotics_acceptance.evaluators]\norg.spec33 = {target}\n".encode()
+    files[f"{dist_info}/entry_points.txt"] = (
+        f"[robotics_acceptance.evaluators]\n{namespace} = {target}\n".encode()
     )
     record = io.StringIO(newline="")
     writer = csv.writer(record)
     for name, payload in files.items():
         digest = base64.urlsafe_b64encode(hashlib.sha256(payload).digest()).rstrip(b"=").decode()
         writer.writerow((name, f"sha256={digest}", len(payload)))
-    writer.writerow((f"{DIST_INFO}/RECORD", "", ""))
-    files[f"{DIST_INFO}/RECORD"] = record.getvalue().encode()
+    writer.writerow((f"{dist_info}/RECORD", "", ""))
+    files[f"{dist_info}/RECORD"] = record.getvalue().encode()
     return files
 
 
 def _install_wheel(
-    tmp_path: Path, sources: Mapping[str, str], target: str = f"{MODULE}:evaluate"
+    tmp_path: Path,
+    sources: Mapping[str, str],
+    target: str = f"{MODULE}:evaluate",
+    *,
+    distribution_name: str = "spec33_evaluator",
+    namespace: str = "org.spec33",
 ) -> Path:
     uv = shutil.which("uv")
     if uv is None:
         pytest.fail("these installed-wheel regressions require the workspace's uv tool")
-    wheel = tmp_path / "spec33_evaluator-1.0-py3-none-any.whl"
+    wheel = tmp_path / f"{distribution_name}-1.0-py3-none-any.whl"
     with ZipFile(wheel, "w") as archive:
-        for name, payload in _wheel_files(sources, target).items():
+        for name, payload in _wheel_files(sources, target, distribution_name, namespace).items():
             archive.writestr(name, payload)
     site = tmp_path / "site"
     result = subprocess.run(
@@ -358,3 +366,245 @@ print('restored')
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "restored"
+
+
+def _namespace_wheels(
+    tmp_path: Path,
+    *,
+    split_sites: bool = False,
+    primary_source: str = "from .lazy_alpha import evaluate\n",
+    primary_target: str = "spec33_shared.alpha:evaluate",
+) -> tuple[Path, Path]:
+    site = _install_wheel(
+        tmp_path,
+        {"spec33_shared/alpha.py": primary_source, "spec33_shared/lazy_alpha.py": SOURCE},
+        primary_target,
+    )
+    peer_root = tmp_path / "peer" if split_sites else tmp_path
+    peer_root.mkdir(exist_ok=True)
+    peer_site = _install_wheel(
+        peer_root,
+        {
+            "spec33_shared/beta.py": (
+                "def evaluate(context):\n"
+                "    from .lazy_beta import evaluate\n"
+                "    yield from evaluate(context)\n"
+            ),
+            "spec33_shared/lazy_beta.py": SOURCE.replace("org.spec33", "org.spec33.peer").replace(
+                "[20, 22]", "[20, 23]"
+            ),
+        },
+        "spec33_shared.beta:evaluate",
+        distribution_name="spec33_peer",
+        namespace="org.spec33.peer",
+    )
+    return site, peer_site
+
+
+def _namespace_run(
+    site: Path,
+    peer_site: Path,
+    body: str,
+    *,
+    include_peer: bool = True,
+    before_qualification: str = "",
+) -> subprocess.CompletedProcess[str]:
+    setup = f"""\
+import hashlib
+from robotics_acceptance_harness.evaluation import (
+    _installed_evaluators, evaluate_acceptance, evaluator_inventory,
+)
+from robotics_acceptance_harness.receipts import load_verified_receipts
+from tests.support import write_verified_receipt
+peer_site = Path({str(peer_site)!r})
+if peer_site != site:
+    sys.path.insert(0, str(peer_site))
+peer = distribution('spec33-peer').entry_points['org.spec33.peer']
+points = [entry_point, peer] if {include_peer!r} else [entry_point]
+chains, requirements = [], []
+for point in points:
+    wheel_root = Path(point.dist.locate_file('')).parent
+    wheel = wheel_root / (point.dist.name.replace('-', '_') + '-1.0-py3-none-any.whl')
+    digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+    chain = write_verified_receipt(site.parent, {{
+        'uri': wheel.as_uri(), 'sha256': digest, 'size_bytes': wheel.stat().st_size,
+        'media_type': 'application/vnd.python.wheel', 'immutable_revision': 'sha256:' + digest,
+    }}, stem=point.dist.name)
+    chains.append(chain)
+    requirements.append({{
+        'namespace': point.name, 'entry_point': point.value,
+        'distribution': point.dist.name, 'version': point.dist.version,
+        'artifact_sha256': digest, 'receipt_sha256': chain['receipt_sha256'],
+    }})
+# Receipt chains may refer to the same external-verification bytes.
+dependencies = {{
+    hashlib.sha256(path.read_bytes()).hexdigest(): path
+    for chain in chains for path in chain['dependencies']
+}}
+receipts = load_verified_receipts(
+    receipt_paths=[chain['receipt'] for chain in chains],
+    verification_paths=[chain['verification'] for chain in chains],
+    dependency_paths=list(dependencies.values()),
+)
+"""
+    return _run(site, setup + textwrap.dedent(before_qualification) + textwrap.dedent(body))
+
+
+@pytest.mark.parametrize("split_sites", [False, True])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_qualified_namespace_wheels_load_in_either_order_and_repeat(
+    tmp_path: Path, split_sites: bool, reverse: bool
+) -> None:
+    site, peer_site = _namespace_wheels(tmp_path, split_sites=split_sites)
+    result = _namespace_run(
+        site,
+        peer_site,
+        """\
+inventory = evaluator_inventory(requirements, receipts)
+assert len(inventory) == 2 and all(item['status'] == 'qualified' for item in inventory)
+for _ in range(2):
+    evaluators = _installed_evaluators(requirements, receipts)
+    for _ in range(2):
+        results = evaluate_acceptance(context(), evaluators=evaluators)
+        values = sorted(item.observed_value for item in results if item.source == 'product')
+        assert values == [42.0, 43.0]
+assert not list(site.parent.rglob('*.pyc'))
+print('both qualified')
+""",
+        before_qualification="requirements.reverse()\n" if reverse else "",
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "both qualified"
+
+
+def test_namespace_peer_record_is_checked_before_any_evaluator_executes(tmp_path: Path) -> None:
+    site, peer_site = _namespace_wheels(
+        tmp_path, primary_source="raise RuntimeError('primary executed before qualification')\n"
+    )
+    (peer_site / "spec33_shared/lazy_beta.py").write_text("raise RuntimeError('tampered peer')")
+    result = _namespace_run(site, peer_site, "_installed_evaluators(requirements, receipts)\n")
+    _assert_rejected(result, "installed evaluator file differs from RECORD")
+    assert "primary executed before qualification" not in result.stderr
+    assert "RuntimeError: tampered peer" not in result.stderr
+
+
+def test_namespace_entry_point_must_belong_to_its_own_wheel(tmp_path: Path) -> None:
+    site, peer_site = _namespace_wheels(tmp_path, primary_target="spec33_shared.beta:evaluate")
+    result = _namespace_run(site, peer_site, "_installed_evaluators(requirements, receipts)\n")
+    _assert_rejected(result, "evaluator module 'spec33_shared.beta' resolves outside")
+
+
+@pytest.mark.parametrize("peer_preverified", [False, True])
+def test_namespace_does_not_authorize_an_unqualified_peer(
+    tmp_path: Path, peer_preverified: bool
+) -> None:
+    site, peer_site = _namespace_wheels(
+        tmp_path,
+        primary_source=(
+            "def evaluate(context):\n"
+            "    from .beta import evaluate\n"
+            "    yield from evaluate(context)\n"
+        ),
+    )
+    result = _namespace_run(
+        site,
+        peer_site,
+        "evaluators = _installed_evaluators(requirements, receipts)\n"
+        "evaluate_acceptance(context(), evaluators=evaluators)\n",
+        include_peer=False,
+        before_qualification=(
+            "_load_evaluator(peer, _verify_installed_record(peer))\n" if peer_preverified else ""
+        ),
+    )
+    assert result.returncode != 0
+    assert (
+        "already imported without verification"
+        if peer_preverified
+        else "outside its verified RECORD"
+    ) in result.stderr
+
+
+def test_qualified_namespace_rejects_a_normally_preimported_peer(tmp_path: Path) -> None:
+    site, peer_site = _namespace_wheels(tmp_path)
+    result = _namespace_run(
+        site,
+        peer_site,
+        "_installed_evaluators(requirements, receipts)\n",
+        before_qualification="import spec33_shared.beta\n",
+    )
+    _assert_rejected(result, "evaluator module 'spec33_shared.beta' was already imported")
+
+
+def test_qualified_namespace_rejects_an_unowned_search_location(tmp_path: Path) -> None:
+    site, peer_site = _namespace_wheels(tmp_path, split_sites=True)
+    result = _namespace_run(
+        site,
+        peer_site,
+        "_installed_evaluators(requirements, receipts)\n",
+        before_qualification="""\
+foreign = site.parent / 'foreign'
+(foreign / 'spec33_shared').mkdir(parents=True)
+sys.path.insert(0, str(foreign))
+""",
+    )
+    _assert_rejected(result, "evaluator namespace 'spec33_shared' is outside its verified RECORD")
+
+
+@pytest.mark.parametrize("failure", ["type", "namespace", "evidence", "finalizer"])
+def test_consumer_rejection_closes_verified_generator_with_retained_traceback(
+    tmp_path: Path, failure: str
+) -> None:
+    value = {
+        "type": "'invalid result'",
+        "namespace": (
+            "AssertionEvaluation('org.other.result', 'passed', 1, '1', source='product', "
+            "namespace='org.other', evidence_sha256=('a' * 64,))"
+        ),
+        "evidence": (
+            "AssertionEvaluation('org.spec33.result', 'passed', 1, '1', source='product', "
+            "namespace='org.spec33', evidence_sha256=('b' * 64,))"
+        ),
+        "finalizer": "'invalid result'",
+    }[failure]
+    source = (
+        "from robotics_acceptance_harness import AssertionEvaluation\n"
+        "closed = []\n"
+        "def evaluate(context):\n"
+        "    try:\n"
+        f"        yield {value}\n"
+        "        raise RuntimeError('consumer advanced after invalid result')\n"
+        "    finally:\n"
+        "        closed.append(True)\n"
+    )
+    if failure == "finalizer":
+        source += "        raise RuntimeError('fixture finalizer failed')\n"
+    site = _install_wheel(tmp_path, {f"{MODULE}.py": source})
+    result = _run(
+        site,
+        f"""\
+from robotics_acceptance_harness.evaluation import evaluate_acceptance
+evaluation_context = context()
+evaluator = _load_evaluator(entry_point, _verify_installed_record(entry_point))
+finders = tuple(sys.meta_path)
+sys.dont_write_bytecode = False
+retained_errors = []
+try:
+    evaluate_acceptance(evaluation_context, evaluators=((entry_point.name, evaluator),))
+except EvaluationError as error:
+    retained_errors.append(error)
+    assert tuple(sys.meta_path) == finders
+    assert sys.dont_write_bytecode is False
+else:
+    raise AssertionError('consumer accepted invalid product result')
+assert retained_errors[0].__traceback__ is not None
+assert sys.modules[{MODULE!r}].closed == [True]
+assert 'consumer advanced' not in str(retained_errors[0])
+if {failure!r} == 'finalizer':
+    assert 'fixture finalizer failed' in str(retained_errors[0])
+assert tuple(sys.meta_path) == finders
+assert sys.dont_write_bytecode is False
+print('restored with retained traceback')
+""",
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "restored with retained traceback"
