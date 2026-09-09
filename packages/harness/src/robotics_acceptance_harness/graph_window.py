@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from robotics_acceptance_harness.errors import HarnessInputError
 from robotics_acceptance_harness.metrics import AssertionEvaluation
 from robotics_acceptance_harness.readiness import GraphSnapshot, ReadinessIssue, evaluate_graph
 
@@ -34,7 +35,7 @@ class ExpectedGraphMonitor:
 
     def __init__(self, expected_graph: Mapping[str, Any], start_ns: int, end_ns: int) -> None:
         if end_ns <= start_ns:
-            raise ValueError("graph measurement window must have positive duration")
+            raise HarnessInputError("graph measurement window must have positive duration")
         self._expected_graph = expected_graph
         self._start_ns = start_ns
         self._end_ns = end_ns

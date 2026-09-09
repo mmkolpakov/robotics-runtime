@@ -21,15 +21,22 @@ from robotics_acceptance_harness.documents import (
     load_document,
     load_document_bytes,
 )
+from robotics_acceptance_harness.errors import HarnessError
 
 
-class ReceiptValidationError(ValueError):
+class ReceiptValidationError(HarnessError, ValueError):
     """Raised when an artifact receipt lacks a verified provenance chain."""
+
+    error_id = "ReceiptValidationError.failed"
 
     def __init__(self, json_path: str, message: str) -> None:
         self.json_path = json_path
         self.validation_message = message
         super().__init__(f"{json_path}: {message}")
+
+    @property
+    def diagnostic_issues(self) -> tuple[tuple[str, str], ...]:
+        return ((self.json_path, self.validation_message),)
 
 
 @dataclass(frozen=True, slots=True)

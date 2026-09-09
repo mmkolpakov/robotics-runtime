@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
+from robotics_acceptance_harness.errors import HarnessInputError
+
 
 def load_extension_schemas(
     values: Sequence[str],
@@ -15,14 +17,14 @@ def load_extension_schemas(
     for value in values:
         uri, separator, path_value = value.partition("=")
         if not separator or not uri or not path_value:
-            raise ValueError(f"invalid {option} value: {value!r}; expected URI=PATH")
+            raise HarnessInputError(f"invalid {option} value: {value!r}; expected URI=PATH")
         if uri in schemas:
-            raise ValueError(f"duplicate {option} URI: {uri}")
+            raise HarnessInputError(f"duplicate {option} URI: {uri}")
         path = Path(path_value).expanduser().resolve()
         try:
             schemas[uri] = path.read_bytes()
         except OSError as error:
-            raise ValueError(f"cannot read extension schema {path}: {error}") from error
+            raise HarnessInputError(f"cannot read extension schema {path}: {error}") from error
     return schemas
 
 

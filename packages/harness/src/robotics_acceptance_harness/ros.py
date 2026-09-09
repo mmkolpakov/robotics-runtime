@@ -7,6 +7,7 @@ from threading import Lock, Thread
 from time import monotonic_ns, time_ns
 from typing import Any, Literal
 
+from robotics_acceptance_harness.errors import HarnessError, HarnessInputError
 from robotics_acceptance_harness.readiness import (
     EndpointObservation,
     GraphSnapshot,
@@ -16,8 +17,10 @@ from robotics_acceptance_harness.readiness import (
 from robotics_acceptance_harness.timing import ClockSample
 
 
-class RosObserverError(RuntimeError):
+class RosObserverError(HarnessError, RuntimeError):
     """Raised when the read-only ROS observer cannot be initialized or queried."""
+
+    error_id = "RosObserverError.failed"
 
 
 @dataclass(slots=True)
@@ -44,7 +47,7 @@ class RosGraphObserver:
         max_clock_samples: int = DEFAULT_MAX_CLOCK_SAMPLES,
     ) -> None:
         if max_clock_samples < 1:
-            raise ValueError("max_clock_samples must be positive")
+            raise HarnessInputError("max_clock_samples must be positive")
         try:
             self._rclpy = module_loader("rclpy")
             actions = module_loader("rclpy.action")

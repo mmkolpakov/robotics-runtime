@@ -8,6 +8,7 @@ from itertools import pairwise
 from math import isfinite
 from typing import Any
 
+from robotics_acceptance_harness.errors import HarnessError, HarnessInputError
 from robotics_acceptance_harness.readiness import ReadinessIssue
 
 _UNIX_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
@@ -20,8 +21,10 @@ def utc_datetime_from_unix_ns(timestamp_ns: int) -> datetime:
     return _UNIX_EPOCH + timedelta(seconds=seconds, microseconds=nanoseconds // 1_000)
 
 
-class TimingValidationError(ValueError):
+class TimingValidationError(HarnessError, ValueError):
     """Carry proven violations separately from unavailable timing conclusions."""
+
+    error_id = "TimingValidationError.failed"
 
     def __init__(
         self,
@@ -41,6 +44,10 @@ class TimingValidationError(ValueError):
             sorted({fields.get(issue.json_path, issue.json_path) for issue in insufficient_issues})
         )
         super().__init__("; ".join(f"{issue.json_path}: {issue.message}" for issue in self.issues))
+
+    @property
+    def diagnostic_issues(self) -> tuple[tuple[str, str], ...]:
+        return tuple((issue.json_path, issue.message) for issue in self.issues)
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,9 +76,9 @@ class ClockMeasurementWindow:
 
     def __post_init__(self) -> None:
         if self.start_ns < 0 or self.end_ns <= self.start_ns:
-            raise ValueError("clock measurement requires increasing nonnegative bounds")
+            raise HarnessInputError("clock measurement requires increasing nonnegative bounds")
         if self.max_sample_gap_ns <= 0:
-            raise ValueError("clock sample gap allowance must be positive")
+            raise HarnessInputError("clock sample gap allowance must be positive")
 
 
 @dataclass(frozen=True, slots=True)
@@ -356,7 +363,7 @@ def evaluate_timing(
     """
 
     if not isfinite(rtf_window_sec) or rtf_window_sec < 1.0:
-        raise ValueError("RTF window must be finite and at least one second")
+        raise HarnessInputError("RTF window must be finite and at least one second")
 
     mode = execution["time_mode"]
     if not samples and mode != "simulation_realtime":

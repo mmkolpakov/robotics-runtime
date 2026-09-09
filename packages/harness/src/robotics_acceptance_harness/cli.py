@@ -27,6 +27,11 @@ from robotics_acceptance_harness.diagnostics import (
     write_error_diagnostic,
 )
 from robotics_acceptance_harness.documents import DocumentBundle, load_bundle, load_document
+from robotics_acceptance_harness.errors import (
+    HarnessError,
+    HarnessInputError,
+    command_error_boundary,
+)
 from robotics_acceptance_harness.evidence import load_evidence_index
 from robotics_acceptance_harness.extension_schemas import load_extension_schemas
 from robotics_acceptance_harness.hardware_timing import evaluate_hardware_timing
@@ -310,9 +315,9 @@ def _keyed_values(values: Sequence[str], option: str) -> Mapping[str, str]:
     for value in values:
         key, separator, item = value.partition("=")
         if not separator or not key or not item:
-            raise ValueError(f"invalid {option} value: {value!r}")
+            raise HarnessInputError(f"invalid {option} value: {value!r}")
         if key in parsed:
-            raise ValueError(f"duplicate {option} key: {key}")
+            raise HarnessInputError(f"duplicate {option} key: {key}")
         parsed[key] = item
     return parsed
 
@@ -322,7 +327,7 @@ def _grouped_values(values: Sequence[str], option: str) -> Mapping[str, tuple[st
     for value in values:
         key, separator, item = value.partition("=")
         if not separator or not key or not item:
-            raise ValueError(f"invalid {option} value: {value!r}")
+            raise HarnessInputError(f"invalid {option} value: {value!r}")
         parsed.setdefault(key, []).append(item)
     return {key: tuple(items) for key, items in parsed.items()}
 
@@ -347,7 +352,9 @@ def _receipt_source(arguments: argparse.Namespace) -> ReceiptSource:
         or arguments.artifact_verification
         or arguments.receipt_dependency
     ):
-        raise ValueError("--receipt-inventory cannot be combined with explicit receipt inputs")
+        raise HarnessInputError(
+            "--receipt-inventory cannot be combined with explicit receipt inputs"
+        )
     return ReceiptInventory(arguments.receipt_inventory)
 
 
@@ -360,9 +367,11 @@ def _domain_receipt_sources(arguments: argparse.Namespace) -> Mapping[str, Recei
     domains = _keyed_values(arguments.evidence_index, "--evidence-index")
     for domain, path in _keyed_values(arguments.receipt_inventory, "--receipt-inventory").items():
         if domain not in domains:
-            raise ValueError(f"--receipt-inventory references an unknown evidence domain: {domain}")
+            raise HarnessInputError(
+                f"--receipt-inventory references an unknown evidence domain: {domain}"
+            )
         if domain in receipts or domain in verifications or domain in dependencies:
-            raise ValueError(
+            raise HarnessInputError(
                 f"--receipt-inventory cannot be combined with explicit receipt inputs: {domain}"
             )
         receipts[domain] = ReceiptInventory(path)
@@ -386,235 +395,234 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     arguments = parser.parse_args(argv)
     try:
-        if arguments.command == "create-run":
-            run_id = create_run_context(
-                arguments.scenario,
-                arguments.output,
-                domains=_keyed_values(arguments.domain, "--domain"),
-                time_authority=arguments.time_authority,
-                time_source=arguments.time_source,
-                run_id=arguments.run_id,
-                extension_schemas=load_extension_schemas(arguments.extension_schema),
-            )
-            print(run_id)
-            return 0
+        with command_error_boundary():
+            if arguments.command == "create-run":
+                run_id = create_run_context(
+                    arguments.scenario,
+                    arguments.output,
+                    domains=_keyed_values(arguments.domain, "--domain"),
+                    time_authority=arguments.time_authority,
+                    time_source=arguments.time_source,
+                    run_id=arguments.run_id,
+                    extension_schemas=load_extension_schemas(arguments.extension_schema),
+                )
+                print(run_id)
+                return 0
 
-        if arguments.command == "doctor":
-            requirements = ()
-            if arguments.scenario is not None:
-                scenario = load_document(arguments.scenario, expected_role="acceptance_scenario")
-                requirements = scenario.data["evaluator_requirements"]
-            report = doctor_report(
-                mode=arguments.mode,
-                evidence_dir=arguments.evidence_dir,
-                measurement_complete=arguments.measurement_complete,
-                evaluator_requirements=requirements,
-                evaluator_receipts=_evaluator_receipts(arguments),
-            )
-            print(
-                report_markdown(report)
-                if arguments.format == "markdown"
-                else json.dumps(report, indent=2, sort_keys=True, allow_nan=False)
-            )
-            return 0 if report["status"] == "passed" else 1
+            if arguments.command == "doctor":
+                requirements = ()
+                if arguments.scenario is not None:
+                    scenario = load_document(
+                        arguments.scenario, expected_role="acceptance_scenario"
+                    )
+                    requirements = scenario.data["evaluator_requirements"]
+                report = doctor_report(
+                    mode=arguments.mode,
+                    evidence_dir=arguments.evidence_dir,
+                    measurement_complete=arguments.measurement_complete,
+                    evaluator_requirements=requirements,
+                    evaluator_receipts=_evaluator_receipts(arguments),
+                )
+                print(
+                    report_markdown(report)
+                    if arguments.format == "markdown"
+                    else json.dumps(report, indent=2, sort_keys=True, allow_nan=False)
+                )
+                return 0 if report["status"] == "passed" else 1
 
-        if arguments.command == "why":
-            report = why_report(arguments.result)
-            print(
-                report_markdown(report)
-                if arguments.format == "markdown"
-                else json.dumps(report, indent=2, sort_keys=True, allow_nan=False)
-            )
-            return 0
+            if arguments.command == "why":
+                report = why_report(arguments.result)
+                print(
+                    report_markdown(report)
+                    if arguments.format == "markdown"
+                    else json.dumps(report, indent=2, sort_keys=True, allow_nan=False)
+                )
+                return 0
 
-        if arguments.command == "otel-summary":
-            samples = load_otlp_json_metrics(arguments.otel_metrics)
+            if arguments.command == "otel-summary":
+                samples = load_otlp_json_metrics(arguments.otel_metrics)
+                print(
+                    json.dumps(
+                        {
+                            "sample_count": len(samples),
+                            "instruments": dict(
+                                sorted(Counter(item.name for item in samples).items())
+                            ),
+                        },
+                        sort_keys=True,
+                    )
+                )
+                return 0
+
+            if arguments.command == "timing-check":
+                scenario = load_document(
+                    arguments.scenario,
+                    expected_role="acceptance_scenario",
+                    extension_schemas=load_extension_schemas(arguments.extension_schema),
+                )
+                load_run_context(
+                    arguments.run_context,
+                    run_id=arguments.run_id,
+                    domain_id=arguments.domain_id,
+                    scenario_id=str(scenario.data["scenario_id"]),
+                    scenario_sha256=scenario.sha256,
+                )
+                evidence = load_evidence_index(
+                    arguments.evidence_index,
+                    expected_run_id=arguments.run_id,
+                    receipt_paths=_receipt_source(arguments),
+                    verification_paths=arguments.artifact_verification,
+                    receipt_dependency_paths=arguments.receipt_dependency,
+                )
+                metrics_path = Path(arguments.otel_metrics).expanduser().resolve()
+                metric_link = evidence.local_files.get(metrics_path)
+                if metric_link is None or metric_link["media_type"] != OTLP_JSON_LINES_MEDIA_TYPE:
+                    raise HarnessInputError(
+                        f"OTLP metrics are not verified local {OTLP_JSON_LINES_MEDIA_TYPE} evidence"
+                    )
+                samples = select_metric_points(
+                    load_otlp_json_metrics(
+                        metrics_path,
+                        expected_sha256=str(metric_link["sha256"]),
+                        evidence_root=evidence.index.path.parent,
+                    ),
+                    run_id=arguments.run_id,
+                    domain_id=arguments.domain_id,
+                )
+                observation = evaluate_hardware_timing(
+                    scenario.data["time_policy"],
+                    tuple(sample for sample in samples if isinstance(sample, MetricSample)),
+                )
+                payload = asdict(observation)
+                payload["measured_at"] = observation.measured_at.isoformat().replace("+00:00", "Z")
+                print(json.dumps(payload, sort_keys=True, allow_nan=False))
+                expected = arguments.expect == "within-policy"
+                return 0 if observation.within_policy is expected else 1
+
+            if arguments.command == "campaign":
+                output = aggregate_campaign(
+                    scenario_path=arguments.scenario,
+                    run_context_paths=arguments.run_context,
+                    aggregate_paths=arguments.aggregate,
+                    output_path=arguments.output,
+                    minimum_passed_runs=arguments.minimum_passed_runs,
+                    maximum_failed_runs=arguments.maximum_failed_runs,
+                    maximum_incomplete_runs=arguments.maximum_incomplete_runs,
+                    maximum_error_runs=arguments.maximum_error_runs,
+                    campaign_id=arguments.campaign_id,
+                    extension_schemas=load_extension_schemas(arguments.extension_schema),
+                )
+                result = json.loads(output.read_text(encoding="utf-8"))
+                return _report_status(output, result["verdict"]["status"], "campaign")
+
+            if arguments.command == "aggregate":
+                output = aggregate_results(
+                    scenario_path=arguments.scenario,
+                    run_context_path=arguments.run_context,
+                    result_paths=arguments.result,
+                    output_path=arguments.output,
+                    transport_qualification_path=arguments.transport_qualification,
+                    extension_schemas=load_extension_schemas(arguments.extension_schema),
+                )
+                aggregate = json.loads(output.read_text(encoding="utf-8"))
+                status = aggregate["cross_domain_e2e"]["status"]
+                if status == "unevaluated":
+                    status = aggregate["per_domain_aggregate"]
+                return _report_status(output, status, "aggregate")
+
+            if arguments.command == "transport-evaluate":
+                output = evaluate_transport_qualification(
+                    run_id=arguments.run_id,
+                    scenario_path=arguments.scenario,
+                    causal_chain_paths=arguments.causal_chain,
+                    channel_contract_paths=arguments.channel_contract,
+                    trace_paths=_keyed_values(arguments.trace, "--trace"),
+                    evidence_index_paths=_keyed_values(
+                        arguments.evidence_index,
+                        "--evidence-index",
+                    ),
+                    artifact_receipt_paths=_domain_receipt_sources(arguments),
+                    artifact_verification_paths=_grouped_values(
+                        arguments.artifact_verification,
+                        "--artifact-verification",
+                    ),
+                    receipt_dependency_paths=_grouped_values(
+                        arguments.receipt_dependency,
+                        "--receipt-dependency",
+                    ),
+                    clock_relation_paths=arguments.clock_relation,
+                    observation_output_dir=arguments.observation_output,
+                    output_path=arguments.output,
+                    extension_schemas=load_extension_schemas(arguments.extension_schema),
+                )
+                result = json.loads(output.read_text(encoding="utf-8"))
+                return _report_status(output, result["verdict"]["status"], "qualification")
+
+            bundle = _bundle(arguments)
+            if arguments.command == "explain":
+                print(json.dumps(explain_bundle(bundle), indent=2, sort_keys=True, allow_nan=False))
+                return 0
+
+            evaluator_receipts = _evaluator_receipts(arguments)
+
+            if arguments.command == "evaluate":
+                outputs = evaluate_from_evidence(
+                    run_id=arguments.run_id,
+                    domain_id=arguments.domain_id,
+                    run_context_path=arguments.run_context,
+                    bundle=bundle,
+                    evidence_index_path=arguments.evidence_index,
+                    artifact_receipt_paths=_receipt_source(arguments),
+                    artifact_verification_paths=arguments.artifact_verification,
+                    receipt_dependency_paths=arguments.receipt_dependency,
+                    evaluator_receipts=evaluator_receipts,
+                    otel_metrics_path=arguments.otel_metrics,
+                    window_start_ns=arguments.window_start_ns,
+                    window_end_ns=arguments.window_end_ns,
+                    output_dir=arguments.output,
+                )
+            else:
+                outputs = run_verification(
+                    run_id=arguments.run_id,
+                    domain_id=arguments.domain_id,
+                    run_context_path=arguments.run_context,
+                    bundle=bundle,
+                    evidence_index_path=arguments.evidence_index,
+                    artifact_receipt_paths=_receipt_source(arguments),
+                    artifact_verification_paths=arguments.artifact_verification,
+                    receipt_dependency_paths=arguments.receipt_dependency,
+                    evaluator_receipts=evaluator_receipts,
+                    otel_metrics_path=arguments.otel_metrics,
+                    measurement_complete_path=arguments.measurement_complete,
+                    output_dir=arguments.output,
+                )
             print(
                 json.dumps(
                     {
-                        "sample_count": len(samples),
-                        "instruments": dict(sorted(Counter(item.name for item in samples).items())),
+                        "status": outputs.result["status"],
+                        "result": str(outputs.result_path),
+                        "junit": str(outputs.junit_path),
                     },
                     sort_keys=True,
+                    allow_nan=False,
                 )
             )
-            return 0
-
-        if arguments.command == "timing-check":
-            scenario = load_document(
-                arguments.scenario,
-                expected_role="acceptance_scenario",
-                extension_schemas=load_extension_schemas(arguments.extension_schema),
-            )
-            load_run_context(
-                arguments.run_context,
-                run_id=arguments.run_id,
-                domain_id=arguments.domain_id,
-                scenario_id=str(scenario.data["scenario_id"]),
-                scenario_sha256=scenario.sha256,
-            )
-            evidence = load_evidence_index(
-                arguments.evidence_index,
-                expected_run_id=arguments.run_id,
-                receipt_paths=_receipt_source(arguments),
-                verification_paths=arguments.artifact_verification,
-                receipt_dependency_paths=arguments.receipt_dependency,
-            )
-            metrics_path = Path(arguments.otel_metrics).expanduser().resolve()
-            metric_link = evidence.local_files.get(metrics_path)
-            if metric_link is None or metric_link["media_type"] != OTLP_JSON_LINES_MEDIA_TYPE:
-                raise ValueError(
-                    f"OTLP metrics are not verified local {OTLP_JSON_LINES_MEDIA_TYPE} evidence"
-                )
-            samples = select_metric_points(
-                load_otlp_json_metrics(
-                    metrics_path,
-                    expected_sha256=str(metric_link["sha256"]),
-                    evidence_root=evidence.index.path.parent,
-                ),
-                run_id=arguments.run_id,
-                domain_id=arguments.domain_id,
-            )
-            observation = evaluate_hardware_timing(
-                scenario.data["time_policy"],
-                tuple(sample for sample in samples if isinstance(sample, MetricSample)),
-            )
-            payload = asdict(observation)
-            payload["measured_at"] = observation.measured_at.isoformat().replace("+00:00", "Z")
-            print(json.dumps(payload, sort_keys=True, allow_nan=False))
-            expected = arguments.expect == "within-policy"
-            return 0 if observation.within_policy is expected else 1
-
-        if arguments.command == "campaign":
-            output = aggregate_campaign(
-                scenario_path=arguments.scenario,
-                run_context_paths=arguments.run_context,
-                aggregate_paths=arguments.aggregate,
-                output_path=arguments.output,
-                minimum_passed_runs=arguments.minimum_passed_runs,
-                maximum_failed_runs=arguments.maximum_failed_runs,
-                maximum_incomplete_runs=arguments.maximum_incomplete_runs,
-                maximum_error_runs=arguments.maximum_error_runs,
-                campaign_id=arguments.campaign_id,
-                extension_schemas=load_extension_schemas(arguments.extension_schema),
-            )
-            result = json.loads(output.read_text(encoding="utf-8"))
-            return _report_status(output, result["verdict"]["status"], "campaign")
-
-        if arguments.command == "aggregate":
-            output = aggregate_results(
-                scenario_path=arguments.scenario,
-                run_context_path=arguments.run_context,
-                result_paths=arguments.result,
-                output_path=arguments.output,
-                transport_qualification_path=arguments.transport_qualification,
-                extension_schemas=load_extension_schemas(arguments.extension_schema),
-            )
-            aggregate = json.loads(output.read_text(encoding="utf-8"))
-            status = aggregate["cross_domain_e2e"]["status"]
-            if status == "unevaluated":
-                status = aggregate["per_domain_aggregate"]
-            return _report_status(output, status, "aggregate")
-
-        if arguments.command == "transport-evaluate":
-            output = evaluate_transport_qualification(
-                run_id=arguments.run_id,
-                scenario_path=arguments.scenario,
-                causal_chain_paths=arguments.causal_chain,
-                channel_contract_paths=arguments.channel_contract,
-                trace_paths=_keyed_values(arguments.trace, "--trace"),
-                evidence_index_paths=_keyed_values(
-                    arguments.evidence_index,
-                    "--evidence-index",
-                ),
-                artifact_receipt_paths=_domain_receipt_sources(arguments),
-                artifact_verification_paths=_grouped_values(
-                    arguments.artifact_verification,
-                    "--artifact-verification",
-                ),
-                receipt_dependency_paths=_grouped_values(
-                    arguments.receipt_dependency,
-                    "--receipt-dependency",
-                ),
-                clock_relation_paths=arguments.clock_relation,
-                observation_output_dir=arguments.observation_output,
-                output_path=arguments.output,
-                extension_schemas=load_extension_schemas(arguments.extension_schema),
-            )
-            result = json.loads(output.read_text(encoding="utf-8"))
-            return _report_status(output, result["verdict"]["status"], "qualification")
-
-        bundle = _bundle(arguments)
-        if arguments.command == "explain":
-            print(json.dumps(explain_bundle(bundle), indent=2, sort_keys=True, allow_nan=False))
-            return 0
-
-        evaluator_receipts = _evaluator_receipts(arguments)
-
-        if arguments.command == "evaluate":
-            outputs = evaluate_from_evidence(
-                run_id=arguments.run_id,
-                domain_id=arguments.domain_id,
-                run_context_path=arguments.run_context,
-                bundle=bundle,
-                evidence_index_path=arguments.evidence_index,
-                artifact_receipt_paths=_receipt_source(arguments),
-                artifact_verification_paths=arguments.artifact_verification,
-                receipt_dependency_paths=arguments.receipt_dependency,
-                evaluator_receipts=evaluator_receipts,
-                otel_metrics_path=arguments.otel_metrics,
-                window_start_ns=arguments.window_start_ns,
-                window_end_ns=arguments.window_end_ns,
-                output_dir=arguments.output,
-            )
-        else:
-            outputs = run_verification(
-                run_id=arguments.run_id,
-                domain_id=arguments.domain_id,
-                run_context_path=arguments.run_context,
-                bundle=bundle,
-                evidence_index_path=arguments.evidence_index,
-                artifact_receipt_paths=_receipt_source(arguments),
-                artifact_verification_paths=arguments.artifact_verification,
-                receipt_dependency_paths=arguments.receipt_dependency,
-                evaluator_receipts=evaluator_receipts,
-                otel_metrics_path=arguments.otel_metrics,
-                measurement_complete_path=arguments.measurement_complete,
-                output_dir=arguments.output,
-            )
-        print(
-            json.dumps(
-                {
-                    "status": outputs.result["status"],
-                    "result": str(outputs.result_path),
-                    "junit": str(outputs.junit_path),
-                },
-                sort_keys=True,
-                allow_nan=False,
-            )
-        )
-        return 0 if outputs.result["status"] == "passed" else 1
-    except Exception as error:
-        error_id = getattr(error, "error_id", None)
-        if error_id is None:
-            error_id = (
-                f"{type(error).__name__}.failed"
-                if isinstance(error, (OSError, RuntimeError, ValueError))
-                else "internal.error"
-            )
-        print(f"error: [{error_id}] {error}", file=sys.stderr)
+            return 0 if outputs.result["status"] == "passed" else 1
+    except HarnessError as error:
+        print(f"error: [{error.error_id}] {error}", file=sys.stderr)
         diagnostic_output = getattr(arguments, "diagnostic_output", None)
         if diagnostic_output:
             try:
-                write_error_diagnostic(
-                    diagnostic_output,
-                    command=str(arguments.command),
-                    error=error,
-                    error_id=error_id,
-                )
-            except Exception as diagnostic_error:
+                with command_error_boundary():
+                    write_error_diagnostic(
+                        diagnostic_output,
+                        command=str(arguments.command),
+                        error=error,
+                        error_id=error.error_id,
+                    )
+            except HarnessError as diagnostic_error:
                 print(f"error: cannot write diagnostic: {diagnostic_error}", file=sys.stderr)
-        return 2
+        return error.exit_code
 
 
 if __name__ == "__main__":

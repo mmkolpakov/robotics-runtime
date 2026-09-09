@@ -25,7 +25,7 @@
   "packages/harness/src/robotics_acceptance_harness/authorization.py::evaluate_physical_authorization::PLR0913": 10,
   "packages/harness/src/robotics_acceptance_harness/campaign.py::aggregate_campaign::C901": 11,
   "packages/harness/src/robotics_acceptance_harness/campaign.py::aggregate_campaign::PLR0913": 12,
-  "packages/harness/src/robotics_acceptance_harness/cli.py::main::C901": 18,
+    "packages/harness/src/robotics_acceptance_harness/cli.py::main::C901": 17,
   "packages/harness/src/robotics_acceptance_harness/documents.py::load_bundle::PLR0913": 8,
   "packages/harness/src/robotics_acceptance_harness/evaluation.py::_product_evaluations::C901": 11,
   "packages/harness/src/robotics_acceptance_harness/evaluation.py::_verify_installed_record::C901": 13,

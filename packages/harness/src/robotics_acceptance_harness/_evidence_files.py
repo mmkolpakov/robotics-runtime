@@ -10,13 +10,21 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import BinaryIO
 
+from robotics_acceptance_harness.errors import HarnessError
 
-class EvidenceReadError(ValueError):
+
+class EvidenceReadError(HarnessError, ValueError):
     """The opened evidence file cannot be bound to the allowed directory."""
+
+    error_id = "EvidenceReadError.failed"
 
     def __init__(self, message: str, *, field: str | None = None) -> None:
         self.field = field
         super().__init__(message)
+
+    @property
+    def diagnostic_issues(self) -> tuple[tuple[str, str], ...]:
+        return ((self.field, str(self)),) if self.field else ()
 
 
 def _windows_final_path(descriptor: int) -> Path:

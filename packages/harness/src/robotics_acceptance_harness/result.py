@@ -13,6 +13,7 @@ from junitparser import Error, Failure, JUnitXml, Skipped, TestCase, TestSuite
 from robotics_runtime_contracts import validate_document, worst_status
 
 from robotics_acceptance_harness.documents import DocumentBundle
+from robotics_acceptance_harness.errors import HarnessInputError
 from robotics_acceptance_harness.evidence import VerifiedEvidence
 from robotics_acceptance_harness.forbidden_graph import ForbiddenGraphObservation
 from robotics_acceptance_harness.hardware_timing import HardwareTimingObservation
@@ -123,7 +124,7 @@ def _authorization_result(bundle: DocumentBundle) -> dict[str, Any]:
     if execution["target_environment"] == "simulation":
         return {"mode": "none"}
     if bundle.permit is None or bundle.verification is None:
-        raise ValueError("physical acceptance result requires verified authorization")
+        raise HarnessInputError("physical acceptance result requires verified authorization")
     return {
         "mode": "verified_execution_permit",
         "permit_sha256": bundle.permit.sha256,
@@ -188,17 +189,17 @@ def build_acceptance_result(
     """Build and validate the canonical per-domain acceptance result."""
 
     if evidence_index.index.data["run_id"] != run_id:
-        raise ValueError("evidence index run_id must equal result run_id")
+        raise HarnessInputError("evidence index run_id must equal result run_id")
     physical = bundle.scenario.data["execution"]["target_environment"] in {
         "hil",
         "real_robot",
     }
     if physical and (hardware_timing is None or hardware_timing_evidence_sha256 is None):
-        raise ValueError("physical acceptance result requires hardware timing evidence")
+        raise HarnessInputError("physical acceptance result requires hardware timing evidence")
     if not physical and (
         hardware_timing is not None or hardware_timing_evidence_sha256 is not None
     ):
-        raise ValueError("simulation acceptance result does not accept hardware timing")
+        raise HarnessInputError("simulation acceptance result does not accept hardware timing")
 
     effective_unevaluated = set(unevaluated)
     if not assertions:

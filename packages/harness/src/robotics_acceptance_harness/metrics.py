@@ -10,6 +10,7 @@ from types import MappingProxyType
 from typing import Any, Literal
 
 from robotics_acceptance_harness._histogram_estimates import Estimate, estimate_statistic
+from robotics_acceptance_harness.errors import HarnessError, HarnessInputError
 
 MetricAttribute = str | bool | int | float
 MetricTemporality = Literal["delta", "cumulative", "unspecified"]
@@ -34,19 +35,19 @@ class MetricSample:
     def __post_init__(self) -> None:
         object.__setattr__(self, "attributes", MappingProxyType(dict(self.attributes)))
         if not math.isfinite(self.value):
-            raise ValueError("metric sample value must be finite")
+            raise HarnessInputError("metric sample value must be finite")
         if self.instrument_kind not in {"gauge", "sum"}:
-            raise ValueError("unsupported scalar metric instrument kind")
+            raise HarnessInputError("unsupported scalar metric instrument kind")
         if self.temporality not in {None, "delta", "cumulative", "unspecified"}:
-            raise ValueError("unsupported metric aggregation temporality")
+            raise HarnessInputError("unsupported metric aggregation temporality")
         if self.instrument_kind == "gauge" and self.temporality is not None:
-            raise ValueError("gauge samples cannot declare aggregation temporality")
+            raise HarnessInputError("gauge samples cannot declare aggregation temporality")
         if self.instrument_kind == "sum" and self.temporality is None:
-            raise ValueError("sum samples require aggregation temporality")
+            raise HarnessInputError("sum samples require aggregation temporality")
         if self.start_time_ns < 0 or self.observed_at_ns < 0:
-            raise ValueError("metric timestamps cannot be negative")
+            raise HarnessInputError("metric timestamps cannot be negative")
         if self.start_time_ns and self.start_time_ns > self.observed_at_ns:
-            raise ValueError("metric start time cannot follow observation time")
+            raise HarnessInputError("metric start time cannot follow observation time")
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,39 +68,43 @@ class HistogramSample:
     def __post_init__(self) -> None:
         object.__setattr__(self, "attributes", MappingProxyType(dict(self.attributes)))
         if self.temporality not in {"delta", "cumulative", "unspecified"}:
-            raise ValueError("unsupported histogram aggregation temporality")
+            raise HarnessInputError("unsupported histogram aggregation temporality")
         if self.start_time_ns < 0 or self.observed_at_ns < 0:
-            raise ValueError("histogram timestamps cannot be negative")
+            raise HarnessInputError("histogram timestamps cannot be negative")
         if self.start_time_ns and self.start_time_ns > self.observed_at_ns:
-            raise ValueError("histogram start time cannot follow observation time")
+            raise HarnessInputError("histogram start time cannot follow observation time")
         if self.count < 0 or any(count < 0 for count in self.bucket_counts):
-            raise ValueError("histogram counts cannot be negative")
+            raise HarnessInputError("histogram counts cannot be negative")
         if len(self.bucket_counts) != len(self.explicit_bounds) + 1:
-            raise ValueError("histogram requires one more bucket count than explicit bounds")
+            raise HarnessInputError("histogram requires one more bucket count than explicit bounds")
         if sum(self.bucket_counts) != self.count:
-            raise ValueError("histogram bucket counts must add up to count")
+            raise HarnessInputError("histogram bucket counts must add up to count")
         if any(not math.isfinite(bound) for bound in self.explicit_bounds):
-            raise ValueError("histogram explicit bounds must be finite")
+            raise HarnessInputError("histogram explicit bounds must be finite")
         if any(current >= following for current, following in pairwise(self.explicit_bounds)):
-            raise ValueError("histogram explicit bounds must be strictly increasing")
+            raise HarnessInputError("histogram explicit bounds must be strictly increasing")
         if any(
             value is not None and not math.isfinite(value)
             for value in (self.sum, self.min, self.max)
         ):
-            raise ValueError("histogram summary values must be finite")
+            raise HarnessInputError("histogram summary values must be finite")
         if self.min is not None and self.max is not None and self.min > self.max:
-            raise ValueError("histogram min cannot exceed max")
+            raise HarnessInputError("histogram min cannot exceed max")
 
 
 type MetricPoint = MetricSample | HistogramSample
 
 
-class MetricAggregationError(ValueError):
+class MetricAggregationError(HarnessError, ValueError):
     """Raised when metric points cannot form an unambiguous window aggregate."""
+
+    error_id = "MetricAggregationError.failed"
 
 
 class MetricInsufficientData(MetricAggregationError):
     """Valid observations do not determine the requested window statistic."""
+
+    error_id = "MetricInsufficientData.failed"
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,8 +126,10 @@ class AssertionEvaluation:
     evidence_sha256: tuple[str, ...] = ()
 
 
-class MetricDefinitionError(ValueError):
+class MetricDefinitionError(HarnessError, ValueError):
     """Raised when observed OTLP instruments contradict their declarations."""
+
+    error_id = "MetricDefinitionError.failed"
 
 
 def percentile(values: Sequence[float], quantile: float) -> float:
@@ -153,7 +160,7 @@ def _aggregate(name: str, values: Sequence[float]) -> float | int:
         return percentile(values, 0.99)
     if name == "count":
         return len(values)
-    raise ValueError(f"unsupported aggregation: {name}")
+    raise HarnessInputError(f"unsupported aggregation: {name}")
 
 
 def _series_key(
@@ -253,10 +260,10 @@ def require_window_coverage(
     """Require each series' total uncovered window time to stay within tolerance."""
 
     if tolerance_ns < 0:
-        raise ValueError("metric coverage tolerance cannot be negative")
+        raise HarnessInputError("metric coverage tolerance cannot be negative")
     window_duration_ns = window_end_ns - window_start_ns
     if window_duration_ns <= 0:
-        raise ValueError("metric evaluation window must have positive duration")
+        raise HarnessInputError("metric evaluation window must have positive duration")
     effective_tolerance_ns = min(
         tolerance_ns,
         int(window_duration_ns * METRIC_WINDOW_MAX_UNCOVERED_FRACTION),
@@ -899,13 +906,13 @@ def evaluate_metric_assertions(
     """Evaluate contract metric assertions against canonical metric samples."""
 
     if (window_start_ns is None) != (window_end_ns is None):
-        raise ValueError("metric evaluation window requires both start and end")
+        raise HarnessInputError("metric evaluation window requires both start and end")
     if (
         window_start_ns is not None
         and window_end_ns is not None
         and window_end_ns < window_start_ns
     ):
-        raise ValueError("metric evaluation window ends before it starts")
+        raise HarnessInputError("metric evaluation window ends before it starts")
 
     grouped: dict[str, list[MetricPoint]] = defaultdict(list)
     for sample in samples:

@@ -18,6 +18,7 @@ from typing import Any, cast
 from packaging.utils import canonicalize_name
 
 from robotics_acceptance_harness.documents import DocumentBundle
+from robotics_acceptance_harness.errors import HarnessError
 from robotics_acceptance_harness.evidence import VerifiedEvidence
 from robotics_acceptance_harness.metrics import (
     AssertionEvaluation,
@@ -35,7 +36,7 @@ EVALUATOR_ENTRY_POINT_GROUP = "robotics_acceptance.evaluators"
 _INSTALLER_GENERATED_NAMES = frozenset({"INSTALLER", "RECORD", "REQUESTED", "direct_url.json"})
 
 
-class EvaluationError(ValueError):
+class EvaluationError(HarnessError, ValueError):
     """Raised when an evaluator violates the public extension contract."""
 
     error_id = "evaluation.invalid"
