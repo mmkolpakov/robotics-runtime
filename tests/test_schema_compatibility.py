@@ -304,10 +304,14 @@ def test_semantic_probe_uses_selected_source_despite_pythonpath(
 
 
 def test_published_alias_fixture_is_validated_as_values_without_rewriting_bytes(
-    published: Path,
+    published: Path, tmp_path: Path
 ) -> None:
-    original = published / "tests/fixtures/model-artifact/valid/onnx.yaml"
-    frozen_bytes = original.read_bytes()
+    # Keep this regression even after a newer release removes fixture aliases.
+    frozen_bytes = history.git(
+        ROOT, "show", f"{history.LEGACY_COMMIT}:tests/fixtures/model-artifact/valid/onnx.yaml"
+    )
+    original = tmp_path / "onnx.yaml"
+    original.write_bytes(frozen_bytes)
     assert b"*id001" in frozen_bytes
     response = semantic.probe(published / "src", {"files": {"onnx": str(original)}})
     document = response["documents"]["onnx"]
@@ -338,15 +342,43 @@ def test_fixture_decoder_preserves_yaml12_json_values(tmp_path: Path) -> None:
     }
 
 
+@pytest.mark.parametrize("value", ["1_000", "0b10", "2026-09-09T00:00:00Z"])
+def test_fixture_decoder_keeps_core_strings_accepted_by_public_writer(
+    published: Path, tmp_path: Path, value: str
+) -> None:
+    from robotics_runtime_contracts import load_mapping
+    from robotics_runtime_contracts.serialization import dumps_yaml
+
+    original = published / "tests/fixtures/model-artifact/valid/onnx.yaml"
+    document = fixture_document(original)
+    document["build"]["version"] = value
+    path = tmp_path / "core-string.yaml"
+    path.write_text(dumps_yaml(document), encoding="utf-8")
+    assert load_mapping(path) == document
+    assert fixture_document(path) == document
+    response = semantic.probe(published / "src", {"files": {"core-string": str(path)}})
+    assert response["documents"]["core-string"]["build"]["version"] == value
+
+
+def test_merge_key_is_a_literal_core_string(tmp_path: Path) -> None:
+    path = tmp_path / "literal.yaml"
+    path.write_text("build: {<<: {tool: onnx}, tool: different}\n", encoding="utf-8")
+    assert fixture_document(path) == {"build": {"<<": {"tool": "onnx"}, "tool": "different"}}
+
+
 @pytest.mark.parametrize(
     "suffix,source",
     [
         ("yaml", "value: 1\nvalue: 2\n"),
         ("yaml", "value: &cycle [*cycle]\n"),
         ("yaml", "value: .inf\n"),
-        ("yaml", "value: 2026-09-09T00:00:00Z\n"),
+        ("yaml", "value: !!timestamp 2026-09-09T00:00:00Z\n"),
         ("yaml", "value: {1: coerced}\n"),
         ("yaml", "value: !!set {a: null}\n"),
+        ("yaml", "build: {<<: {tool: onnx}, tool: 17, tool: onnx}\n"),
+        ("yaml", "build: {!!merge <<: {tool: onnx}, tool: 17, tool: onnx}\n"),
+        ("yaml", "value: !!int 1_000\n"),
+        ("yaml", "%YAML 1.1\n---\nvalue: 010\n"),
         ("json", '{"value": 1, "value": 2}'),
         ("json", '{"value": NaN}'),
         ("json", '{"value": 1,}'),
