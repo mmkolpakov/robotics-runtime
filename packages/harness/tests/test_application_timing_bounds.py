@@ -179,26 +179,30 @@ def _verify(
 
 
 @pytest.mark.parametrize(
-    "profile",
+    ("profile", "expected_status"),
     [
-        "freeze-midpoint",
-        "freeze-tail",
-        "freeze-catch-up",
-        "burst-freeze-catch-up",
-        "short-final-trace",
-        "silent-tail",
-        "silent-interior",
+        ("freeze-midpoint", "failed"),
+        ("freeze-tail", "failed"),
+        ("freeze-catch-up", "failed"),
+        ("burst-freeze-catch-up", "incomplete"),
+        ("short-final-trace", "incomplete"),
+        ("silent-tail", "incomplete"),
+        ("silent-interior", "incomplete"),
     ],
 )
 def test_full_measurement_rejects_pauses_and_missing_clock_coverage(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str, expected_status: str
 ) -> None:
     observer = InjectedClockObserver(FakeTime(), profile)
     outputs = _verify(tmp_path, observer, monkeypatch)
-    assert outputs.result["status"] == "failed"
+    assert outputs.result["status"] == expected_status
     assert outputs.result["clock_observation"]["real_time_factor"] == 0
     junit = JUnitXml.fromfile(str(outputs.junit_path))
-    assert junit.failures == 1 and junit.errors == 0
+    assert junit.failures == (1 if expected_status == "failed" else 0)
+    assert junit.errors == 0
+    if expected_status == "incomplete":
+        assert junit.skipped == 2  # Time policy and incomplete evaluation coverage.
+        assert "$.clock_observation.real_time_factor" in outputs.result["unevaluated"]
     if "freeze" in profile:
         assert observer.callback_count == len(observer.clock_samples) == 600
 

@@ -377,6 +377,7 @@ def run_verification(
     )
     hardware_timing: HardwareTimingObservation | None = None
     timing_failure: AssertionEvaluation | None = None
+    timing_unevaluated: tuple[str, ...] = ()
     if physical:
         hardware_timing = evaluate_hardware_timing(
             scenario["time_policy"],
@@ -403,14 +404,21 @@ def run_verification(
                 scenario["time_policy"],
                 clock_samples,
                 measurement_window=ClockMeasurementWindow(
-                    measurement_started_monotonic_ns, measurement_finished_monotonic_ns
+                    measurement_started_monotonic_ns,
+                    measurement_finished_monotonic_ns,
+                    deadline_miss_ratio=(
+                        _maximum_deadline_ratio(metric_samples)
+                        if execution["time_mode"] == "simulation_realtime"
+                        else None
+                    ),
                 ),
             )
         except TimingValidationError as error:
             timing = error.observation
+            timing_unevaluated = error.unevaluated
             timing_failure = AssertionEvaluation(
                 assertion_id="time-policy",
-                status="failed",
+                status="failed" if error.failed else "skipped",
                 observed_value=None,
                 unit="1",
                 message=str(error),
@@ -462,7 +470,7 @@ def run_verification(
         time_authority=time_authority,
         time_authority_evidence_sha256=metrics_evidence_sha256,
         assertions=assertions,
-        unevaluated=[],
+        unevaluated=timing_unevaluated,
         started_at=started_at,
         finished_at=finished_at,
         monotonic_duration_sec=monotonic_duration_sec,
