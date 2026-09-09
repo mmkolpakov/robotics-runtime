@@ -166,6 +166,7 @@ def why_report(
         )
     if (
         "$.clock_observation" not in unevaluated
+        and "$.clock_observation.monotonic" not in unevaluated
         and not result.data["clock_observation"]["monotonic"]
     ):
         observations.append(
