@@ -42,14 +42,12 @@ version.
 | Component | Baseline |
 | --- | --- |
 | Python | 3.12 through 3.14 |
-| Contracts | Workspace candidate `robotics-runtime-contracts>=0.17.0rc1,<0.18` |
+| Contracts | `robotics-runtime-contracts>=0.17,<0.18` |
 | ROS observation | ROS 2 Jazzy packages in the observer environment |
 | Metrics | OTLP JSON Lines exported by OpenTelemetry Collector |
 
 All public contract families currently use one canonical `v1`. Published
 schemas are checked for compatible changes against the release baseline.
-The contracts candidate above is under development; its preparation does not
-mean it is available on PyPI.
 
 ## Install
 
@@ -291,7 +289,9 @@ explicit source loader, without reading or writing bytecode caches. This covers
 the evaluator's parent packages and imports within the distribution's module
 namespaces, including imports deferred until evaluation. Regular packages,
 namespace packages, relative imports, and dotted entry-point attributes are
-supported. Evaluator-owned modules require hashed Python source; native and
+supported. Wheels sharing a namespace must each be qualified for the current
+evaluation; every entry point is still checked against its own distribution's
+RECORD. Evaluator-owned modules require hashed Python source; native and
 sourceless evaluator modules are rejected. Dependencies outside those namespaces
 use Python's normal import machinery and remain part of the execution image's
 trust boundary. This loading check is not a sandbox for malicious Python code,
