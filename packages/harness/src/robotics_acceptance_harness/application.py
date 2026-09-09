@@ -10,7 +10,7 @@ from time import monotonic_ns, sleep, time_ns
 from typing import Any, Protocol, cast
 from uuid import uuid4
 
-from robotics_acceptance_harness.documents import DocumentBundle
+from robotics_acceptance_harness.documents import DocumentBundle, DocumentInput, DocumentSource
 from robotics_acceptance_harness.errors import HarnessError, HarnessInputError
 from robotics_acceptance_harness.evaluation import EvaluationContext, evaluate_acceptance
 from robotics_acceptance_harness.evidence import (
@@ -188,7 +188,7 @@ def _enrich_clock_samples(
 
 
 def _wait_for_evidence(
-    path: str | Path,
+    path: DocumentInput,
     *,
     run_id: str,
     receipt_paths: ReceiptSource,
@@ -203,7 +203,8 @@ def _wait_for_evidence(
         raise HarnessInputError("evidence timeout must be finite and nonnegative")
     if not isfinite(poll_interval_sec) or poll_interval_sec <= 0:
         raise HarnessInputError("evidence poll interval must be finite and positive")
-    source = Path(path).expanduser().resolve()
+    source = path if isinstance(path, DocumentSource) else DocumentSource(path)
+    source = DocumentSource(Path(source.path).expanduser().resolve(), source.extension_schemas)
     deadline_ns = now_ns() + int(timeout_sec * 1_000_000_000)
     while True:
         try:
@@ -218,7 +219,7 @@ def _wait_for_evidence(
             remaining_sec = (deadline_ns - now_ns()) / 1_000_000_000
             if remaining_sec <= 0:
                 raise VerificationError(
-                    f"finalized evidence index not ready before deadline: {source}: {error}"
+                    f"finalized evidence index not ready before deadline: {source.path}: {error}"
                 ) from error
             sleep_fn(min(poll_interval_sec, remaining_sec))
 
@@ -259,7 +260,7 @@ def run_verification(
             f"measurement completion directory does not exist: {measurement_complete.parent}"
         )
     run_context = load_run_context(
-        run_context_path,
+        DocumentSource(run_context_path, bundle.extension_schemas),
         run_id=run_id,
         domain_id=domain_id,
         scenario_id=str(scenario["scenario_id"]),
@@ -342,7 +343,7 @@ def run_verification(
 
     assert last_snapshot is not None
     evidence = _wait_for_evidence(
-        evidence_index_path,
+        DocumentSource(evidence_index_path, bundle.extension_schemas),
         run_id=run_id,
         receipt_paths=artifact_receipt_paths,
         verification_paths=artifact_verification_paths,
@@ -512,14 +513,14 @@ def evaluate_from_evidence(
     if window_end_ns <= window_start_ns:
         raise VerificationError("offline evaluation window must have positive duration")
     run_context = load_run_context(
-        run_context_path,
+        DocumentSource(run_context_path, bundle.extension_schemas),
         run_id=run_id,
         domain_id=domain_id,
         scenario_id=str(bundle.scenario_data["scenario_id"]),
         scenario_sha256=bundle.scenario.sha256,
     )
     evidence = load_evidence_index(
-        evidence_index_path,
+        DocumentSource(evidence_index_path, bundle.extension_schemas),
         expected_run_id=run_id,
         receipt_paths=artifact_receipt_paths,
         verification_paths=artifact_verification_paths,

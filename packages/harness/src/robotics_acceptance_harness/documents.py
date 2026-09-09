@@ -10,10 +10,12 @@ from typing import Any, NotRequired, TypedDict, cast
 
 from robotics_runtime_contracts import (
     ProviderRequirementError,
+    RobotDescriptionBindingError,
     loads_mapping,
     schema_for_role,
     validate_document,
     validate_provider_requirements,
+    validate_robot_description_binding,
     validate_role,
 )
 from robotics_runtime_contracts.serialization import read_document_bytes
@@ -52,12 +54,14 @@ class ScenarioDocument(TypedDict):
     provider_requirements: Mapping[str, Any]
     model_manifest_sha256: NotRequired[str]
     dataset_manifest_sha256: NotRequired[str]
+    workload: NotRequired[Mapping[str, str]]
 
 
 class RuntimeWorkloadDocument(TypedDict):
     kind: str
     model: NotRequired[Mapping[str, Any]]
     inference: NotRequired[Mapping[str, Any]]
+    robot_description: NotRequired[Mapping[str, str]]
 
 
 class RuntimeDocument(TypedDict):
@@ -115,6 +119,23 @@ def _freeze(value: Any) -> Any:
 
 
 @dataclass(frozen=True, slots=True)
+class DocumentSource:
+    """A document path with the local schemas required to validate its inputs."""
+
+    path: str | Path
+    extension_schemas: Mapping[str, bytes | str] | None = None
+
+    def __post_init__(self) -> None:
+        if self.extension_schemas is not None:
+            object.__setattr__(
+                self, "extension_schemas", MappingProxyType(dict(self.extension_schemas))
+            )
+
+
+DocumentInput = str | Path | DocumentSource
+
+
+@dataclass(frozen=True, slots=True)
 class LoadedDocument:
     path: Path
     data: Mapping[str, Any]
@@ -133,6 +154,13 @@ class DocumentBundle:
     dataset: LoadedDocument | None = None
     permit: LoadedDocument | None = None
     verification: LoadedDocument | None = None
+    extension_schemas: Mapping[str, bytes | str] | None = None
+
+    def __post_init__(self) -> None:
+        if self.extension_schemas is not None:
+            object.__setattr__(
+                self, "extension_schemas", MappingProxyType(dict(self.extension_schemas))
+            )
 
     @property
     def scenario_data(self) -> ScenarioDocument:
@@ -151,13 +179,18 @@ def _read_bytes(path: Path) -> bytes:
 
 
 def load_document(
-    path: str | Path,
+    path: DocumentInput,
     *,
     expected_role: str | None = None,
     extension_schemas: Mapping[str, bytes | str] | None = None,
 ) -> LoadedDocument:
     """Load, validate, hash, and freeze one contract document."""
 
+    if isinstance(path, DocumentSource):
+        if extension_schemas is not None:
+            raise BundleValidationError("$.extension_schemas", "schema registry was supplied twice")
+        extension_schemas = path.extension_schemas
+        path = path.path
     resolved_path = Path(path).expanduser().resolve()
     return load_document_bytes(
         _read_bytes(resolved_path),
@@ -329,19 +362,28 @@ def load_bundle(
     runtime = load_document(
         runtime_path,
         expected_role="runtime_manifest",
+        extension_schemas=extension_schemas,
     )
     model = (
-        load_document(model_path, expected_role="model_artifact_manifest")
+        load_document(
+            model_path,
+            expected_role="model_artifact_manifest",
+            extension_schemas=extension_schemas,
+        )
         if model_path is not None
         else None
     )
     dataset = (
-        load_document(dataset_path, expected_role="dataset_manifest")
+        load_document(
+            dataset_path, expected_role="dataset_manifest", extension_schemas=extension_schemas
+        )
         if dataset_path is not None
         else None
     )
     permit = (
-        load_document(permit_path, expected_role="execution_permit")
+        load_document(
+            permit_path, expected_role="execution_permit", extension_schemas=extension_schemas
+        )
         if permit_path is not None
         else None
     )
@@ -349,6 +391,7 @@ def load_bundle(
         load_document(
             verification_path,
             expected_role="execution_verification",
+            extension_schemas=extension_schemas,
         )
         if verification_path is not None
         else None
@@ -358,6 +401,12 @@ def load_bundle(
     runtime_data = cast(RuntimeDocument, runtime.data)
     _validate_execution_alignment(scenario_data, runtime_data)
     _validate_provider_alignment(scenario_data, runtime_data)
+    try:
+        validate_robot_description_binding(scenario_data, runtime_data)
+    except RobotDescriptionBindingError as error:
+        raise BundleValidationError(
+            "$.runtime.workload.robot_description.sha256", str(error)
+        ) from error
     _require_equal(
         "$.runtime.evaluator_bindings",
         scenario_data["evaluator_requirements"],
@@ -387,4 +436,5 @@ def load_bundle(
         dataset=dataset,
         permit=permit,
         verification=verification,
+        extension_schemas=extension_schemas,
     )

@@ -123,12 +123,17 @@ def doctor_report(
     }
 
 
-def why_report(path: str | Path) -> dict[str, Any]:
+def why_report(
+    path: str | Path,
+    *,
+    extension_schemas: Mapping[str, bytes | str] | None = None,
+) -> dict[str, Any]:
     """Extract actionable verdict causes from a canonical result."""
 
     result = load_document(
         path,
         expected_role="acceptance_result",
+        extension_schemas=extension_schemas,
     )
     assertions = [
         {

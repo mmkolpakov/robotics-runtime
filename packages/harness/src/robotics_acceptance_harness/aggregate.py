@@ -14,7 +14,11 @@ from robotics_runtime_contracts import (
 )
 
 from robotics_acceptance_harness import __version__
-from robotics_acceptance_harness.documents import BundleValidationError, load_document
+from robotics_acceptance_harness.documents import (
+    BundleValidationError,
+    DocumentSource,
+    load_document,
+)
 from robotics_acceptance_harness.evidence import load_evidence_index
 from robotics_acceptance_harness.otel import OTLP_JSON_LINES_MEDIA_TYPE
 from robotics_acceptance_harness.receipts import ReceiptSource
@@ -49,7 +53,9 @@ def aggregate_results(
         extension_schemas=extension_schemas,
     )
     context_path = Path(run_context_path).expanduser().resolve()
-    context = load_document(context_path, expected_role="acceptance_run")
+    context = load_document(
+        context_path, expected_role="acceptance_run", extension_schemas=extension_schemas
+    )
     if (
         context.data["scenario_id"] != scenario.data["scenario_id"]
         or context.data["scenario_sha256"] != scenario.sha256
@@ -63,6 +69,7 @@ def aggregate_results(
         load_document(
             path,
             expected_role="acceptance_result",
+            extension_schemas=extension_schemas,
         )
         for path in resolved_result_paths
     ]
@@ -75,6 +82,7 @@ def aggregate_results(
         load_document(
             qualification_path,
             expected_role="transport_qualification_result",
+            extension_schemas=extension_schemas,
         )
         if qualification_path is not None
         else None
@@ -286,7 +294,8 @@ def evaluate_transport_qualification(
             "at least one causal-chain contract is required",
         )
     chain_contracts = [
-        load_document(path, expected_role="causal_chain") for path in causal_chain_paths
+        load_document(path, expected_role="causal_chain", extension_schemas=extension_schemas)
+        for path in causal_chain_paths
     ]
     chain_ids = [str(item.data["chain_id"]) for item in chain_contracts]
     if len(chain_ids) != len(set(chain_ids)):
@@ -303,7 +312,8 @@ def evaluate_transport_qualification(
         )
 
     channel_contracts = [
-        load_document(path, expected_role="transport_channel") for path in channel_contract_paths
+        load_document(path, expected_role="transport_channel", extension_schemas=extension_schemas)
+        for path in channel_contract_paths
     ]
     channel_ids = [str(item.data["channel_id"]) for item in channel_contracts]
     if len(channel_ids) != len(set(channel_ids)):
@@ -371,7 +381,7 @@ def evaluate_transport_qualification(
     verified_by_domain = {}
     for domain_id in sorted(expected_domains):
         verified = load_evidence_index(
-            evidence_index_paths[domain_id],
+            DocumentSource(evidence_index_paths[domain_id], extension_schemas),
             expected_run_id=run_id,
             receipt_paths=(artifact_receipt_paths or {}).get(domain_id, ()),
             verification_paths=(artifact_verification_paths or {}).get(domain_id, ()),
@@ -402,7 +412,8 @@ def evaluate_transport_qualification(
     validate_trace_set(spans_by_domain)
 
     clock_relations = [
-        load_document(path, expected_role="clock_relation") for path in clock_relation_paths
+        load_document(path, expected_role="clock_relation", extension_schemas=extension_schemas)
+        for path in clock_relation_paths
     ]
     clock_relation_references: list[dict[str, Any]] = []
     clock_statuses: set[str] = set()

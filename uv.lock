@@ -953,7 +953,7 @@ wheels = [
 
 [[package]]
 name = "robotics-acceptance-harness"
-version = "0.18.0"
+version = "0.20.0"
 source = { editable = "packages/harness" }
 dependencies = [
     { name = "junitparser" },

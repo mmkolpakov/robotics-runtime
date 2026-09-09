@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from robotics_acceptance_harness.documents import (
     BundleValidationError,
+    DocumentInput,
     LoadedDocument,
     load_document,
 )
@@ -52,7 +53,7 @@ def create_run_context(
 
 
 def load_run_context(
-    path: str | Path,
+    path: DocumentInput,
     *,
     run_id: str,
     domain_id: str,

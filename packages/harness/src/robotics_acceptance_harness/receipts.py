@@ -99,15 +99,19 @@ def _documents(
     role: str,
     *,
     root: Path | None = None,
+    extension_schemas: Mapping[str, bytes | str] | None = None,
 ) -> Mapping[str, LoadedDocument]:
     documents: dict[str, LoadedDocument] = {}
     for path in paths:
         if root is None:
-            document = load_document(path, expected_role=role)
+            document = load_document(path, expected_role=role, extension_schemas=extension_schemas)
         else:
             with open_evidence(Path(path), root) as stream:
                 document = load_document_bytes(
-                    read_document_stream(stream), source=Path(path), expected_role=role
+                    read_document_stream(stream),
+                    source=Path(path),
+                    expected_role=role,
+                    extension_schemas=extension_schemas,
                 )
         if document.sha256 in documents:
             raise ReceiptValidationError(f"$.{role}", "duplicate document bytes")
@@ -153,12 +157,26 @@ def _inventory_paths(path: Path) -> tuple[Path, Mapping[str, tuple[Path, ...]]]:
     return root, paths
 
 
-def _load_inventory(inventory: ReceiptInventory) -> VerifiedReceiptSet:
+def _load_inventory(
+    inventory: ReceiptInventory,
+    *,
+    extension_schemas: Mapping[str, bytes | str] | None = None,
+) -> VerifiedReceiptSet:
     try:
         root, paths = _inventory_paths(Path(inventory.path).expanduser().absolute())
         return _verify_documents(
-            _documents(paths["receipts"], "artifact_receipt", root=root),
-            _documents(paths["verifications"], "artifact_verification", root=root),
+            _documents(
+                paths["receipts"],
+                "artifact_receipt",
+                root=root,
+                extension_schemas=extension_schemas,
+            ),
+            _documents(
+                paths["verifications"],
+                "artifact_verification",
+                root=root,
+                extension_schemas=extension_schemas,
+            ),
             _raw_digests(paths["dependencies"], root=root),
         )
     except ReceiptValidationError:
@@ -172,18 +190,21 @@ def load_verified_receipts(
     receipt_paths: ReceiptSource = (),
     verification_paths: Sequence[str | Path] = (),
     dependency_paths: Sequence[str | Path] = (),
+    extension_schemas: Mapping[str, bytes | str] | None = None,
 ) -> VerifiedReceiptSet:
-    """Load receipts and bind them to externally verified provenance records."""
+    """Validate receipt extensions offline and bind externally verified provenance."""
 
     if isinstance(receipt_paths, ReceiptInventory):
         if verification_paths or dependency_paths:
             raise ReceiptValidationError(
                 "$.receipt_inventory", "inventory cannot be combined with explicit receipt inputs"
             )
-        return _load_inventory(receipt_paths)
+        return _load_inventory(receipt_paths, extension_schemas=extension_schemas)
     return _verify_documents(
-        _documents(receipt_paths, "artifact_receipt"),
-        _documents(verification_paths, "artifact_verification"),
+        _documents(receipt_paths, "artifact_receipt", extension_schemas=extension_schemas),
+        _documents(
+            verification_paths, "artifact_verification", extension_schemas=extension_schemas
+        ),
         _raw_digests(dependency_paths),
     )
 
