@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.18.0
 
+- Make current model-artifact fixtures readable by the public input loader.
+  Remove YAML aliases and validate fixtures with the same parser used by clients.
 - Support digest-pinned, offline extensions in every public role, including
   qualification predicates. Preserve legacy unpinned payloads where v1 already
   allowed them. Carry supplied schemas through qualification loading, receipt

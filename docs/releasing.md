@@ -9,13 +9,15 @@ Tag pushes must resolve to the checked-out commit and be reachable from `origin/
 
 ## Current readiness and dry runs
 
-The current candidate is **contracts 0.17.0rc1**. Dispatch
-`contracts-v0.17.0-rc.1` on its reviewed branch to build and install both archives
-without publishing. A successful candidate run does not establish PyPI publisher
-registration or a stable release. Harness remains **0.18.0** during development;
-its temporary workspace bound admits this contracts candidate. Before the stable
-contracts release, replace that bound with `>=0.17,<0.18`. Harness `0.19.0` also
-requires its own version, changelog and completed contracts release (SPEC 37).
+Read the selected package's committed version before dispatching a candidate.
+For example, contracts `0.18.0` requires `contracts-v0.18.0`; an RC version
+`0.18.0rc1` requires `contracts-v0.18.0-rc.1`. A reviewed development branch can
+build and install both archives without publishing. A successful dry run does
+not establish PyPI publisher registration or a published release.
+
+Harness releases also require their own stable version, changelog and the
+completed contracts release matching their dependency bound. Development metadata
+alone does not establish either package's release readiness.
 
 `workflow_dispatch` requires a `candidate` input and always runs in dry-run mode.
 Select the ref containing the reviewed source and matching version. It executes helper
@@ -33,7 +35,7 @@ uv sync --locked --only-group dev --no-install-workspace --python 3.12
 PY="$UV_PROJECT_ENVIRONMENT/bin/python"
 "$PY" -m pytest tests/release
 "$PY" -m scripts.release.plan \
-  --candidate contracts-v0.17.0-rc.1 --event workflow_dispatch \
+  --candidate contracts-v0.18.0 --event workflow_dispatch \
   --repository mmkolpakov/robotics-runtime --output artifacts/release/plan.json
 uv build --package robotics-runtime-contracts --no-sources --out-dir artifacts/release/dist
 "$PY" -m scripts.release.verify_install \

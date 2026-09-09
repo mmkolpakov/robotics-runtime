@@ -8,7 +8,7 @@ source:
   media_type: application/onnx
   runtime_family: onnx
   execution_provider: reference
-  inputs: &id001
+  inputs:
     - name: images
       element_type: float32
       shape:
@@ -16,7 +16,7 @@ source:
         - 3
         - 640
         - 640
-  outputs: &id002
+  outputs:
     - name: detections
       element_type: float32
       shape:
@@ -31,8 +31,21 @@ target:
   media_type: application/onnx
   runtime_family: onnxruntime_cpu
   execution_provider: CPUExecutionProvider
-  inputs: *id001
-  outputs: *id002
+  inputs:
+    - name: images
+      element_type: float32
+      shape:
+        - batch
+        - 3
+        - 640
+        - 640
+  outputs:
+    - name: detections
+      element_type: float32
+      shape:
+        - batch
+        - candidates
+        - 6
 build:
   tool: onnx
   version: 1.20.1

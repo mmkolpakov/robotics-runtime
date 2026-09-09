@@ -8,12 +8,12 @@ source:
   media_type: application/onnx
   runtime_family: onnx
   execution_provider: reference
-  inputs: &id001
+  inputs:
     - name: input
       element_type: float32
       shape:
         - 1
-  outputs: &id002
+  outputs:
     - name: output
       element_type: float32
       shape:
@@ -26,8 +26,16 @@ target:
   media_type: application/vnd.nvidia.tensorrt.engine
   runtime_family: onnxruntime_tensorrt
   execution_provider: TensorrtExecutionProvider
-  inputs: *id001
-  outputs: *id002
+  inputs:
+    - name: input
+      element_type: float32
+      shape:
+        - 1
+  outputs:
+    - name: output
+      element_type: float32
+      shape:
+        - 1
 build:
   tool: TensorRT
   version: 11.0.0
