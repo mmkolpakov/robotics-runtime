@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "robotics-acceptance-harness"
-version = "0.18.0"
+version = "0.19.0"
 description = "Attach-only acceptance observer for validated robotics executions."
 requires-python = ">=3.12,<3.15"
 readme = "README.md"
@@ -38,9 +38,9 @@ pytest = ["pytest>=8,<10"]
 robotics-acceptance = "robotics_acceptance_harness.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/mmkolpakov/robotics-acceptance-harness"
-Repository = "https://github.com/mmkolpakov/robotics-acceptance-harness"
-Issues = "https://github.com/mmkolpakov/robotics-acceptance-harness/issues"
+Homepage = "https://github.com/mmkolpakov/robotics-runtime/tree/main/packages/harness"
+Repository = "https://github.com/mmkolpakov/robotics-runtime"
+Issues = "https://github.com/mmkolpakov/robotics-runtime/issues"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
