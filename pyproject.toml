@@ -7,6 +7,7 @@ dev = [
   "pre-commit==4.6.0",
   "pytest==9.1.1",
   "ruff==0.15.21",
+  "ruamel.yaml==0.19.1",
   "types-jsonschema==4.26.0.20260518",
   "types-protobuf==7.34.1.20260518",
   "types-PyYAML==6.0.12.20260518",
