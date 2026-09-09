@@ -191,7 +191,7 @@ def test_missing_clock_diagnostic_retains_timing_issues(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def fail(**_kwargs: object) -> None:
-        evaluate_timing({}, {}, ())
+        evaluate_timing({"time_mode": "simulation_stepped"}, {}, ())
 
     monkeypatch.setattr("robotics_acceptance_harness.cli.doctor_report", fail)
     diagnostic = tmp_path / "diagnostic.json"

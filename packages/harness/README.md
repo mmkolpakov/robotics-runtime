@@ -42,14 +42,12 @@ version.
 | Component | Baseline |
 | --- | --- |
 | Python | 3.12 through 3.14 |
-| Contracts | Workspace candidate `robotics-runtime-contracts>=0.17.0rc1,<0.18` |
+| Contracts | `robotics-runtime-contracts>=0.17,<0.18` |
 | ROS observation | ROS 2 Jazzy packages in the observer environment |
 | Metrics | OTLP JSON Lines exported by OpenTelemetry Collector |
 
 All public contract families currently use one canonical `v1`. Published
 schemas are checked for compatible changes against the release baseline.
-The contracts candidate above is under development; its preparation does not
-mean it is available on PyPI.
 
 ## Install
 
@@ -262,6 +260,22 @@ Missing statistics use explicit unevaluated markers and diagnostic placeholders,
 never proof of a measured zero or a threshold breach. JUnit preserves these
 skipped outcomes. Artifact digests and existing result schema fields are unchanged.
 
+## Realtime timing windows
+
+Live verification evaluates the complete measurement interval and overlapping
+windows of at least one second. Clock callbacks bound source-clock progress;
+the recorded `real_time_factor` is a conservative lower bound. A lower bound
+below the policy threshold alone does not prove a violation. If the upper bound
+also lies below the threshold, the time-policy assertion fails. When the bounds
+straddle the threshold or clock coverage is missing, it is skipped and the
+corresponding clock fields are listed as unevaluated, producing `incomplete`
+unless another observation proves a failure.
+
+Deadline ratios are independent evidence: the greatest observed value is checked
+even when clock callbacks or other deadline samples are missing. A known deadline
+exceedance or a clock stall proved by recorded endpoints remains a failure.
+`why` preserves the distinction between unobserved and violated clock properties.
+
 ## Contract Inputs
 
 | Input | Contract role |
@@ -305,7 +319,9 @@ explicit source loader, without reading or writing bytecode caches. This covers
 the evaluator's parent packages and imports within the distribution's module
 namespaces, including imports deferred until evaluation. Regular packages,
 namespace packages, relative imports, and dotted entry-point attributes are
-supported. Evaluator-owned modules require hashed Python source; native and
+supported. Wheels sharing a namespace must each be qualified for the current
+evaluation; every entry point is still checked against its own distribution's
+RECORD. Evaluator-owned modules require hashed Python source; native and
 sourceless evaluator modules are rejected. Dependencies outside those namespaces
 use Python's normal import machinery and remain part of the execution image's
 trust boundary. This loading check is not a sandbox for malicious Python code,

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from importlib.metadata import EntryPoint
 from pathlib import Path
 
 import pytest
 
 from robotics_acceptance_harness.diagnostics import doctor_report, why_report
+from robotics_acceptance_harness.metrics import AssertionEvaluation
 from robotics_acceptance_harness.result import build_acceptance_result, write_contract_json
 from robotics_acceptance_harness.time_authority import TimeAuthorityObservation
 from tests.test_result import result_inputs
@@ -91,3 +93,33 @@ def test_why_reports_failed_runtime_observations(tmp_path: Path) -> None:
             "message": "time-authority evidence is out of policy",
         }
     ]
+
+
+@pytest.mark.parametrize(
+    "unevaluated",
+    [(), ("$.clock_observation",), ("$.clock_observation.monotonic",)],
+)
+def test_why_distinguishes_unobserved_clock_monotonicity(
+    tmp_path: Path, unevaluated: tuple[str, ...]
+) -> None:
+    inputs = result_inputs(tmp_path)
+    inputs["timing"] = replace(inputs["timing"], monotonic=False)
+    inputs["unevaluated"] = unevaluated
+    if not unevaluated:
+        inputs["assertions"] = (AssertionEvaluation("time-policy", "failed", 0, "1"),)
+    path = write_contract_json(build_acceptance_result(**inputs), tmp_path / "result.json")
+
+    report = why_report(path)
+
+    assert report["unevaluated"] == list(unevaluated)
+    assert report["runtime_observations"] == (
+        []
+        if unevaluated
+        else [
+            {
+                "observation_id": "clock-monotonicity",
+                "status": "failed",
+                "message": "observed clock is not monotonic",
+            }
+        ]
+    )
