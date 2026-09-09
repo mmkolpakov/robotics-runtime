@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.17.0rc1 - Release candidate
+## 0.17.0
 
-The first candidate from the shared `robotics-runtime` workspace. Its distribution
+The first release from the shared `robotics-runtime` workspace. Its distribution
 contains the contracts package independently of workspace sources. Existing 0.16
 roles retain compatible assertions; the 0.15 generation still requires migration.
 
