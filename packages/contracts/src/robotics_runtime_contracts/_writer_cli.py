@@ -11,6 +11,7 @@ from robotics_runtime_contracts.recordings import recording_summary_from_mcap
 from robotics_runtime_contracts.statements import write_qualification_statement
 from robotics_runtime_contracts.writers import (
     add_evidence_artifact,
+    create_artifact_receipt,
     create_evidence_index,
     create_runtime_manifest,
     evidence_sources,
@@ -43,6 +44,7 @@ def add_writer_commands[ParserT: argparse.ArgumentParser](
     add_extensions(init)
     init.set_defaults(writer_operation="evidence_init")
     _add_evidence_operations(operations, add_extensions)
+    _add_receipt_command(subparsers, add_extensions)
 
     recording = subparsers.add_parser("recording-summary", help="extract observed MCAP statistics")
     mcap = recording.add_subparsers(dest="operation", required=True).add_parser("from-mcap")
@@ -63,6 +65,22 @@ def add_writer_commands[ParserT: argparse.ArgumentParser](
     statement.add_argument("--output", required=True, metavar="PATH")
     add_extensions(statement)
     statement.set_defaults(writer_operation="qualification_statement")
+
+
+def _add_receipt_command[ParserT: argparse.ArgumentParser](
+    subparsers: argparse._SubParsersAction[ParserT],
+    add_extensions: Callable[[argparse.ArgumentParser], None],
+) -> None:
+    receipt = subparsers.add_parser(
+        "artifact-receipt", help="bind a receipt to source bytes and external verification"
+    )
+    create = receipt.add_subparsers(dest="operation", required=True).add_parser("create")
+    _template_command(create)
+    create.add_argument("--source", required=True, metavar="PATH")
+    create.add_argument("--verification", required=True, metavar="PATH")
+    create.add_argument("--dependency", action="append", required=True, metavar="PATH")
+    add_extensions(create)
+    create.set_defaults(writer_operation="artifact_receipt")
 
 
 def _add_evidence_operations[ParserT: argparse.ArgumentParser](
@@ -122,6 +140,20 @@ def _recording(arguments: argparse.Namespace, _extensions: Mapping[str, bytes]) 
     return write_document(recording_summary_from_mcap(arguments.source), arguments.output)
 
 
+def _artifact_receipt(arguments: argparse.Namespace, _extensions: Mapping[str, bytes]) -> Path:
+    protect_inputs(
+        arguments.output,
+        [arguments.template, arguments.source, arguments.verification, *arguments.dependency],
+    )
+    document = create_artifact_receipt(
+        load_mapping(arguments.template),
+        arguments.source,
+        arguments.verification,
+        arguments.dependency,
+    )
+    return write_document(document, arguments.output)
+
+
 def _qualification_statement(
     arguments: argparse.Namespace, extensions: Mapping[str, bytes]
 ) -> Path:
@@ -141,6 +173,7 @@ def run_writer(arguments: argparse.Namespace, extensions: Mapping[str, bytes]) -
         "evidence_add": _evidence_add,
         "evidence_finalize": _evidence_finalize,
         "recording": _recording,
+        "artifact_receipt": _artifact_receipt,
         "qualification_statement": _qualification_statement,
     }
     return operations[arguments.writer_operation](arguments, extensions)

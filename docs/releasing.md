@@ -9,12 +9,13 @@ Tag pushes must resolve to the checked-out commit and be reachable from `origin/
 
 ## Current readiness and dry runs
 
-At the workspace import, contracts is **0.16.0** and harness is **0.18.0**.
-A dry run of `contracts-v0.16.0` exercises the actual current metadata without changing
-it. This is a build candidate, not permission to republish an existing PyPI version.
-The planned `contracts-v0.17.0-rc.1` dry run remains blocked until an explicitly reviewed
-version change sets `0.17.0rc1` (SPEC 26). Harness `0.19.0` needs the corresponding
-version and dependency changes (SPEC 37). This workflow never synthesizes those versions.
+The current candidate is **contracts 0.17.0rc1**. Dispatch
+`contracts-v0.17.0-rc.1` on its reviewed branch to build and install both archives
+without publishing. A successful candidate run does not establish PyPI publisher
+registration or a stable release. Harness remains **0.18.0** during development;
+its temporary workspace bound admits this contracts candidate. Before the stable
+contracts release, replace that bound with `>=0.17,<0.18`. Harness `0.19.0` also
+requires its own version, changelog and completed contracts release (SPEC 37).
 
 `workflow_dispatch` requires a `candidate` input and always runs in dry-run mode.
 Select the ref containing the reviewed source and matching version. It executes helper
@@ -32,7 +33,7 @@ uv sync --locked --only-group dev --no-install-workspace --python 3.12
 PY="$UV_PROJECT_ENVIRONMENT/bin/python"
 "$PY" -m pytest tests/release
 "$PY" -m scripts.release.plan \
-  --candidate contracts-v0.16.0 --event workflow_dispatch \
+  --candidate contracts-v0.17.0-rc.1 --event workflow_dispatch \
   --repository mmkolpakov/robotics-runtime --output artifacts/release/plan.json
 uv build --package robotics-runtime-contracts --no-sources --out-dir artifacts/release/dist
 "$PY" -m scripts.release.verify_install \
@@ -92,7 +93,8 @@ version explicitly. `uv pip check` verifies dependency compatibility.
 
 Smoke runs use the clean interpreter with `-I`, without `PYTHONPATH` or editable packages.
 They check installed file inventories and digests, schema resource loading, API validation
-of the copied consumer example, and `robotics-contracts validate`. Harness additionally
+of the copied consumer example, runtime writer round-trip, structured qualification
+diagnostics, the new role resources, and `robotics-contracts validate`. Harness additionally
 checks its existing `EvaluationContext`/`ProductEvaluator` exports and
 `robotics-acceptance explain`. Contracts has no `--version` option; no harness SDK is assumed
 before SPEC 56 introduces one. A temporary directory configured inside the workspace fails.
@@ -104,12 +106,15 @@ must verify them before enabling publication:
 
 1. Register a GitHub Trusted Publisher separately for **both PyPI projects**, with
    owner `mmkolpakov`, repository `robotics-runtime`, workflow filename `release.yml`, and
-   environment `pypi`. Follow [PyPI's publisher registration guide][publisher], or configure
+   environment `pypi` for contracts and `pypi-harness` for harness. Pending publishers
+   for two new projects cannot share the same repository/workflow/environment tuple.
+   Follow [PyPI's publisher registration guide][publisher], or configure
    a [pending publisher][pending] if the project does not exist yet. Registration itself
    does not establish that a version is available from PyPI. Do not add
    a long-lived PyPI API token to this workflow.
-2. Create the GitHub `pypi` environment and configure its reviewers and permitted tag
-   patterns for the two release prefixes. Check required branch/tag protection independently;
+2. Create the GitHub `pypi` and `pypi-harness` environments, each with required reviewers.
+   Permit only `contracts-v*` tags in `pypi` and `harness-v*` tags in `pypi-harness`.
+   Check required branch/tag protection independently;
    this workflow does not change rules or the stable `validate` CI context.
 3. Enable immutable GitHub releases. The final job deliberately fails if
    [`gh release verify`][verify-release] or [`gh release verify-asset`][verify-asset]
@@ -119,7 +124,8 @@ must verify them before enabling publication:
    publication jobs are skipped. A green build alone does not mean anything was published.
 
 All actions are pinned to full commit SHAs. Build jobs have only `contents: read`; the PyPI
-job alone uses the `pypi` environment with `id-token: write`. The separate GitHub release
+job uses the environment selected by the validated release plan with `id-token: write`.
+There is no user-supplied environment input. The separate GitHub release
 job has the contents, attestation and OIDC permissions it needs, and runs only after PyPI
 succeeds. Failed, cancelled or skipped prerequisites cannot publish a GitHub release.
 Both jobs consume the exact uploaded distributions; neither rebuilds them.

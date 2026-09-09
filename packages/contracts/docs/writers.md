@@ -63,6 +63,33 @@ outputs, and commands reject outputs that would overwrite evidence inputs.
 Python equivalents: `create_evidence_index`, `add_evidence_artifact`,
 `write_evidence_draft`, and `finalize_evidence_index`. Inputs are copied.
 
+## Artifact receipt
+
+```sh
+robotics-contracts artifact-receipt create \
+  --template receipt-metadata.json --source recording.mcap \
+  --verification artifact-verification.json \
+  --dependency statement.json --dependency trust-policy.json \
+  --dependency verification-evidence.json --output artifact-receipt.json
+```
+
+The template supplies `receipt_id`, `created_at` and the optional `run_id`.
+The artifact descriptor, producer identity/implementation and statement digest
+come from a validated `artifact-verification.v1`; any values supplied in the
+template must agree. The receipt hashes the original verification file bytes,
+checks the source file's SHA-256 and size against that descriptor, and requires
+all provenance dependencies by their raw-byte digests. Include the content
+manifest when the verification references one. Missing, duplicate and unreferenced
+dependency bytes are rejected. The receipt must not predate verification.
+
+The Python API is `create_artifact_receipt(template, source, verification,
+dependencies)`. Like the other producers, it checks consistency of supplied
+facts. It does not run a signature verifier or establish trust in an arbitrary
+verification JSON. The caller must first verify provenance through its trusted
+external verifier and preserve the verification evidence. S3 object metadata or
+an upload checksum alone cannot supply that verification. CLI output cannot
+overwrite the source, template, verification, or any dependency file.
+
 ## Recording summary
 
 Install `robotics-runtime-contracts[mcap]` (MCAP Python 1.4 or later, below 2).
@@ -138,3 +165,19 @@ claim. It does not sign, upload or grant execution authorization. Invalid links,
 missing/duplicate subjects, changed file bytes and output/input aliases fail
 before output replacement. Tests generate statements for the complete transport,
 inference and physical fixtures and validate the existing public statement schema.
+
+After an external verifier authenticates the DSSE payload, use
+`robotics-contracts validate-qualification --statement decoded-statement.json`
+with the same `--artifact` and `--extension-schema` arguments. The public API is
+`validate_qualification_statement(statement_path, specifications, extension_schemas=...)`.
+It returns the validated artifact metadata, including hashes of the original
+subject bytes. The CLI can write that metadata with `--output` and refuses to
+replace the statement, artifacts, or extension schemas.
+
+Matching uses the same deterministic JSON profile as the writer: whitespace and
+object-key order do not matter, while subject and classification arrays must use
+the writer's sorted order. Mismatches report `qualification.statement_mismatch`.
+The original statement and subjects remain untouched. This checks content and
+cross-document links only; it does not authenticate a signature, identity, trust
+root, transparency log, or receipt. The verifier must pass the same payload bytes
+it authenticated, rather than rereading a mutable external bundle afterwards.

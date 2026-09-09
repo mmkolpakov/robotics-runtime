@@ -6,7 +6,12 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from robotics_runtime_contracts import validate_document
+from robotics_runtime_contracts import (
+    ContractError,
+    dumps_canonical,
+    load_mapping,
+    validate_document,
+)
 from robotics_runtime_contracts.qualification import validate_qualification_artifacts
 from robotics_runtime_contracts.writers import protect_inputs, write_document
 
@@ -23,7 +28,12 @@ def create_qualification_statement(
     The timestamp comes from the validated aggregate; run identity comes from
     the validated run. Neither value is a writer default.
     """
-    metadata = validate_qualification_artifacts(specifications, extension_schemas)
+    return _statement_from_metadata(
+        validate_qualification_artifacts(specifications, extension_schemas)
+    )
+
+
+def _statement_from_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
     artifacts = metadata["artifacts"]
     statement = {
         "_type": "https://in-toto.io/Statement/v1",
@@ -45,6 +55,33 @@ def create_qualification_statement(
     return statement
 
 
+def validate_qualification_statement(
+    statement: str | Path,
+    specifications: Sequence[str],
+    *,
+    extension_schemas: Mapping[str, bytes] | None = None,
+) -> dict[str, Any]:
+    """Match a decoded statement to a fully validated local artifact set.
+
+    Return the artifact metadata from the same reads used for comparison.
+    Object formatting is immaterial; subject/classification arrays must use the
+    writer's sorted order. Neither the statement nor its subjects are rewritten.
+    Signature verification is the caller's responsibility and must authenticate
+    the exact statement bytes passed here.
+    """
+    candidate = load_mapping(statement)
+    validate_document(candidate, schema="qualification-bundle.v1")
+    metadata = validate_qualification_artifacts(specifications, extension_schemas)
+    expected = _statement_from_metadata(metadata)
+    if dumps_canonical(candidate) != dumps_canonical(expected):
+        raise ContractError(
+            "statement does not exactly match local subjects, digests, and classifications",
+            error_id="qualification.statement_mismatch",
+            json_path="$",
+        )
+    return metadata
+
+
 def write_qualification_statement(
     specifications: Sequence[str],
     output: str | Path,
@@ -58,4 +95,8 @@ def write_qualification_statement(
     return write_document(statement, output, schema="qualification-bundle.v1")
 
 
-__all__ = ["create_qualification_statement", "write_qualification_statement"]
+__all__ = [
+    "create_qualification_statement",
+    "validate_qualification_statement",
+    "write_qualification_statement",
+]

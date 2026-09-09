@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -260,3 +261,45 @@ def test_current_checkout_contracts_candidate_is_validated_without_mutating_vers
     assert plan.version == str(version) and plan.dry_run
     assert plan.source_files["robotics-runtime-contracts"]
     assert metadata_path.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    ("candidate", "package", "environment"),
+    [
+        ("contracts-v0.17.0", "robotics-runtime-contracts", "pypi"),
+        ("harness-v0.19.0", "robotics-acceptance-harness", "pypi-harness"),
+    ],
+)
+def test_cli_routes_verified_candidates_to_distinct_pypi_environments(
+    candidate_repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    candidate: str,
+    package: str,
+    environment: str,
+) -> None:
+    output = candidate_repo / "plan.json"
+    github_output = candidate_repo / "github-output"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "plan",
+            "--candidate",
+            candidate,
+            "--event",
+            "workflow_dispatch",
+            "--workspace",
+            str(candidate_repo),
+            "--repository",
+            "owner/repo",
+            "--output",
+            str(output),
+            "--github-output",
+            str(github_output),
+        ],
+    )
+    assert release.main() == 0
+    values = dict(line.split("=", 1) for line in github_output.read_text().splitlines())
+    assert values["package"] == package
+    assert values["pypi_environment"] == environment
+    assert json.loads(output.read_text())["dry_run"] is True

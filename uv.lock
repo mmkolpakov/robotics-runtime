@@ -980,7 +980,7 @@ provides-extras = ["pytest"]
 
 [[package]]
 name = "robotics-runtime-contracts"
-version = "0.16.0"
+version = "0.17.0"
 source = { editable = "packages/contracts" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },

@@ -1,6 +1,29 @@
 # Changelog
 
-## Unreleased
+## 0.17.0
+
+The first release from the shared `robotics-runtime` workspace. Its distribution
+contains the contracts package independently of workspace sources. Existing 0.16
+roles retain compatible assertions; the 0.15 generation still requires migration.
+
+- Add validated runtime-manifest and evidence-index writers, recording summaries
+  with optional MCAP decoding, and an in-toto qualification statement builder.
+  Artifact digests continue to identify exact retained bytes. Producer outputs
+  cannot replace their artifact or extension-schema inputs.
+- Add an artifact-receipt writer that binds source bytes to an externally
+  produced verification and its complete provenance dependency set. It preserves
+  raw-byte verification digests and does not perform signature verification.
+- Match decoded qualification statements to validated local artifact sets with
+  `validate-qualification --statement`. Keep original signed bytes unchanged;
+  object formatting is immaterial and mismatches have a typed diagnostic.
+- Add execution trust policy and robot description roles, with byte-bound
+  consumer examples. Trust-policy principals are unique by role and identity.
+- Expose public qualification inspection with typed accumulated diagnostics and
+  explicit blocked checks. Invalid cross-document execution modes cannot enter
+  incompatible authorization checks. File metadata comes from one streamed read.
+- Compare actual released Git schemas and semantic witnesses in CI, allowing only
+  supported additive changes. Unsupported structures fail closed for review;
+  the bounded gate does not claim a general proof of semantic equivalence.
 
 - Check canonical object-key size before constructing diagnostic paths. Bound
   path escaping by the document byte budget and retain the enclosing path when
@@ -37,7 +60,7 @@
   Renovate hook updates and group duplicate tool pins. Hosted bot onboarding
   and the first dependency PR remain an external acceptance gate.
 - Lock the published 0.16 schema resources and catalog with a byte-digest and
-  resource-inventory tripwire; structural compatibility checking remains planned.
+  resource-inventory tripwire, alongside the release compatibility gate.
 - Document the breaking 0.15 to 0.16 migration and known consumer versions.
 - Replace the pre-1.0 schema-name reuse policy with the compatibility rules in
   [ADR 0007](docs/decisions/0007-preserve-published-schema-compatibility.md).
