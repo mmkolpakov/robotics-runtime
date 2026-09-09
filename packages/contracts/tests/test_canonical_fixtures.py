@@ -7,10 +7,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 
 from robotics_runtime_contracts import (
-    DocumentParseError,
     dumps_canonical,
     file_sha256,
     load_mapping,
@@ -32,26 +30,13 @@ FIXTURES = sorted(
     for path in directory.rglob("*")
     if path.suffix in {".json", ".yaml", ".yml"}
 )
-LEGACY_ALIAS_FIXTURES = {
-    PACKAGE / "tests/fixtures/model-artifact/invalid/portable-tensorrt.yaml",
-    PACKAGE / "tests/fixtures/model-artifact/valid/onnx.yaml",
-    PACKAGE / "tests/fixtures/model-artifact/valid/tensorrt.yaml",
-}
 
 
 def fixture_document(path: Path) -> Any:
     if path.suffix == ".json":
         # The three artifacts.json inventories have array roots, not contracts.
         return json.loads(path.read_bytes())
-    try:
-        return load_mapping(path)
-    except DocumentParseError as error:
-        if path not in LEGACY_ALIAS_FIXTURES or error.error_id != "input.yaml_alias":
-            raise
-        # Only these reviewed, trusted legacy model fixtures contain aliases.
-        # Exercise their Python value trees without changing bytes or weakening
-        # the public loader, which correctly rejected them above (SPEC17).
-        return yaml.safe_load(path.read_text(encoding="utf-8"))
+    return load_mapping(path)
 
 
 def assert_same_json_types(left: Any, right: Any) -> None:
