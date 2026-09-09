@@ -8,7 +8,6 @@
   "packages/contracts/src/robotics_runtime_contracts/_qualification.py::_validate_transport::PLR0913": 9,
   "packages/contracts/src/robotics_runtime_contracts/document_ops.py::create_execution_permit::PLR0913": 14,
   "packages/contracts/src/robotics_runtime_contracts/extensions.py::_reject_external_references::C901": 12,
-  "packages/contracts/src/robotics_runtime_contracts/extensions.py::validate_extensions::C901": 14,
   "packages/contracts/src/robotics_runtime_contracts/qualification_policy.py::derive_channel_violations::PLR0913": 8,
   "packages/contracts/src/robotics_runtime_contracts/semantics.py::_validate_acceptance_scenario::C901": 23,
   "packages/contracts/src/robotics_runtime_contracts/semantics.py::_validate_result::C901": 35,

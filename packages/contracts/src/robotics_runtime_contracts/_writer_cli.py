@@ -140,7 +140,7 @@ def _recording(arguments: argparse.Namespace, _extensions: Mapping[str, bytes]) 
     return write_document(recording_summary_from_mcap(arguments.source), arguments.output)
 
 
-def _artifact_receipt(arguments: argparse.Namespace, _extensions: Mapping[str, bytes]) -> Path:
+def _artifact_receipt(arguments: argparse.Namespace, extensions: Mapping[str, bytes]) -> Path:
     protect_inputs(
         arguments.output,
         [arguments.template, arguments.source, arguments.verification, *arguments.dependency],
@@ -150,8 +150,9 @@ def _artifact_receipt(arguments: argparse.Namespace, _extensions: Mapping[str, b
         arguments.source,
         arguments.verification,
         arguments.dependency,
+        extension_schemas=extensions,
     )
-    return write_document(document, arguments.output)
+    return write_document(document, arguments.output, extension_schemas=extensions)
 
 
 def _qualification_statement(

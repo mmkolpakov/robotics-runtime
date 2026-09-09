@@ -238,6 +238,45 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 256
+    },
+    "extensionSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "schema_uri",
+        "sha256"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)+$"
+        },
+        "schema_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sha256": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
+        }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "default": {},
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)+$"
+      },
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
+    "extensionSchemas": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/extensionSchema"
+      }
     }
   }
 }

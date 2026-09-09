@@ -14,6 +14,7 @@ from referencing import Registry
 from referencing.exceptions import Unresolvable
 from referencing.jsonschema import DRAFT202012, Schema, SchemaRegistry, SchemaResource
 
+from robotics_runtime_contracts.catalog import internal_schema_names
 from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.semantics import SemanticValidationError
 from robotics_runtime_contracts.serialization import loads_mapping
@@ -183,99 +184,139 @@ def _extension_validation_error(
         _fail(schema_name, declaration_path, f"schema reference cannot be evaluated: {error}")
 
 
-def validate_extensions(
+def _load_extension_schema(
+    schema_name: str,
+    declaration: Mapping[str, str],
+    path: str,
+    schema_documents: Mapping[str, bytes | str],
+) -> dict[str, Any]:
+    namespace = declaration["namespace"]
+    uri = declaration["schema_uri"]
+    try:
+        raw_document = schema_documents[uri]
+    except KeyError:
+        message = "schema document was not supplied"
+        if namespace in schema_documents:
+            message = (
+                f"schema document key must equal schema_uri {uri!r}, not namespace {namespace!r}"
+            )
+        _fail(
+            schema_name,
+            f"{path}.schema_uri",
+            message,
+        )
+    raw_bytes = raw_document if isinstance(raw_document, bytes) else raw_document.encode("utf-8")
+    if sha256(raw_bytes).hexdigest() != declaration["sha256"]:
+        _fail(
+            schema_name,
+            f"{path}.sha256",
+            "schema digest does not match",
+        )
+
+    try:
+        extension_schema = loads_mapping(raw_bytes, source_name="extension-schema.json")
+    except ContractError as error:
+        _fail(
+            schema_name,
+            path,
+            f"schema must be UTF-8 JSON: {error}",
+        )
+    if extension_schema.get("$id") != uri:
+        _fail(
+            schema_name,
+            f"{path}.schema_uri",
+            "must match the schema $id",
+        )
+
+    _reject_external_references(schema_name, extension_schema)
+    try:
+        Draft202012Validator.check_schema(extension_schema)
+    except SchemaError as error:
+        _fail(
+            schema_name,
+            path,
+            f"invalid Draft 2020-12 schema: {error}",
+        )
+
+    return extension_schema
+
+
+def _validate_payload(
     schema_name: str,
     document: Mapping[str, Any],
+    path: str,
     schema_documents: Mapping[str, bytes | str] | None,
 ) -> None:
-    """Validate declared scenario extensions without performing network access."""
-
-    if not schema_name.startswith("acceptance-scenario."):
-        return
-
     declarations = document.get("extension_schemas", [])
     extensions = document.get("extensions", {})
     if not declarations and not extensions:
         return
-    if not isinstance(schema_documents, Mapping):
-        _fail(
-            schema_name,
-            "$.extension_schemas",
-            "declared extensions require supplied schema documents",
-        )
-
     declared_namespaces = [item["namespace"] for item in declarations]
     if len(declared_namespaces) != len(set(declared_namespaces)):
-        _fail(schema_name, "$.extension_schemas", "namespaces must be unique")
+        _fail(schema_name, f"{path}.extension_schemas", "namespaces must be unique")
     if set(declared_namespaces) != set(extensions):
         _fail(
             schema_name,
-            "$.extensions",
+            f"{path}.extensions",
             "extension payload namespaces must exactly match extension_schemas",
         )
-
-    for index, declaration in enumerate(declarations):
-        namespace = declaration["namespace"]
-        uri = declaration["schema_uri"]
-        try:
-            raw_document = schema_documents[uri]
-        except KeyError:
-            message = "schema document was not supplied"
-            if namespace in schema_documents:
-                message = (
-                    f"schema document key must equal schema_uri {uri!r}, "
-                    f"not namespace {namespace!r}"
-                )
-            _fail(
-                schema_name,
-                f"$.extension_schemas[{index}].schema_uri",
-                message,
-            )
-        raw_bytes = (
-            raw_document if isinstance(raw_document, bytes) else raw_document.encode("utf-8")
+    if not isinstance(schema_documents, Mapping):
+        _fail(
+            schema_name,
+            f"{path}.extension_schemas",
+            "declared extensions require supplied schema documents",
         )
-        if sha256(raw_bytes).hexdigest() != declaration["sha256"]:
-            _fail(
-                schema_name,
-                f"$.extension_schemas[{index}].sha256",
-                "schema digest does not match",
-            )
-
-        try:
-            extension_schema = loads_mapping(raw_bytes, source_name="extension-schema.json")
-        except ContractError as error:
-            _fail(
-                schema_name,
-                f"$.extension_schemas[{index}]",
-                f"schema must be UTF-8 JSON: {error}",
-            )
-        if extension_schema.get("$id") != uri:
-            _fail(
-                schema_name,
-                f"$.extension_schemas[{index}].schema_uri",
-                "must match the schema $id",
-            )
-
-        _reject_external_references(schema_name, extension_schema)
-        try:
-            Draft202012Validator.check_schema(extension_schema)
-        except SchemaError as error:
-            _fail(
-                schema_name,
-                f"$.extension_schemas[{index}]",
-                f"invalid Draft 2020-12 schema: {error}",
-            )
-
+    for index, declaration in enumerate(declarations):
+        declaration_path = f"{path}.extension_schemas[{index}]"
+        extension_schema = _load_extension_schema(
+            schema_name, declaration, declaration_path, schema_documents
+        )
+        namespace = declaration["namespace"]
         validation_error = _extension_validation_error(
-            schema_name, extension_schema, extensions[namespace], f"$.extension_schemas[{index}]"
+            schema_name, extension_schema, extensions[namespace], declaration_path
         )
         if validation_error is not None:
             suffix = validation_error.json_path.removeprefix("$")
             _fail(
                 schema_name,
-                f"$.extensions[{json.dumps(namespace, ensure_ascii=False)}]{suffix}",
+                f"{path}.extensions[{json.dumps(namespace, ensure_ascii=False)}]{suffix}",
                 validation_error.message,
             )
+
+
+_LEGACY_UNPINNED_SCHEMAS = frozenset(
+    {
+        "acceptance-result.v1",
+        "dataset-manifest.v1",
+        "evidence-index.v1",
+        "execution-permit.v1",
+        "execution-verification.v1",
+        "model-artifact-manifest.v1",
+        "runtime-manifest.v1",
+    }
+)
+
+
+def validate_extensions(
+    schema_name: str,
+    document: Mapping[str, Any],
+    schema_documents: Mapping[str, bytes | str] | None,
+) -> None:
+    """Validate schema-checked public document extensions entirely offline.
+
+    Seven v1 roles historically accepted unpinned payloads. Absence of the new
+    extension_schemas field preserves that behavior; its presence opts into
+    digest verification and exact namespace matching. New roles are strict.
+    The in-toto statement carries extensions inside its predicate.
+    """
+    if schema_name in internal_schema_names():
+        return
+    if schema_name in _LEGACY_UNPINNED_SCHEMAS and "extension_schemas" not in document:
+        return
+    if schema_name == "qualification-bundle.v1":
+        _validate_payload(schema_name, document["predicate"], "$.predicate", schema_documents)
+    else:
+        _validate_payload(schema_name, document, "$", schema_documents)
 
 
 __all__ = ["ExtensionValidationError", "validate_extensions"]

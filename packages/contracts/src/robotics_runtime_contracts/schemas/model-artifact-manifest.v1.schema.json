@@ -43,6 +43,9 @@
       "additionalProperties": {
         "type": "object"
       }
+    },
+    "extension_schemas": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensionSchemas"
     }
   },
   "$defs": {
