@@ -49,6 +49,11 @@ class CoreConstructor(SafeConstructor):
         # duplicate-key checks in merged mappings. Core treats << as a string.
         return BaseConstructor.construct_mapping(self, node, deep=deep)
 
+    def construct_scalar(self, node: Any) -> Any:
+        # SafeConstructor also implements YAML 1.1's !!value mapping shorthand,
+        # bypassing construct_object for nested nodes. Core scalars must be scalar nodes.
+        return BaseConstructor.construct_scalar(self, node)
+
 
 def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}

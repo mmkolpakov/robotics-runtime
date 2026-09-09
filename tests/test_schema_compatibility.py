@@ -378,6 +378,7 @@ def test_merge_key_is_a_literal_core_string(tmp_path: Path) -> None:
         ("yaml", "build: {<<: {tool: onnx}, tool: 17, tool: onnx}\n"),
         ("yaml", "build: {!!merge <<: {tool: onnx}, tool: 17, tool: onnx}\n"),
         ("yaml", "value: !!int 1_000\n"),
+        ("yaml", "build: {version: !!str {!!value ignored: !native 1.20.1}}\n"),
         ("yaml", "%YAML 1.1\n---\nvalue: 010\n"),
         ("json", '{"value": 1, "value": 2}'),
         ("json", '{"value": NaN}'),
