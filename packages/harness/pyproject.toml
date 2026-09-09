@@ -25,7 +25,7 @@ dependencies = [
   "junitparser>=5.0.1,<6",
   "opentelemetry-proto>=1.43,<2",
   "packaging>=24",
-  "robotics-runtime-contracts>=0.17.0rc1,<0.18",
+  "robotics-runtime-contracts>=0.17,<0.18",
 ]
 
 [tool.uv.sources]
