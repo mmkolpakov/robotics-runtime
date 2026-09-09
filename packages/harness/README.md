@@ -246,6 +246,22 @@ Missing statistics use explicit unevaluated markers and diagnostic placeholders,
 never proof of a measured zero or a threshold breach. JUnit preserves these
 skipped outcomes. Artifact digests and existing result schema fields are unchanged.
 
+## Realtime timing windows
+
+Live verification evaluates the complete measurement interval and overlapping
+windows of at least one second. Clock callbacks bound source-clock progress;
+the recorded `real_time_factor` is a conservative lower bound. A lower bound
+below the policy threshold alone does not prove a violation. If the upper bound
+also lies below the threshold, the time-policy assertion fails. When the bounds
+straddle the threshold or clock coverage is missing, it is skipped and the
+corresponding clock fields are listed as unevaluated, producing `incomplete`
+unless another observation proves a failure.
+
+Deadline ratios are independent evidence: the greatest observed value is checked
+even when clock callbacks or other deadline samples are missing. A known deadline
+exceedance or a clock stall proved by recorded endpoints remains a failure.
+`why` preserves the distinction between unobserved and violated clock properties.
+
 ## Contract Inputs
 
 | Input | Contract role |
