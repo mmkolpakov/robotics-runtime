@@ -26,7 +26,12 @@ from robotics_acceptance_harness.diagnostics import (
     why_report,
     write_error_diagnostic,
 )
-from robotics_acceptance_harness.documents import DocumentBundle, load_bundle, load_document
+from robotics_acceptance_harness.documents import (
+    DocumentBundle,
+    DocumentSource,
+    load_bundle,
+    load_document,
+)
 from robotics_acceptance_harness.errors import (
     HarnessError,
     HarnessInputError,
@@ -259,10 +264,12 @@ def _parser() -> argparse.ArgumentParser:
         default=[],
         metavar="PATH",
     )
+    _add_extension_schema_argument(doctor)
 
     why = subparsers.add_parser("why", help="Explain an acceptance result verdict.")
     why.add_argument("result", metavar="PATH")
     why.add_argument("--format", choices=("json", "markdown"), default="json")
+    _add_extension_schema_argument(why)
 
     timing = subparsers.add_parser(
         "timing-check",
@@ -378,11 +385,15 @@ def _domain_receipt_sources(arguments: argparse.Namespace) -> Mapping[str, Recei
     return receipts
 
 
-def _evaluator_receipts(arguments: argparse.Namespace) -> VerifiedReceiptSet:
+def _evaluator_receipts(
+    arguments: argparse.Namespace,
+    extension_schemas: Mapping[str, bytes | str] | None,
+) -> VerifiedReceiptSet:
     return load_verified_receipts(
         receipt_paths=arguments.evaluator_receipt,
         verification_paths=arguments.evaluator_verification,
         dependency_paths=arguments.evaluator_receipt_dependency,
+        extension_schemas=extension_schemas,
     )
 
 
@@ -410,10 +421,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 0
 
             if arguments.command == "doctor":
+                extension_schemas = load_extension_schemas(arguments.extension_schema)
                 requirements = ()
                 if arguments.scenario is not None:
                     scenario = load_document(
-                        arguments.scenario, expected_role="acceptance_scenario"
+                        arguments.scenario,
+                        expected_role="acceptance_scenario",
+                        extension_schemas=extension_schemas,
                     )
                     requirements = scenario.data["evaluator_requirements"]
                 report = doctor_report(
@@ -421,7 +435,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     evidence_dir=arguments.evidence_dir,
                     measurement_complete=arguments.measurement_complete,
                     evaluator_requirements=requirements,
-                    evaluator_receipts=_evaluator_receipts(arguments),
+                    evaluator_receipts=_evaluator_receipts(arguments, extension_schemas),
                 )
                 print(
                     report_markdown(report)
@@ -431,7 +445,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 0 if report["status"] == "passed" else 1
 
             if arguments.command == "why":
-                report = why_report(arguments.result)
+                report = why_report(
+                    arguments.result,
+                    extension_schemas=load_extension_schemas(arguments.extension_schema),
+                )
                 print(
                     report_markdown(report)
                     if arguments.format == "markdown"
@@ -455,20 +472,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 0
 
             if arguments.command == "timing-check":
+                extension_schemas = load_extension_schemas(arguments.extension_schema)
                 scenario = load_document(
                     arguments.scenario,
                     expected_role="acceptance_scenario",
-                    extension_schemas=load_extension_schemas(arguments.extension_schema),
+                    extension_schemas=extension_schemas,
                 )
                 load_run_context(
-                    arguments.run_context,
+                    DocumentSource(arguments.run_context, extension_schemas),
                     run_id=arguments.run_id,
                     domain_id=arguments.domain_id,
                     scenario_id=str(scenario.data["scenario_id"]),
                     scenario_sha256=scenario.sha256,
                 )
                 evidence = load_evidence_index(
-                    arguments.evidence_index,
+                    DocumentSource(arguments.evidence_index, extension_schemas),
                     expected_run_id=arguments.run_id,
                     receipt_paths=_receipt_source(arguments),
                     verification_paths=arguments.artifact_verification,
@@ -563,7 +581,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(json.dumps(explain_bundle(bundle), indent=2, sort_keys=True, allow_nan=False))
                 return 0
 
-            evaluator_receipts = _evaluator_receipts(arguments)
+            evaluator_receipts = _evaluator_receipts(arguments, bundle.extension_schemas)
 
             if arguments.command == "evaluate":
                 outputs = evaluate_from_evidence(

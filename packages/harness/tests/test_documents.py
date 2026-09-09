@@ -38,6 +38,28 @@ def test_load_bundle_requires_runtime() -> None:
         load_bundle(FIXTURES / "scenario.yaml")
 
 
+@pytest.mark.parametrize("observed", [None, "b" * 64, "a" * 64])
+def test_load_bundle_checks_robot_description_before_observation(
+    tmp_path: Path, observed: str | None
+) -> None:
+    scenario = yaml.safe_load((FIXTURES / "scenario.yaml").read_text(encoding="utf-8"))
+    runtime = yaml.safe_load((FIXTURES / "runtime.yaml").read_text(encoding="utf-8"))
+    scenario["workload"] = {"robot_description_sha256": "a" * 64}
+    if observed is not None:
+        runtime["workload"]["robot_description"] = {"sha256": observed}
+    scenario_path, runtime_path = tmp_path / "scenario.yaml", tmp_path / "runtime.yaml"
+    scenario_path.write_text(yaml.safe_dump(scenario), encoding="utf-8")
+    runtime_path.write_text(yaml.safe_dump(runtime), encoding="utf-8")
+    if observed == "a" * 64:
+        bundle = load_bundle(scenario_path, runtime_path=runtime_path)
+        assert bundle.runtime.data["workload"]["robot_description"]["sha256"] == observed
+    else:
+        with pytest.raises(BundleValidationError) as caught:
+            load_bundle(scenario_path, runtime_path=runtime_path)
+        assert caught.value.json_path == "$.runtime.workload.robot_description.sha256"
+        assert "robot description digest does not match" in str(caught.value)
+
+
 def test_load_bundle_rejects_a_document_with_the_wrong_role() -> None:
     with pytest.raises(BundleValidationError, match="expected runtime-manifest.v1"):
         load_bundle(FIXTURES / "scenario.yaml", runtime_path=FIXTURES / "scenario.yaml")

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from robotics_acceptance_harness.cli import main
+from robotics_acceptance_harness.documents import DocumentSource
 from robotics_acceptance_harness.hardware_timing import HardwareTimingObservation
 from robotics_acceptance_harness.receipts import ReceiptInventory
 from tests.support import write_extended_scenario
@@ -523,7 +524,7 @@ def test_timing_check_exposes_policy_result(
     assert report["within_policy"] is False
     assert report["measured_at"] == "2026-08-17T00:00:00Z"
     assert run_context == {
-        "path": "acceptance-run.json",
+        "path": DocumentSource("acceptance-run.json", {}),
         "run_id": "run-01234567-89ab-4def-8123-456789abcdef",
         "domain_id": "primary",
         "scenario_id": "org.example.timing",

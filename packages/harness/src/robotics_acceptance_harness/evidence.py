@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha256
+from io import BufferedReader
 from os import fstat
 from pathlib import Path
+from tempfile import SpooledTemporaryFile
 from types import MappingProxyType
-from typing import Any
+from typing import Any, BinaryIO
 from urllib.parse import quote, urlsplit
 from urllib.request import url2pathname
 
@@ -15,6 +18,8 @@ from robotics_runtime_contracts.serialization import MAX_DOCUMENT_BYTES
 from robotics_acceptance_harness._evidence_files import EvidenceReadError, open_evidence
 from robotics_acceptance_harness.documents import (
     BundleValidationError,
+    DocumentInput,
+    DocumentSource,
     LoadedDocument,
     load_document,
     load_document_bytes,
@@ -43,6 +48,12 @@ class EvidenceValidationError(HarnessError, ValueError):
         return ((self.json_path, self.validation_message),)
 
 
+class EvidenceAccessError(HarnessError, ValueError):
+    """The requested digest has no verified local payload available to an evaluator."""
+
+    error_id = "evidence.unavailable"
+
+
 @dataclass(frozen=True, slots=True)
 class VerifiedEvidence:
     index: LoadedDocument
@@ -50,6 +61,30 @@ class VerifiedEvidence:
     local_files: Mapping[Path, Mapping[str, Any]]
     recording_summaries: tuple[LoadedDocument, ...] = ()
     receipts: tuple[LoadedDocument, ...] = ()
+
+    @contextmanager
+    def __call__(self, digest: str) -> Iterator[BinaryIO]:
+        """Yield a seekable snapshot of local bytes verified against an artifact digest."""
+        if not any(link["sha256"] == digest for link in self.links):
+            raise EvidenceAccessError(f"digest is absent from verified evidence: {digest}")
+        candidates = [
+            (path, reference)
+            for path, reference in self.local_files.items()
+            if reference["sha256"] == digest
+        ]
+        if not candidates:
+            raise EvidenceAccessError(f"verified local bytes are unavailable for digest: {digest}")
+        path, reference = candidates[0]
+        # Large recordings spill to disk. The consumer never reads the original
+        # file after validation, including when that file changes during evaluation.
+        with SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b") as snapshot:
+            try:
+                _stream_verified_payload(path, reference, self.index.path.parent, snapshot.write)
+            except (OSError, EvidenceReadError) as error:
+                raise EvidenceValidationError("$.artifacts", str(error)) from error
+            snapshot.seek(0)
+            with BufferedReader(snapshot) as reader:
+                yield reader
 
 
 def _verified_payload(
@@ -65,6 +100,14 @@ def _verified_payload(
             "summary exceeds the contract document byte limit", field="size_bytes"
         )
     payload = bytearray()
+    _stream_verified_payload(path, reference, root, payload.extend if capture else lambda _: None)
+    return bytes(payload)
+
+
+def _stream_verified_payload(
+    path: Path, reference: Mapping[str, Any], root: Path, write: Callable[[bytes], object]
+) -> None:
+    expected_size = int(reference["size_bytes"])
     digest, size = sha256(), 0
     with open_evidence(path, root) as stream:
         before = fstat(stream.fileno())
@@ -78,8 +121,7 @@ def _verified_payload(
             if size > expected_size:
                 raise EvidenceReadError("evidence grew while being read", field="size_bytes")
             digest.update(chunk)
-            if capture:
-                payload.extend(chunk)
+            write(chunk)
         after = fstat(stream.fileno())
     if size != expected_size or (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
         after.st_size,
@@ -92,7 +134,6 @@ def _verified_payload(
             f"expected {reference['sha256']}; observed {digest.hexdigest()}",
             field="sha256",
         )
-    return bytes(payload)
 
 
 def _read_local(
@@ -181,6 +222,7 @@ def _local_summary(
     artifact: Mapping[str, Any],
     index: int,
     root: Path,
+    extension_schemas: Mapping[str, bytes | str] | None,
 ) -> LoadedDocument:
     reference = artifact["recording_summary"]
     json_path = f"$.artifacts[{index}].recording_summary"
@@ -193,7 +235,9 @@ def _local_summary(
     path = Path(url2pathname(uri.path)).absolute()
     raw = _read_local(path, reference, root, json_path, capture=True)
     try:
-        summary = load_document_bytes(raw, source=path, expected_role="recording_summary")
+        summary = load_document_bytes(
+            raw, source=path, expected_role="recording_summary", extension_schemas=extension_schemas
+        )
     except BundleValidationError as error:
         raise EvidenceValidationError(error.json_path, error.validation_message) from error
     if summary.data["source_sha256"] != artifact["sha256"]:
@@ -205,7 +249,7 @@ def _local_summary(
 
 
 def load_evidence_index(
-    path: str | Path,
+    path: DocumentInput,
     *,
     expected_run_id: str | None = None,
     receipt_paths: ReceiptSource = (),
@@ -214,6 +258,7 @@ def load_evidence_index(
 ) -> VerifiedEvidence:
     """Validate a finalized index and verify every reusable evidence link."""
 
+    extension_schemas = path.extension_schemas if isinstance(path, DocumentSource) else None
     try:
         document = load_document(
             path,
@@ -235,6 +280,7 @@ def load_evidence_index(
             receipt_paths=receipt_paths,
             verification_paths=verification_paths,
             dependency_paths=receipt_dependency_paths,
+            extension_schemas=extension_schemas,
         )
     except ReceiptValidationError as error:
         raise EvidenceValidationError(error.json_path, error.validation_message) from error
@@ -249,7 +295,9 @@ def load_evidence_index(
             links.append(_remote_link(artifact, index, receipts, run_id))
             used_receipts.add(str(artifact["receipt_sha256"]))
         if artifact["kind"] == "recording":
-            summaries.append(_local_summary(artifact, index, document.path.parent))
+            summaries.append(
+                _local_summary(artifact, index, document.path.parent, extension_schemas)
+            )
     if used_receipts != set(receipts.by_digest):
         raise EvidenceValidationError("$.receipts", "unreferenced artifact receipt")
     return VerifiedEvidence(

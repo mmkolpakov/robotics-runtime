@@ -42,7 +42,7 @@ version.
 | Component | Baseline |
 | --- | --- |
 | Python | 3.12 through 3.14 |
-| Contracts | Workspace candidate `robotics-runtime-contracts>=0.17.0rc1,<0.18` |
+| Contracts | Workspace candidate `robotics-runtime-contracts>=0.18,<0.19` |
 | ROS observation | ROS 2 Jazzy packages in the observer environment |
 | Metrics | OTLP JSON Lines exported by OpenTelemetry Collector |
 
@@ -280,6 +280,12 @@ Scenario extensions are explicit and digest-pinned. Pass the same
 Extensions cannot replace common safety, timing, transport, or evidence rules.
 
 ## Product Evaluators
+
+The [evaluator SDK guide](docs/evaluator-sdk.md) includes a buildable product
+package template, wheel installation and `doctor` checks. Import its public
+types from `robotics_acceptance_harness.sdk`. Read verified local artifacts with
+`with context.evidence(digest) as stream`; the stream supports reading and seeking
+over a validated snapshot while preserving the existing evidence metadata API.
 
 Product packages register standard PyPA entry points:
 

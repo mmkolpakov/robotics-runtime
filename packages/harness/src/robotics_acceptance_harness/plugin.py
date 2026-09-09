@@ -122,6 +122,7 @@ def pytest_configure(config: pytest.Config) -> None:
             run_context = load_document(
                 run_context_path,
                 expected_role="acceptance_run",
+                extension_schemas=bundle.extension_schemas,
             )
         except BundleValidationError as error:
             raise pytest.UsageError(f"invalid robotics run context: {error}") from error
