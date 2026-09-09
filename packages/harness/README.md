@@ -111,6 +111,20 @@ non-passing verdict, including `failed`, `incomplete`, or `error`. An input,
 observation, or execution exception handled by the CLI returns `2` with a
 diagnostic. A result whose status is `error` is distinct from such an exception.
 
+Modeled library failures inherit from the public `HarnessError` base, with an
+explicit `error_id` and `exit_code` (normally `2`). Existing exception classes
+retain their identifiers and their `ValueError`, `RuntimeError`, or `TimeoutError`
+compatibility. Invalid values supplied to the harness raise `HarnessInputError`
+with `input.invalid`.
+
+The command boundary translates dependency failures before the CLI handles
+`HarnessError`: contract errors retain their identifier, I/O errors use
+`input.io_error`, invalid dependency values use `input.invalid`, and unexpected
+exceptions use `internal.error`. Diagnostics retain the original exception type,
+message, and any JSON paths; exception chaining preserves the original cause.
+Readiness, bundle, and evidence errors expose structured `(json_path, message)`
+pairs through `diagnostic_issues`. `KeyboardInterrupt` and `SystemExit` propagate.
+
 `campaign` emits `incomplete` when passed runs are below the required minimum
 and no failed/error runs were observed. This writer requires the corresponding
 contracts reader update, which also accepts legacy `campaign-summary.v1` files

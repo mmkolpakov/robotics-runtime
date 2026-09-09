@@ -15,6 +15,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 )
 from robotics_runtime_contracts import channel_observation_status, derive_channel_violations
 
+from robotics_acceptance_harness.errors import HarnessError
 from robotics_acceptance_harness.otel import (
     otlp_attributes,
     parse_otlp_request,
@@ -29,8 +30,10 @@ _OTLP_IDENTIFIER_LENGTHS = {
 }
 
 
-class TraceInputError(ValueError):
+class TraceInputError(HarnessError, ValueError):
     """Raised when OTLP trace evidence is incomplete or contradictory."""
+
+    error_id = "TraceInputError.failed"
 
 
 @dataclass(frozen=True, slots=True)

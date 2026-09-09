@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from fractions import Fraction
 from typing import TYPE_CHECKING, Literal
 
+from robotics_acceptance_harness.errors import HarnessInputError
+
 if TYPE_CHECKING:
     from robotics_acceptance_harness.metrics import HistogramSample
 
@@ -24,13 +26,13 @@ class Estimate:
         if any(
             isinstance(value, float) and math.isnan(value) for value in (self.lower, self.upper)
         ):
-            raise ValueError("histogram statistic bounds cannot be NaN")
+            raise HarnessInputError("histogram statistic bounds cannot be NaN")
         if self.lower > self.upper:
-            raise ValueError("histogram statistic bounds are inconsistent")
+            raise HarnessInputError("histogram statistic bounds are inconsistent")
 
     def compare(self, operator: str, threshold: float) -> Comparison:
         if not math.isfinite(threshold):
-            raise ValueError("histogram threshold must be finite")
+            raise HarnessInputError("histogram threshold must be finite")
         outcomes = {
             "lt": (self.upper < threshold, self.lower >= threshold),
             "lte": (self.upper <= threshold, self.lower > threshold),
@@ -68,7 +70,7 @@ def _rank_bucket(histogram: HistogramSample, rank: int) -> int:
         cumulative += count
         if cumulative >= rank:
             return index
-    raise ValueError("histogram bucket counts do not cover the requested rank")
+    raise HarnessInputError("histogram bucket counts do not cover the requested rank")
 
 
 def _has_negative_event(histogram: HistogramSample) -> bool:
@@ -96,12 +98,12 @@ def estimate_statistic(
     if aggregation == "count":
         return Estimate(histogram.count, histogram.count)
     if histogram.count == 0:
-        raise ValueError("histogram has no recorded events")
+        raise HarnessInputError("histogram has no recorded events")
     if nonnegative and _has_negative_event(histogram):
-        raise ValueError("histogram records a negative value in a nonnegative domain")
+        raise HarnessInputError("histogram records a negative value in a nonnegative domain")
     if aggregation == "mean":
         if histogram.sum is None:
-            raise ValueError("histogram mean requires a recorded sum")
+            raise HarnessInputError("histogram mean requires a recorded sum")
         mean = histogram.sum / histogram.count
         return Estimate(mean, mean)
     return _rank_estimate(histogram, aggregation, nonnegative=nonnegative)
