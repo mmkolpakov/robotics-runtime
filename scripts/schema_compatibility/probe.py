@@ -8,6 +8,48 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from ruamel.yaml import YAML
+
+
+def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"Duplicate object key: {key!r}")
+        result[key] = value
+    return result
+
+
+def require_string_keys(value: Any) -> None:
+    if isinstance(value, dict):
+        if any(not isinstance(key, str) for key in value):
+            raise ValueError("Object keys must be strings")
+        for child in value.values():
+            require_string_keys(child)
+    elif isinstance(value, list):
+        for child in value:
+            require_string_keys(child)
+
+
+def fixture_document(path: Path) -> Any:
+    """Decode frozen fixture values independently of a release's input syntax policy."""
+    try:
+        source = path.read_text(encoding="utf-8")
+        if path.suffix == ".json":
+            document = json.loads(source, object_pairs_hook=unique_object)
+        else:
+            parser = YAML(typ="safe", pure=True)
+            parser.version = (1, 2)
+            parser.allow_duplicate_keys = False
+            document = parser.load(source)
+        # The semantic corpus is JSON-valued. Reject cycles, implicit native
+        # timestamps and non-finite values instead of changing their meaning.
+        serialized = json.dumps(document, allow_nan=False)
+        require_string_keys(document)
+        return json.loads(serialized)
+    except Exception as error:
+        raise ValueError(f"{path.name}: fixture decoding failed: {error}") from error
+
 
 def validate(source: Path, request: dict[str, Any]) -> dict[str, Any]:
     sys.path.insert(0, str(source.resolve()))
@@ -17,7 +59,7 @@ def validate(source: Path, request: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Validator import escaped the selected source tree")
     documents = request.get("documents", {})
     for name, path in request.get("files", {}).items():
-        documents[name] = contracts.load_mapping(Path(path))
+        documents[name] = fixture_document(Path(path))
     if not documents:
         raise ValueError("Semantic regression corpus is empty")
     for name, document in documents.items():

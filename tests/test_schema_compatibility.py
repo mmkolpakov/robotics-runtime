@@ -18,6 +18,7 @@ from referencing.exceptions import Unresolvable
 from scripts import check_schema_compatibility as gate
 from scripts.bundle_schemas import DIALECT, ROOT, Schema, read_schemas
 from scripts.schema_compatibility import history, semantic
+from scripts.schema_compatibility.probe import fixture_document
 from scripts.schema_compatibility.structure import (
     Context,
     Expansion,
@@ -300,6 +301,64 @@ def test_semantic_probe_uses_selected_source_despite_pythonpath(
     response = semantic.probe(published / "src", {"documents": semantic.regressions()})
     assert Path(response["origin"]).is_relative_to(published)
     assert response["documents"] == semantic.regressions()
+
+
+def test_published_alias_fixture_is_validated_as_values_without_rewriting_bytes(
+    published: Path,
+) -> None:
+    original = published / "tests/fixtures/model-artifact/valid/onnx.yaml"
+    frozen_bytes = original.read_bytes()
+    assert b"*id001" in frozen_bytes
+    response = semantic.probe(published / "src", {"files": {"onnx": str(original)}})
+    document = response["documents"]["onnx"]
+    assert document == fixture_document(original)
+    assert original.read_bytes() == frozen_bytes
+    # The current public file loader still rejects aliases: compatibility of
+    # document values does not weaken its input syntax or resource limits.
+    from robotics_runtime_contracts import load_mapping
+    from robotics_runtime_contracts.serialization import DocumentParseError
+
+    with pytest.raises(DocumentParseError, match="aliases"):
+        load_mapping(original)
+    candidate = ROOT / "packages/contracts/src"
+    assert semantic.probe(candidate, {"documents": response["documents"]})["documents"] == {
+        "onnx": document
+    }
+
+
+def test_fixture_decoder_preserves_yaml12_json_values(tmp_path: Path) -> None:
+    path = tmp_path / "values.yaml"
+    path.write_text(
+        'source: &values [yes, 010, true, 1.25, null, "2026-09-09"]\ncopy: *values\n',
+        encoding="utf-8",
+    )
+    assert fixture_document(path) == {
+        "source": ["yes", 10, True, 1.25, None, "2026-09-09"],
+        "copy": ["yes", 10, True, 1.25, None, "2026-09-09"],
+    }
+
+
+@pytest.mark.parametrize(
+    "suffix,source",
+    [
+        ("yaml", "value: 1\nvalue: 2\n"),
+        ("yaml", "value: &cycle [*cycle]\n"),
+        ("yaml", "value: .inf\n"),
+        ("yaml", "value: 2026-09-09T00:00:00Z\n"),
+        ("yaml", "value: {1: coerced}\n"),
+        ("yaml", "value: !!set {a: null}\n"),
+        ("json", '{"value": 1, "value": 2}'),
+        ("json", '{"value": NaN}'),
+        ("json", '{"value": 1,}'),
+    ],
+)
+def test_fixture_decoder_rejects_ambiguous_or_non_json_values(
+    tmp_path: Path, suffix: str, source: str
+) -> None:
+    path = tmp_path / f"invalid.{suffix}"
+    path.write_text(source, encoding="utf-8")
+    with pytest.raises(ValueError, match=f"invalid.{suffix}: fixture decoding failed"):
+        fixture_document(path)
 
 
 def test_missing_or_corrupt_semantic_regressions_fail(
