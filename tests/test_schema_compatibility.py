@@ -189,6 +189,81 @@ def test_annotations_only_at_schema_locations_and_typed_literal_data() -> None:
         comparison(before, after)
 
 
+def discriminated_union() -> Schema:
+    return schema(
+        {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": ["kind"],
+                    "additionalProperties": False,
+                    "properties": {"kind": {"const": kind}},
+                }
+                for kind in ("none", "inference")
+            ]
+        }
+    )
+
+
+def test_optional_property_in_disjoint_oneof_preserves_old_instances() -> None:
+    before = discriminated_union()
+    after = deepcopy(before)
+    after["oneOf"][0]["properties"]["description"] = {"type": "string"}
+    comparison(before, after, input_document=True)
+    for document in ({"kind": "none"}, {"kind": "inference"}):
+        assert Draft202012Validator(before).is_valid(document)
+        assert Draft202012Validator(after).is_valid(document)
+    assert Draft202012Validator(after).is_valid({"kind": "none", "description": "robot"})
+
+
+@pytest.mark.parametrize(
+    "mutation", ["optional-tag", "duplicate-tag", "numeric-tag", "missing-type"]
+)
+def test_oneof_without_proven_string_discriminator_stays_frozen(mutation: str) -> None:
+    before = discriminated_union()
+    first, second = before["oneOf"]
+    if mutation == "optional-tag":
+        first["required"] = []
+    elif mutation == "duplicate-tag":
+        second["properties"]["kind"]["const"] = "none"
+    elif mutation == "numeric-tag":
+        first["properties"]["kind"]["const"] = 1
+        second["properties"]["kind"]["const"] = 1.0
+    else:
+        del first["type"]
+    after = deepcopy(before)
+    after["oneOf"][0]["properties"]["description"] = {"type": "string"}
+    with pytest.raises(ReviewRequired, match="frozen"):
+        comparison(before, after, input_document=True)
+
+
+def test_discriminated_union_cannot_hide_new_required_property_or_changed_tag() -> None:
+    before = discriminated_union()
+    after = deepcopy(before)
+    after["oneOf"][0]["properties"]["description"] = {"type": "string"}
+    after["oneOf"][0]["required"].append("description")
+    assert not Draft202012Validator(after).is_valid({"kind": "none"})
+    with pytest.raises(ReviewRequired):
+        comparison(before, after, input_document=True)
+    after = deepcopy(before)
+    after["oneOf"][0]["properties"]["kind"]["const"] = "different"
+    with pytest.raises(ReviewRequired, match="const"):
+        comparison(before, after, input_document=True)
+
+
+def test_discriminated_union_inside_not_remains_frozen() -> None:
+    before = schema({"not": discriminated_union()})
+    del before["not"]["$id"]
+    del before["not"]["$schema"]
+    after = deepcopy(before)
+    after["not"]["oneOf"][0]["properties"]["description"] = {"type": "string"}
+    witness = {"kind": "none", "description": "robot"}
+    assert Draft202012Validator(before).is_valid(witness)
+    assert not Draft202012Validator(after).is_valid(witness)
+    with pytest.raises(ReviewRequired, match="frozen"):
+        comparison(before, after, input_document=True)
+
+
 @pytest.mark.parametrize("keyword", ["default", "$comment", "minimum"])
 def test_changes_outside_d10_allowlist_need_review_even_if_widening(keyword: str) -> None:
     before = schema({keyword: "old" if keyword == "$comment" else 1})

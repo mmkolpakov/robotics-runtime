@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- Support digest-pinned, offline extensions in every public role, including
+  qualification predicates. Preserve legacy unpinned payloads where v1 already
+  allowed them. Carry supplied schemas through qualification loading, receipt
+  writers and recording-summary references; retain exact artifact byte hashes.
+
+- Add a flight-controller interface profile and qualification examples using the
+  existing extensible provider identifiers, with six required capabilities and
+  checks that reject missing capabilities or a mismatched provider kind.
+- Bind optional scenario robot-description digests to runtime workload metadata
+  and the exact retained description artifact bytes during qualification. Keep
+  existing workload documents and qualification artifact kinds compatible.
+- Prove additive changes inside `oneOf` only when all object branches retain
+  a required, distinct string discriminator; ambiguous unions stay frozen.
+
 ## 0.17.0
 
 The first release from the shared `robotics-runtime` workspace. Its distribution

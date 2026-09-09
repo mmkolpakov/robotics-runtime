@@ -66,6 +66,10 @@ from robotics_runtime_contracts.serialization import (
     loads_mapping,
 )
 from robotics_runtime_contracts.status import OutcomeStatus, worst_status
+from robotics_runtime_contracts.workloads import (
+    RobotDescriptionBindingError,
+    validate_robot_description_binding,
+)
 
 _PUBLIC_SCHEMA_FILES = {name: f"{name}.schema.json" for name in role_schemas().values()}
 _INTERNAL_SCHEMA_FILES = {name: f"{name}.schema.json" for name in internal_schema_names()}
@@ -248,6 +252,7 @@ __all__ = [
     "ExtensionValidationError",
     "NonFiniteNumberError",
     "ProviderRequirementError",
+    "RobotDescriptionBindingError",
     "SemanticValidationError",
     "UnknownContractRoleError",
     "UnknownSchemaError",
@@ -276,6 +281,7 @@ __all__ = [
     "validate_artifact_receipt",
     "validate_document",
     "validate_provider_requirements",
+    "validate_robot_description_binding",
     "validate_role",
     "worst_status",
 ]

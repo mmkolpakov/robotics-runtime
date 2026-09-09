@@ -52,3 +52,7 @@ robotics-contracts validate execution-trust-policy/trust-policy.json \
 
 See [product artifact roles](../docs/product-artifact-roles.md) for locator rules,
 units, producer-reported checks, and the boundary with later consumer integration.
+
+The [flight controller profile](flight-controller/README.md) adds six interface
+requirements using the existing extensible `flight_controller` provider kind.
+Controller selection and live conformance belong to the infrastructure stages.

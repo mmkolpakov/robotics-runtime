@@ -162,10 +162,14 @@ def _bind(artifact: dict[str, Any], field: str, value: Any) -> None:
     artifact[field] = value
 
 
-def _summary_reference(path: Path, source_digest: str) -> dict[str, Any]:
+def _summary_reference(
+    path: Path,
+    source_digest: str,
+    extension_schemas: Mapping[str, bytes | str] | None,
+) -> dict[str, Any]:
     raw = read_document_bytes(path)
     summary = loads_mapping(raw, source_name=str(path))
-    validate_role(summary, "recording_summary")
+    validate_role(summary, "recording_summary", extension_schemas=extension_schemas)
     if summary["source_sha256"] != source_digest:
         raise WriterError("recording summary is bound to different file bytes")
     return {"uri": path.as_uri(), "sha256": hashlib.sha256(raw).hexdigest(), "size_bytes": len(raw)}
@@ -189,7 +193,9 @@ def add_evidence_artifact(
     if artifact.get("storage_state") == "local":
         _bind(artifact, "uri", path.as_uri())
     if recording_summary is not None:
-        reference = _summary_reference(Path(recording_summary).expanduser().resolve(), digest)
+        reference = _summary_reference(
+            Path(recording_summary).expanduser().resolve(), digest, extension_schemas
+        )
         _bind(artifact, "recording_summary", reference)
     elif "recording_summary" in artifact:
         raise WriterError("supply the recording summary file, not an unchecked reference")
@@ -234,7 +240,9 @@ def finalize_evidence_index(
         if artifact["storage_state"] == "local":
             _bind(artifact, "uri", path.as_uri())
         if "recording_summary" in artifact:
-            reference = _summary_reference(_summary_path(artifact["recording_summary"]), digest)
+            reference = _summary_reference(
+                _summary_path(artifact["recording_summary"]), digest, extension_schemas
+            )
             _bind(artifact, "recording_summary", reference)
     index["finalized"] = True
     validate_role(index, "evidence_index", extension_schemas=extension_schemas)
@@ -246,6 +254,8 @@ def create_artifact_receipt(
     source: str | Path,
     verification: str | Path,
     dependencies: Sequence[str | Path],
+    *,
+    extension_schemas: Mapping[str, bytes | str] | None = None,
 ) -> dict[str, Any]:
     """Bind a receipt to source bytes and an externally produced verification.
 
@@ -255,7 +265,7 @@ def create_artifact_receipt(
     verification_path = Path(verification).expanduser().resolve()
     raw = read_document_bytes(verification_path)
     verified = loads_mapping(raw, source_name=str(verification_path))
-    validate_role(verified, "artifact_verification")
+    validate_role(verified, "artifact_verification", extension_schemas=extension_schemas)
     document = deepcopy(dict(template))
     document.setdefault("schema_version", "artifact-receipt.v1")
     for field, value in (
@@ -274,7 +284,7 @@ def create_artifact_receipt(
     digest, size = _file_facts(Path(source).expanduser().resolve())
     _bind(document["artifact"], "sha256", digest)
     _bind(document["artifact"], "size_bytes", size)
-    validate_role(document, "artifact_receipt")
+    validate_role(document, "artifact_receipt", extension_schemas=extension_schemas)
     dependency_digests = [
         _file_facts(Path(path).expanduser().resolve())[0] for path in dependencies
     ]

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, cast
 
@@ -19,6 +21,7 @@ from robotics_runtime_contracts.qualification import (
     RAW_ARTIFACT_KINDS,
     QualificationArtifact,
     QualificationError,
+    inspect_qualification_documents,
     load_qualification_artifact,
     validate_qualification_artifacts,
     validate_qualification_documents,
@@ -79,6 +82,49 @@ _PLAYBACK = {
 @pytest.mark.parametrize("case", ["transport", "inference", "physical"])
 def test_schema_valid_qualification_fixture_is_complete(case: str) -> None:
     validate_qualification_artifacts(qualification_specifications(case))
+
+
+@pytest.mark.parametrize("case", ["transport", "inference", "physical"])
+def test_robot_description_binding_uses_retained_file_bytes(case: str, tmp_path: Path) -> None:
+    items = artifacts(case)
+    description_path = tmp_path / "robot-description.json"
+    source = Path(__file__).parent / "fixtures/robot-description/valid/urdf.json"
+    original = source.read_bytes()
+    description_path.write_bytes(original)
+    digest = sha256(original).hexdigest()
+    # Exercise the descriptor API for the pre-existing fixture graph; the new
+    # raw artifact always goes through the real file loader.
+    document(items, "scenario.json")["workload"] = {"robot_description_sha256": digest}
+    for item in items:
+        if item.kind == "runtime_manifest":
+            document(items, item.subject_name)["workload"]["robot_description"] = {"sha256": digest}
+    specification = f"other_evidence:robot-description.json={description_path}"
+    retained = load_qualification_artifact(specification)
+    assert retained.sha256 == digest
+    assert inspect_qualification_documents([*items, retained]).diagnostics == ()
+    report = inspect_qualification_documents(items)
+    assert [item.check for item in report.diagnostics] == ["robot.description"]
+    assert "robot description" in report.diagnostics[0].message
+    # Whitespace leaves the JSON document unchanged but changes its identity.
+    description_path.write_bytes(original + b"\n")
+    changed = load_qualification_artifact(specification)
+    assert changed.sha256 != digest
+    report = inspect_qualification_documents([*items, changed])
+    assert [item.check for item in report.diagnostics] == ["robot.description"]
+
+
+def test_qualification_rejects_wrong_scenario_robot_digest() -> None:
+    items = artifacts("transport")
+    document(items, "scenario.json")["workload"] = {"robot_description_sha256": "a" * 64}
+    for item in items:
+        if item.kind == "runtime_manifest":
+            document(items, item.subject_name)["workload"]["robot_description"] = {
+                "sha256": "b" * 64
+            }
+    report = inspect_qualification_documents(items)
+    assert len(report.diagnostics) == 1
+    assert report.diagnostics[0].error_id == "workload.robot_description_mismatch"
+    assert report.diagnostics[0].check == "robot.description"
 
 
 @pytest.mark.parametrize("case", ["transport", "inference", "physical"])
@@ -675,6 +721,97 @@ def test_scenario_provider_capabilities_are_not_replaced_by_profile_requirements
 
     with pytest.raises(QualificationError, match="do not satisfy capabilities"):
         validate_qualification_documents(items)
+
+
+FLIGHT_CAPABILITIES = (
+    "arm_disarm_service",
+    "flight_mode_service",
+    "local_position_topic",
+    "attitude_topic",
+    "battery_state_topic",
+    "clock_follows_simulation",
+)
+
+
+def flight_controller_artifacts(
+    tmp_path: Path, missing: str | None = None
+) -> list[QualificationArtifact]:
+    items = artifacts("transport")
+    profile_path = (
+        Path(__file__).parents[1] / "consumer-examples/flight-controller/qualification-profile.json"
+    )
+    profile = load_qualification_artifact(
+        f"qualification_profile:flight/profile.json={profile_path}"
+    )
+    profile_document = profile.document
+    assert profile_document is not None
+    assert profile_document["provider_kind"] == "flight_controller"
+    assert profile_document["requirements"] == [
+        {"capability": capability, "required": True} for capability in FLIGHT_CAPABILITIES
+    ]
+    config_path = tmp_path / "fixture-config.json"
+    config_path.write_text('{"implementation":"fixture","live":false}\n', encoding="utf-8")
+    config = load_qualification_artifact(f"other_evidence:flight/config.json={config_path}")
+    capabilities = [capability for capability in FLIGHT_CAPABILITIES if capability != missing]
+    conformance = deepcopy(document(items, "providers/conformance-result.json"))
+    conformance.pop("scene")
+    conformance.update(
+        result_id="flight-controller-fixture",
+        target_id="flight-controller-fixture",
+        qualification_profile_sha256=profile.sha256,
+        provider={
+            "kind": "flight_controller",
+            "implementation_id": "fixture",
+            "version": "1.0.0",
+            "configuration_sha256": config.sha256,
+        },
+        capabilities=capabilities,
+        checks=[
+            {
+                "check_id": capability,
+                "capability": capability,
+                "status": "passed",
+                "observed_value": "fixture",
+            }
+            for capability in capabilities
+        ],
+    )
+    result_path = tmp_path / "fixture-result.json"
+    result_path.write_text(json.dumps(conformance), encoding="utf-8")
+    result = load_qualification_artifact(f"provider_conformance:flight/result.json={result_path}")
+    for item in items:
+        if item.kind == "runtime_manifest":
+            document(items, item.subject_name)["provider_bindings"].append(
+                {
+                    "target_id": conformance["target_id"],
+                    "provider": conformance["provider"],
+                    "capabilities": capabilities,
+                    "qualification_profile_sha256": profile.sha256,
+                    "conformance_result_sha256": result.sha256,
+                }
+            )
+    return [*items, profile, config, result]
+
+
+def test_flight_controller_profile_qualifies_with_existing_schema_roles(tmp_path: Path) -> None:
+    report = inspect_qualification_documents(flight_controller_artifacts(tmp_path))
+    assert report.diagnostics == ()
+
+
+@pytest.mark.parametrize("missing", FLIGHT_CAPABILITIES)
+def test_flight_controller_requires_every_profile_capability(tmp_path: Path, missing: str) -> None:
+    report = inspect_qualification_documents(flight_controller_artifacts(tmp_path, missing))
+    assert len(report.diagnostics) == 1
+    assert report.diagnostics[0].check == "provider.bindings"
+    assert "omits required profile capabilities" in report.diagnostics[0].message
+
+
+def test_flight_controller_profile_cannot_qualify_another_provider_kind(tmp_path: Path) -> None:
+    items = flight_controller_artifacts(tmp_path)
+    document(items, "flight/profile.json")["provider_kind"] = "simulator"
+    report = inspect_qualification_documents(items)
+    assert len(report.diagnostics) == 1
+    assert "provider kind does not match" in report.diagnostics[0].message
 
 
 def test_provider_capabilities_are_derived_from_passing_checks() -> None:

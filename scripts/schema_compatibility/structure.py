@@ -183,6 +183,8 @@ def _keyword(key: str, old: Any, new: Any, parent: tuple[Node, Context]) -> None
     if token(old) == token(new):
         return
     child = context.child(key, key in POSITIVE)
+    if key == "oneOf" and _disjoint_objects(old) and _disjoint_objects(new):
+        child = context.child(key)
     if key == "enum" and context.input_document and context.positive:
         if {token(item) for item in old} <= {token(item) for item in new}:
             return
@@ -197,6 +199,34 @@ def _keyword(key: str, old: Any, new: Any, parent: tuple[Node, Context]) -> None
             compare(left, right, child.child(str(index)))
         return
     context.child(key).reject("change is not an automatically allowed D10 addition")
+
+
+def _string_discriminators(branch: Node | bool) -> dict[str, str]:
+    if not isinstance(branch, Node) or branch.keywords.get("type") != "object":
+        return {}
+    result = {}
+    properties = branch.keywords.get("properties", {})
+    for name in branch.keywords.get("required", []):
+        constraint = properties.get(name)
+        if isinstance(constraint, Node):
+            value = constraint.keywords.get("const")
+            if isinstance(value, str):
+                result[name] = value
+    return result
+
+
+def _disjoint_objects(branches: list[Node | bool]) -> bool:
+    """Prove branches cannot overlap using a required, unique string constant.
+
+    Schema relaxation within an arbitrary oneOf can reject old instances by
+    making two branches match. An unchanged exclusive discriminator rules out
+    that counterexample; normal D10 comparison still checks every assertion.
+    """
+    if not branches:
+        return False
+    discriminators = [_string_discriminators(branch) for branch in branches]
+    common = set.intersection(*(set(item) for item in discriminators))
+    return any(len({item[name] for item in discriminators}) == len(branches) for name in common)
 
 
 def _properties(old: Schema, new: Schema, parent: Node, context: Context) -> None:

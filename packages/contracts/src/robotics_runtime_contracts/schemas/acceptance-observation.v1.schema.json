@@ -18,21 +18,49 @@
     "evidence"
   ],
   "properties": {
-    "schema_version": {"const": "acceptance-observation.v1"},
-    "observation_id": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"},
-    "run_id": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runId"},
-    "scenario_id": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"},
-    "domain_id": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"},
-    "started_at": {"type": "string", "format": "date-time"},
-    "finished_at": {"type": "string", "format": "date-time"},
-    "runtime_observation": {"$ref": "urn:robotics-runtime-contracts:v1:acceptance-result#/$defs/runtimeObservation"},
-    "observed_ros_graph": {"$ref": "urn:robotics-runtime-contracts:v1:acceptance-result#/$defs/observedRosGraph"},
+    "schema_version": {
+      "const": "acceptance-observation.v1"
+    },
+    "observation_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+    },
+    "run_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runId"
+    },
+    "scenario_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+    },
+    "domain_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finished_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "runtime_observation": {
+      "$ref": "urn:robotics-runtime-contracts:v1:acceptance-result#/$defs/runtimeObservation"
+    },
+    "observed_ros_graph": {
+      "$ref": "urn:robotics-runtime-contracts:v1:acceptance-result#/$defs/observedRosGraph"
+    },
     "lifecycle_states": {
       "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-result-core#/properties/lifecycle_states"
     },
     "evidence": {
       "type": "array",
-      "items": {"$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"}
+      "items": {
+        "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+      }
+    },
+    "extension_schemas": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensionSchemas"
+    },
+    "extensions": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensions"
     }
   }
 }

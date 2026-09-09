@@ -130,13 +130,26 @@ complete documents with real artifact byte digests.
 
 ## Extensions
 
-Scenario extensions can use digest-pinned schemas without changing the common
-contract. This validation currently applies only to acceptance scenarios;
-`extensions` in other document roles do not receive the same schema checks.
+Every public role supports `extension_schemas` declarations and namespaced
+`extensions` without changing the common contract. The qualification bundle
+places both fields inside its in-toto `predicate`; other roles use the root.
 Extension schemas are interpreted as Draft 2020-12. Extension keys use
 reverse-domain namespaces such as
 `org.example.sorting`; schema bytes are supplied by the caller and are never
 fetched from the network.
+
+For compatibility, seven existing v1 roles retain unpinned extensions when
+`extension_schemas` is absent: acceptance result, dataset manifest, evidence
+index, execution permit, execution verification, model artifact manifest, and
+runtime manifest. Adding the field opts into strict validation, including when
+the declaration list is empty. An unpinned legacy payload has no schema-integrity
+guarantee. All other roles require a declaration for each payload namespace.
+
+The declaration digest identifies the exact supplied schema bytes. The URI must
+match the schema's `$id`, and registry keys must be those URIs. Duplicate or
+unmatched namespaces fail validation. A qualification statement's validated
+extensions are domain claims; its core subjects, digests and classifications
+still must exactly match the locally validated artifacts.
 
 ```python
 validate_document(
