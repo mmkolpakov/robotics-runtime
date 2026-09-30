@@ -103,6 +103,18 @@ Run `robotics-acceptance COMMAND --help` for the complete option set.
 Successful acceptance returns `0`, a completed non-passing verdict returns `1`,
 and invalid input or an observation failure returns `2`.
 
+A domain result takes the most severe outcome of its assertions and of the
+forbidden-graph, hardware-clock and time-authority observations. Skipped
+assertions and declared `unevaluated` paths make an otherwise passing result
+`incomplete`; they appear in JUnit as skipped cases, not failures.
+
+`clock_observation.real_time_factor` and `deadline_miss_ratio` are measured only
+in `simulation_realtime`; other time modes report `0`.
+
+`campaign` reports `incomplete` when fewer runs passed than the required
+minimum and no failed or error runs were observed. Tolerated failed or error
+runs still allow `passed` when every threshold is met.
+
 ## Live Observation
 
 Runtime infrastructure starts the workload, recorder, and telemetry collector.

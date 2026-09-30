@@ -684,6 +684,7 @@ def test_physical_verification_emits_authorized_result(tmp_path: Path) -> None:
     assert result["schema_version"] == "acceptance-result.v1"
     assert result["evaluation_mode"] == "live"
     assert result["status"] == "passed"
+    assert result["unevaluated"] == []
     assert result["authorization"]["mode"] == "verified_execution_permit"
     assert result["hardware_clock_observation"]["within_policy"] is True
     assert JUnitXml.fromfile(str(outputs.junit_path)).failures == 0

@@ -101,7 +101,7 @@ def aggregate_campaign(
         verdict = "passed"
     else:
         priority = ("error", "failed", "incomplete")
-        verdict = next((status for status in priority if counts[status]), "failed")
+        verdict = next((status for status in priority if counts[status]), "incomplete")
     document = {
         "schema_version": "campaign-summary.v1",
         "campaign_id": campaign_id or f"campaign-{uuid4()}",
