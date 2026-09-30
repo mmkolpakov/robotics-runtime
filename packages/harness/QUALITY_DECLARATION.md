@@ -30,15 +30,17 @@ YAML linting, and Markdown linting are required checks.
 
 ## Dependencies
 
-Runtime dependencies are `junitparser`, `opentelemetry-proto`, `PyYAML`, and
-`robotics-runtime-contracts`. Live ROS observation uses the qualified runtime
+Runtime dependencies are `junitparser`, `opentelemetry-proto`, `packaging`, and
+`robotics-runtime-contracts`. Live ROS observation uses the observer runtime
 environment instead of declaring ROS packages as Python dependencies.
 
 ## Platform Support
 
-Document-only commands support Python 3.12 and 3.13. Live observation is
-qualified on Linux with ROS 2 Jazzy. The package does not claim every REP-2000
-Tier 1 platform, which is another reason not to claim Quality Level 3.
+CI tests document-only commands on Linux with Python 3.12 through 3.14. A
+separate Linux job exercises live observation with real ROS 2 Jazzy and an
+OpenTelemetry Collector, including a lifecycle transition during measurement.
+These fixtures do not qualify every robot, hardware provider, or REP-2000 Tier 1
+platform, which is another reason not to claim Quality Level 3.
 
 ## Security
 
