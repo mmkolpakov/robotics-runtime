@@ -122,10 +122,21 @@ def project(repo: Path, key: str) -> dict[str, Any]:
 
 
 def verify_contracts_tree(repo: Path, tag: str) -> tuple[str, str]:
+    """Require the released contracts sources and project metadata at HEAD.
+
+    They define the installed code and its dependency metadata. Repository-only
+    files such as contributor documents or tests may change after the release.
+    """
     commit = git(repo, "rev-parse", "--verify", f"refs/tags/{tag}^{{commit}}")
-    published_tree = git(repo, "rev-parse", f"{commit}:packages/contracts")
-    if published_tree != git(repo, "rev-parse", "HEAD:packages/contracts"):
-        raise ReleaseError(f"packages/contracts differs from released tag {tag}")
+    published_tree = git(repo, "rev-parse", f"{commit}:packages/contracts/src")
+    if published_tree != git(repo, "rev-parse", "HEAD:packages/contracts/src"):
+        raise ReleaseError(f"packages/contracts/src differs from released tag {tag}")
+    released, current = (
+        tomllib.loads(git(repo, "show", f"{ref}:packages/contracts/pyproject.toml")).get("project")
+        for ref in (commit, "HEAD")
+    )
+    if released != current:
+        raise ReleaseError(f"packages/contracts project metadata differs from released tag {tag}")
     return commit, published_tree
 
 

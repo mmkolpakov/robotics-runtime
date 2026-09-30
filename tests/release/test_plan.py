@@ -118,10 +118,12 @@ def test_exact_version_tag_tree_is_checked_without_sorting_other_tags(
         # only the tag corresponding to the source version may be used.
         responses = {
             ("rev-parse", "--verify", "refs/tags/contracts-v0.9.0^{commit}"): "released-commit",
-            ("rev-parse", "released-commit:packages/contracts"): "released-tree",
-            ("rev-parse", "HEAD:packages/contracts"): "changed-tree"
+            ("rev-parse", "released-commit:packages/contracts/src"): "released-tree",
+            ("rev-parse", "HEAD:packages/contracts/src"): "changed-tree"
             if changed_tree
             else "released-tree",
+            ("show", "released-commit:packages/contracts/pyproject.toml"): PROJECT,
+            ("show", "HEAD:packages/contracts/pyproject.toml"): PROJECT,
         }
         return responses[args]
 
@@ -134,7 +136,77 @@ def test_exact_version_tag_tree_is_checked_without_sorting_other_tags(
             "released-commit",
             "released-tree",
         )
-    assert len(calls) == 3
+    assert len(calls) == (3 if changed_tree else 5)
+
+
+PROJECT = '[project]\nname = "robotics-runtime-contracts"\nversion = "0.9.0"\n'
+
+
+def _commit_all(repo: Path, message: str) -> None:
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "commit", "-q", "--no-verify", "-m", message], check=True
+    )
+
+
+@pytest.fixture
+def released_contracts(tmp_path: Path) -> Path:
+    package = tmp_path / "packages/contracts"
+    (package / "src/robotics_runtime_contracts").mkdir(parents=True)
+    (package / "src/robotics_runtime_contracts/__init__.py").write_text("VALUE = 1\n")
+    (package / "pyproject.toml").write_text(
+        PROJECT + '\n[build-system]\nrequires = ["hatchling==1.29.0"]\n'
+    )
+    (package / "CONTRIBUTING.md").write_text("# Contributing\n")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    for key, value in (("user.name", "test"), ("user.email", "test@example.invalid")):
+        subprocess.run(["git", "-C", str(tmp_path), "config", key, value], check=True)
+    _commit_all(tmp_path, "release")
+    subprocess.run(["git", "-C", str(tmp_path), "tag", "contracts-v0.9.0"], check=True)
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    ("path", "text"),
+    [
+        ("CONTRIBUTING.md", "# Contributing\n\nUpdated.\n"),
+        ("pyproject.toml", PROJECT + '\n[build-system]\nrequires = ["hatchling==1.32.4"]\n'),
+        ("tests/test_new.py", "def test_new() -> None:\n    pass\n"),
+    ],
+)
+def test_repository_only_contracts_changes_keep_the_release_binding(
+    released_contracts: Path, path: str, text: str
+) -> None:
+    target = released_contracts / "packages/contracts" / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text)
+    _commit_all(released_contracts, "post-release change")
+
+    commit, tree = release.verify_contracts_tree(released_contracts, "contracts-v0.9.0")
+
+    assert commit == release.git(released_contracts, "rev-parse", "contracts-v0.9.0^{commit}")
+    assert tree == release.git(released_contracts, "rev-parse", "HEAD:packages/contracts/src")
+
+
+@pytest.mark.parametrize(
+    ("path", "text", "message"),
+    [
+        ("src/robotics_runtime_contracts/__init__.py", "VALUE = 2\n", "src differs"),
+        (
+            "pyproject.toml",
+            PROJECT + 'dependencies = ["PyYAML>=6"]\n',
+            "project metadata differs",
+        ),
+    ],
+)
+def test_distributed_contracts_changes_block_the_harness_release(
+    released_contracts: Path, path: str, text: str, message: str
+) -> None:
+    (released_contracts / "packages/contracts" / path).write_text(text)
+    _commit_all(released_contracts, "post-release change")
+
+    with pytest.raises(release.ReleaseError, match=message):
+        release.verify_contracts_tree(released_contracts, "contracts-v0.9.0")
 
 
 @pytest.mark.parametrize(
@@ -178,11 +250,13 @@ def candidate_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     def git(repo: Path, *args: str) -> str:
         if args[0] == "status":
             return ""
+        if args[0] == "show" and args[-1].endswith(":packages/contracts/pyproject.toml"):
+            return (tmp_path / "packages/contracts/pyproject.toml").read_text(encoding="utf-8")
         if args[0] == "show":
             return "1234567890"
         if args[0] == "merge-base":
             return ""
-        if args[-1].endswith(":packages/contracts"):
+        if args[-1].endswith(":packages/contracts/src"):
             return "contracts-tree"
         if args[-1].endswith(":packages/harness"):
             return "harness-tree"

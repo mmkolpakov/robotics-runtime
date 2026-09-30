@@ -57,9 +57,11 @@ It requires all of the following, even in dry-run mode:
    `robotics-runtime-contracts>=0.17,<0.18` and a stable contracts `0.17.*` version.
 2. The exact root tag `contracts-vX.Y.Z`, with a published, stable, non-draft GitHub release
    in `mmkolpakov/robotics-runtime`. Imported `contracts-legacy/*` tags do not satisfy this.
-3. An identical Git tree for the entire `packages/contracts` directory at that tag and
-   at the candidate commit. A change to contracts after its release blocks harness until
-   contracts is versioned and released again.
+3. An identical Git tree for `packages/contracts/src` and an identical `[project]` table in
+   `packages/contracts/pyproject.toml` at that tag and at the candidate commit. A change to
+   the contracts sources or project metadata after its release blocks harness until
+   contracts is versioned and released again. Repository-only files such as contributor
+   documents, tests and the build requirement may change in between.
 4. A `packages/harness/CHANGELOG.md` section for the harness version naming that exact
    contracts tag. Maintainers should link it to the root repository's corresponding release.
 5. Successful isolated installation of the exact contracts version from PyPI, with its
