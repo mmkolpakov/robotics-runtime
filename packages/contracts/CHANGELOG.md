@@ -6,6 +6,8 @@
   symlink to an input document; `diff` previously overwrote its source. CLI
   documents are written through a temporary file and one rename, and
   `scenario resolve` prepares both outputs before replacing either.
+  `scenario resolve` also protects `--extension-schema` files, and
+  `evidence-index finalize` refuses to replace its own draft.
 - Atomic outputs of the writers and the CLI get the mode of an ordinary new
   file (0644 under umask 022) instead of 0600, and a symlinked output path
   replaces the link target instead of the link.
