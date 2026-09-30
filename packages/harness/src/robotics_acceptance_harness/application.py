@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from itertools import pairwise
 from math import isfinite
 from pathlib import Path
 from time import monotonic_ns, sleep, time_ns
@@ -168,7 +169,7 @@ def _enrich_clock_samples(
 
     deadline_ratio = _maximum_deadline_ratio(metrics)
     ratios: list[float] = []
-    for previous, current in zip(samples, samples[1:], strict=False):
+    for previous, current in pairwise(samples):
         wall_delta = current.observed_at_ns - previous.observed_at_ns
         source_delta = current.source_time_ns - previous.source_time_ns
         ratios.append(source_delta / wall_delta if wall_delta > 0 else 0.0)
