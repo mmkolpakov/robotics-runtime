@@ -12,6 +12,7 @@ import pytest
 
 from robotics_runtime_contracts.cli import main
 from robotics_runtime_contracts.qualification import (
+    QualificationArtifact,
     QualificationError,
     inspect_qualification_artifacts,
     inspect_qualification_documents,
@@ -268,3 +269,32 @@ def test_incompatible_execution_documents_block_binding_shapes(
     assert error["error_id"] != "internal.error"
     assert "authorization" in error["blocked_checks"]
     assert len(error["diagnostics"]) >= 2
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["notes/./extra.txt", "notes/extra.txt/", "notes/.", "notes//extra.txt", "notes/../extra.txt"],
+)
+def test_subject_names_must_be_canonical_relative_paths(tmp_path: Path, name: str) -> None:
+    raw = tmp_path / "extra.txt"
+    raw.write_bytes(b"retained")
+
+    report = inspect_qualification_artifacts([f"other_evidence:{name}={raw}"])
+
+    assert [item.error_id for item in report.diagnostics] == ["cli.arguments_invalid"]
+    assert "non-canonical qualification subject name" in report.diagnostics[0].message
+
+
+def test_descriptor_identity_problems_are_qualification_errors() -> None:
+    descriptor = QualificationArtifact(
+        kind="other_evidence",
+        subject_name="notes/./extra.txt",
+        sha256="0" * 64,
+        size_bytes=0,
+        document=None,
+    )
+
+    report = inspect_qualification_documents([descriptor])
+
+    assert [item.error_id for item in report.diagnostics] == ["qualification.invalid"]
+    assert report.blocked_checks == ("links",)

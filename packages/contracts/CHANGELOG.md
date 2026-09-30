@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Qualification subject names reject empty, `.` and `..` segments and a
+  trailing `/`; `notes/./extra.txt` and `notes/extra.txt` could previously name
+  two subjects for one bundle path. Descriptor problems found through
+  `inspect_qualification_documents` report `qualification.invalid` instead of
+  `cli.arguments_invalid`.
+
 ## 0.17.0
 
 The first release from the shared `robotics-runtime` workspace. Its distribution
