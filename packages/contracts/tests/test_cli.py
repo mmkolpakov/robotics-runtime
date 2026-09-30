@@ -451,3 +451,21 @@ def test_cli_resolve_leaves_outputs_untouched_when_the_trace_path_is_a_directory
     assert main([*arguments, "--output", str(output), "--trace-output", str(trace)]) == 1
     assert output.read_text(encoding="utf-8") == "previous\n"
     assert "output is a directory" in capsys.readouterr().err
+
+
+def test_cli_resolve_output_cannot_replace_an_extension_schema(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    overlay = tmp_path / "overlay.yaml"
+    overlay.write_text("seed: 43\n", encoding="utf-8")
+    schema = tmp_path / "extension.schema.json"
+    schema.write_text('{"type": "object"}\n', encoding="utf-8")
+    original = schema.read_bytes()
+    arguments = ["scenario", "resolve", str(FIXTURE), "--overlay", str(overlay)]
+    extension = ["--extension-schema", f"https://example.org/ext.json={schema}"]
+
+    assert main([*arguments, *extension, "--output", str(schema)]) == 2
+
+    assert schema.read_bytes() == original
+    assert "must not overwrite an input document" in capsys.readouterr().err
