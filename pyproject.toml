@@ -10,7 +10,7 @@ dev = [
   "ruamel.yaml==0.19.1",
   "types-jsonschema==4.26.0.20260518",
   "types-protobuf==7.34.1.20260518",
-  "types-PyYAML==6.0.12.20260518",
+  "types-PyYAML==6.0.12.20260906",
   "yamllint==1.38.0",
 ]
 
