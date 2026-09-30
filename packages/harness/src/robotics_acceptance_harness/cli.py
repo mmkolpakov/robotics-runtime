@@ -427,6 +427,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 load_otlp_json_metrics(
                     metrics_path,
                     expected_sha256=str(metric_link["sha256"]),
+                    evidence_root=evidence.index.path.parent,
                 ),
                 run_id=arguments.run_id,
                 domain_id=arguments.domain_id,

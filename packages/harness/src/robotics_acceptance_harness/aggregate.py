@@ -397,6 +397,7 @@ def evaluate_transport_qualification(
             expected_run_id=run_id,
             expected_domain_id=domain_id,
             expected_sha256=str(link["sha256"]),
+            evidence_root=verified.index.path.parent,
         )
     validate_trace_set(spans_by_domain)
     require_attributable_channels([item.data for item in channel_contracts], spans_by_domain)
