@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,7 @@ from robotics_acceptance_harness.traces import (
     evaluate_causal_chain,
     evaluate_channel_delivery,
     load_otlp_json_traces,
+    require_attributable_channels,
 )
 
 SECOND_NS = 1_000_000_000
@@ -58,8 +60,8 @@ def channel_contract(**delivery_overrides: object) -> dict[str, Any]:
     delivery.update(delivery_overrides)
     return {
         "channel_id": "sensor.control",
-        "source": {"domain_id": "source"},
-        "destination": {"domain_id": "destination"},
+        "source": {"domain_id": "source", "topic": "/sensor"},
+        "destination": {"domain_id": "destination", "topic": "/sensor"},
         "delivery": delivery,
         "trace": {
             "producer_span_name": "publish",
@@ -316,8 +318,8 @@ def _causal_contracts() -> tuple[dict[str, Any], list[dict[str, Any]]]:
     channels = [
         {
             "channel_id": "sensor.decision",
-            "source": {"domain_id": "sensor"},
-            "destination": {"domain_id": "decision"},
+            "source": {"domain_id": "sensor", "topic": "/detections"},
+            "destination": {"domain_id": "decision", "topic": "/detections"},
             "trace": {
                 "producer_span_name": "sensor publish",
                 "consumer_span_name": "decision receive",
@@ -326,8 +328,8 @@ def _causal_contracts() -> tuple[dict[str, Any], list[dict[str, Any]]]:
         },
         {
             "channel_id": "decision.actuation",
-            "source": {"domain_id": "decision"},
-            "destination": {"domain_id": "actuation"},
+            "source": {"domain_id": "decision", "topic": "/cmd_vel"},
+            "destination": {"domain_id": "actuation", "topic": "/cmd_vel"},
             "trace": {
                 "producer_span_name": "decision publish",
                 "consumer_span_name": "actuation receive",
@@ -527,3 +529,94 @@ def test_otlp_traces_are_parsed_only_when_digest_matches(tmp_path: Path) -> None
             expected_domain_id="sensor",
             expected_sha256="0" * 64,
         )
+
+
+def _topic_channels() -> list[dict[str, Any]]:
+    channels = []
+    for channel_id, topic in (("commands", "/cmd_vel"), ("status", "/status")):
+        channel = channel_contract()
+        channel["channel_id"] = channel_id
+        channel["source"] = {"domain_id": "source", "topic": topic}
+        channel["destination"] = {"domain_id": "destination", "topic": topic}
+        channels.append(channel)
+    return channels
+
+
+def _command_traffic(*, destination: str | None) -> dict[str, list[TraceSpan]]:
+    spans: dict[str, list[TraceSpan]] = {"source": [], "destination": []}
+    for index in range(10):
+        start_ns = 10 * SECOND_NS + index * 1_000_000
+        for domain, name, offset in (("source", "publish", 0), ("destination", "receive", 1)):
+            spans[domain].append(
+                replace(
+                    span(
+                        domain_id=domain,
+                        name=name,
+                        span_index=2 * index + offset,
+                        message_id=f"command-{index}",
+                        start_ns=start_ns + offset * 10_000,
+                    ),
+                    destination=destination,
+                )
+            )
+    return spans
+
+
+def test_channels_sharing_span_names_are_separated_by_topic() -> None:
+    commands, status = _topic_channels()
+    spans = _command_traffic(destination="/cmd_vel")
+
+    require_attributable_channels([commands, status], spans)
+    delivered = evaluate_channel_delivery(commands, spans)
+    silent = evaluate_channel_delivery(status, spans)
+
+    assert (delivered.status, delivered.sent_count, delivered.received_count) == ("passed", 10, 10)
+    assert silent.status != "passed"
+    assert (silent.sent_count, silent.received_count) == (0, 0)
+
+
+def test_spans_without_a_topic_cannot_serve_channels_on_different_topics() -> None:
+    channels = _topic_channels()
+    spans = _command_traffic(destination=None)
+
+    with pytest.raises(TraceInputError, match="cannot be told apart"):
+        require_attributable_channels(channels, spans)
+    require_attributable_channels(channels[:1], spans)
+
+
+def test_otlp_span_destination_topic_is_retained(tmp_path: Path) -> None:
+    path = tmp_path / "traces.jsonl"
+    attributes = [
+        {"key": key, "value": {"stringValue": value}}
+        for key, value in (
+            ("run.id", "run"),
+            ("domain.id", "source"),
+            ("messaging.message.id", "command-0"),
+            ("messaging.destination.name", "/cmd_vel"),
+        )
+    ]
+    record = {
+        "resourceSpans": [
+            {
+                "scopeSpans": [
+                    {
+                        "spans": [
+                            {
+                                "traceId": "1" * 32,
+                                "spanId": "2" * 16,
+                                "name": "publish",
+                                "startTimeUnixNano": "1",
+                                "endTimeUnixNano": "2",
+                                "attributes": attributes,
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+    path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+    (loaded,) = load_otlp_json_traces(path, expected_run_id="run", expected_domain_id="source")
+
+    assert loaded.destination == "/cmd_vel"
