@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from time import monotonic_ns, sleep
 from types import MappingProxyType
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,12 +36,16 @@ class GraphSnapshot:
     services: Mapping[str, EndpointObservation] = field(default_factory=dict)
     actions: Mapping[str, EndpointObservation] = field(default_factory=dict)
     lifecycle_nodes: Mapping[str, LifecycleObservation] = field(default_factory=dict)
+    # None means this observer cannot report node presence, not an empty ROS graph.
+    node_names: frozenset[str] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "topics", MappingProxyType(dict(self.topics)))
         object.__setattr__(self, "services", MappingProxyType(dict(self.services)))
         object.__setattr__(self, "actions", MappingProxyType(dict(self.actions)))
         object.__setattr__(self, "lifecycle_nodes", MappingProxyType(dict(self.lifecycle_nodes)))
+        if self.node_names is not None:
+            object.__setattr__(self, "node_names", frozenset(self.node_names))
 
 
 class GraphObserver(Protocol):
@@ -56,6 +60,7 @@ class GraphObserver(Protocol):
 class ReadinessIssue:
     json_path: str
     message: str
+    status: Literal["failed", "error"] = "failed"
 
 
 class GraphReadinessTimeout(TimeoutError):
@@ -121,6 +126,7 @@ def _check_topics(
                 ReadinessIssue(
                     f"{path}.first_message_timeout_sec",
                     "no message has been observed",
+                    status="error",
                 )
             )
     return issues
@@ -149,6 +155,32 @@ def _check_endpoints(
     return issues
 
 
+def _check_lifecycle(
+    expected_nodes: tuple[Mapping[str, Any], ...] | list[Mapping[str, Any]],
+    snapshot: GraphSnapshot,
+) -> list[ReadinessIssue]:
+    issues: list[ReadinessIssue] = []
+    for index, expected in enumerate(expected_nodes):
+        path = f"$.expected_ros_graph.lifecycle_nodes[{index}]"
+        name = expected["name"]
+        observed = snapshot.lifecycle_nodes.get(name)
+        if snapshot.node_names is not None and name not in snapshot.node_names:
+            issues.append(ReadinessIssue(path, f"managed node {name} is absent"))
+        elif observed is None or observed.state == "unknown":
+            issues.append(
+                ReadinessIssue(path, f"managed node {name} state is unavailable", status="error")
+            )
+        elif observed.state != expected["required_state"]:
+            issues.append(
+                ReadinessIssue(
+                    f"{path}.required_state",
+                    f"managed node {name}: expected {expected['required_state']}; "
+                    f"observed {observed.state}",
+                )
+            )
+    return issues
+
+
 def evaluate_graph(
     expected_graph: Mapping[str, Any],
     snapshot: GraphSnapshot,
@@ -158,19 +190,7 @@ def evaluate_graph(
     issues = _check_topics(expected_graph["topics"], snapshot)
     issues.extend(_check_endpoints("services", expected_graph["services"], snapshot.services))
     issues.extend(_check_endpoints("actions", expected_graph["actions"], snapshot.actions))
-    for index, expected in enumerate(expected_graph["lifecycle_nodes"]):
-        path = f"$.expected_ros_graph.lifecycle_nodes[{index}]"
-        name = expected["name"]
-        observed = snapshot.lifecycle_nodes.get(name)
-        if observed is None:
-            issues.append(ReadinessIssue(path, f"managed node {name} state is unavailable"))
-        elif observed.state != expected["required_state"]:
-            issues.append(
-                ReadinessIssue(
-                    f"{path}.required_state",
-                    f"expected {expected['required_state']}; observed {observed.state}",
-                )
-            )
+    issues.extend(_check_lifecycle(expected_graph["lifecycle_nodes"], snapshot))
     return tuple(issues)
 
 
