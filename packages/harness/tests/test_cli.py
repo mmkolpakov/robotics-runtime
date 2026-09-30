@@ -333,6 +333,20 @@ def test_transport_evaluate_maps_domain_evidence_and_reports_verdict(
     }
 
 
+def test_doctor_reads_a_scenario_with_declared_extensions(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    scenario, schema, uri = write_extended_scenario(tmp_path, FIXTURES / "scenario.yaml")
+
+    exit_code = main(
+        ["doctor", "--scenario", str(scenario), "--extension-schema", f"{uri}={schema}"]
+    )
+
+    assert exit_code == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "passed"
+
+
 def test_doctor_reports_extension_inventory(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(["doctor"])
 
