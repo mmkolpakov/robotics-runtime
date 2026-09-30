@@ -306,8 +306,13 @@ def _temporary_path(path: Path) -> Path:
     return Path(name)
 
 
-def write_contract_json(document: Mapping[str, Any], path: str | Path) -> Path:
-    """Validate and atomically write a contract document as canonical JSON."""
+def write_contract_json(
+    document: Mapping[str, Any], path: str | Path, *, replace: bool = True
+) -> Path:
+    """Validate and atomically write a contract document as canonical JSON.
+
+    With replace=False an existing destination is kept and FileExistsError is raised.
+    """
 
     validate_document(document)
     destination = Path(path).expanduser().resolve()
@@ -319,7 +324,12 @@ def write_contract_json(document: Mapping[str, Any], path: str | Path) -> Path:
             temporary.flush()
             os.chmod(temporary_path, 0o644)
             os.fsync(temporary.fileno())
-        os.replace(temporary_path, destination)
+        if replace:
+            os.replace(temporary_path, destination)
+        else:
+            # A hard link publishes the complete file but never replaces one.
+            os.link(temporary_path, destination)
+            temporary_path.unlink()
     except Exception:
         temporary_path.unlink(missing_ok=True)
         raise
