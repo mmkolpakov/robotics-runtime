@@ -241,7 +241,8 @@ def _scenario_resolve(arguments: argparse.Namespace) -> None:
     outputs = [arguments.output]
     if arguments.trace_output:
         outputs.append(arguments.trace_output)
-    _reject_input_aliases("scenario", outputs, [arguments.base, *arguments.overlay])
+    schema_files = [item.partition("=")[2] for item in arguments.extension_schema]
+    _reject_input_aliases("scenario", outputs, [arguments.base, *arguments.overlay, *schema_files])
     if arguments.trace_output:
         try:
             protect_inputs(arguments.trace_output, [arguments.output])
