@@ -209,6 +209,11 @@ def validate_document(
     if not isinstance(selected_schema, str):
         raise UnknownSchemaError("Document must declare schema_version")
     schema_name = resolve_schema_name(selected_schema)
+    if schema_name not in _PUBLIC_SCHEMA_FILES:
+        # Internal resources skip role semantics and extensions; common.v1 has no root rules.
+        raise UnknownSchemaError(
+            f"{schema_name} is an internal schema resource, not a document role"
+        )
     try:
         error = best_match(_validator(schema_name).iter_errors(document))
     except Unresolvable as cause:

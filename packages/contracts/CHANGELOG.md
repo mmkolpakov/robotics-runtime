@@ -5,6 +5,10 @@
 - `create_execution_permit` rejects a naive `now` with `input.invalid_timestamp`
   instead of reading it as host local time, which shifted `issued_at` and
   `expires_at` by the host UTC offset.
+- `validate_document` and `robotics-contracts validate` reject internal schema
+  resources such as `common.v1` or `*-core.v1` with `schema.unknown`. A
+  document declaring `schema_version: common.v1` previously passed without any
+  root constraint, and core schemas skipped role semantics and extensions.
 
 ## 0.17.0
 

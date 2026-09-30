@@ -17,6 +17,7 @@ from jsonschema.exceptions import ValidationError
 import robotics_runtime_contracts as contracts
 from robotics_runtime_contracts import ContractError, load_mapping
 from robotics_runtime_contracts._timestamps import parse_timestamp
+from robotics_runtime_contracts.catalog import internal_schema_names
 from robotics_runtime_contracts.cli import CLIArgumentError, main
 from robotics_runtime_contracts.document_ops import _resolve_property
 from robotics_runtime_contracts.qualification import QualificationError
@@ -415,3 +416,25 @@ print(json.dumps({"directory": str(directory), "digests": {
         name: contracts.schema_digest(name) for name in contracts.schema_resource_names()
     }
     assert not Path(payload["directory"]).exists()
+
+
+@pytest.mark.parametrize("name", internal_schema_names())
+def test_internal_schema_resources_do_not_validate_documents(name: str) -> None:
+    identifier = contracts.load_schema(name)["$id"]
+    for selected in (name, identifier, f"{name}.schema.json"):
+        with pytest.raises(
+            contracts.UnknownSchemaError, match="internal schema resource"
+        ) as declared:
+            contracts.validate_document({"schema_version": selected, "anything": [1, 2, 3]})
+        assert declared.value.error_id == "schema.unknown"
+        with pytest.raises(contracts.UnknownSchemaError, match="internal schema resource"):
+            contracts.validate_document({"schema_version": "acceptance-scenario.v1"}, selected)
+
+
+def test_cli_rejects_an_internal_schema_override(capsys: pytest.CaptureFixture[str]) -> None:
+    fixture = Path(__file__).parent / "fixtures/scenario/valid/simulation-realtime.yaml"
+    arguments = ["--format", "json", "validate", "--schema", "acceptance-scenario-core.v1"]
+
+    assert main([*arguments, str(fixture)]) == 1
+
+    assert json.loads(capsys.readouterr().err)["error"]["error_id"] == "schema.unknown"
