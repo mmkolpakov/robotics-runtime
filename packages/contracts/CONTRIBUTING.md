@@ -9,7 +9,8 @@ extension, not in a common schema.
 Follow [COMPATIBILITY.md](COMPATIBILITY.md). Published names allow only additive
 schema changes; breaking changes require a new schema major, a catalog role,
 release notes and a migration plan for every known consumer. Published schema
-changes remain deferred until the structural compatibility gate is implemented.
+changes must pass `scripts/check_schema_compatibility.py`, which compares them
+with the last release structurally and replays its published documents.
 Tagged releases remain immutable.
 
 Architectural changes to this package require an accepted
@@ -20,19 +21,20 @@ not belong in this repository.
 ## Development
 
 Requirements: Python 3.12 through 3.14 and [uv](https://docs.astral.sh/uv/).
+Run from the workspace root:
 
 ```bash
-uv sync --locked --all-groups
+uv sync --locked --all-packages --all-groups
 uv run pre-commit run --all-files --show-diff-on-failure
-uv run mypy --strict src/robotics_runtime_contracts
-uv run pytest
-uv build --no-sources
+uv run --directory packages/contracts mypy src tests
+uv run --directory packages/contracts pytest
+uv build --package robotics-runtime-contracts --no-sources
 ```
 
 Every schema change requires positive and negative fixtures, a metaschema test,
 semantic tests where JSON Schema cannot express the invariant, and consumer
-integration evidence. Contracts CI currently checks only its own fixtures and
-examples; a cross-repository gate is still planned. Update `consumer-examples/` when a public workflow
+integration evidence. The workspace `consumers` job validates producer examples
+and harness fixtures together. Update `consumer-examples/` when a public workflow
 changes. Pull requests must not include credentials, private data, model
 weights, recordings, or hardware identifiers.
 

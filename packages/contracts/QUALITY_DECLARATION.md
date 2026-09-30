@@ -46,8 +46,10 @@ CI performs:
 - positive, negative, semantic, qualification-link, and consumer-example tests;
 - Ruff linting and formatting;
 - strict mypy analysis of the typed package;
-- wheel and source-distribution builds;
-- installation checks against the built distributions.
+- structural and semantic compatibility checks against the last release.
+
+The release workflow builds the wheel and source distribution and installs
+each into a clean CPython 3.12 environment before publication.
 
 These checks exceed the minimum Level 4 requirements. The project does not yet
 publish or enforce a coverage threshold and therefore does not claim a higher
@@ -64,8 +66,8 @@ compatibility with released harness/infra combinations.
 ## Platform Support
 
 The CI validation matrix targets CPython 3.12, 3.13 and 3.14 on Ubuntu 24.04
-x86-64, running the test suite and wheel/source-distribution installation checks
-for each interpreter. The release build remains on CPython 3.12. The declared
+x86-64 and runs the test suite for each interpreter. Distribution builds and
+installation checks run in the release workflow on CPython 3.12 only. The declared
 support range is `>=3.12,<3.15`; `.python-version` selects its minimum for local
 development. A matrix configuration is not itself evidence of a successful
 hosted run. The pure-Python wheel does not establish support for additional
