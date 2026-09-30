@@ -287,6 +287,9 @@
           "properties": {
             "kind": {
               "const": "none"
+            },
+            "robot_description": {
+              "$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/$defs/robotDescriptionBinding"
             }
           }
         },
@@ -303,6 +306,9 @@
             "kind": {
               "const": "inference"
             },
+            "robot_description": {
+              "$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/$defs/robotDescriptionBinding"
+            },
             "model": {
               "$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/$defs/model"
             },
@@ -315,6 +321,17 @@
           }
         }
       ]
+    },
+    "robotDescriptionBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256"],
+      "properties": {
+        "sha256": {
+          "description": "SHA-256 of the exact retained robot-description document bytes.",
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
+        }
+      }
     },
     "model": {
       "type": "object",

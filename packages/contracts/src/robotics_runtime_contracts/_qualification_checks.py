@@ -15,6 +15,7 @@ from robotics_runtime_contracts._qualification_types import (
     QualificationReport,
 )
 from robotics_runtime_contracts.errors import ContractError
+from robotics_runtime_contracts.workloads import validate_robot_description_binding
 
 
 @dataclass(frozen=True, slots=True)
@@ -259,10 +260,26 @@ def _aggregate_results(context: _Context) -> None:
         rules._fail("aggregate per_domain_results do not exactly match local results")
 
 
+def _robot_description_bindings(context: _Context) -> None:
+    for domain, artifact in context.runtimes.items():
+        runtime = rules._document(artifact)
+        validate_robot_description_binding(context.scenario, runtime)
+        binding = runtime["workload"].get("robot_description")
+        if binding is None:
+            continue
+        rules._artifact_by_digest(
+            context.grouped,
+            "other_evidence",
+            binding["sha256"],
+            f"runtime {domain} robot description",
+        )
+
+
 def _binding_checks(context: _Context) -> Iterator[_Check]:
     grouped, scenario = context.grouped, context.scenario
     run_id, created = context.run["run_id"], context.run["created_at"]
     generated = context.aggregate["generated_at"]
+    yield _Check("robot.description", partial(_robot_description_bindings, context))
     yield _Check(
         "provider.bindings",
         partial(
