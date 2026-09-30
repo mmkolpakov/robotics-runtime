@@ -163,14 +163,16 @@ def _read_document(path: str) -> Mapping[str, Any]:
     return _read_document_source(path)[0]
 
 
-def _write_document(path: str | Path, document: Mapping[str, Any]) -> Path:
+def _serialize_document(path: str | Path, document: Mapping[str, Any]) -> bytes:
     ensure_finite_numbers(document)
+    if Path(path).suffix.lower() in {".yaml", ".yml"}:
+        return dumps_yaml(document).encode("utf-8")
+    return (json.dumps(document, allow_nan=False, indent=2, sort_keys=True) + "\n").encode()
+
+
+def _write_document(path: str | Path, document: Mapping[str, Any]) -> Path:
     output = Path(path).expanduser()
-    if output.suffix.lower() in {".yaml", ".yml"}:
-        content = dumps_yaml(document)
-    else:
-        content = json.dumps(document, allow_nan=False, indent=2, sort_keys=True) + "\n"
-    write_bytes_atomically(content.encode("utf-8"), output)
+    write_bytes_atomically(_serialize_document(output, document), output)
     return output
 
 
@@ -252,7 +254,8 @@ def _scenario_resolve(arguments: argparse.Namespace) -> None:
         overlays,
         extension_schemas=extension_schemas or None,
     )
-    output = _write_document(arguments.output, resolved)
+    output = Path(arguments.output).expanduser()
+    content = _serialize_document(output, resolved)
     trace = {
         "base": {
             "path": arguments.base,
@@ -270,10 +273,18 @@ def _scenario_resolve(arguments: argparse.Namespace) -> None:
             )
         ],
         "resolved": str(output),
-        "resolved_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+        "resolved_sha256": hashlib.sha256(content).hexdigest(),
     }
-    if arguments.trace_output:
-        _write_document(arguments.trace_output, trace)
+    trace_content = (
+        _serialize_document(arguments.trace_output, trace) if arguments.trace_output else None
+    )
+    for destination in outputs:
+        if Path(destination).expanduser().is_dir():
+            raise ContractError(f"output is a directory: {destination}", error_id="input.io_error")
+    # Both documents are ready before either file changes.
+    write_bytes_atomically(content, output)
+    if trace_content is not None:
+        write_bytes_atomically(trace_content, Path(arguments.trace_output).expanduser())
     _emit({**trace, "message": f"resolved: {output}"}, output_format=arguments.format)
 
 
