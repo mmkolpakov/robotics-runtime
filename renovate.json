@@ -5,6 +5,7 @@
     "helpers:pinGitHubActionDigests"
   ],
   "enabledManagers": [
+    "dockerfile",
     "github-actions",
     "pep621",
     "pre-commit"
@@ -13,6 +14,11 @@
     "enabled": true
   },
   "timezone": "Europe/Helsinki",
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 2,
   "packageRules": [
     {
       "matchPackageNames": ["ruff", "astral-sh/ruff-pre-commit"],
@@ -21,6 +27,10 @@
     {
       "matchPackageNames": ["check-jsonschema", "python-jsonschema/check-jsonschema"],
       "groupName": "check-jsonschema package and hooks"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "groupName": "non-major dependencies"
     }
   ],
   "labels": [
