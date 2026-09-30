@@ -144,6 +144,9 @@ def create_execution_permit(
 
     if not 1 <= validity_sec <= 1800:
         raise ContractError("validity_sec must be between 1 and 1800")
+    if now is not None and now.utcoffset() is None:
+        # astimezone() would read a naive value as host local time.
+        raise ContractError("now must be timezone-aware", error_id="input.invalid_timestamp")
     issued_at = (now or datetime.now(UTC)).astimezone(UTC)
     expires_at = issued_at + timedelta(seconds=validity_sec)
     document = {

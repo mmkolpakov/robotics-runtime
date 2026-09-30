@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from robotics_runtime_contracts import (
+    ContractError,
     ContractValidationError,
     SemanticValidationError,
     validate_document,
 )
+from robotics_runtime_contracts.document_ops import create_execution_permit
 from tests.support import load_fixture
 
 FIXTURES = Path(__file__).parent / "fixtures" / "physical" / "valid"
@@ -163,3 +166,39 @@ def test_passed_result_rejects_forbidden_interface_violation() -> None:
         validate_document(result)
     assert caught.value.error_id == "schema.validation_failed"
     assert caught.value.json_path == "$.forbidden_graph_observation.violations"
+
+
+def _permit(now: datetime) -> dict[str, Any]:
+    return create_execution_permit(
+        scenario_sha256="a" * 64,
+        subject_digest="sha256:" + "b" * 64,
+        trust_policy_sha256="c" * 64,
+        environment="hil",
+        target_id="bench-01",
+        identity_kind="udev_serial",
+        identity_sha256="d" * 64,
+        hardware_scope=["controller"],
+        operator_id="operator",
+        approver_id="approver",
+        interlock_reference="s3://robotics-evidence/interlocks/bench-01.json",
+        interlock_sha256="e" * 64,
+        validity_sec=600,
+        now=now,
+    )
+
+
+def test_permit_rejects_a_naive_issue_time() -> None:
+    with pytest.raises(ContractError, match="timezone-aware") as caught:
+        _permit(datetime(2026, 7, 12, 10, 0))
+
+    assert caught.value.error_id == "input.invalid_timestamp"
+
+
+def test_permit_normalizes_an_aware_issue_time_to_utc() -> None:
+    moscow = timezone(timedelta(hours=3))
+    permit = _permit(datetime(2026, 7, 12, 13, 0, tzinfo=moscow))
+
+    assert permit["issued_at"] == "2026-07-12T10:00:00Z"
+    assert permit["expires_at"] == "2026-07-12T10:10:00Z"
+    assert permit["interlock_check"]["checked_at"] == permit["issued_at"]
+    assert _permit(datetime(2026, 7, 12, 10, 0, tzinfo=UTC))["issued_at"] == permit["issued_at"]
