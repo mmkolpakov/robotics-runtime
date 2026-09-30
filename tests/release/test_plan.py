@@ -50,42 +50,42 @@ def test_release_dependencies_cannot_be_local_or_vcs(requirement: str) -> None:
 @pytest.mark.parametrize(
     "requirement",
     [
-        "robotics-runtime-contracts>=0.16,<0.17",
-        "robotics-runtime-contracts>=0.17",
-        "robotics-runtime-contracts>=0.17,<0.19",
-        "robotics-runtime-contracts==0.17.0",
-        "robotics-runtime-contracts>=0.17,<0.18; python_version < '3.14'",
-        "robotics-runtime-contracts[extra]>=0.17,<0.18",
+        "robotics-runtime-contracts>=0.17,<0.18",
+        "robotics-runtime-contracts>=0.18",
+        "robotics-runtime-contracts>=0.18,<0.20",
+        "robotics-runtime-contracts==0.18.0",
+        "robotics-runtime-contracts>=0.18,<0.19; python_version < '3.14'",
+        "robotics-runtime-contracts[extra]>=0.18,<0.19",
     ],
 )
 def test_first_workspace_harness_train_requires_the_exact_bounded_minor(requirement: str) -> None:
     with pytest.raises(release.ReleaseError):
-        release.contracts_requirement([requirement], Version("0.19.0"), Version("0.17.0"))
+        release.contracts_requirement([requirement], Version("0.19.0"), Version("0.18.0"))
 
 
 def test_harness_requirement_tracks_released_patch_versions() -> None:
     assert (
         release.contracts_requirement(
-            ["robotics-runtime-contracts>=0.17,<0.18"], Version("0.19.0"), Version("0.17.9")
+            ["robotics-runtime-contracts>=0.18,<0.19"], Version("0.19.0"), Version("0.18.9")
         )
-        == "robotics-runtime-contracts<0.18,>=0.17"
+        == "robotics-runtime-contracts<0.19,>=0.18"
     )
     with pytest.raises(release.ReleaseError, match="0.19 requires"):
         release.contracts_requirement(
-            ["robotics-runtime-contracts>=0.16,<0.17"], Version("0.19.0"), Version("0.16.0")
+            ["robotics-runtime-contracts>=0.17,<0.18"], Version("0.19.0"), Version("0.17.0")
         )
 
 
-@pytest.mark.parametrize("values", [[], ["robotics-runtime-contracts>=0.17,<0.18"] * 2])
+@pytest.mark.parametrize("values", [[], ["robotics-runtime-contracts>=0.18,<0.19"] * 2])
 def test_missing_and_duplicate_contracts_dependencies_fail(values: list[str]) -> None:
     with pytest.raises(release.ReleaseError, match="one unconditional"):
-        release.contracts_requirement(values, Version("0.19.0"), Version("0.17.0"))
+        release.contracts_requirement(values, Version("0.19.0"), Version("0.18.0"))
 
 
 def test_harness_cannot_depend_on_prerelease_contracts() -> None:
     with pytest.raises(release.ReleaseError, match="stable contracts"):
         release.contracts_requirement(
-            ["robotics-runtime-contracts>=0.17,<0.18"], Version("0.19.0rc1"), Version("0.17.0rc1")
+            ["robotics-runtime-contracts>=0.18,<0.19"], Version("0.19.0rc1"), Version("0.18.0rc1")
         )
 
 
@@ -234,8 +234,8 @@ def test_draft_prerelease_wrong_or_incomplete_release_records_fail(
 def candidate_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     # Synthetic metadata only: no git repository, tags, or package releases are created.
     for key, version, dependencies in (
-        ("contracts", "0.17.0", []),
-        ("harness", "0.19.0", ["robotics-runtime-contracts>=0.17,<0.18"]),
+        ("contracts", "0.18.0", []),
+        ("harness", "0.19.0", ["robotics-runtime-contracts>=0.18,<0.19"]),
     ):
         package = tmp_path / "packages" / key
         package.mkdir(parents=True)
@@ -244,7 +244,7 @@ def candidate_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
             encoding="utf-8",
         )
     (tmp_path / "packages/harness/CHANGELOG.md").write_text(
-        "## 0.19.0\ncontracts-v0.17.0\n", encoding="utf-8"
+        "## 0.19.0\ncontracts-v0.18.0\n", encoding="utf-8"
     )
 
     def git(repo: Path, *args: str) -> str:
@@ -277,15 +277,15 @@ def test_successful_harness_plan_binds_tree_commit_requirement_and_sources(
         candidate_repo, "harness-v0.19.0", event="push", repository="owner/repo"
     )
     assert not plan.dry_run
-    assert plan.contracts_tag == "contracts-v0.17.0"
+    assert plan.contracts_tag == "contracts-v0.18.0"
     assert plan.contracts_commit == "commit" and plan.contracts_tree == "contracts-tree"
-    assert plan.contracts_requirement == "robotics-runtime-contracts<0.18,>=0.17"
+    assert plan.contracts_requirement == "robotics-runtime-contracts<0.19,>=0.18"
     assert set(plan.source_files) == set(release.PACKAGES.values())
 
 
 def test_dry_run_does_not_waive_version_match(candidate_repo: Path) -> None:
     with pytest.raises(release.ReleaseError, match="does not match"):
-        release.create_plan(candidate_repo, "contracts-v0.17.0-rc.1", event="workflow_dispatch")
+        release.create_plan(candidate_repo, "contracts-v0.18.0-rc.1", event="workflow_dispatch")
 
 
 def test_tag_push_rejects_wrong_commit_and_unmerged_commit(
@@ -301,7 +301,7 @@ def test_tag_push_rejects_wrong_commit_and_unmerged_commit(
 
     monkeypatch.setattr(release, "git", wrong_tag)
     with pytest.raises(release.ReleaseError, match="checked-out commit"):
-        release.create_plan(candidate_repo, "contracts-v0.17.0", event="push")
+        release.create_plan(candidate_repo, "contracts-v0.18.0", event="push")
 
     def unmerged(repo: Path, *args: str) -> str:
         if args[0] == "merge-base":
@@ -310,7 +310,7 @@ def test_tag_push_rejects_wrong_commit_and_unmerged_commit(
 
     monkeypatch.setattr(release, "git", unmerged)
     with pytest.raises(release.ReleaseError, match="not reachable"):
-        release.create_plan(candidate_repo, "contracts-v0.17.0", event="push")
+        release.create_plan(candidate_repo, "contracts-v0.18.0", event="push")
 
 
 def test_dry_run_still_rejects_unreleased_contracts(
@@ -340,7 +340,7 @@ def test_current_checkout_contracts_candidate_is_validated_without_mutating_vers
 @pytest.mark.parametrize(
     ("candidate", "package", "environment"),
     [
-        ("contracts-v0.17.0", "robotics-runtime-contracts", "pypi"),
+        ("contracts-v0.18.0", "robotics-runtime-contracts", "pypi"),
         ("harness-v0.19.0", "robotics-acceptance-harness", "pypi-harness"),
     ],
 )
