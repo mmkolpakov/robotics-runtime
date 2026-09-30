@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -336,4 +337,73 @@ def test_cli_creates_a_valid_unsigned_permit(
     permit = json.loads(output.read_text(encoding="utf-8"))
     validate_document(permit)
     assert permit["allowed_physical_effect"] == "none"
+    capsys.readouterr()
+
+
+@pytest.mark.parametrize("output_name", ["source.json", "target.json"])
+def test_cli_diff_output_cannot_replace_an_input(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    output_name: str,
+) -> None:
+    source = tmp_path / "source.json"
+    target = tmp_path / "target.json"
+    source.write_text('{"value": 1}\n', encoding="utf-8")
+    target.write_text('{"value": 2}\n', encoding="utf-8")
+    originals = {path: path.read_bytes() for path in (source, target)}
+
+    arguments = ["diff", str(source), str(target), "--output", str(tmp_path / output_name)]
+
+    assert main(arguments) == 2
+    assert {path: path.read_bytes() for path in originals} == originals
+    assert "diff outputs must not overwrite an input document" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("link", ["hard", "symbolic"])
+def test_cli_resolve_rejects_an_output_linked_to_the_base(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    link: str,
+) -> None:
+    base = tmp_path / "base.yaml"
+    base.write_bytes(FIXTURE.read_bytes())
+    overlay = tmp_path / "overlay.yaml"
+    overlay.write_text("seed: 43\n", encoding="utf-8")
+    output = tmp_path / "resolved.yaml"
+    if link == "hard":
+        os.link(base, output)
+    else:
+        output.symlink_to(base)
+    original = base.read_bytes()
+
+    arguments = ["scenario", "resolve", str(base), "--overlay", str(overlay)]
+
+    assert main([*arguments, "--output", str(output)]) == 2
+    assert base.read_bytes() == original
+    assert "must not overwrite an input document" in capsys.readouterr().err
+
+
+def test_cli_document_output_is_replaced_atomically(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source = tmp_path / "source.json"
+    target = tmp_path / "target.json"
+    source.write_text('{"value": 1}\n', encoding="utf-8")
+    target.write_text('{"value": 2}\n', encoding="utf-8")
+    output = tmp_path / "patch.json"
+    previous = tmp_path / "previous.json"
+    output.write_text("{}\n", encoding="utf-8")
+    os.link(output, previous)
+
+    assert main(["diff", str(source), str(target), "--output", str(output)]) == 0
+
+    assert json.loads(output.read_text(encoding="utf-8")) == {"value": 2}
+    assert previous.read_text(encoding="utf-8") == "{}\n"
+    assert sorted(path.name for path in tmp_path.iterdir()) == [
+        "patch.json",
+        "previous.json",
+        "source.json",
+        "target.json",
+    ]
     capsys.readouterr()
