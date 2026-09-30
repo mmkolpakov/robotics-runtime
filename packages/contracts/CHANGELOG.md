@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `resolve_merge_patches` rejects overlays that change `schema_version`
+  (`merge.schema_version_changed`), and `scenario resolve` requires an
+  `acceptance-scenario.v1` base (`schema.role_mismatch`). Any document could
+  previously be resolved and an overlay could retag the result.
+
 ## 0.17.0
 
 The first release from the shared `robotics-runtime` workspace. Its distribution
