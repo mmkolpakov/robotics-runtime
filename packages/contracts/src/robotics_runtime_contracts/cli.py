@@ -12,6 +12,7 @@ from robotics_runtime_contracts import (
     ensure_finite_numbers,
     loads_mapping,
     resolve_schema_name,
+    schema_for_role,
     validate_document,
 )
 from robotics_runtime_contracts._writer_cli import add_writer_commands, run_writer
@@ -236,6 +237,14 @@ def _emit_error(error: ContractError, *, output_format: str) -> None:
 def _scenario_resolve(arguments: argparse.Namespace) -> None:
     extension_schemas = _read_extension_schemas(arguments.extension_schema)
     base, base_source = _read_document_source(arguments.base)
+    declared = base.get("schema_version")
+    scenario_schema = schema_for_role("acceptance_scenario")
+    if not isinstance(declared, str) or resolve_schema_name(declared) != scenario_schema:
+        raise ContractError(
+            f"scenario resolve requires a {scenario_schema} base document",
+            error_id="schema.role_mismatch",
+            json_path="$.schema_version",
+        )
     overlay_sources = [_read_document_source(path) for path in arguments.overlay]
     overlays = [document for document, _source in overlay_sources]
     outputs = [arguments.output]

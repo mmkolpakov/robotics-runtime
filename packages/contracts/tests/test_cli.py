@@ -469,3 +469,19 @@ def test_cli_resolve_output_cannot_replace_an_extension_schema(
 
     assert schema.read_bytes() == original
     assert "must not overwrite an input document" in capsys.readouterr().err
+
+
+def test_cli_resolve_requires_a_scenario_base(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    manifest = FIXTURES / "runtime" / "valid" / "cpu-simulation.yaml"
+    overlay = tmp_path / "overlay.yaml"
+    overlay.write_text("{}\n", encoding="utf-8")
+    output = tmp_path / "resolved.json"
+    arguments = ["--format", "json", "scenario", "resolve", str(manifest)]
+
+    assert main([*arguments, "--overlay", str(overlay), "--output", str(output)]) == 1
+
+    assert json.loads(capsys.readouterr().err)["error"]["error_id"] == "schema.role_mismatch"
+    assert not output.exists()

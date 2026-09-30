@@ -102,6 +102,12 @@ def resolve_merge_patches(
         merged = merge_patch(resolved, dict(overlay))
         assert isinstance(merged, dict)  # An object patch always produces an object.
         resolved = merged
+    if resolved.get("schema_version") != base.get("schema_version"):
+        raise ContractError(
+            "overlays must not change schema_version",
+            error_id="merge.schema_version_changed",
+            json_path="$.schema_version",
+        )
     validate_document(resolved, extension_schemas=extension_schemas)
     return resolved
 
