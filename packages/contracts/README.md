@@ -288,8 +288,9 @@ to validation failures. `--help` and process interrupts retain normal behavior.
 All CLI file inputs and outputs expand `~` before accessing the filesystem.
 
 Error families include `schema.validation_failed`, `schema.unknown`,
-`schema.role_unknown`, `schema.reference_invalid`, `semantic.validation_failed`,
-`extension.validation_failed`, `qualification.invalid`,
+`schema.role_unknown`, `schema.role_mismatch`, `schema.reference_invalid`,
+`semantic.validation_failed`, `extension.validation_failed`,
+`merge.schema_version_changed`, `qualification.invalid`,
 `qualification.unknown_domain`, `qualification.unknown_channel`,
 `provider.requirements_unsatisfied`, `receipt.validation_failed`,
 `clock.evidence_invalid`, `status.invalid`, `input.parse_failed`,
