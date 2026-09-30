@@ -33,6 +33,18 @@ FIXTURES = Path(__file__).parent / "fixtures"
             "$.expected_ros_graph.topics",
         ),
         (
+            "scenario/valid/simulation-realtime.yaml",
+            lambda value: value["expected_ros_graph"]["lifecycle_nodes"].append(
+                {
+                    "name": "/controller",
+                    "required_state": "active",
+                    "timeout_sec": 10,
+                    "stable_for_sec": value["timeouts"]["graph_ready_sec"] + 1,
+                }
+            ),
+            "$.expected_ros_graph.lifecycle_nodes[0].stable_for_sec",
+        ),
+        (
             "dataset/valid/camera-mcap.yaml",
             lambda value: value["time"].update(end_ns=value["time"]["start_ns"]),
             "$.time.end_ns",

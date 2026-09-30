@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Scenario semantics reject a lifecycle node whose `stable_for_sec` exceeds
+  `timeouts.graph_ready_sec`; readiness could never be reached, and observers
+  reported a healthy graph as unstable after the timeout.
 - `create_execution_permit` rejects a naive `now` with `input.invalid_timestamp`
   instead of reading it as host local time, which shifted `issued_at` and
   `expires_at` by the host UTC offset.

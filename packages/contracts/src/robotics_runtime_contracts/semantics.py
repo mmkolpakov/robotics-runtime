@@ -48,15 +48,23 @@ def _require_unique(
         _fail(schema_name, path, f"{key} values must be unique")
 
 
+def _validate_scenario_stability(schema_name: str, document: Mapping[str, Any]) -> None:
+    # Readiness must stay stable for these periods before graph_ready_sec expires.
+    ready = document["timeouts"]["graph_ready_sec"]
+    if document["timeouts"]["stable_for_sec"] > ready:
+        _fail(schema_name, "$.timeouts.stable_for_sec", "must not exceed graph_ready_sec")
+    for index, node in enumerate(document["expected_ros_graph"]["lifecycle_nodes"]):
+        if node["stable_for_sec"] > ready:
+            _fail(
+                schema_name,
+                f"$.expected_ros_graph.lifecycle_nodes[{index}].stable_for_sec",
+                "must not exceed timeouts.graph_ready_sec",
+            )
+
+
 def _validate_acceptance_scenario(document: Mapping[str, Any]) -> None:
     schema_name = document["schema_version"]
-    timeouts = document["timeouts"]
-    if timeouts["stable_for_sec"] > timeouts["graph_ready_sec"]:
-        _fail(
-            schema_name,
-            "$.timeouts.stable_for_sec",
-            "must not exceed graph_ready_sec",
-        )
+    _validate_scenario_stability(schema_name, document)
 
     graph = document["expected_ros_graph"]
     for key in ("topics", "services", "actions", "lifecycle_nodes"):
