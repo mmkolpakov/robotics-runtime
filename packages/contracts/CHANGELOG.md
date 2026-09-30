@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `diff --output` and `scenario resolve` refuse outputs that name, hard-link or
+  symlink to an input document; `diff` previously overwrote its source. CLI
+  documents are written through a temporary file and one rename.
+
 ## 0.17.0
 
 The first release from the shared `robotics-runtime` workspace. Its distribution

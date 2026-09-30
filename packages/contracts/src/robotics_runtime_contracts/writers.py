@@ -49,10 +49,11 @@ def write_document(
 ) -> Path:
     """Validate and atomically replace a document; leave existing output on failure."""
     validate_document(document, schema, extension_schemas=extension_schemas)
-    return _write_bytes(dumps_canonical(dict(document)), output)
+    return write_bytes_atomically(dumps_canonical(dict(document)), output)
 
 
-def _write_bytes(content: bytes, output: str | Path) -> Path:
+def write_bytes_atomically(content: bytes, output: str | Path) -> Path:
+    """Replace ``output`` in one rename; keep the previous file on failure."""
     destination = Path(output).expanduser().absolute()
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
@@ -141,7 +142,7 @@ def write_evidence_draft(
 ) -> Path:
     index = _validate_draft(draft, extension_schemas)
     protect_inputs(output, evidence_sources(index))
-    return _write_bytes(dumps_canonical({"writer_state": _DRAFT, "index": index}), output)
+    return write_bytes_atomically(dumps_canonical({"writer_state": _DRAFT, "index": index}), output)
 
 
 def _file_facts(path: Path) -> tuple[str, int]:

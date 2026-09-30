@@ -33,7 +33,7 @@ from robotics_runtime_contracts.serialization import (
     read_document_stream,
 )
 from robotics_runtime_contracts.statements import validate_qualification_statement
-from robotics_runtime_contracts.writers import protect_inputs
+from robotics_runtime_contracts.writers import protect_inputs, write_bytes_atomically
 
 
 class ContractArgumentParser(argparse.ArgumentParser):
@@ -166,13 +166,25 @@ def _read_document(path: str) -> Mapping[str, Any]:
 def _write_document(path: str | Path, document: Mapping[str, Any]) -> Path:
     ensure_finite_numbers(document)
     output = Path(path).expanduser()
-    output.parent.mkdir(parents=True, exist_ok=True)
     if output.suffix.lower() in {".yaml", ".yml"}:
         content = dumps_yaml(document)
     else:
         content = json.dumps(document, allow_nan=False, indent=2, sort_keys=True) + "\n"
-    output.write_text(content, encoding="utf-8")
+    write_bytes_atomically(content.encode("utf-8"), output)
     return output
+
+
+def _reject_input_aliases(command: str, outputs: Sequence[str], inputs: Sequence[str]) -> None:
+    """Reject outputs that name, link to or share a file with an input document."""
+
+    sources = [path for path in inputs if path != "-"]
+    for output in outputs:
+        try:
+            protect_inputs(output, sources)
+        except ContractError as error:
+            raise CLIArgumentError(
+                f"{command} outputs must not overwrite an input document"
+            ) from error
 
 
 def _read_extension_schemas(values: Sequence[str]) -> dict[str, bytes]:
@@ -224,19 +236,17 @@ def _scenario_resolve(arguments: argparse.Namespace) -> None:
     base, base_source = _read_document_source(arguments.base)
     overlay_sources = [_read_document_source(path) for path in arguments.overlay]
     overlays = [document for document, _source in overlay_sources]
-    inputs = {
-        Path(path).expanduser().resolve()
-        for path in (arguments.base, *arguments.overlay)
-        if path != "-"
-    }
-    output_path = Path(arguments.output).expanduser().resolve()
-    trace_path = (
-        Path(arguments.trace_output).expanduser().resolve() if arguments.trace_output else None
-    )
-    if output_path in inputs or trace_path in inputs:
-        raise CLIArgumentError("scenario outputs must not overwrite an input document")
-    if trace_path is not None and trace_path == output_path:
-        raise CLIArgumentError("--output and --trace-output must identify different files")
+    outputs = [arguments.output]
+    if arguments.trace_output:
+        outputs.append(arguments.trace_output)
+    _reject_input_aliases("scenario", outputs, [arguments.base, *arguments.overlay])
+    if arguments.trace_output:
+        try:
+            protect_inputs(arguments.trace_output, [arguments.output])
+        except ContractError as error:
+            raise CLIArgumentError(
+                "--output and --trace-output must identify different files"
+            ) from error
     resolved = resolve_merge_patches(
         base,
         overlays,
@@ -392,6 +402,7 @@ def _run(arguments: argparse.Namespace) -> int:
             _read_document(arguments.target),
         )
         if arguments.output:
+            _reject_input_aliases("diff", [arguments.output], [arguments.source, arguments.target])
             _write_document(arguments.output, patch)
         else:
             print(json.dumps(patch, allow_nan=False, indent=2, sort_keys=True))
