@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Sequence
 from hashlib import sha256
 from os import fstat
@@ -26,6 +27,7 @@ from robotics_acceptance_harness.metrics import (
 )
 
 OTLP_JSON_LINES_MEDIA_TYPE = "application/x-ndjson"
+_LOGGER = logging.getLogger(__name__)
 
 
 class MetricInputError(HarnessError, ValueError):
@@ -128,7 +130,34 @@ def _has_recorded_value(point: Any) -> bool:
     return int(point.flags) & DataPointFlags.DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK == 0
 
 
-def otlp_attribute_value(value: Any) -> MetricAttribute | None:
+def _warn_unsupported_instrument(metric: Any, source: Path, line_number: int) -> None:
+    data_kind = metric.WhichOneof("data")
+    if data_kind is None:
+        return
+    data = getattr(metric, data_kind)
+    if not any(_has_recorded_value(point) for point in data.data_points):
+        return
+    _LOGGER.warning(
+        "Discarding OTLP instrument with unsupported type %s",
+        data_kind,
+        extra={
+            "diagnostic_id": "otlp.unsupported_instrument",
+            "source_path": str(source),
+            "line_number": line_number,
+            "metric_name": str(metric.name),
+            "otlp_type": data_kind,
+        },
+    )
+
+
+def otlp_attribute_value(
+    value: Any,
+    *,
+    source_path: str | Path | None = None,
+    line_number: int | None = None,
+    metric_name: str | None = None,
+    attribute_key: str | None = None,
+) -> MetricAttribute | None:
     value_kind = value.WhichOneof("value")
     if value_kind == "string_value":
         return str(value.string_value)
@@ -138,13 +167,37 @@ def otlp_attribute_value(value: Any) -> MetricAttribute | None:
         return int(value.int_value)
     if value_kind == "double_value":
         return float(value.double_value)
+    _LOGGER.warning(
+        "Discarding OTLP attribute with unsupported type %s",
+        value_kind or "unset",
+        extra={
+            "diagnostic_id": "otlp.unsupported_attribute",
+            "source_path": str(source_path) if source_path is not None else None,
+            "line_number": line_number,
+            "metric_name": metric_name,
+            "attribute_key": attribute_key,
+            "otlp_type": value_kind or "unset",
+        },
+    )
     return None
 
 
-def otlp_attributes(items: Any) -> dict[str, MetricAttribute]:
+def otlp_attributes(
+    items: Any,
+    *,
+    source_path: str | Path | None = None,
+    line_number: int | None = None,
+    metric_name: str | None = None,
+) -> dict[str, MetricAttribute]:
     attributes: dict[str, MetricAttribute] = {}
     for item in items:
-        value = otlp_attribute_value(item.value)
+        value = otlp_attribute_value(
+            item.value,
+            source_path=source_path,
+            line_number=line_number,
+            metric_name=metric_name,
+            attribute_key=str(item.key),
+        )
         if value is not None:
             attributes[str(item.key)] = value
     return attributes
@@ -173,15 +226,20 @@ def load_otlp_json_metrics(
             ) from error
 
         for resource_metrics in request.resource_metrics:
-            resource_attributes = otlp_attributes(resource_metrics.resource.attributes)
+            resource_attributes = otlp_attributes(
+                resource_metrics.resource.attributes, source_path=source, line_number=line_number
+            )
             for scope_metrics in resource_metrics.scope_metrics:
                 scope_attributes = {
                     **resource_attributes,
-                    **otlp_attributes(scope_metrics.scope.attributes),
+                    **otlp_attributes(
+                        scope_metrics.scope.attributes, source_path=source, line_number=line_number
+                    ),
                 }
                 for metric in scope_metrics.metrics:
                     data_kind = metric.WhichOneof("data")
                     if data_kind not in {"gauge", "sum", "histogram"}:
+                        _warn_unsupported_instrument(metric, source, line_number)
                         continue
                     data = getattr(metric, data_kind)
                     temporality = (
@@ -194,7 +252,12 @@ def load_otlp_json_metrics(
                             continue
                         attributes = {
                             **scope_attributes,
-                            **otlp_attributes(point.attributes),
+                            **otlp_attributes(
+                                point.attributes,
+                                source_path=source,
+                                line_number=line_number,
+                                metric_name=str(metric.name),
+                            ),
                         }
                         if data_kind == "histogram":
                             try:

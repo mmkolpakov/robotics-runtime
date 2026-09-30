@@ -7,7 +7,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 from pathlib import Path
-from typing import cast
+from typing import NoReturn, cast
 
 from robotics_acceptance_harness import __version__
 from robotics_acceptance_harness.aggregate import (
@@ -20,11 +20,15 @@ from robotics_acceptance_harness.application import (
     run_verification,
 )
 from robotics_acceptance_harness.campaign import aggregate_campaign
+from robotics_acceptance_harness.command_reporting import (
+    command_reporting,
+    configure_command,
+    record_command_error,
+)
 from robotics_acceptance_harness.diagnostics import (
     doctor_report,
     report_markdown,
     why_report,
-    write_error_diagnostic,
 )
 from robotics_acceptance_harness.documents import (
     DocumentBundle,
@@ -135,8 +139,14 @@ def _add_trace_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--output", required=True, metavar="PATH")
 
 
+class _CommandParser(argparse.ArgumentParser):
+    def error(self, message: str) -> NoReturn:
+        record_command_error(HarnessInputError(message))
+        super().error(message)
+
+
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = _CommandParser(
         prog="robotics-acceptance",
         description="Attach-only acceptance observer for an existing ROS 2 execution.",
     )
@@ -311,10 +321,40 @@ def _parser() -> argparse.ArgumentParser:
         command_parser.add_argument(
             "--diagnostic-output",
             metavar="PATH",
-            help="Write a machine-readable diagnostic if execution fails.",
+            help="Write a machine-readable completion or error report, including warnings.",
+        )
+        command_parser.add_argument(
+            "--log-level",
+            choices=("DEBUG", "INFO", "WARNING", "ERROR"),
+            default="WARNING",
+            help="Minimum log severity written to stderr; diagnostics retain all warnings.",
         )
 
     return parser
+
+
+def _diagnostic_destination(argv: Sequence[str]) -> str | None:
+    """Recover only an explicitly named destination after a syntax error."""
+    parser = argparse.ArgumentParser(add_help=False, allow_abbrev=False, exit_on_error=False)
+    parser.add_argument("--diagnostic-output")
+    try:
+        arguments, _unknown = parser.parse_known_args(argv)
+    except argparse.ArgumentError:
+        return None
+    return cast(str | None, arguments.diagnostic_output)
+
+
+def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
+    values = list(sys.argv[1:] if argv is None else argv)
+    try:
+        return _parser().parse_args(values)
+    except SystemExit as error:
+        if error.code == 2:
+            command = (
+                values[0] if values and not values[0].startswith("-") else "robotics-acceptance"
+            )
+            configure_command(command, _diagnostic_destination(values), "WARNING")
+        raise
 
 
 def _keyed_values(values: Sequence[str], option: str) -> Mapping[str, str]:
@@ -402,9 +442,10 @@ def _report_status(output: Path, status: str, key: str) -> int:
     return 0 if status == "passed" else 1
 
 
+@command_reporting
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = _parser()
-    arguments = parser.parse_args(argv)
+    arguments = _parse_arguments(argv)
+    configure_command(arguments.command, arguments.diagnostic_output, arguments.log_level)
     try:
         with command_error_boundary():
             if arguments.command == "create-run":
@@ -628,18 +669,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0 if outputs.result["status"] == "passed" else 1
     except HarnessError as error:
         print(f"error: [{error.error_id}] {error}", file=sys.stderr)
-        diagnostic_output = getattr(arguments, "diagnostic_output", None)
-        if diagnostic_output:
-            try:
-                with command_error_boundary():
-                    write_error_diagnostic(
-                        diagnostic_output,
-                        command=str(arguments.command),
-                        error=error,
-                        error_id=error.error_id,
-                    )
-            except HarnessError as diagnostic_error:
-                print(f"error: cannot write diagnostic: {diagnostic_error}", file=sys.stderr)
+        record_command_error(error)
         return error.exit_code
 
 

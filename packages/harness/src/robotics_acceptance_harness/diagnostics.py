@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import tempfile
 from collections.abc import Mapping, Sequence
 from importlib import import_module
 from importlib.metadata import version
@@ -235,13 +236,10 @@ def report_markdown(report: Mapping[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write_error_diagnostic(
-    path: str | Path, *, command: str, error: Exception, error_id: str | None = None
-) -> Path:
-    """Write a stable machine-readable diagnostic after a command failure."""
-
-    destination = Path(path).expanduser().resolve()
-    destination.parent.mkdir(parents=True, exist_ok=True)
+def error_diagnostic(
+    *, command: str, error: Exception, error_id: str | None = None
+) -> dict[str, Any]:
+    """Describe a command failure without losing its dependency error identity."""
     source = error.diagnostic_exception if isinstance(error, HarnessError) else error
     payload = {
         "status": "error",
@@ -266,11 +264,53 @@ def write_error_diagnostic(
             }
             for json_path, message in issues
         ]
-    destination.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n",
-        encoding="utf-8",
-    )
+    return payload
+
+
+def write_command_diagnostic(path: str | Path, payload: Mapping[str, Any]) -> Path:
+    """Atomically replace a command report after serializing the complete payload."""
+
+    serialized = json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    destination = Path(path).expanduser().resolve()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as stream:
+            temporary_path = Path(stream.name)
+            stream.write(serialized)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temporary_path, 0o644)
+        os.replace(temporary_path, destination)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
     return destination
 
 
-__all__ = ["doctor_report", "report_markdown", "why_report", "write_error_diagnostic"]
+def write_error_diagnostic(
+    path: str | Path, *, command: str, error: Exception, error_id: str | None = None
+) -> Path:
+    """Write a stable machine-readable diagnostic after a command failure."""
+
+    return write_command_diagnostic(
+        path, error_diagnostic(command=command, error=error, error_id=error_id)
+    )
+
+
+__all__ = [
+    "doctor_report",
+    "error_diagnostic",
+    "report_markdown",
+    "why_report",
+    "write_command_diagnostic",
+    "write_error_diagnostic",
+]

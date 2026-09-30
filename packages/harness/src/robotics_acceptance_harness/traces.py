@@ -174,11 +174,15 @@ def load_otlp_json_traces(
                 f"invalid OTLP JSON at {source}:{line_number}: {error}"
             ) from error
         for resource_spans in request.resource_spans:
-            resource_attributes = otlp_attributes(resource_spans.resource.attributes)
+            resource_attributes = otlp_attributes(
+                resource_spans.resource.attributes, source_path=source, line_number=line_number
+            )
             for scope_spans in resource_spans.scope_spans:
                 scope_attributes = {
                     **resource_attributes,
-                    **otlp_attributes(scope_spans.scope.attributes),
+                    **otlp_attributes(
+                        scope_spans.scope.attributes, source_path=source, line_number=line_number
+                    ),
                 }
                 for span in scope_spans.spans:
                     location = f"{source}:{line_number} span {span.name!r}"
@@ -190,7 +194,12 @@ def load_otlp_json_traces(
                         raise TraceInputError(
                             f"{location} reports dropped trace data and cannot prove causality"
                         )
-                    attributes = {**scope_attributes, **otlp_attributes(span.attributes)}
+                    attributes = {
+                        **scope_attributes,
+                        **otlp_attributes(
+                            span.attributes, source_path=source, line_number=line_number
+                        ),
+                    }
                     run_id = _string_attribute(
                         attributes,
                         "run.id",
@@ -232,7 +241,9 @@ def load_otlp_json_traces(
                             or link_span_id == "0" * 16
                         ):
                             raise TraceInputError(f"{location} contains an invalid span link")
-                        link_attributes = otlp_attributes(link.attributes)
+                        link_attributes = otlp_attributes(
+                            link.attributes, source_path=source, line_number=line_number
+                        )
                         links.append(
                             TraceLink(
                                 trace_id=link_trace_id,
