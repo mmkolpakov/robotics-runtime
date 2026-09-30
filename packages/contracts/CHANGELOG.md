@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.18.0
+
+Adds optional robot-description bindings, a flight-controller provider profile
+and digest-pinned extensions for every document role. Schema changes are
+additive against 0.17.0 under the compatibility gate. Fixes that reject inputs
+0.17 accepted by mistake are listed with the other changes.
 
 - Bind optional scenario robot-description digests to runtime workload metadata
   and the exact retained description artifact bytes during qualification. Keep

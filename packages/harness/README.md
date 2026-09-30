@@ -42,7 +42,7 @@ version.
 | Component | Baseline |
 | --- | --- |
 | Python | 3.12 through 3.14 |
-| Contracts | `robotics-runtime-contracts>=0.17,<0.18` |
+| Contracts | `robotics-runtime-contracts>=0.18,<0.19` |
 | ROS observation | ROS 2 Jazzy packages in the observer environment |
 | Metrics | OTLP JSON Lines exported by OpenTelemetry Collector |
 
