@@ -25,6 +25,7 @@ from robotics_acceptance_harness.traces import (
     evaluate_causal_chain,
     evaluate_channel_delivery,
     load_otlp_json_traces,
+    require_attributable_channels,
     validate_trace_set,
 )
 
@@ -398,6 +399,7 @@ def evaluate_transport_qualification(
             expected_sha256=str(link["sha256"]),
         )
     validate_trace_set(spans_by_domain)
+    require_attributable_channels([item.data for item in channel_contracts], spans_by_domain)
 
     clock_relations = [
         load_document(path, expected_role="clock_relation") for path in clock_relation_paths

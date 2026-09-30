@@ -21,6 +21,7 @@ from robotics_acceptance_harness.otel import (
 )
 
 MESSAGE_ID_ATTRIBUTE = "messaging.message.id"
+DESTINATION_ATTRIBUTE = "messaging.destination.name"
 _OTLP_IDENTIFIER_LENGTHS = {
     "traceId": 16,
     "spanId": 8,
@@ -51,6 +52,7 @@ class TraceSpan:
     start_time_unix_nano: int
     end_time_unix_nano: int
     links: tuple[TraceLink, ...]
+    destination: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,6 +259,12 @@ def load_otlp_json_traces(
                             start_time_unix_nano=int(span.start_time_unix_nano),
                             end_time_unix_nano=int(span.end_time_unix_nano),
                             links=tuple(links),
+                            destination=_string_attribute(
+                                attributes,
+                                DESTINATION_ATTRIBUTE,
+                                required=False,
+                                location=location,
+                            ),
                         )
                     )
     if not spans:
@@ -264,21 +272,64 @@ def load_otlp_json_traces(
     return tuple(spans)
 
 
+def _endpoint_spans(
+    contract: Mapping[str, Any],
+) -> tuple[tuple[str, str, str], tuple[str, str, str]]:
+    """Return (domain, span name, topic) for the producer and consumer side."""
+
+    trace = contract["trace"]
+    return (
+        (
+            str(contract["source"]["domain_id"]),
+            str(trace["producer_span_name"]),
+            str(contract["source"]["topic"]),
+        ),
+        (
+            str(contract["destination"]["domain_id"]),
+            str(trace["consumer_span_name"]),
+            str(contract["destination"]["topic"]),
+        ),
+    )
+
+
 def _channel_spans(
     contract: Mapping[str, Any],
     spans_by_domain: Mapping[str, Sequence[TraceSpan]],
 ) -> tuple[list[TraceSpan], list[TraceSpan]]:
-    source_domain = str(contract["source"]["domain_id"])
-    destination_domain = str(contract["destination"]["domain_id"])
-    producer_name = str(contract["trace"]["producer_span_name"])
-    consumer_name = str(contract["trace"]["consumer_span_name"])
-    producers = [
-        span for span in spans_by_domain.get(source_domain, ()) if span.name == producer_name
-    ]
-    consumers = [
-        span for span in spans_by_domain.get(destination_domain, ()) if span.name == consumer_name
-    ]
+    producers, consumers = (
+        [
+            span
+            for span in spans_by_domain.get(domain, ())
+            if span.name == name and span.destination in {None, topic}
+        ]
+        for domain, name, topic in _endpoint_spans(contract)
+    )
     return producers, consumers
+
+
+def require_attributable_channels(
+    contracts: Sequence[Mapping[str, Any]],
+    spans_by_domain: Mapping[str, Sequence[TraceSpan]],
+) -> None:
+    """Reject spans that channels on different topics would each claim by name."""
+
+    topics: dict[tuple[str, str], set[str]] = {}
+    for contract in contracts:
+        for domain, name, topic in _endpoint_spans(contract):
+            topics.setdefault((domain, name), set()).add(topic)
+    for (domain, name), declared in sorted(topics.items()):
+        if len(declared) < 2:
+            continue
+        unattributed = sum(
+            span.name == name and span.destination is None
+            for span in spans_by_domain.get(domain, ())
+        )
+        if unattributed:
+            raise TraceInputError(
+                f"{unattributed} spans named {name!r} in domain {domain!r} lack "
+                f"{DESTINATION_ATTRIBUTE}; channels on topics {sorted(declared)} "
+                "cannot be told apart"
+            )
 
 
 def _relationship_matches(
