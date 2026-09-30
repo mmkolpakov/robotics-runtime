@@ -4,11 +4,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
 from os import fstat
-from os import name as os_name
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
-from urllib.parse import unquote, urlsplit
+from urllib.parse import quote, urlsplit
+from urllib.request import url2pathname
 
 from robotics_runtime_contracts.serialization import MAX_DOCUMENT_BYTES
 
@@ -42,13 +42,6 @@ class VerifiedEvidence:
     local_files: Mapping[Path, Mapping[str, Any]]
     recording_summaries: tuple[LoadedDocument, ...] = ()
     receipts: tuple[LoadedDocument, ...] = ()
-
-
-def _local_path(value: str) -> Path:
-    decoded = unquote(value)
-    if os_name == "nt" and decoded.startswith("/") and decoded[2:3] == ":":
-        decoded = decoded[1:]
-    return Path(decoded)
 
 
 def _verified_payload(
@@ -118,7 +111,9 @@ def _local_link(
     index: int,
     root: Path,
 ) -> tuple[Path, Mapping[str, Any]]:
-    path = _local_path(str(artifact["local_path"]))
+    # Preserve the legacy /C:/ spelling used by Windows fixtures. Quote
+    # literal percent signs before conversion so filenames are not URI-decoded.
+    path = Path(url2pathname(quote(str(artifact["local_path"]), safe="/:")))
     json_path = f"$.artifacts[{index}]"
     uri = urlsplit(str(artifact["uri"]))
     if uri.scheme != "file" or uri.netloc not in {"", "localhost"}:
@@ -126,7 +121,7 @@ def _local_link(
             f"{json_path}.uri",
             "local evidence requires a local file URI",
         )
-    uri_path = _local_path(uri.path)
+    uri_path = Path(url2pathname(uri.path))
     if uri_path.resolve() != path.resolve():
         raise EvidenceValidationError(
             f"{json_path}.local_path",
@@ -187,7 +182,7 @@ def _local_summary(
             f"{json_path}.uri",
             "acceptance verification requires a local recording summary",
         )
-    path = _local_path(uri.path).absolute()
+    path = Path(url2pathname(uri.path)).absolute()
     raw = _read_local(path, reference, root, json_path, capture=True)
     try:
         summary = load_document_bytes(raw, source=path, expected_role="recording_summary")

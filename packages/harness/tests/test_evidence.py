@@ -52,8 +52,11 @@ def _retained_artifact(tmp_path: Path) -> tuple[dict[str, object], dict[str, Any
     return artifact, chain
 
 
-def test_verified_local_evidence_becomes_result_link(tmp_path: Path) -> None:
-    artifact = tmp_path / "run.json"
+@pytest.mark.parametrize(
+    "name", ["run.json", "run space.json", "run%25.json", "run%2F.json", "данные.json"]
+)
+def test_verified_local_evidence_becomes_result_link(tmp_path: Path, name: str) -> None:
+    artifact = tmp_path / name
     artifact.write_bytes(b"verified evidence")
 
     verified = load_evidence_index(

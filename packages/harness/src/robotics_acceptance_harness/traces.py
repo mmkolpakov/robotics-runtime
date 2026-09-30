@@ -399,24 +399,6 @@ def validate_trace_set(
             identities[identity] = domain_id
 
 
-def _reachable(
-    graph: Mapping[tuple[str, str], set[tuple[str, str]]],
-    source: tuple[str, str],
-    target: tuple[str, str],
-) -> bool:
-    pending = [source]
-    visited: set[tuple[str, str]] = set()
-    while pending:
-        node = pending.pop()
-        if node == target:
-            return True
-        if node in visited:
-            continue
-        visited.add(node)
-        pending.extend(graph.get(node, ()))
-    return False
-
-
 type _SpanKey = tuple[str, str]
 type _MessagePair = tuple[TraceSpan, TraceSpan]
 
