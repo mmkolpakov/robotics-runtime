@@ -409,6 +409,39 @@ def test_causal_chain_requires_forward_reachability_between_channels() -> None:
     assert [violation.code for violation in reversed_edge.violations] == ["relationship_mismatch"]
 
 
+def test_a_message_that_stops_after_one_channel_does_not_hide_a_complete_path() -> None:
+    chain, channels = _causal_contracts()
+    spans = _causal_spans(reverse_middle_edge=False)
+    dropped_trace = "4" * 32
+    spans["sensor"].append(
+        span(
+            domain_id="sensor",
+            name="sensor publish",
+            span_index=10,
+            message_id="message-0",
+            start_ns=9 * SECOND_NS,
+            trace_id=dropped_trace,
+        )
+    )
+    spans["decision"].append(
+        span(
+            domain_id="decision",
+            name="decision receive",
+            span_index=11,
+            message_id="message-0",
+            start_ns=9 * SECOND_NS + 10_000,
+            trace_id=dropped_trace,
+            links=(TraceLink(dropped_trace, f"{11:016x}", "message-0"),),
+        )
+    )
+
+    evaluation = evaluate_causal_chain(chain, channels, spans)
+
+    assert evaluation.status == "passed"
+    assert [hop.producer.message_id for hop in evaluation.hops] == ["message-1", "message-2"]
+    assert evaluation.root_trace_id == "1" * 32
+
+
 @pytest.mark.parametrize("channel_index", [0, 1])
 @pytest.mark.parametrize("violation", ["relationship_mismatch", "temporal_order_mismatch"])
 def test_valid_message_cannot_hide_another_broken_causal_pair(
