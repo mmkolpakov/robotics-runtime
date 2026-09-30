@@ -51,8 +51,14 @@ The [GitHub Actions manager](https://docs.renovatebot.com/modules/manager/github
 tracks action SHA pins and the `astral-sh/setup-uv` `version` input. Hook updates
 are explicitly enabled through the
 [pre-commit manager](https://docs.renovatebot.com/modules/manager/pre-commit/).
-Ruff and check-jsonschema package/hook updates are grouped so their duplicate
-pins can be reviewed together. Lock maintenance runs weekly in Helsinki time;
+The [Dockerfile manager](https://docs.renovatebot.com/modules/manager/dockerfile/)
+tracks base images of the live ROS test image.
+
+CI runners are shared with other repositories, so Renovate runs before 6am on
+Mondays (Helsinki time), keeps at most three open pull requests and opens at
+most two per hour. Minor, patch, digest and pin updates arrive as one grouped
+pull request; major updates stay separate, with Ruff and check-jsonschema
+package and hook majors grouped together. Lock maintenance runs weekly;
 automerge is disabled.
 
 The Python support range, CI matrix and `.python-version` (the minimum supported
