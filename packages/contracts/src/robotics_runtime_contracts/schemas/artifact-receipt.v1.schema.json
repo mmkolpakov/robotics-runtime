@@ -63,6 +63,12 @@
     },
     "verification_sha256": {
       "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
+    },
+    "extension_schemas": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensionSchemas"
+    },
+    "extensions": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensions"
     }
   }
 }

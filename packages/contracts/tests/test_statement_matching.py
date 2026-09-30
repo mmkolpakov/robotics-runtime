@@ -13,6 +13,7 @@ from robotics_runtime_contracts.statements import (
     validate_qualification_statement,
     write_qualification_statement,
 )
+from tests.extension_support import NAMESPACE, SCHEMAS, with_extension
 from tests.support import qualification_specifications
 
 
@@ -34,11 +35,14 @@ def test_matches_reformatted_payload_without_modifying_signed_bytes(
 @pytest.mark.parametrize(
     "change", ["digest", "kind", "run", "timestamp", "missing", "extra", "order"]
 )
+@pytest.mark.parametrize("extended", [False, True])
 def test_rejects_schema_valid_statement_with_a_different_inventory(
-    change: str, tmp_path: Path
+    change: str, tmp_path: Path, extended: bool
 ) -> None:
     specifications = qualification_specifications("transport")
     document = create_qualification_statement(specifications)
+    if extended:
+        document["predicate"] = with_extension(document["predicate"])
     if change == "digest":
         document["subject"][0]["digest"]["sha256"] = "0" * 64
     elif change == "kind":
@@ -60,11 +64,11 @@ def test_rejects_schema_valid_statement_with_a_different_inventory(
         )
     else:
         document["subject"].reverse()
-    validate_document(document, schema="qualification-bundle.v1")
+    validate_document(document, schema="qualification-bundle.v1", extension_schemas=SCHEMAS)
     payload = tmp_path / "decoded.json"
     payload.write_text(json.dumps(document), encoding="utf-8")
     with pytest.raises(ContractError) as raised:
-        validate_qualification_statement(payload, specifications)
+        validate_qualification_statement(payload, specifications, extension_schemas=SCHEMAS)
     assert raised.value.error_id == "qualification.statement_mismatch"
     assert raised.value.json_path == "$"
 
@@ -138,3 +142,31 @@ def test_metadata_output_cannot_replace_the_signed_payload_through_an_alias(tmp_
         arguments.extend(("--artifact", item))
     assert main(arguments) == 1
     assert payload.read_bytes() == alias.read_bytes() == original
+
+
+def test_statement_and_aggregate_extensions_are_checked_before_inventory_comparison(
+    tmp_path: Path,
+) -> None:
+    specifications = qualification_specifications("inference")
+    aggregate = next(item for item in specifications if item.startswith("acceptance_aggregate:"))
+    name, _, source = aggregate.partition("=")
+    extended = tmp_path / "aggregate.json"
+    extended.write_text(json.dumps(with_extension(load_mapping(source))), encoding="utf-8")
+    specifications[specifications.index(aggregate)] = f"{name}={extended}"
+    document = create_qualification_statement(specifications, extension_schemas=SCHEMAS)
+    document["predicate"] = with_extension(document["predicate"])
+    payload = tmp_path / "statement.json"
+    payload.write_text(json.dumps(document, indent=3), encoding="utf-8")
+    original = payload.read_bytes()
+    assert validate_qualification_statement(
+        payload, specifications, extension_schemas=SCHEMAS
+    ) == validate_qualification_artifacts(specifications, SCHEMAS)
+    assert payload.read_bytes() == original
+    with pytest.raises(ContractError) as raised:
+        validate_qualification_statement(payload, specifications)
+    assert raised.value.error_id == "extension.validation_failed"
+    document["predicate"]["extensions"][NAMESPACE]["mission_id"] = ""
+    payload.write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(ContractError) as raised:
+        validate_qualification_statement(payload, specifications, extension_schemas=SCHEMAS)
+    assert raised.value.json_path == f'$.predicate.extensions["{NAMESPACE}"].mission_id'

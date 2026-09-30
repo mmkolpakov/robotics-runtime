@@ -68,11 +68,19 @@ def validate_qualification_statement(
     writer's sorted order. Neither the statement nor its subjects are rewritten.
     Signature verification is the caller's responsibility and must authenticate
     the exact statement bytes passed here.
+
+    Predicate extensions must pass their supplied, digest-pinned schemas. They
+    carry domain claims, never replacements for the core artifact bindings.
     """
     candidate = load_mapping(statement)
-    validate_document(candidate, schema="qualification-bundle.v1")
+    validate_document(
+        candidate, schema="qualification-bundle.v1", extension_schemas=extension_schemas
+    )
     metadata = validate_qualification_artifacts(specifications, extension_schemas)
     expected = _statement_from_metadata(metadata)
+    for field in ("extension_schemas", "extensions"):
+        if field in candidate["predicate"]:
+            expected["predicate"][field] = candidate["predicate"][field]
     if dumps_canonical(candidate) != dumps_canonical(expected):
         raise ContractError(
             "statement does not exactly match local subjects, digests, and classifications",

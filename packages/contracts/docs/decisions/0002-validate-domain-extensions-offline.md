@@ -27,6 +27,13 @@ The caller supplies extension-schema bytes. A declaration binds namespace,
 canonical URI, and SHA-256 digest. External schema references are rejected;
 local fragment references remain available.
 
+This applies to every public catalog role. Qualification bundle declarations
+and payloads live in the predicate; other roles keep them at the document root.
+Existing roles that accepted unpinned v1 extensions retain that behavior while
+the new `extension_schemas` field is absent. Its presence opts into strict
+verification. The README lists these seven compatibility cases explicitly.
+Internal schema resources do not independently enforce public-role semantics.
+
 ### Consequences
 
 - Validation is deterministic and network-free.

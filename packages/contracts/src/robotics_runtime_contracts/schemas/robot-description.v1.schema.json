@@ -97,6 +97,12 @@
           "description": "[x, y, z, roll, pitch, yaw]; position in metres, fixed-axis RPY in radians, relative to frame."
         }
       }
+    },
+    "extension_schemas": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensionSchemas"
+    },
+    "extensions": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensions"
     }
   },
   "$defs": {

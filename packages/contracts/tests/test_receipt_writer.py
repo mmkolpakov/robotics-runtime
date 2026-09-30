@@ -11,6 +11,7 @@ import pytest
 from robotics_runtime_contracts import ContractError, load_mapping, validate_role
 from robotics_runtime_contracts.cli import main
 from robotics_runtime_contracts.writers import create_artifact_receipt
+from tests.extension_support import RAW_SCHEMA, SCHEMA_URI, SCHEMAS, with_extension
 
 
 @pytest.fixture
@@ -62,6 +63,54 @@ def produce(inputs: dict[str, Any]) -> dict[str, Any]:
     return create_artifact_receipt(
         inputs["template"], inputs["source"], inputs["verification"], inputs["dependencies"]
     )
+
+
+def test_receipt_writer_and_cli_validate_receipt_and_verification_extensions(
+    receipt_inputs: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    verification = receipt_inputs["verification"]
+    verification.write_text(
+        json.dumps(with_extension(load_mapping(verification)), indent=3), encoding="utf-8"
+    )
+    template = with_extension(receipt_inputs["template"])
+    result = create_artifact_receipt(
+        template,
+        receipt_inputs["source"],
+        verification,
+        receipt_inputs["dependencies"],
+        extension_schemas=SCHEMAS,
+    )
+    assert result["verification_sha256"] == sha256(verification.read_bytes()).hexdigest()
+    template_file = tmp_path / "template.json"
+    template_file.write_text(json.dumps(template), encoding="utf-8")
+    schema = tmp_path / "schema.json"
+    schema.write_bytes(RAW_SCHEMA)
+    output = tmp_path / "receipt.json"
+    output.write_bytes(b"previous")
+    arguments = [
+        "artifact-receipt",
+        "create",
+        "--template",
+        str(template_file),
+        "--source",
+        str(receipt_inputs["source"]),
+        "--verification",
+        str(verification),
+        "--output",
+        str(output),
+    ]
+    for dependency in receipt_inputs["dependencies"]:
+        arguments.extend(["--dependency", str(dependency)])
+    assert main(arguments) == 1
+    assert output.read_bytes() == b"previous"
+    arguments.extend(["--extension-schema", f"{SCHEMA_URI}={schema}"])
+    assert main(arguments) == 0
+    assert load_mapping(output) == result
+    schema.write_bytes(RAW_SCHEMA + b" ")
+    original = output.read_bytes()
+    assert main(arguments) == 1
+    assert output.read_bytes() == original
 
 
 def test_receipt_binds_exact_verification_source_and_dependency_bytes(
