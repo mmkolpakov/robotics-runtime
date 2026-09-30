@@ -46,7 +46,9 @@ def test_verification_retains_measurement_faults_but_not_initialization_faults(
             return snapshot
 
     outputs = _simulation_case(tmp_path, observer_type=RecoveringObserver)
-    assert len(observations) == 4
+    # The shared fixture measures one second, polling every 50 ms.
+    assert len(observations) == 20
+    assert observations[-1].observed_at_ns - observations[0].observed_at_ns == 950_000_000
     assert observations[-1].topics["/clock"].publishers == 1
     assert outputs.result["status"] == status
     assertions = outputs.result["assertion_results"]
