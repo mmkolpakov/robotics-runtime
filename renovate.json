@@ -5,6 +5,7 @@
     "helpers:pinGitHubActionDigests"
   ],
   "enabledManagers": [
+    "dockerfile",
     "github-actions",
     "pep621",
     "pre-commit"

@@ -51,6 +51,8 @@ The [GitHub Actions manager](https://docs.renovatebot.com/modules/manager/github
 tracks action SHA pins and the `astral-sh/setup-uv` `version` input. Hook updates
 are explicitly enabled through the
 [pre-commit manager](https://docs.renovatebot.com/modules/manager/pre-commit/).
+The [Dockerfile manager](https://docs.renovatebot.com/modules/manager/dockerfile/)
+tracks base images of the live ROS test image.
 Ruff and check-jsonschema package/hook updates are grouped so their duplicate
 pins can be reviewed together. Lock maintenance runs weekly in Helsinki time;
 automerge is disabled.
