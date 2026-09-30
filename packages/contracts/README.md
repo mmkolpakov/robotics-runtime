@@ -1,6 +1,6 @@
 # Robotics Runtime Contracts
 
-[![CI](https://github.com/mmkolpakov/robotics-runtime-contracts/actions/workflows/ci.yml/badge.svg)](https://github.com/mmkolpakov/robotics-runtime-contracts/actions/workflows/ci.yml)
+[![CI](https://github.com/mmkolpakov/robotics-runtime/actions/workflows/ci.yml/badge.svg)](https://github.com/mmkolpakov/robotics-runtime/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Canonical, machine-verifiable contracts for portable robotics executions.
