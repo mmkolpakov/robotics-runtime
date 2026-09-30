@@ -95,6 +95,9 @@
     },
     "extensions": {
       "$ref": "urn:robotics-runtime-contracts:v1:internal:runtime-manifest-core#/properties/extensions"
+    },
+    "extension_schemas": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensionSchemas"
     }
   },
   "allOf": [

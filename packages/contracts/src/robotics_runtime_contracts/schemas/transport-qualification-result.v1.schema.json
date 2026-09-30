@@ -62,6 +62,12 @@
     },
     "verdict": {
       "$ref": "urn:robotics-runtime-contracts:v1:internal:transport-qualification-result-core#/properties/verdict"
+    },
+    "extension_schemas": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensionSchemas"
+    },
+    "extensions": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensions"
     }
   },
   "$defs": {

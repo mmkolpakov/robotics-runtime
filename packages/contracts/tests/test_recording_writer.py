@@ -16,6 +16,7 @@ from robotics_runtime_contracts.writers import (
     finalize_evidence_index,
     write_document,
 )
+from tests.extension_support import SCHEMAS, with_extension
 from tests.test_writers import artifact_metadata, index_template
 
 
@@ -106,24 +107,32 @@ def test_missing_statistics_or_truncated_file_preserves_output(tmp_path: Path) -
     assert error.value.error_id == "writer.invalid_mcap"
 
 
-def test_recording_and_summary_are_both_bound_and_rechecked(tmp_path: Path) -> None:
+@pytest.mark.parametrize("extended", [False, True])
+def test_recording_and_summary_are_both_bound_and_rechecked(tmp_path: Path, extended: bool) -> None:
     source = recording(tmp_path / "observations.mcap")
     output = tmp_path / "summary.json"
     assert main(["recording-summary", "from-mcap", str(source), "--output", str(output)]) == 0
     expected = output.read_bytes()
     assert main(["recording-summary", "from-mcap", str(source), "--output", str(output)]) == 0
     assert output.read_bytes() == expected
+    if extended:
+        write_document(with_extension(load_mapping(output)), output, extension_schemas=SCHEMAS)
+        expected = output.read_bytes()
     metadata = artifact_metadata()
     metadata.update(kind="recording", media_type="application/mcap")
     draft = add_evidence_artifact(
-        create_evidence_index(index_template()), source, metadata, recording_summary=output
+        create_evidence_index(index_template()),
+        source,
+        metadata,
+        recording_summary=output,
+        extension_schemas=SCHEMAS,
     )
-    result = finalize_evidence_index(draft)
+    result = finalize_evidence_index(draft, extension_schemas=SCHEMAS)
     assert result["artifacts"][0]["recording_summary"]["sha256"] == file_sha256(output)
     assert result["artifacts"][0]["sha256"] == file_sha256(source)
     output.write_bytes(expected + b"\n")
     with pytest.raises(WriterError, match="recording_summary"):
-        finalize_evidence_index(draft)
+        finalize_evidence_index(draft, extension_schemas=SCHEMAS)
 
 
 def test_foreign_summary_and_schemaless_channel_are_rejected(tmp_path: Path) -> None:

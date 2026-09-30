@@ -52,6 +52,12 @@
           "$ref": "#/$defs/evaluatedTransport"
         }
       ]
+    },
+    "extension_schemas": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensionSchemas"
+    },
+    "extensions": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensions"
     }
   },
   "$defs": {

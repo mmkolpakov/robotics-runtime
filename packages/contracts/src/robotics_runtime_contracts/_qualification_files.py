@@ -63,7 +63,7 @@ def validate_descriptor(
     validate_document(
         document,
         schema=schema,
-        extension_schemas=(extension_schemas or None) if artifact.kind == "scenario" else None,
+        extension_schemas=extension_schemas,
     )
 
 
