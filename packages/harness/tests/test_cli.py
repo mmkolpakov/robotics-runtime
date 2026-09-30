@@ -414,6 +414,7 @@ def test_timing_check_exposes_policy_result(
     monkeypatch.setattr(
         "robotics_acceptance_harness.cli.load_evidence_index",
         lambda *_args, **_kwargs: SimpleNamespace(
+            index=SimpleNamespace(path=tmp_path / "evidence-index.json"),
             local_files={
                 metrics_path.resolve(): {
                     "media_type": "application/x-ndjson",
