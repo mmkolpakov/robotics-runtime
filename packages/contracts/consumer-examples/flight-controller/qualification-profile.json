@@ -1,0 +1,13 @@
+{
+  "schema_version": "qualification-profile.v1",
+  "profile_id": "org.robotics-runtime.flight-controller.interfaces.v1",
+  "provider_kind": "flight_controller",
+  "requirements": [
+    {"capability": "arm_disarm_service", "required": true},
+    {"capability": "flight_mode_service", "required": true},
+    {"capability": "local_position_topic", "required": true},
+    {"capability": "attitude_topic", "required": true},
+    {"capability": "battery_state_topic", "required": true},
+    {"capability": "clock_follows_simulation", "required": true}
+  ]
+}
