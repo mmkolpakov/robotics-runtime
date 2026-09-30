@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import sys
 from collections.abc import Iterable
 from importlib.metadata import EntryPoint, FileHash, PackagePath, PathDistribution
 from pathlib import Path
@@ -152,6 +153,20 @@ def test_unregistered_generated_bytecode_is_rejected(tmp_path: Path) -> None:
     pyc_path.write_bytes(b"derived bytecode")
 
     with pytest.raises(EvaluationError, match="unverified bytecode cache"):
+        _verify_installed_record(entry_point)
+
+
+def test_bytecode_prefix_outside_the_record_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entry_point, _files = _installed_distribution(tmp_path)
+    prefix = tmp_path / "bytecode-prefix"
+    cached = prefix / tmp_path.relative_to(tmp_path.anchor) / "__pycache__"
+    cached.mkdir(parents=True)
+    (cached / "example_evaluator.cpython-312.pyc").write_bytes(b"untrusted bytecode")
+    monkeypatch.setattr(sys, "pycache_prefix", str(prefix))
+
+    with pytest.raises(EvaluationError, match="pycache_prefix"):
         _verify_installed_record(entry_point)
 
 
