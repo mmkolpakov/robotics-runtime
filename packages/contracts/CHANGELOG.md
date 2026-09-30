@@ -9,6 +9,9 @@
   resources such as `common.v1` or `*-core.v1` with `schema.unknown`. A
   document declaring `schema_version: common.v1` previously passed without any
   root constraint, and core schemas skipped role semantics and extensions.
+- Add a flight-controller interface profile and qualification examples using the
+  existing extensible provider identifiers, with six required capabilities and
+  checks that reject missing capabilities or a mismatched provider kind.
 
 ## 0.17.0
 
