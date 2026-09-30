@@ -91,3 +91,16 @@ def test_default_in_place_add_protects_extension_input(tmp_path: Path) -> None:
     assert main(arguments) == 1
     assert draft_path.read_bytes() == original
     assert load_mapping(draft_path)["index"]["artifacts"][0]["artifact_id"] == "observation-1"
+
+
+def test_finalize_cannot_replace_its_draft(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    arguments = commands(tmp_path)["finalize"]
+    draft_path = Path(arguments[2])
+    original = draft_path.read_bytes()
+
+    assert main(["--format", "json", *arguments, "--output", str(draft_path)]) == 1
+
+    assert '"error_id": "writer.invalid_input"' in capsys.readouterr().err
+    assert draft_path.read_bytes() == original
