@@ -52,9 +52,19 @@ def write_document(
     return write_bytes_atomically(dumps_canonical(dict(document)), output)
 
 
+def _new_file_mode() -> int:
+    mask = os.umask(0o022)
+    os.umask(mask)
+    return 0o666 & ~mask
+
+
 def write_bytes_atomically(content: bytes, output: str | Path) -> Path:
-    """Replace ``output`` in one rename; keep the previous file on failure."""
-    destination = Path(output).expanduser().absolute()
+    """Replace ``output`` in one rename; keep the previous file on failure.
+
+    A symlinked output replaces its target, and the result gets the mode of an
+    ordinary new file rather than the private mode of the temporary file.
+    """
+    destination = Path(output).expanduser().resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
     try:
@@ -64,6 +74,7 @@ def write_bytes_atomically(content: bytes, output: str | Path) -> Path:
             temporary = Path(stream.name)
             stream.write(content)
             stream.flush()
+            os.fchmod(stream.fileno(), _new_file_mode())
             os.fsync(stream.fileno())
         os.replace(temporary, destination)
     finally:

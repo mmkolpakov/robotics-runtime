@@ -407,3 +407,47 @@ def test_cli_document_output_is_replaced_atomically(
         "target.json",
     ]
     capsys.readouterr()
+
+
+def test_cli_outputs_follow_symlinks_and_get_regular_modes(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source = tmp_path / "source.json"
+    target = tmp_path / "target.json"
+    source.write_text('{"value": 1}\n', encoding="utf-8")
+    target.write_text('{"value": 2}\n', encoding="utf-8")
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    real = shared / "patch.json"
+    real.write_text("{}\n", encoding="utf-8")
+    link = tmp_path / "patch.json"
+    link.symlink_to(real)
+    previous = os.umask(0o022)
+    try:
+        assert main(["diff", str(source), str(target), "--output", str(link)]) == 0
+    finally:
+        os.umask(previous)
+
+    assert link.is_symlink()
+    assert json.loads(real.read_text(encoding="utf-8")) == {"value": 2}
+    assert real.stat().st_mode & 0o777 == 0o644
+    capsys.readouterr()
+
+
+def test_cli_resolve_leaves_outputs_untouched_when_the_trace_path_is_a_directory(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    overlay = tmp_path / "overlay.yaml"
+    overlay.write_text("seed: 43\n", encoding="utf-8")
+    output = tmp_path / "resolved.json"
+    output.write_text("previous\n", encoding="utf-8")
+    trace = tmp_path / "trace"
+    trace.mkdir()
+
+    arguments = ["scenario", "resolve", str(FIXTURE), "--overlay", str(overlay)]
+
+    assert main([*arguments, "--output", str(output), "--trace-output", str(trace)]) == 1
+    assert output.read_text(encoding="utf-8") == "previous\n"
+    assert "output is a directory" in capsys.readouterr().err
