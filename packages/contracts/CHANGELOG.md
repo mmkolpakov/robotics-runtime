@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Bind optional scenario robot-description digests to runtime workload metadata
+  and the exact retained description artifact bytes during qualification. Keep
+  existing workload documents and qualification artifact kinds compatible.
 - `create_execution_permit` rejects a naive `now` with `input.invalid_timestamp`
   instead of reading it as host local time, which shifted `issued_at` and
   `expires_at` by the host UTC offset.

@@ -148,6 +148,9 @@
     "workload": {
       "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/workload"
     },
+    "robotDescriptionBinding": {
+      "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/robotDescriptionBinding"
+    },
     "model": {
       "$ref": "urn:robotics-runtime-contracts:build:runtime-manifest-core#/$defs/model"
     },

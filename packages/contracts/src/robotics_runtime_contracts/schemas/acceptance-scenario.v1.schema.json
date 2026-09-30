@@ -29,6 +29,17 @@
     "scenario_id": {
       "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-scenario-core#/properties/scenario_id"
     },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["robot_description_sha256"],
+      "properties": {
+        "robot_description_sha256": {
+          "description": "SHA-256 of the exact retained robot-description document bytes.",
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
+        }
+      }
+    },
     "execution": {
       "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-scenario-core#/properties/execution"
     },
