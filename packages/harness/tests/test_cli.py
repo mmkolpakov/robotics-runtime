@@ -105,6 +105,34 @@ def test_explain_loads_extension_schema_by_canonical_uri(
     assert json.loads(capsys.readouterr().out)["policy"] == "accepted-simulation"
 
 
+def test_create_run_keeps_an_existing_run_context(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "acceptance-run.json"
+    arguments = [
+        "create-run",
+        "--scenario",
+        str(FIXTURES / "scenario.yaml"),
+        "--output",
+        str(output),
+        "--domain",
+        "primary=observer",
+        "--time-authority",
+        "sim_clock",
+        "--time-source",
+        "gazebo-clock",
+    ]
+    assert main(arguments) == 0
+    original = output.read_bytes()
+    capsys.readouterr()
+
+    assert main(arguments) == 2
+    assert output.read_bytes() == original
+    assert "exists" in capsys.readouterr().err
+    assert [path.name for path in tmp_path.iterdir()] == ["acceptance-run.json"]
+
+
 def test_create_run_loads_extension_schema_by_canonical_uri(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],

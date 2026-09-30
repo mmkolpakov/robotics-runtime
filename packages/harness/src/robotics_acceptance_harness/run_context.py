@@ -47,7 +47,7 @@ def create_run_context(
             {"domain_id": domain_id, "role": role} for domain_id, role in sorted(domains.items())
         ],
     }
-    write_contract_json(document, output_path)
+    write_contract_json(document, output_path, replace=False)
     return resolved_run_id
 
 
