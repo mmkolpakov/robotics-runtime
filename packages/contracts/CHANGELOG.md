@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `create_execution_permit` rejects a naive `now` with `input.invalid_timestamp`
+  instead of reading it as host local time, which shifted `issued_at` and
+  `expires_at` by the host UTC offset.
+
 ## 0.17.0
 
 The first release from the shared `robotics-runtime` workspace. Its distribution
