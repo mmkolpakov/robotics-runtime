@@ -416,12 +416,184 @@ def _reachable(
     return False
 
 
+type _SpanKey = tuple[str, str]
+type _MessagePair = tuple[TraceSpan, TraceSpan]
+
+
+def _span_key(span: TraceSpan) -> _SpanKey:
+    return (span.trace_id, span.span_id)
+
+
+def _channel_pairs(
+    contract: Mapping[str, Any],
+    spans_by_domain: Mapping[str, Sequence[TraceSpan]],
+) -> tuple[list[_MessagePair], ChainViolation | None]:
+    """Return one channel's correlated pairs, earliest delivery first, or its violation."""
+
+    channel_id = str(contract["channel_id"])
+    producers, consumers = _channel_spans(contract, spans_by_domain)
+    for spans, side in ((producers, "producer"), (consumers, "consumer")):
+        if not spans:
+            return [], ChainViolation(
+                code="missing_span", channel_id=channel_id, message=f"{side} span is absent"
+            )
+    message_pairs = [
+        (producer, consumer)
+        for producer in producers
+        for consumer in consumers
+        if producer.message_id is not None and producer.message_id == consumer.message_id
+    ]
+    if not message_pairs:
+        return [], ChainViolation(
+            code="message_id_mismatch",
+            channel_id=channel_id,
+            message="producer and consumer have no common messaging.message.id",
+        )
+    relationship = str(contract["trace"]["relationship"])
+    broken = [pair for pair in message_pairs if not _relationship_matches(relationship, *pair)]
+    if broken:
+        return [], ChainViolation(
+            code="relationship_mismatch",
+            channel_id=channel_id,
+            message=f"{len(broken)} correlated producer-consumer pairs violate {relationship!r}",
+        )
+    if any(
+        consumer.start_time_unix_nano < producer.start_time_unix_nano
+        for producer, consumer in message_pairs
+    ):
+        return [], ChainViolation(
+            code="temporal_order_mismatch",
+            channel_id=channel_id,
+            message="a consumer span starts before its producer span",
+        )
+    return sorted(
+        message_pairs,
+        key=lambda pair: (
+            pair[1].start_time_unix_nano,
+            pair[0].start_time_unix_nano,
+            pair[0].span_id,
+            pair[1].span_id,
+        ),
+    ), None
+
+
+class _ChainPathSearch:
+    """Find the earliest message path that crosses every channel in order."""
+
+    def __init__(
+        self,
+        pairs_by_channel: Sequence[Sequence[_MessagePair]],
+        graph: Mapping[_SpanKey, set[_SpanKey]],
+    ) -> None:
+        self._pairs = pairs_by_channel
+        self._graph = graph
+        self._descendants: dict[_SpanKey, set[_SpanKey]] = {}
+        self._dead_ends: set[tuple[int, _SpanKey]] = set()
+        self.failed_index = 0
+        self.saw_earlier_producer = False
+
+    def _reachable_from(self, source: _SpanKey) -> set[_SpanKey]:
+        cached = self._descendants.get(source)
+        if cached is None:
+            cached = set()
+            pending = [source]
+            while pending:
+                node = pending.pop()
+                if node not in cached:
+                    cached.add(node)
+                    pending.extend(self._graph.get(node, ()))
+            self._descendants[source] = cached
+        return cached
+
+    def _candidates(
+        self, index: int, previous: TraceSpan | None
+    ) -> tuple[list[_MessagePair], bool]:
+        """Return pairs that can follow the previous consumer and whether one started too early."""
+        if previous is None:
+            return list(self._pairs[index]), False
+        descendants = self._reachable_from(_span_key(previous))
+        same_domain = [
+            pair for pair in self._pairs[index] if pair[0].domain_id == previous.domain_id
+        ]
+        earlier = any(
+            producer.start_time_unix_nano < previous.start_time_unix_nano
+            for producer, _ in same_domain
+        )
+        return [
+            pair
+            for pair in same_domain
+            if pair[0].start_time_unix_nano >= previous.start_time_unix_nano
+            and _span_key(pair[0]) in descendants
+        ], earlier
+
+    def _record_failure(self, index: int, earlier: bool) -> None:
+        if index > self.failed_index:
+            self.failed_index, self.saw_earlier_producer = index, earlier
+        elif index == self.failed_index:
+            self.saw_earlier_producer = self.saw_earlier_producer or earlier
+
+    def path(self, index: int = 0, previous: TraceSpan | None = None) -> list[_MessagePair] | None:
+        if index == len(self._pairs):
+            return []
+        memo = None if previous is None else (index, _span_key(previous))
+        if memo in self._dead_ends:
+            return None
+        candidates, earlier = self._candidates(index, previous)
+        for producer, consumer in candidates:
+            rest = self.path(index + 1, consumer)
+            if rest is not None:
+                return [(producer, consumer), *rest]
+        if memo is not None:
+            self._dead_ends.add(memo)
+        self._record_failure(index, earlier)
+        return None
+
+
+def _hop(contract: Mapping[str, Any], pair: _MessagePair) -> CausalHop:
+    return CausalHop(
+        channel_id=str(contract["channel_id"]),
+        relationship=cast(Literal["link", "parent"], str(contract["trace"]["relationship"])),
+        producer=pair[0],
+        consumer=pair[1],
+    )
+
+
+def _connected_hops(
+    channel_contracts: Sequence[Mapping[str, Any]],
+    pairs_by_channel: Sequence[Sequence[_MessagePair]],
+    spans_by_domain: Mapping[str, Sequence[TraceSpan]],
+) -> tuple[list[CausalHop], ChainViolation | None]:
+    search = _ChainPathSearch(pairs_by_channel, _trace_graph(spans_by_domain))
+    path = search.path()
+    if path is not None:
+        return [
+            _hop(contract, pair) for contract, pair in zip(channel_contracts, path, strict=True)
+        ], None
+    # Report each channel's earliest delivery and the first channel no path reaches.
+    hops = [
+        _hop(contract, pairs[0])
+        for contract, pairs in zip(channel_contracts, pairs_by_channel, strict=True)
+    ]
+    channel_id = str(channel_contracts[search.failed_index]["channel_id"])
+    if search.saw_earlier_producer:
+        return hops, ChainViolation(
+            code="temporal_order_mismatch",
+            channel_id=channel_id,
+            message="the next channel producer starts before the preceding consumer span",
+        )
+    return hops, ChainViolation(
+        code="relationship_mismatch",
+        channel_id=channel_id,
+        message="no preceding consumer causally reaches the next channel producer",
+    )
+
+
 def evaluate_causal_chain(
     chain_contract: Mapping[str, Any],
     channel_contracts: Sequence[Mapping[str, Any]],
     spans_by_domain: Mapping[str, Sequence[TraceSpan]],
 ) -> CausalChainEvaluation:
-    """Verify the complete expected channel sequence as one connected trace graph."""
+    """Verify that one message path crosses the expected channels as a connected trace graph."""
 
     validate_trace_set(spans_by_domain)
     expected_channel_ids = tuple(
@@ -432,132 +604,22 @@ def evaluate_causal_chain(
         raise TraceInputError("channel contracts differ from the causal-chain contract")
 
     violations: list[ChainViolation] = []
-    hops: list[CausalHop] = []
-    missing = False
+    pairs_by_channel: list[list[_MessagePair]] = []
     for contract in channel_contracts:
-        channel_id = str(contract["channel_id"])
-        producers, consumers = _channel_spans(contract, spans_by_domain)
-        if not producers:
-            missing = True
-            violations.append(
-                ChainViolation(
-                    code="missing_span",
-                    channel_id=channel_id,
-                    message="producer span is absent",
-                )
-            )
-            continue
-        if not consumers:
-            missing = True
-            violations.append(
-                ChainViolation(
-                    code="missing_span",
-                    channel_id=channel_id,
-                    message="consumer span is absent",
-                )
-            )
-            continue
-
-        message_pairs = [
-            (producer, consumer)
-            for producer in producers
-            for consumer in consumers
-            if producer.message_id is not None and producer.message_id == consumer.message_id
-        ]
-        if not message_pairs:
-            violations.append(
-                ChainViolation(
-                    code="message_id_mismatch",
-                    channel_id=channel_id,
-                    message="producer and consumer have no common messaging.message.id",
-                )
-            )
-            continue
-        relationship = cast(
-            Literal["link", "parent"],
-            str(contract["trace"]["relationship"]),
-        )
-        relationship_pairs = [
-            pair for pair in message_pairs if _relationship_matches(relationship, pair[0], pair[1])
-        ]
-        if len(relationship_pairs) != len(message_pairs):
-            violations.append(
-                ChainViolation(
-                    code="relationship_mismatch",
-                    channel_id=channel_id,
-                    message=(
-                        f"{len(message_pairs) - len(relationship_pairs)} correlated "
-                        f"producer-consumer pairs violate {relationship!r}"
-                    ),
-                )
-            )
-            continue
-        valid_pairs = [
-            pair
-            for pair in relationship_pairs
-            if pair[1].start_time_unix_nano >= pair[0].start_time_unix_nano
-        ]
-        if len(valid_pairs) != len(relationship_pairs):
-            violations.append(
-                ChainViolation(
-                    code="temporal_order_mismatch",
-                    channel_id=channel_id,
-                    message="a consumer span starts before its producer span",
-                )
-            )
-            continue
-        producer, consumer = min(
-            valid_pairs,
-            key=lambda pair: (
-                pair[1].start_time_unix_nano,
-                pair[0].start_time_unix_nano,
-                pair[0].span_id,
-                pair[1].span_id,
-            ),
-        )
-        hops.append(
-            CausalHop(
-                channel_id=channel_id,
-                relationship=relationship,
-                producer=producer,
-                consumer=consumer,
-            )
-        )
-
-    if len(hops) == len(channel_contracts):
-        graph = _trace_graph(spans_by_domain)
-        for previous, current in zip(hops, hops[1:], strict=False):
-            previous_consumer = (
-                previous.consumer.trace_id,
-                previous.consumer.span_id,
-            )
-            current_producer = (
-                current.producer.trace_id,
-                current.producer.span_id,
-            )
-            if current.producer.start_time_unix_nano < previous.consumer.start_time_unix_nano:
-                violations.append(
-                    ChainViolation(
-                        code="temporal_order_mismatch",
-                        channel_id=current.channel_id,
-                        message=(
-                            "the next channel producer starts before the preceding consumer span"
-                        ),
-                    )
-                )
-            elif previous.consumer.domain_id != current.producer.domain_id or not _reachable(
-                graph, previous_consumer, current_producer
-            ):
-                violations.append(
-                    ChainViolation(
-                        code="relationship_mismatch",
-                        channel_id=current.channel_id,
-                        message=(
-                            "the preceding consumer does not causally reach "
-                            "the next channel producer"
-                        ),
-                    )
-                )
+        pairs, violation = _channel_pairs(contract, spans_by_domain)
+        if violation is not None:
+            violations.append(violation)
+        pairs_by_channel.append(pairs)
+    missing = any(violation.code == "missing_span" for violation in violations)
+    hops: list[CausalHop] = [
+        _hop(contract, pairs[0])
+        for contract, pairs in zip(channel_contracts, pairs_by_channel, strict=True)
+        if pairs
+    ]
+    if not violations:
+        hops, path_violation = _connected_hops(channel_contracts, pairs_by_channel, spans_by_domain)
+        if path_violation is not None:
+            violations.append(path_violation)
 
     status: Literal["passed", "failed", "incomplete", "error"]
     if not violations:
