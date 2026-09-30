@@ -299,7 +299,8 @@ def _write_metrics(
 def _simulation_bundle(tmp_path: Path) -> DocumentBundle:
     scenario = yaml.safe_load((FIXTURES / "scenario.yaml").read_text(encoding="utf-8"))
     scenario["timeouts"]["stable_for_sec"] = 0
-    scenario["timeouts"]["execution_sec"] = 0.2
+    # Match the one-second wall-clock evidence window used by these fixtures.
+    scenario["timeouts"]["execution_sec"] = 1
     scenario_path = tmp_path / "scenario.yaml"
     scenario_path.write_text(yaml.safe_dump(scenario, sort_keys=False), encoding="utf-8")
     return load_bundle(scenario_path, runtime_path=FIXTURES / "runtime.yaml")
@@ -664,7 +665,13 @@ def test_verification_ignores_metrics_from_another_run(tmp_path: Path) -> None:
 
 
 def test_valid_latency_does_not_hide_a_frozen_simulation_clock(tmp_path: Path) -> None:
-    outputs = _simulation_case(tmp_path, source_scale=0)
+    class CompleteWindowObserver(FakeObserver):
+        def stop_clock_observation(self) -> tuple[ClockSample, ...]:
+            samples = super().stop_clock_observation()
+            # Prove the freeze over the full policy window, including its end.
+            return (*samples, ClockSample(self.clock.value_ns, 0))
+
+    outputs = _simulation_case(tmp_path, source_scale=0, observer_type=CompleteWindowObserver)
 
     timing = next(
         item
