@@ -124,7 +124,7 @@ def _check_topics(
             issues.append(
                 ReadinessIssue(
                     f"{path}.qos_profile",
-                    "publisher and subscriber QoS policies are incompatible",
+                    "publisher QoS is incompatible with the observer subscription",
                 )
             )
         if observed.first_message_at_ns is None:
