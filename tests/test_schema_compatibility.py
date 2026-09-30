@@ -294,6 +294,25 @@ def test_semantic_only_mutation_is_caught_with_unchanged_schemas(
         semantic.check_semantics(published, candidate)
 
 
+def test_semantic_gate_replays_published_qualification_documents(
+    published: Path, tmp_path: Path
+) -> None:
+    names = semantic.published_documents(published)
+    assert "tests/fixtures/qualification/transport/clock-relation.json" in names
+    assert any(name.startswith("consumer-examples/") for name in names)
+    assert not any("/invalid/" in name for name in names)
+    candidate = tmp_path / "candidate"
+    shutil.copytree(ROOT / "packages/contracts/src", candidate / "src")
+    path = candidate / "src/robotics_runtime_contracts/semantics.py"
+    source = path.read_text(encoding="utf-8")
+    declaration = "def _validate_clock_relation(document: Mapping[str, Any]) -> None:\n"
+    assert source.count(declaration) == 1
+    mutation = '    raise ValueError("clock-relation-mutation")\n'
+    path.write_text(source.replace(declaration, declaration + mutation), encoding="utf-8")
+    with pytest.raises(ReviewRequired, match="clock-relation.json.*clock-relation-mutation"):
+        semantic.check_semantics(published, candidate)
+
+
 def test_semantic_probe_uses_selected_source_despite_pythonpath(
     published: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
