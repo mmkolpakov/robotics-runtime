@@ -177,7 +177,13 @@ def _yaml_scalar(node: ScalarNode, path: str) -> Any:
         if tag == "bool":
             return text.lower() == "true"
         if tag == "int":
-            return int(text, 8 if text.startswith("0o") else 16 if text.startswith("0x") else 10)
+            value = int(text, 8 if text.startswith("0o") else 16 if text.startswith("0x") else 10)
+            try:
+                # Hex and octal bypass CPython's digit limit; every later repr would fail.
+                str(value)
+            except ValueError:
+                _limit("integer exceeds the decimal digit limit", path)
+            return value
         number = float(text.lower().replace(".inf", "inf").replace(".nan", "nan"))
         ensure_finite_numbers(number, path)
         return number

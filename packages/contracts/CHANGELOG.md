@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- YAML hexadecimal and octal integers too large for decimal conversion are
+  rejected with `input.limit_exceeded` while loading. They previously passed
+  the loader and failed later as `internal.error`.
+
 ## 0.17.0
 
 The first release from the shared `robotics-runtime` workspace. Its distribution
