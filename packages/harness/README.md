@@ -246,7 +246,11 @@ it verifies every installed file hash declared by the environment's `RECORD`;
 that installation belongs to the observed execution-subject image. PEP 610
 metadata and an installed `RECORD` are not treated as proof of released wheel
 identity. Unhashed bytecode and module origins outside that `RECORD` fail
-closed; evaluator images should install with bytecode generation disabled.
+closed, and verification refuses to run while `sys.pycache_prefix`
+(`PYTHONPYCACHEPREFIX`) points bytecode at a tree the `RECORD` does not cover.
+Evaluator images should install with bytecode generation disabled. The check
+compares installed files with their `RECORD`; it does not protect against a
+writer that changes the environment between verification and import.
 
 An evaluator receives an immutable `EvaluationContext` and returns
 `AssertionEvaluation` objects in its own namespace. Every product assertion

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import sys
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib.machinery import PathFinder
@@ -75,7 +76,17 @@ def _load_evaluator(entry_point: EntryPoint) -> ProductEvaluator:
     return cast(ProductEvaluator, evaluator)
 
 
+def _require_local_bytecode_cache() -> None:
+    # A bytecode prefix loads cached code from a tree that RECORD does not cover.
+    if sys.pycache_prefix is not None:
+        raise EvaluationError(
+            "installed evaluators cannot be verified while sys.pycache_prefix is set; "
+            "unset PYTHONPYCACHEPREFIX"
+        )
+
+
 def _verify_installed_record(entry_point: EntryPoint) -> frozenset[Path]:
+    _require_local_bytecode_cache()
     distribution = entry_point.dist
     if distribution is None or distribution.files is None:
         raise EvaluationError(f"entry point {entry_point.name!r} has no installed file manifest")
