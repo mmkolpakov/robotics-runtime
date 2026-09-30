@@ -254,6 +254,7 @@ def _parser() -> argparse.ArgumentParser:
         default=[],
         metavar="PATH",
     )
+    _add_extension_schema_argument(doctor)
 
     why = subparsers.add_parser("why", help="Explain an acceptance result verdict.")
     why.add_argument("result", metavar="PATH")
@@ -402,7 +403,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         if arguments.command == "doctor":
             requirements = ()
             if arguments.scenario is not None:
-                scenario = load_document(arguments.scenario, expected_role="acceptance_scenario")
+                scenario = load_document(
+                    arguments.scenario,
+                    expected_role="acceptance_scenario",
+                    extension_schemas=load_extension_schemas(arguments.extension_schema),
+                )
                 requirements = scenario.data["evaluator_requirements"]
             report = doctor_report(
                 mode=arguments.mode,
