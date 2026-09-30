@@ -10,7 +10,7 @@ members = [
 
 [manifest.dependency-groups]
 dev = [
-    { name = "check-jsonschema", specifier = "==0.37.4" },
+    { name = "check-jsonschema", specifier = "==0.38.2" },
     { name = "coverage", extras = ["toml"], specifier = "==7.16.2" },
     { name = "mcap", specifier = ">=1.4,<2" },
     { name = "mypy", specifier = "==2.3.1" },
@@ -228,7 +228,7 @@ wheels = [
 
 [[package]]
 name = "check-jsonschema"
-version = "0.37.4"
+version = "0.38.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -237,9 +237,9 @@ dependencies = [
     { name = "requests" },
     { name = "ruamel-yaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f3/dd/27b7f575586505c3d71b66b1fd60076feeba1ba7ffd1303fbf5a70cedad6/check_jsonschema-0.37.4.tar.gz", hash = "sha256:f933521f14cbeaaf113270751185b01379f453ac9ce9fb01d6190ce1352ccaa6", size = 428594, upload-time = "2026-06-29T21:10:23.726Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7f/43/f0cb0cc7e68421c5b0be6bca74d37e2daad915ee74edef42c4af21aaef19/check_jsonschema-0.38.2.tar.gz", hash = "sha256:967176475f9eddd2809baabf7e0d157f7eb482b06ac002a29a79788c0c8a5a90", size = 444493, upload-time = "2026-09-23T16:23:22.385Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/92/82/6a929238ec352eadd4f4ce6e1be98c575fa8cbebe45b7c519f8016ad2860/check_jsonschema-0.37.4-py3-none-any.whl", hash = "sha256:e4d1647992674d6b1ed2ca46eee6697760d17a5cc0c167ba09c5b503b883d041", size = 412508, upload-time = "2026-06-29T21:10:22.041Z" },
+    { url = "https://files.pythonhosted.org/packages/64/15/286e11f294c86616202f413df069dc6625c0085fc70d32b3e5e703236a17/check_jsonschema-0.38.2-py3-none-any.whl", hash = "sha256:8edefe154b7117962f2e88318f315fc4bb9615827f932b37cb676a8d42a3a286", size = 427987, upload-time = "2026-09-23T16:23:20.607Z" },
 ]
 
 [[package]]
