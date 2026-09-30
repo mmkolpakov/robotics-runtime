@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `recording-summary from-mcap` rejects a chunk that declares more than 256 MiB
+  of uncompressed data before decompressing it. A 62 KiB zstd file declaring
+  1 GiB previously drove the reader to about 2 GiB of memory.
 - `create_execution_permit` rejects a naive `now` with `input.invalid_timestamp`
   instead of reading it as host local time, which shifted `issued_at` and
   `expires_at` by the host UTC offset.
