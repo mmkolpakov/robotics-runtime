@@ -18,6 +18,9 @@ from robotics_runtime_contracts._mcap_crc import verify_extra_crcs
 from robotics_runtime_contracts._mcap_observations import Observations
 from robotics_runtime_contracts.writers import WriterError
 
+# The reader inflates a whole chunk in memory; a tiny zstd chunk can declare gigabytes.
+MAX_CHUNK_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
+
 
 def _statistics(summary: Summary) -> dict[str, int]:
     stats = summary.statistics
@@ -51,6 +54,12 @@ def _compressions(stream: IO[bytes]) -> tuple[list[str], int]:
     chunks = 0
     for record in StreamReader(stream, emit_chunks=True, validate_crcs=True).records:
         if isinstance(record, Chunk):
+            if record.uncompressed_size > MAX_CHUNK_UNCOMPRESSED_BYTES:
+                raise WriterError(
+                    f"MCAP chunk declares {record.uncompressed_size} uncompressed bytes; "
+                    f"the limit is {MAX_CHUNK_UNCOMPRESSED_BYTES}",
+                    error_id="writer.invalid_mcap",
+                )
             chunks += 1
             compressions.add(record.compression or "none")
     return sorted(compressions or {"none"}), chunks
@@ -87,9 +96,11 @@ def _summarize_stream(stream: IO[bytes], digest: str) -> dict[str, Any]:
     if summary is None:
         raise WriterError("MCAP requires a finalized summary", error_id="writer.invalid_mcap")
     expected = _statistics(summary)
+    # Size chunks from their headers before any pass decompresses them.
+    compressions, chunk_count = _compressions(stream)
     observed = _observed_statistics(stream)
     statistics = observed.statistics()
-    compressions, statistics["chunk_count"] = _compressions(stream)
+    statistics["chunk_count"] = chunk_count
     if expected != statistics:
         raise WriterError("MCAP Statistics contradict its records", error_id="writer.invalid_mcap")
     assert summary.statistics is not None

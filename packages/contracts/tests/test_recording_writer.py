@@ -174,3 +174,21 @@ def test_recording_output_cannot_replace_its_source(tmp_path: Path) -> None:
     assert main(["recording-summary", "from-mcap", str(source), "--output", str(source)]) == 1
     assert file_sha256(source) == digest
     assert load_mapping(write_document(recording_summary_from_mcap(source), tmp_path / "ok.json"))
+
+
+def test_oversized_chunks_are_rejected_before_decompression(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from robotics_runtime_contracts import _mcap_summary
+
+    def decompressing_pass(_stream: object) -> None:
+        raise AssertionError("chunk records were decompressed")
+
+    source = recording(tmp_path / "recording.mcap")
+    monkeypatch.setattr(_mcap_summary, "MAX_CHUNK_UNCOMPRESSED_BYTES", 16)
+    monkeypatch.setattr(_mcap_summary, "_observed_statistics", decompressing_pass)
+
+    with pytest.raises(WriterError, match="uncompressed bytes") as error:
+        recording_summary_from_mcap(source)
+
+    assert error.value.error_id == "writer.invalid_mcap"
