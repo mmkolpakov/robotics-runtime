@@ -44,6 +44,7 @@ insufficient. CI must pass before merge.
 
 ## Dependency Updates
 
+The workspace root `renovate.json` configures Renovate for both packages.
 Renovate tracks Python runtime, development and build requirements and `uv.lock`
 through its [PEP 621 manager](https://docs.renovatebot.com/modules/manager/pep621/).
 The [GitHub Actions manager](https://docs.renovatebot.com/modules/manager/github-actions/)
@@ -62,12 +63,9 @@ Validate configuration changes with Renovate's official
 [config validator](https://docs.renovatebot.com/config-validation/):
 
 ```bash
+# from the workspace root
 renovate-config-validator --strict renovate.json
 ```
 
-Configuration in Git is not proof that the hosted bot is installed or active.
-An administrator must enable the Renovate GitHub App for this repository and
-complete onboarding. The M0 acceptance criterion is an actual dependency PR
-from Renovate with passing checks, not a local config-validation result. If no
-such PR exists by the end of M0, remove the inactive configuration as required
-by the implementation plan. This remains an external gate until a PR is observed.
+The hosted Renovate app is active for the repository; pending and
+rate-limited updates are listed in its Dependency Dashboard issue.
