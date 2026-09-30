@@ -34,7 +34,6 @@
   "packages/harness/src/robotics_acceptance_harness/metrics.py::counter_window_aggregate::C901": 26,
   "packages/harness/src/robotics_acceptance_harness/metrics.py::counter_window_aggregate::PLR0913": 6,
   "packages/harness/src/robotics_acceptance_harness/metrics.py::evaluate_metric_assertions::C901": 12,
-  "packages/harness/src/robotics_acceptance_harness/metrics.py::require_window_coverage::C901": 12,
   "packages/harness/src/robotics_acceptance_harness/metrics.py::require_window_coverage::PLR0913": 6,
   "packages/harness/src/robotics_acceptance_harness/otel.py::load_otlp_json_metrics::C901": 14,
   "packages/harness/src/robotics_acceptance_harness/policy.py::evaluate_data_plane_policy::C901": 11,
