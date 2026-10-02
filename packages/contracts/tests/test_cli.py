@@ -431,7 +431,7 @@ def test_cli_outputs_follow_symlinks_and_get_regular_modes(
 
     assert link.is_symlink()
     assert json.loads(real.read_text(encoding="utf-8")) == {"value": 2}
-    assert real.stat().st_mode & 0o777 == 0o644
+    assert real.stat().st_mode & 0o777 == (0o666 if os.name == "nt" else 0o644)
     capsys.readouterr()
 
 
