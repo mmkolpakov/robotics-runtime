@@ -2,12 +2,14 @@
 
 ## Package Line
 
-The `0.18.x` harness line requires Python 3.12 or 3.13 and
-`robotics-runtime-contracts>=0.16,<0.17`.
+The `0.19.x` harness line requires Python `>=3.12,<3.15` and
+`robotics-runtime-contracts>=0.18,<0.19`. Harness `0.19.0` is prepared against
+the exact `contracts-v0.18.1` release; its publication requires that contracts
+version to be available on PyPI and GitHub.
 
-The repository is pre-1.0 and has no external consumers. Each public document
-family therefore has one canonical `v1`; superseded experimental v2-v5 schemas
-and compatibility branches are intentionally absent. The first stable release
+The repository is pre-1.0. Each public document family has one canonical `v1`;
+superseded experimental v2-v5 schemas and compatibility branches are intentionally
+absent. The first stable release
 will establish the long-term compatibility baseline.
 
 ## Document Set
@@ -35,6 +37,9 @@ installing this package.
 
 ## Dependency Reproducibility
 
-`uv.lock` pins the exact contracts Git revision for repository development.
-Release artifacts replace that source with published, provenance-verified
-wheels. CI must test installed wheels without editable sibling checkouts.
+`uv.lock` pins the workspace's development dependency graph. The contracts
+workspace source override applies only to development. Releases use
+`uv build --no-sources` and standard index requirements, then test wheel and
+source distributions outside the workspace with the exact released contracts
+version from PyPI. See the [workspace release procedure](../../../docs/releasing.md)
+for the source, metadata and provenance checks.

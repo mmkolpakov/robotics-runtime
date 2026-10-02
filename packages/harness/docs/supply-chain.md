@@ -1,78 +1,45 @@
 # Supply-Chain Assurance
 
-This declaration evaluates release wheel and source distributions against the
-[SLSA 1.2 Build track](https://slsa.dev/spec/v1.2/). The current claim is
-**Build L2**. It does not apply to local development builds.
+Harness releases are built by the `mmkolpakov/robotics-runtime` workspace.
+The [workspace release procedure](../../../docs/releasing.md) is authoritative
+for release ordering, `harness-vX.Y.Z` tags, publisher registration and protected
+publication environments. GitHub release creation requires successful PyPI
+publication; a local build or dry run does not establish a published release.
 
-## Component Assessment
+## Release Artifact Assessment
 
-| SLSA 1.2 requirement | Repository evidence | Status |
-| --- | --- | --- |
-| Consistent build process | Tagged releases run `.github/workflows/release.yml` and `uv build --no-sources` | Met |
-| Hosted build platform | Releases use a GitHub-hosted Ubuntu runner | Met |
-| Provenance exists | `actions/attest` records each wheel and source archive by digest | Met |
-| Authentic provenance | GitHub signs the artifact attestation outside user build steps | Met |
-| Provenance distribution | Attestations are discoverable with the GitHub release artifact | Met |
-| Consumer verification | `gh attestation verify --repo mmkolpakov/robotics-acceptance-harness FILE` | Required |
-| Unforgeable provenance | No Build L3 claim; the release workflow is not a qualified reusable builder | Not claimed |
-| Isolated build platform | No independent Build L3 assessment is published by this project | Not claimed |
+Maintainers assess a published wheel or source distribution against
+[SLSA 1.2 Build L2](https://slsa.dev/spec/v1.2/) only when its completed release
+run and verified provenance establish the following evidence. This is an
+artifact-specific maintainer assessment, not an independent certification.
+Unreleased candidates and local development builds have no Build L2 claim.
+
+| SLSA 1.2 requirement | Evidence required for the released archive |
+| --- | --- |
+| Consistent build process | The tagged `.github/workflows/release.yml` run builds with `uv build --no-sources` |
+| Hosted build platform | The release build runs on a GitHub-hosted Ubuntu runner |
+| Authentic provenance | GitHub's `actions/attest` attestation binds the archive digest to the workspace release workflow |
+| Provenance distribution | The released archive's attestation is discoverable and verifies against `mmkolpakov/robotics-runtime` |
 
 Build L2 permits best-effort resolved dependency completeness. The lockfile pins
 the development graph; the wheel carries standard version constraints. The
 contracts source override is disabled by `uv build --no-sources`.
 
-The release workflow builds and tests the distributions once in a job without
-OIDC authority. It uploads those files as a short-lived workflow artifact.
-The enabled publication jobs then download the same files:
-
-- optional `publish-pypi` publishes them through PyPI Trusted Publishing when
-  `PYPI_PUBLISH_ENABLED` is `true`;
-- `github-release` attests them and attaches them to the GitHub Release.
-
-Only `publish-pypi` has the PyPI OIDC permission. That job does not check out
-the repository or execute project code. No PyPI API token is used or stored.
+The release workflow builds and tests the distributions once, then publication
+jobs consume those exact files. The canonical release procedure describes the
+Trusted Publishing and GitHub provenance gates; neither rebuilds the archives.
 
 ## Release Verification
 
-Download the wheel or source archive and verify its attestation before
-installation:
+Download a published wheel or source archive and verify its attestation before
+installation. For harness `0.19.0`, after publication:
 
 ```bash
 gh attestation verify \
-  --repo mmkolpakov/robotics-acceptance-harness \
-  robotics_acceptance_harness-*.whl
+  --repo mmkolpakov/robotics-runtime \
+  robotics_acceptance_harness-0.19.0-py3-none-any.whl
 ```
 
 The repository does not claim SLSA Source-track conformance or Build L3.
 Reaching Build L3 requires a separately reviewed reusable build workflow and a
 published assessment of the builder controls.
-
-## Trusted Publisher Setup
-
-Status: **pending external configuration**.
-
-Before the first publication, create and protect the GitHub environment named
-`pypi`. Register a pending publisher if the project does not yet exist on PyPI;
-otherwise add a Trusted Publisher to the existing project. Use these exact
-values:
-
-| PyPI field | Value |
-| --- | --- |
-| Owner | `mmkolpakov` |
-| Repository | `robotics-acceptance-harness` |
-| Workflow | `release.yml` |
-| Environment | `pypi` |
-
-Do not create a `PYPI_API_TOKEN` secret. After the external publisher is
-registered, set the repository variable `PYPI_PUBLISH_ENABLED` to `true`.
-Until then, the PyPI job remains skipped and the attested GitHub Release is the
-canonical distribution channel. Once enabled, a PyPI publication failure fails
-the release workflow.
-
-Release the compatible `robotics-runtime-contracts` tag first and verify its
-GitHub Release wheel and build-provenance attestation. Foundation consumers pin
-that wheel by URL and SHA-256. PyPI promotion remains a separate, explicitly
-enabled channel. Create and push the protected
-`robotics-acceptance-harness` tag after the compatible contracts GitHub Release
-and build-provenance attestation are available. The tag must equal `v` followed
-by the installed harness package version.
