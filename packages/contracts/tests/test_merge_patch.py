@@ -181,3 +181,13 @@ def test_cli_diff_emits_bool_to_number_patch(
     assert not captured.err
     assert captured.out.strip() != "{}"
     assert type(json.loads(captured.out)["a"]) is int
+
+
+def test_overlays_cannot_change_the_schema_version() -> None:
+    base = load_mapping(FIXTURE)
+
+    with pytest.raises(ContractError, match="must not change schema_version") as caught:
+        resolve_merge_patches(base, [{"schema_version": "runtime-manifest.v1"}])
+
+    assert caught.value.error_id == "merge.schema_version_changed"
+    assert caught.value.json_path == "$.schema_version"

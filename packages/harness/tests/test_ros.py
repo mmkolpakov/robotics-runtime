@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import robotics_acceptance_harness.ros as ros_module
 from robotics_acceptance_harness.readiness import evaluate_graph
 from robotics_acceptance_harness.ros import RosGraphObserver, RosObserverError
 from tests.graph_types import ExpectedGraph
@@ -424,3 +425,37 @@ def test_ros_observer_queries_forbidden_names_without_subscribing() -> None:
     assert snapshot.actions["/land"].client_nodes == 1
     assert "/cmd_vel" not in node.callbacks
     observer.close()
+
+
+def test_an_unanswered_lifecycle_request_expires_the_cached_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    node = FakeNode()
+    now_ns = [0]
+    monkeypatch.setattr(ros_module, "monotonic_ns", lambda: now_ns[0])
+    cancelled: list[bool] = []
+    pending = SimpleNamespace(done=lambda: False, cancel=lambda: cancelled.append(True))
+    with RosGraphObserver(
+        expected_graph(),
+        observe_clock=False,
+        module_loader=fake_modules(node).__getitem__,
+    ) as observer:
+        assert node.executor_started.wait(timeout=1.0)
+        observer.snapshot()
+        monkeypatch.setattr(FakeClient, "call_async", lambda _self, _request: pending)
+        assert observer.snapshot().lifecycle_nodes["/camera"].state == "active"
+
+        now_ns[0] = RosGraphObserver.LIFECYCLE_RESPONSE_TIMEOUT_NS
+        assert observer.snapshot().lifecycle_nodes["/camera"].state == "active"
+
+        now_ns[0] += 1
+        snapshot = observer.snapshot()
+
+    assert "/camera" not in snapshot.lifecycle_nodes
+    assert cancelled == [True]
+    (issue,) = (
+        issue
+        for issue in evaluate_graph(expected_graph(), snapshot)
+        if "lifecycle_nodes" in issue.json_path
+    )
+    assert issue.status == "error"

@@ -22,6 +22,7 @@ from robotics_acceptance_harness.authorization import (
     AuthorizationIssue,
     evaluate_physical_authorization,
 )
+from robotics_acceptance_harness.errors import HarnessError
 
 
 class RuntimeExecutionDocument(TypedDict):
@@ -71,8 +72,10 @@ class RuntimeDocument(TypedDict):
     data_plane: NotRequired[Mapping[str, Any]]
 
 
-class BundleValidationError(ValueError):
+class BundleValidationError(HarnessError, ValueError):
     """Raised when individually valid execution documents contradict each other."""
+
+    error_id = "BundleValidationError.failed"
 
     def __init__(
         self,
@@ -85,6 +88,10 @@ class BundleValidationError(ValueError):
         self.validation_message = message
         self.issues = ((json_path, message), *related)
         super().__init__("; ".join(f"{path}: {detail}" for path, detail in self.issues))
+
+    @property
+    def diagnostic_issues(self) -> tuple[tuple[str, str], ...]:
+        return self.issues
 
     @classmethod
     def from_authorization_issues(

@@ -7,16 +7,21 @@ import shutil
 from collections import Counter
 from pathlib import Path
 from tempfile import TemporaryFile
-from typing import IO, Any
+from typing import IO, Any, cast
 
-from mcap.reader import make_reader
+from mcap.reader import SeekingReader
 from mcap.records import Chunk, Statistics
 from mcap.stream_reader import StreamReader
 from mcap.summary import Summary
 
+from robotics_runtime_contracts._mcap_chunk_limits import BoundedReadStream, validate_chunk_size
 from robotics_runtime_contracts._mcap_crc import verify_extra_crcs
 from robotics_runtime_contracts._mcap_observations import Observations
 from robotics_runtime_contracts.writers import WriterError
+
+# The reader inflates a whole chunk in memory; a tiny zstd chunk can declare gigabytes.
+MAX_CHUNK_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
+MAX_RECORD_BYTES = 256 * 1024 * 1024
 
 
 def _statistics(summary: Summary) -> dict[str, int]:
@@ -40,7 +45,9 @@ def _statistics(summary: Summary) -> dict[str, int]:
 def _observed_statistics(stream: IO[bytes]) -> Observations:
     observed = Observations()
     stream.seek(0)
-    for record in StreamReader(stream, validate_crcs=True).records:
+    for record in StreamReader(
+        stream, validate_crcs=True, record_size_limit=MAX_RECORD_BYTES
+    ).records:
         observed.observe(record)
     return observed
 
@@ -49,8 +56,14 @@ def _compressions(stream: IO[bytes]) -> tuple[list[str], int]:
     stream.seek(0)
     compressions: set[str] = set()
     chunks = 0
-    for record in StreamReader(stream, emit_chunks=True, validate_crcs=True).records:
+    for record in StreamReader(
+        stream,
+        emit_chunks=True,
+        validate_crcs=True,
+        record_size_limit=MAX_RECORD_BYTES,
+    ).records:
         if isinstance(record, Chunk):
+            validate_chunk_size(record, MAX_CHUNK_UNCOMPRESSED_BYTES)
             chunks += 1
             compressions.add(record.compression or "none")
     return sorted(compressions or {"none"}), chunks
@@ -82,14 +95,20 @@ def _check_channel_counts(statistics: Statistics, observed: Observations) -> Non
 
 
 def _summarize_stream(stream: IO[bytes], digest: str) -> dict[str, Any]:
+    stream = cast(IO[bytes], BoundedReadStream(stream, MAX_RECORD_BYTES))
     verify_extra_crcs(stream)
-    summary = make_reader(stream, validate_crcs=True).get_summary()
+    # Validate actual decoded sizes before the upstream reader inflates whole chunks.
+    compressions, chunk_count = _compressions(stream)
+    stream.seek(0)
+    summary = SeekingReader(
+        stream, validate_crcs=True, record_size_limit=MAX_RECORD_BYTES
+    ).get_summary()
     if summary is None:
         raise WriterError("MCAP requires a finalized summary", error_id="writer.invalid_mcap")
     expected = _statistics(summary)
     observed = _observed_statistics(stream)
     statistics = observed.statistics()
-    compressions, statistics["chunk_count"] = _compressions(stream)
+    statistics["chunk_count"] = chunk_count
     if expected != statistics:
         raise WriterError("MCAP Statistics contradict its records", error_id="writer.invalid_mcap")
     assert summary.statistics is not None

@@ -60,9 +60,14 @@ def baseline(root: Path) -> Baseline:
 
 
 def extract(root: Path, release: Baseline, destination: Path) -> Path:
-    """Extract only released source and fixtures; reject links and unsafe archive paths."""
+    """Extract released source, fixtures and consumer examples; reject links and unsafe paths."""
     content = git(
-        root, "archive", release.commit, f"{release.prefix}src", f"{release.prefix}tests/fixtures"
+        root,
+        "archive",
+        release.commit,
+        f"{release.prefix}src",
+        f"{release.prefix}tests/fixtures",
+        f"{release.prefix}consumer-examples",
     )
     with tarfile.open(fileobj=io.BytesIO(content)) as archive:
         members = archive.getmembers()

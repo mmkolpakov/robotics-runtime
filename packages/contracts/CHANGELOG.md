@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.18.1
+
+- Reject CLI and writer outputs that alias an input, including hard links,
+  extension schemas and evidence drafts. Preserve regular file permissions
+  and atomic replacement when writing through symlinks.
+- Bound MCAP records and decoded chunks to 256 MiB. Validate actual decoded
+  sizes through the codecs' streaming APIs before whole-chunk decoding.
+- Bound hexadecimal and octal YAML integers during loading. Require canonical
+  qualification subject names and the scenario role during overlay resolution.
+- Reject lifecycle stability windows longer than graph readiness timeouts.
+- Replay published qualification documents and consumer examples in the semantic
+  compatibility gate. Update workspace release and supply-chain documentation.
+
 ## 0.18.0
 
 Adds optional robot-description bindings, a flight-controller provider profile

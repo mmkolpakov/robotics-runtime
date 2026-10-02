@@ -21,11 +21,17 @@ from robotics_runtime_contracts.errors import CLIArgumentError, ContractError
 from robotics_runtime_contracts.serialization import read_document_bytes
 
 
-def _identity(kind: str, subject_name: str) -> None:
+def _identity_problem(kind: str, subject_name: str) -> str | None:
     if kind not in _CONTRACT_SCHEMAS and kind not in _RAW_ARTIFACT_KINDS:
-        raise CLIArgumentError(f"unsupported qualification artifact kind: {kind}")
-    if not _SUBJECT_NAME.fullmatch(subject_name) or ".." in subject_name or "//" in subject_name:
-        raise CLIArgumentError(f"non-canonical qualification subject name: {subject_name}")
+        return f"unsupported qualification artifact kind: {kind}"
+    segments = subject_name.split("/")
+    if (
+        not _SUBJECT_NAME.fullmatch(subject_name)
+        or not segments[0]
+        or any(segment in {"", ".", ".."} for segment in segments)
+    ):
+        return f"non-canonical qualification subject name: {subject_name}"
+    return None
 
 
 def _specification(specification: str) -> tuple[str, str, Path]:
@@ -33,7 +39,8 @@ def _specification(specification: str) -> tuple[str, str, Path]:
     name, path_separator, path_value = remainder.partition("=")
     if not kind_separator or not path_separator or not kind or not name or not path_value:
         raise CLIArgumentError("--artifact must use KIND:SUBJECT=PATH")
-    _identity(kind, name)
+    if (problem := _identity_problem(kind, name)) is not None:
+        raise CLIArgumentError(problem)
     return kind, name, Path(path_value).expanduser()
 
 
@@ -41,7 +48,9 @@ def validate_descriptor(
     artifact: QualificationArtifact,
     extension_schemas: Mapping[str, bytes] | None,
 ) -> None:
-    _identity(artifact.kind, artifact.subject_name)
+    if (problem := _identity_problem(artifact.kind, artifact.subject_name)) is not None:
+        # Descriptors come from API callers, not command-line arguments.
+        raise QualificationError(problem)
     if not re.fullmatch(r"[0-9a-f]{64}", artifact.sha256):
         raise QualificationError("artifact sha256 must be 64 lowercase hexadecimal characters")
     if type(artifact.size_bytes) is not int or artifact.size_bytes < 0:

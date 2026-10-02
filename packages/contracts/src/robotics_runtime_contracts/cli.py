@@ -12,6 +12,7 @@ from robotics_runtime_contracts import (
     ensure_finite_numbers,
     loads_mapping,
     resolve_schema_name,
+    schema_for_role,
     validate_document,
 )
 from robotics_runtime_contracts._writer_cli import add_writer_commands, run_writer
@@ -33,7 +34,7 @@ from robotics_runtime_contracts.serialization import (
     read_document_stream,
 )
 from robotics_runtime_contracts.statements import validate_qualification_statement
-from robotics_runtime_contracts.writers import protect_inputs
+from robotics_runtime_contracts.writers import protect_inputs, write_bytes_atomically
 
 
 class ContractArgumentParser(argparse.ArgumentParser):
@@ -163,16 +164,30 @@ def _read_document(path: str) -> Mapping[str, Any]:
     return _read_document_source(path)[0]
 
 
-def _write_document(path: str | Path, document: Mapping[str, Any]) -> Path:
+def _serialize_document(path: str | Path, document: Mapping[str, Any]) -> bytes:
     ensure_finite_numbers(document)
+    if Path(path).suffix.lower() in {".yaml", ".yml"}:
+        return dumps_yaml(document).encode("utf-8")
+    return (json.dumps(document, allow_nan=False, indent=2, sort_keys=True) + "\n").encode()
+
+
+def _write_document(path: str | Path, document: Mapping[str, Any]) -> Path:
     output = Path(path).expanduser()
-    output.parent.mkdir(parents=True, exist_ok=True)
-    if output.suffix.lower() in {".yaml", ".yml"}:
-        content = dumps_yaml(document)
-    else:
-        content = json.dumps(document, allow_nan=False, indent=2, sort_keys=True) + "\n"
-    output.write_text(content, encoding="utf-8")
+    write_bytes_atomically(_serialize_document(output, document), output)
     return output
+
+
+def _reject_input_aliases(command: str, outputs: Sequence[str], inputs: Sequence[str]) -> None:
+    """Reject outputs that name, link to or share a file with an input document."""
+
+    sources = [path for path in inputs if path != "-"]
+    for output in outputs:
+        try:
+            protect_inputs(output, sources)
+        except ContractError as error:
+            raise CLIArgumentError(
+                f"{command} outputs must not overwrite an input document"
+            ) from error
 
 
 def _read_extension_schemas(values: Sequence[str]) -> dict[str, bytes]:
@@ -222,27 +237,35 @@ def _emit_error(error: ContractError, *, output_format: str) -> None:
 def _scenario_resolve(arguments: argparse.Namespace) -> None:
     extension_schemas = _read_extension_schemas(arguments.extension_schema)
     base, base_source = _read_document_source(arguments.base)
+    declared = base.get("schema_version")
+    scenario_schema = schema_for_role("acceptance_scenario")
+    if not isinstance(declared, str) or resolve_schema_name(declared) != scenario_schema:
+        raise ContractError(
+            f"scenario resolve requires a {scenario_schema} base document",
+            error_id="schema.role_mismatch",
+            json_path="$.schema_version",
+        )
     overlay_sources = [_read_document_source(path) for path in arguments.overlay]
     overlays = [document for document, _source in overlay_sources]
-    inputs = {
-        Path(path).expanduser().resolve()
-        for path in (arguments.base, *arguments.overlay)
-        if path != "-"
-    }
-    output_path = Path(arguments.output).expanduser().resolve()
-    trace_path = (
-        Path(arguments.trace_output).expanduser().resolve() if arguments.trace_output else None
-    )
-    if output_path in inputs or trace_path in inputs:
-        raise CLIArgumentError("scenario outputs must not overwrite an input document")
-    if trace_path is not None and trace_path == output_path:
-        raise CLIArgumentError("--output and --trace-output must identify different files")
+    outputs = [arguments.output]
+    if arguments.trace_output:
+        outputs.append(arguments.trace_output)
+    schema_files = [item.partition("=")[2] for item in arguments.extension_schema]
+    _reject_input_aliases("scenario", outputs, [arguments.base, *arguments.overlay, *schema_files])
+    if arguments.trace_output:
+        try:
+            protect_inputs(arguments.trace_output, [arguments.output])
+        except ContractError as error:
+            raise CLIArgumentError(
+                "--output and --trace-output must identify different files"
+            ) from error
     resolved = resolve_merge_patches(
         base,
         overlays,
         extension_schemas=extension_schemas or None,
     )
-    output = _write_document(arguments.output, resolved)
+    output = Path(arguments.output).expanduser()
+    content = _serialize_document(output, resolved)
     trace = {
         "base": {
             "path": arguments.base,
@@ -260,10 +283,18 @@ def _scenario_resolve(arguments: argparse.Namespace) -> None:
             )
         ],
         "resolved": str(output),
-        "resolved_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+        "resolved_sha256": hashlib.sha256(content).hexdigest(),
     }
-    if arguments.trace_output:
-        _write_document(arguments.trace_output, trace)
+    trace_content = (
+        _serialize_document(arguments.trace_output, trace) if arguments.trace_output else None
+    )
+    for destination in outputs:
+        if Path(destination).expanduser().is_dir():
+            raise ContractError(f"output is a directory: {destination}", error_id="input.io_error")
+    # Both documents are ready before either file changes.
+    write_bytes_atomically(content, output)
+    if trace_content is not None:
+        write_bytes_atomically(trace_content, Path(arguments.trace_output).expanduser())
     _emit({**trace, "message": f"resolved: {output}"}, output_format=arguments.format)
 
 
@@ -392,6 +423,7 @@ def _run(arguments: argparse.Namespace) -> int:
             _read_document(arguments.target),
         )
         if arguments.output:
+            _reject_input_aliases("diff", [arguments.output], [arguments.source, arguments.target])
             _write_document(arguments.output, patch)
         else:
             print(json.dumps(patch, allow_nan=False, indent=2, sort_keys=True))

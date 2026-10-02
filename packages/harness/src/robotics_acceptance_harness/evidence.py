@@ -19,6 +19,7 @@ from robotics_acceptance_harness.documents import (
     load_document,
     load_document_bytes,
 )
+from robotics_acceptance_harness.errors import HarnessError
 from robotics_acceptance_harness.receipts import (
     ReceiptSource,
     ReceiptValidationError,
@@ -27,13 +28,19 @@ from robotics_acceptance_harness.receipts import (
 )
 
 
-class EvidenceValidationError(ValueError):
+class EvidenceValidationError(HarnessError, ValueError):
     """Raised when finalized evidence cannot be independently verified."""
+
+    error_id = "EvidenceValidationError.failed"
 
     def __init__(self, json_path: str, message: str) -> None:
         self.json_path = json_path
         self.validation_message = message
         super().__init__(f"{json_path}: {message}")
+
+    @property
+    def diagnostic_issues(self) -> tuple[tuple[str, str], ...]:
+        return ((self.json_path, self.validation_message),)
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import struct
 import sys
 from pathlib import Path
 
 import pytest
+from mcap.opcode import Opcode
 from mcap.writer import CompressionType, IndexType, Writer
 
 from robotics_runtime_contracts import file_sha256, load_mapping, validate_document
@@ -174,3 +176,41 @@ def test_recording_output_cannot_replace_its_source(tmp_path: Path) -> None:
     assert main(["recording-summary", "from-mcap", str(source), "--output", str(source)]) == 1
     assert file_sha256(source) == digest
     assert load_mapping(write_document(recording_summary_from_mcap(source), tmp_path / "ok.json"))
+
+
+def test_oversized_chunks_are_rejected_before_decompression(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from robotics_runtime_contracts import _mcap_summary
+
+    def decompressing_pass(_stream: object) -> None:
+        raise AssertionError("chunk records were decompressed")
+
+    source = recording(tmp_path / "recording.mcap")
+    monkeypatch.setattr(_mcap_summary, "MAX_CHUNK_UNCOMPRESSED_BYTES", 16)
+    monkeypatch.setattr(_mcap_summary, "_observed_statistics", decompressing_pass)
+
+    with pytest.raises(WriterError, match="uncompressed bytes") as error:
+        recording_summary_from_mcap(source)
+
+    assert error.value.error_id == "writer.invalid_mcap"
+
+
+def test_nested_chunk_length_is_bounded_before_upstream_allocation(tmp_path: Path) -> None:
+    def envelope(opcode: Opcode, body: bytes) -> bytes:
+        return struct.pack("<BQ", opcode, len(body)) + body
+
+    # The outer envelope is tiny, but the nested data length requests 1 GiB.
+    body = struct.pack("<QQQIIQ", 0, 0, 1, 0, 0, 1024**3) + b"x"
+    magic = b"\x89MCAP0\r\n"
+    source = tmp_path / "nested-length.mcap"
+    source.write_bytes(
+        magic
+        + envelope(Opcode.CHUNK, body)
+        + envelope(Opcode.DATA_END, struct.pack("<I", 0))
+        + envelope(Opcode.FOOTER, struct.pack("<QQI", 0, 0, 0))
+        + magic
+    )
+    with pytest.raises(WriterError, match="read requests 1073741824 bytes") as error:
+        recording_summary_from_mcap(source)
+    assert error.value.error_id == "writer.invalid_mcap"

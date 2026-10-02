@@ -2,6 +2,7 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
+from robotics_acceptance_harness.errors import HarnessError, HarnessInputError
 from robotics_acceptance_harness.evaluation import (
     AssertionEvaluation,
     EvaluationContext,
@@ -16,6 +17,8 @@ except PackageNotFoundError:
 __all__ = [
     "AssertionEvaluation",
     "EvaluationContext",
+    "HarnessError",
+    "HarnessInputError",
     "ProductEvaluator",
     "__version__",
 ]

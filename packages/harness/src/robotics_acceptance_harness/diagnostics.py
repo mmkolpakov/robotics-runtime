@@ -11,6 +11,7 @@ from typing import Any
 
 from robotics_acceptance_harness import __version__
 from robotics_acceptance_harness.documents import load_document
+from robotics_acceptance_harness.errors import HarnessError, HarnessInputError
 from robotics_acceptance_harness.evaluation import evaluator_inventory
 from robotics_acceptance_harness.receipts import VerifiedReceiptSet
 
@@ -42,7 +43,7 @@ def doctor_report(
     """Check dependencies required by the selected evaluation mode."""
 
     if mode not in {"live", "offline"}:
-        raise ValueError(f"unsupported doctor mode: {mode}")
+        raise HarnessInputError(f"unsupported doctor mode: {mode}")
     checks = [_check("contracts-package", True, "robotics-runtime-contracts is importable")]
     try:
         inventory = list(evaluator_inventory(evaluator_requirements, evaluator_receipts))
@@ -236,21 +237,29 @@ def write_error_diagnostic(
 
     destination = Path(path).expanduser().resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
+    source = error.diagnostic_exception if isinstance(error, HarnessError) else error
     payload = {
         "status": "error",
         "command": command,
         "error_id": error_id or getattr(error, "error_id", f"{type(error).__name__}.failed"),
-        "exception_type": type(error).__name__,
-        "message": str(error),
+        "exception_type": type(source).__name__,
+        "message": str(source),
     }
-    issues = getattr(error, "issues", ())
+    issues = (
+        error.diagnostic_issues
+        if isinstance(error, HarnessError)
+        else tuple(
+            (str(getattr(issue, "json_path", "")), str(getattr(issue, "message", issue)))
+            for issue in getattr(error, "issues", ())
+        )
+    )
     if issues:
         payload["issues"] = [
             {
-                "json_path": str(getattr(issue, "json_path", "")),
-                "message": str(getattr(issue, "message", issue)),
+                "json_path": json_path,
+                "message": message,
             }
-            for issue in issues
+            for json_path, message in issues
         ]
     destination.write_text(
         json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n",

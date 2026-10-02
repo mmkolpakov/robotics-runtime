@@ -253,3 +253,15 @@ def test_digest_pinned_extension_schemas_use_strict_json() -> None:
     with pytest.raises(ExtensionValidationError, match="duplicate object key") as caught:
         validate_document(scenario, extension_schemas={SCHEMA_URI: raw})
     assert caught.value.json_path == "$.extension_schemas[0]"
+
+
+@pytest.mark.parametrize("prefix, digit", [("0x", "f"), ("0o", "7")])
+def test_yaml_power_of_two_integers_respect_the_digit_limit(prefix: str, digit: str) -> None:
+    source = f"schema_version: acceptance-scenario.v1\nseed: {prefix}{digit * 6000}\n"
+
+    with pytest.raises(DocumentParseError, match="decimal digit limit") as caught:
+        loads_mapping(source, source_name="scenario.yaml")
+
+    assert caught.value.error_id == "input.limit_exceeded"
+    assert caught.value.json_path == "$.seed"
+    assert loads_mapping(f"seed: {prefix}{digit * 8}\n", source_name="small.yaml")["seed"] > 0

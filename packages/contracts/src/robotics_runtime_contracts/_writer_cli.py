@@ -131,7 +131,7 @@ def _evidence_add(arguments: argparse.Namespace, extensions: Mapping[str, bytes]
 
 def _evidence_finalize(arguments: argparse.Namespace, extensions: Mapping[str, bytes]) -> Path:
     document = finalize_evidence_index(load_mapping(arguments.draft), extension_schemas=extensions)
-    protect_inputs(arguments.output, evidence_sources(document))
+    protect_inputs(arguments.output, [arguments.draft, *evidence_sources(document)])
     return write_document(document, arguments.output, extension_schemas=extensions)
 
 

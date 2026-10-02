@@ -7,6 +7,7 @@ from threading import Lock, Thread
 from time import monotonic_ns, time_ns
 from typing import Any, Literal
 
+from robotics_acceptance_harness.errors import HarnessError, HarnessInputError
 from robotics_acceptance_harness.readiness import (
     EndpointObservation,
     GraphSnapshot,
@@ -16,8 +17,10 @@ from robotics_acceptance_harness.readiness import (
 from robotics_acceptance_harness.timing import ClockSample
 
 
-class RosObserverError(RuntimeError):
+class RosObserverError(HarnessError, RuntimeError):
     """Raised when the read-only ROS observer cannot be initialized or queried."""
+
+    error_id = "RosObserverError.failed"
 
 
 @dataclass(slots=True)
@@ -25,6 +28,7 @@ class _LifecycleTracker:
     client: Any
     request_type: Any
     future: Any = None
+    requested_at_ns: int = 0
     observation: LifecycleObservation | None = None
 
 
@@ -32,6 +36,7 @@ class RosGraphObserver:
     """Read-only rclpy observer attached to an already running ROS domain."""
 
     DEFAULT_MAX_CLOCK_SAMPLES = 1_000_000
+    LIFECYCLE_RESPONSE_TIMEOUT_NS = 5_000_000_000
 
     def __init__(
         self,
@@ -44,7 +49,7 @@ class RosGraphObserver:
         max_clock_samples: int = DEFAULT_MAX_CLOCK_SAMPLES,
     ) -> None:
         if max_clock_samples < 1:
-            raise ValueError("max_clock_samples must be positive")
+            raise HarnessInputError("max_clock_samples must be positive")
         try:
             self._rclpy = module_loader("rclpy")
             actions = module_loader("rclpy.action")
@@ -219,7 +224,7 @@ class RosGraphObserver:
         forbidden = (str(name) for name in self._forbidden_graph[kind])
         return tuple(dict.fromkeys((*expected, *forbidden)))
 
-    def _poll_lifecycle(self, observed_at_ns: int) -> None:
+    def _poll_lifecycle(self, observed_at_ns: int, now_ns: int) -> None:
         for tracker in self._lifecycle.values():
             if tracker.future is not None and tracker.future.done():
                 try:
@@ -231,8 +236,17 @@ class RosGraphObserver:
                 except Exception:
                     tracker.observation = None
                 tracker.future = None
+            elif (
+                tracker.future is not None
+                and now_ns - tracker.requested_at_ns > self.LIFECYCLE_RESPONSE_TIMEOUT_NS
+            ):
+                # An unanswered GetState leaves the cached state unverified.
+                tracker.future.cancel()
+                tracker.future = None
+                tracker.observation = None
             if tracker.future is None and tracker.client.service_is_ready():
                 tracker.future = tracker.client.call_async(tracker.request_type())
+                tracker.requested_at_ns = now_ns
 
     def _external_nodes(self) -> tuple[tuple[str, str], ...]:
         own = (self._node.get_name(), self._node.get_namespace())
@@ -310,7 +324,7 @@ class RosGraphObserver:
     def snapshot(self) -> GraphSnapshot:
         self._require_running()
         observed_at_ns = monotonic_ns()
-        self._poll_lifecycle(time_ns())
+        self._poll_lifecycle(time_ns(), observed_at_ns)
         with self._observation_lock:
             first_messages = dict(self._first_messages)
 

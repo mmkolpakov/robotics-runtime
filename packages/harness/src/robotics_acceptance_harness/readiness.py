@@ -6,6 +6,8 @@ from time import monotonic_ns, sleep
 from types import MappingProxyType
 from typing import Any, Literal, Protocol
 
+from robotics_acceptance_harness.errors import HarnessError
+
 
 @dataclass(frozen=True, slots=True)
 class TopicObservation:
@@ -69,13 +71,19 @@ class ReadinessIssue:
     status: Literal["failed", "error"] = "failed"
 
 
-class GraphReadinessTimeout(TimeoutError):
+class GraphReadinessTimeout(HarnessError, TimeoutError):
     """Raised when the expected graph never remains ready for the required window."""
+
+    error_id = "GraphReadinessTimeout.failed"
 
     def __init__(self, issues: tuple[ReadinessIssue, ...]) -> None:
         self.issues = issues
         detail = "; ".join(f"{issue.json_path}: {issue.message}" for issue in issues)
         super().__init__(detail or "ROS graph did not remain stable before timeout")
+
+    @property
+    def diagnostic_issues(self) -> tuple[tuple[str, str], ...]:
+        return tuple((issue.json_path, issue.message) for issue in self.issues)
 
 
 @dataclass(frozen=True, slots=True)

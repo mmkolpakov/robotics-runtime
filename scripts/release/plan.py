@@ -94,9 +94,10 @@ def contracts_requirement(values: list[str], harness: Version, contracts: Versio
     if contracts.is_prerelease:
         raise ReleaseError("harness requires an already released stable contracts version")
     major, minor = contracts.release[:2]
-    # SPEC 37's first workspace train. Later trains follow the selected contracts minor.
-    if harness.release[:2] == (0, 19) and (major, minor) != (0, 17):
-        raise ReleaseError("harness 0.19 requires released contracts >=0.17,<0.18")
+    # The first workspace train pairs harness 0.19 with contracts 0.18; later trains
+    # follow the selected contracts minor.
+    if harness.release[:2] == (0, 19) and (major, minor) != (0, 18):
+        raise ReleaseError("harness 0.19 requires released contracts >=0.18,<0.19")
     expected = SpecifierSet(f">={major}.{minor},<{major}.{minor + 1}")
     if matches[0].specifier != expected or contracts not in matches[0].specifier:
         raise ReleaseError(f"harness contracts requirement must be {expected}")
