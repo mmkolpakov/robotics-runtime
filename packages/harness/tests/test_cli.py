@@ -184,11 +184,13 @@ def test_verify_requires_run_id(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 @pytest.mark.parametrize("inventory", [False, True])
+@pytest.mark.parametrize("budget", [None, 8192])
 def test_verify_forwards_canonical_run_inputs(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     inventory: bool,
+    budget: int | None,
 ) -> None:
     captured: dict[str, object] = {}
 
@@ -208,6 +210,7 @@ def test_verify_forwards_canonical_run_inputs(
     exit_code = main(
         [
             "verify",
+            *(["--max-raw-evidence-bytes", str(budget)] if budget is not None else []),
             "--scenario",
             str(FIXTURES / "scenario.yaml"),
             "--runtime",
@@ -230,6 +233,7 @@ def test_verify_forwards_canonical_run_inputs(
         ]
     )
 
+    assert captured["max_raw_evidence_bytes"] == budget
     assert exit_code == 0
     assert captured["domain_id"] == "camera-domain"
     assert captured["run_context_path"] == "acceptance-run.yaml"
@@ -290,11 +294,13 @@ def test_aggregate_forwards_transport_qualification(
 
 
 @pytest.mark.parametrize("inventory", [False, True])
+@pytest.mark.parametrize("budget", [None, 8192])
 def test_transport_evaluate_maps_domain_evidence_and_reports_verdict(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     inventory: bool,
+    budget: int | None,
 ) -> None:
     captured: dict[str, object] = {}
     output = tmp_path / "transport-qualification.json"
@@ -315,6 +321,7 @@ def test_transport_evaluate_maps_domain_evidence_and_reports_verdict(
     exit_code = main(
         [
             "transport-evaluate",
+            *(["--max-raw-evidence-bytes", str(budget)] if budget is not None else []),
             "--run-id",
             "run-6ba7b810-9dad-41d1-80b4-00c04fd430c8",
             "--scenario",
@@ -341,6 +348,7 @@ def test_transport_evaluate_maps_domain_evidence_and_reports_verdict(
         ]
     )
 
+    assert captured["max_raw_evidence_bytes"] == budget
     assert exit_code == 0
     assert captured["trace_paths"] == {
         "source": "source-traces.json",
@@ -452,19 +460,31 @@ def test_doctor_fails_for_a_stale_measurement_marker(
     assert any(item["check_id"] == "measurement-marker" for item in report["checks"])
 
 
+@pytest.mark.parametrize("budget", [None, 8192])
 def test_otel_summary_uses_the_public_cli(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    budget: int | None,
 ) -> None:
-    monkeypatch.setattr(
-        "robotics_acceptance_harness.cli.load_otlp_json_metrics",
-        lambda _path: (
-            SimpleNamespace(name="robotics.clock.offset"),
-            SimpleNamespace(name="robotics.clock.offset"),
-        ),
-    )
+    captured: dict[str, object] = {}
 
-    exit_code = main(["otel-summary", "--otel-metrics", "metrics.jsonl"])
+    def fake_metrics(_path: object, **kwargs: object) -> tuple[SimpleNamespace, ...]:
+        captured.update(kwargs)
+        return (
+            SimpleNamespace(name="robotics.clock.offset"),
+            SimpleNamespace(name="robotics.clock.offset"),
+        )
+
+    monkeypatch.setattr("robotics_acceptance_harness.cli.load_otlp_json_metrics", fake_metrics)
+    exit_code = main(
+        [
+            "otel-summary",
+            "--otel-metrics",
+            "metrics.jsonl",
+            *(["--max-raw-evidence-bytes", str(budget)] if budget is not None else []),
+        ]
+    )
+    assert captured["max_raw_evidence_bytes"] == budget
 
     assert exit_code == 0
     assert json.loads(capsys.readouterr().out) == {
@@ -488,11 +508,14 @@ def test_otel_summary_reports_invalid_protobuf_as_input_error(
     assert "Traceback" not in captured.err
 
 
+@pytest.mark.parametrize("budget", [None, 8192])
 def test_timing_check_exposes_policy_result(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    budget: int | None,
 ) -> None:
+    captured_metrics: dict[str, object] = {}
     observation = HardwareTimingObservation(
         sync_protocol="ptp",
         source="pmc",
@@ -533,7 +556,7 @@ def test_timing_check_exposes_policy_result(
     )
     monkeypatch.setattr(
         "robotics_acceptance_harness.cli.load_otlp_json_metrics",
-        lambda _path, **_kwargs: (),
+        lambda _path, **kwargs: captured_metrics.update(kwargs) or (),
     )
     monkeypatch.setattr(
         "robotics_acceptance_harness.cli.evaluate_hardware_timing",
@@ -543,6 +566,7 @@ def test_timing_check_exposes_policy_result(
     exit_code = main(
         [
             "timing-check",
+            *(["--max-raw-evidence-bytes", str(budget)] if budget is not None else []),
             "--scenario",
             "scenario.yaml",
             "--run-context",
@@ -560,6 +584,7 @@ def test_timing_check_exposes_policy_result(
         ]
     )
 
+    assert captured_metrics["max_raw_evidence_bytes"] == budget
     assert exit_code == 0
     report = json.loads(capsys.readouterr().out)
     assert report["within_policy"] is False
@@ -573,10 +598,12 @@ def test_timing_check_exposes_policy_result(
     }
 
 
+@pytest.mark.parametrize("budget", [None, 8192])
 def test_evaluate_forwards_offline_window(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    budget: int | None,
 ) -> None:
     captured: dict[str, object] = {}
 
@@ -595,6 +622,7 @@ def test_evaluate_forwards_offline_window(
     exit_code = main(
         [
             "evaluate",
+            *(["--max-raw-evidence-bytes", str(budget)] if budget is not None else []),
             "--scenario",
             str(FIXTURES / "scenario.yaml"),
             "--runtime",
@@ -618,6 +646,7 @@ def test_evaluate_forwards_offline_window(
         ]
     )
 
+    assert captured["max_raw_evidence_bytes"] == budget
     assert exit_code == 1
     assert captured["window_start_ns"] == 100
     assert captured["window_end_ns"] == 200

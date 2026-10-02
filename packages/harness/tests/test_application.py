@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -16,6 +18,7 @@ from robotics_acceptance_harness.application import (
     run_verification,
 )
 from robotics_acceptance_harness.documents import DocumentBundle, load_bundle
+from robotics_acceptance_harness.otel import MetricInputError
 from robotics_acceptance_harness.readiness import GraphSnapshot, TopicObservation
 from robotics_acceptance_harness.time_authority import DELIVERY_LATENCY_METRIC
 from robotics_acceptance_harness.timing import ClockSample
@@ -594,7 +597,11 @@ def test_verification_finalizes_measurement_before_reading_evidence(
     assert observer.closed
 
 
-def test_offline_evaluation_reuses_retained_gazebo_evidence(tmp_path: Path) -> None:
+@pytest.mark.parametrize("budget_delta", [None, 0, -1])
+def test_offline_evaluation_reuses_retained_gazebo_evidence(
+    tmp_path: Path,
+    budget_delta: int | None,
+) -> None:
     bundle = _simulation_bundle(tmp_path)
     metrics_path = tmp_path / "metrics.otlp.json"
     _write_metrics(
@@ -619,17 +626,28 @@ def test_offline_evaluation_reuses_retained_gazebo_evidence(tmp_path: Path) -> N
         source_id="simulation-clock",
     )
 
-    outputs = evaluate_from_evidence(
-        run_id=SIMULATION_RUN_ID,
-        domain_id=SIMULATION_DOMAIN,
-        run_context_path=context_path,
-        bundle=bundle,
-        evidence_index_path=evidence_path,
-        otel_metrics_path=metrics_path,
-        window_start_ns=1_000_000_000,
-        window_end_ns=2_000_000_000,
-        output_dir=tmp_path / "offline-output",
+    budget = None if budget_delta is None else metrics_path.stat().st_size + budget_delta
+    expectation = (
+        pytest.raises(MetricInputError, match="exceeds max_raw_evidence_bytes")
+        if budget_delta == -1
+        else nullcontext()
     )
+    with expectation:
+        outputs = evaluate_from_evidence(
+            run_id=SIMULATION_RUN_ID,
+            domain_id=SIMULATION_DOMAIN,
+            run_context_path=context_path,
+            bundle=bundle,
+            evidence_index_path=evidence_path,
+            otel_metrics_path=metrics_path,
+            window_start_ns=1_000_000_000,
+            window_end_ns=2_000_000_000,
+            output_dir=tmp_path / "offline-output",
+            max_raw_evidence_bytes=budget,
+        )
+    if budget_delta == -1:
+        assert not (tmp_path / "offline-output").exists()
+        return
 
     assert outputs.result["evaluation_mode"] == "offline"
     assert outputs.result["status"] == "incomplete"
@@ -718,3 +736,31 @@ def test_physical_verification_enforces_hardware_clock_policy(tmp_path: Path) ->
 
     assert outputs.result["status"] == "failed"
     assert outputs.result["hardware_clock_observation"]["within_policy"] is False
+
+
+@pytest.mark.parametrize("budget_delta", [0, -1])
+def test_live_verification_applies_raw_budget_before_result_publication(
+    tmp_path: Path,
+    budget_delta: int,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    metrics = tmp_path / "metrics.otlp.json"
+    _write_metrics(
+        metrics,
+        run_id=SIMULATION_RUN_ID,
+        domain_id=SIMULATION_DOMAIN,
+        source_id="simulation-clock",
+        start_ns=1_000_000_000,
+        end_ns=2_000_000_000,
+    )
+    budget = metrics.stat().st_size + budget_delta
+    monkeypatch.setattr(
+        __name__ + ".run_verification",
+        partial(run_verification, max_raw_evidence_bytes=budget),
+    )
+    if budget_delta == -1:
+        with pytest.raises(MetricInputError, match="exceeds max_raw_evidence_bytes"):
+            _simulation_case(tmp_path)
+        assert not (tmp_path / "output").exists()
+    else:
+        assert _simulation_case(tmp_path).result["status"] == "passed"

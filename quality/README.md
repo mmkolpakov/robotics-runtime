@@ -15,6 +15,11 @@ in the same commit. `uv run python scripts/ci/check_complexity.py --write-baseli
 the candidate file. Review the diff: an unrelated increase is a regression, not
 a reason to refresh all budgets. CI never rewrites this file.
 
+The optional raw-evidence byte limit adds one keyword-only argument to three
+public verification APIs and the trace loader. Their argument budgets include
+that compatibility-preserving extension; complexity budgets remain unchanged.
+The existing flat API signatures remain debt for a separate API refactor.
+
 The root development dependency and pre-commit hook pin Ruff **0.16.9**.
 The gate reads Ruff's JSON diagnostics and extracts measured values from the
 `C901`/`PLR0913` message text. An unexpected format fails the gate. A Ruff upgrade

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-import shutil
+import os
 from collections import Counter
 from pathlib import Path
 from tempfile import TemporaryFile
@@ -22,6 +22,7 @@ from robotics_runtime_contracts.writers import WriterError
 # The reader inflates a whole chunk in memory; a tiny zstd chunk can declare gigabytes.
 MAX_CHUNK_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
 MAX_RECORD_BYTES = 256 * 1024 * 1024
+_SNAPSHOT_BLOCK_BYTES = 64 * 1024
 
 
 def _statistics(summary: Summary) -> dict[str, int]:
@@ -122,10 +123,38 @@ def _summarize_stream(stream: IO[bytes], digest: str) -> dict[str, Any]:
     }
 
 
-def summarize(source: Path) -> dict[str, Any]:
+def summarize(source: Path, *, max_raw_evidence_bytes: int | None = None) -> dict[str, Any]:
     # Parse/hash the same private byte snapshot; source replacement cannot mix passes.
     with source.open("rb") as original, TemporaryFile() as snapshot:
-        shutil.copyfileobj(original, snapshot)
+        before = os.fstat(original.fileno())
+        if max_raw_evidence_bytes is not None and before.st_size > max_raw_evidence_bytes:
+            raise WriterError(
+                "MCAP raw evidence exceeds max_raw_evidence_bytes", error_id="writer.invalid_mcap"
+            )
+        copied = 0
+        while True:
+            size = _SNAPSHOT_BLOCK_BYTES
+            if max_raw_evidence_bytes is not None:
+                size = min(size, max_raw_evidence_bytes - copied + 1)
+            block = original.read(size)
+            if not block:
+                break
+            copied += len(block)
+            if max_raw_evidence_bytes is not None and copied > max_raw_evidence_bytes:
+                raise WriterError(
+                    "MCAP raw evidence exceeds max_raw_evidence_bytes",
+                    error_id="writer.invalid_mcap",
+                )
+            snapshot.write(block)
+        after = os.fstat(original.fileno())
+        if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        ) or copied != before.st_size:
+            raise WriterError(
+                "MCAP source changed while creating its snapshot", error_id="writer.invalid_mcap"
+            )
         snapshot.seek(0)
         digest = hashlib.file_digest(snapshot, "sha256").hexdigest()
         snapshot.seek(0)

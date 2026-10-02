@@ -50,6 +50,12 @@ def add_writer_commands[ParserT: argparse.ArgumentParser](
     mcap = recording.add_subparsers(dest="operation", required=True).add_parser("from-mcap")
     mcap.add_argument("source", metavar="MCAP")
     mcap.add_argument("--output", required=True, metavar="PATH")
+    mcap.add_argument(
+        "--max-raw-evidence-bytes",
+        type=int,
+        metavar="BYTES",
+        help="positive per-file raw MCAP byte limit; omitted means no whole-file limit",
+    )
     add_extensions(mcap)
     mcap.set_defaults(writer_operation="recording")
 
@@ -137,7 +143,10 @@ def _evidence_finalize(arguments: argparse.Namespace, extensions: Mapping[str, b
 
 def _recording(arguments: argparse.Namespace, _extensions: Mapping[str, bytes]) -> Path:
     protect_inputs(arguments.output, (arguments.source,))
-    return write_document(recording_summary_from_mcap(arguments.source), arguments.output)
+    document = recording_summary_from_mcap(
+        arguments.source, max_raw_evidence_bytes=arguments.max_raw_evidence_bytes
+    )
+    return write_document(document, arguments.output)
 
 
 def _artifact_receipt(arguments: argparse.Namespace, extensions: Mapping[str, bytes]) -> Path:

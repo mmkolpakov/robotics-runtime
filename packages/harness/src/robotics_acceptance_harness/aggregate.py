@@ -16,7 +16,10 @@ from robotics_runtime_contracts import (
 from robotics_acceptance_harness import __version__
 from robotics_acceptance_harness.documents import BundleValidationError, load_document
 from robotics_acceptance_harness.evidence import load_evidence_index
-from robotics_acceptance_harness.otel import OTLP_JSON_LINES_MEDIA_TYPE
+from robotics_acceptance_harness.otel import (
+    OTLP_JSON_LINES_MEDIA_TYPE,
+    _validate_raw_evidence_budget,
+)
 from robotics_acceptance_harness.receipts import ReceiptSource
 from robotics_acceptance_harness.result import format_utc_datetime, write_contract_json
 from robotics_acceptance_harness.timing import utc_datetime_from_unix_ns
@@ -266,8 +269,11 @@ def evaluate_transport_qualification(
     qualification_id: str | None = None,
     generated_at: datetime | None = None,
     extension_schemas: Mapping[str, bytes | str] | None = None,
+    max_raw_evidence_bytes: int | None = None,
 ) -> Path:
     """Evaluate transport evidence without inventing a domain execution."""
+
+    _validate_raw_evidence_budget(max_raw_evidence_bytes)
 
     evaluated_at = generated_at or datetime.now(UTC)
     scenario = load_document(
@@ -399,6 +405,7 @@ def evaluate_transport_qualification(
             expected_domain_id=domain_id,
             expected_sha256=str(link["sha256"]),
             evidence_root=verified.index.path.parent,
+            max_raw_evidence_bytes=max_raw_evidence_bytes,
         )
     validate_trace_set(spans_by_domain)
     require_attributable_channels([item.data for item in channel_contracts], spans_by_domain)

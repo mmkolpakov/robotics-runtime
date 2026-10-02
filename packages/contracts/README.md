@@ -103,6 +103,14 @@ blocked checks when prerequisites are invalid. Link errors can have no JSON path
 The package exports `worst_status()` for consumers to share status-folding
 rules; this does not mean every consumer already uses it.
 
+The optional MCAP producer supports
+`recording_summary_from_mcap(path, max_raw_evidence_bytes=limit)` and CLI
+`recording-summary from-mcap --max-raw-evidence-bytes BYTES`. The limit is a
+positive integer, excluding booleans, for each raw source file. Omission preserves
+existing large-file compatibility. The private snapshot rejects over-limit or
+changed source bytes before parsing. This does not bound decoded chunks, aggregate
+evidence or process memory; existing MCAP record/chunk limits still apply.
+
 ## Contract Set
 
 Release 0.18.1 publishes one catalogued `v1` contract set. These identifiers are

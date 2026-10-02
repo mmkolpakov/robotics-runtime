@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, NotRequired, TypedDict, cast
@@ -793,7 +794,11 @@ def test_transport_qualification_proves_span_link(tmp_path: Path) -> None:
     assert channel["destination_domain_id"] == "control-domain"
 
 
-def test_transport_qualification_binds_cross_domain_clock_relation(tmp_path: Path) -> None:
+@pytest.mark.parametrize("budget_delta", [None, 0, -1])
+def test_transport_qualification_binds_cross_domain_clock_relation(
+    tmp_path: Path,
+    budget_delta: int | None,
+) -> None:
     scenario_path = transport_scenario(tmp_path)
     producer = trace_file(
         tmp_path,
@@ -813,20 +818,37 @@ def test_transport_qualification_binds_cross_domain_clock_relation(tmp_path: Pat
     channel_path = channel_contract(tmp_path, "link")
     relation = clock_relation(tmp_path, scenario_path, producer)
 
-    output = evaluate_transport_qualification(
-        run_id=RUN_ID,
-        scenario_path=scenario_path,
-        causal_chain_paths=(causal_chain(tmp_path, channel_path),),
-        channel_contract_paths=(channel_path,),
-        trace_paths={"camera-domain": producer, "control-domain": consumer},
-        evidence_index_paths={
-            "camera-domain": trace_evidence_index(tmp_path, "camera-domain", producer),
-            "control-domain": trace_evidence_index(tmp_path, "control-domain", consumer),
-        },
-        clock_relation_paths=(relation,),
-        observation_output_dir=tmp_path / "transport-observations",
-        output_path=tmp_path / "transport-qualification-updated.json",
+    # The cap is per file: the sum of these two files exceeds this valid cap.
+    budget = (
+        None
+        if budget_delta is None
+        else max(producer.stat().st_size, consumer.stat().st_size) + budget_delta
     )
+    expectation = (
+        pytest.raises(TraceInputError, match="exceeds max_raw_evidence_bytes")
+        if budget_delta == -1
+        else nullcontext()
+    )
+    with expectation:
+        output = evaluate_transport_qualification(
+            run_id=RUN_ID,
+            scenario_path=scenario_path,
+            causal_chain_paths=(causal_chain(tmp_path, channel_path),),
+            channel_contract_paths=(channel_path,),
+            trace_paths={"camera-domain": producer, "control-domain": consumer},
+            evidence_index_paths={
+                "camera-domain": trace_evidence_index(tmp_path, "camera-domain", producer),
+                "control-domain": trace_evidence_index(tmp_path, "control-domain", consumer),
+            },
+            clock_relation_paths=(relation,),
+            max_raw_evidence_bytes=budget,
+            observation_output_dir=tmp_path / "transport-observations",
+            output_path=tmp_path / "transport-qualification-updated.json",
+        )
+    if budget_delta == -1:
+        assert not (tmp_path / "transport-observations").exists()
+        assert not (tmp_path / "transport-qualification-updated.json").exists()
+        return
     document = json.loads(output.read_text(encoding="utf-8"))
 
     assert document["schema_version"] == "transport-qualification-result.v1"
