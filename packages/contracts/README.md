@@ -30,12 +30,14 @@ they do not select a schema.
 
 ## Install
 
-Python 3.12 through 3.14 is supported. Install a wheel from a tagged
-[GitHub Release](https://github.com/mmkolpakov/robotics-runtime-contracts/releases),
-or create a development environment:
+Python 3.12 through 3.14 is supported. The current published version is
+[0.18.1 on PyPI](https://pypi.org/project/robotics-runtime-contracts/0.18.1/), with
+archives in the root workspace's
+[tagged release](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.18.1):
 
 ```bash
-uv sync --locked --all-groups
+uv venv
+uv pip install robotics-runtime-contracts==0.18.1
 ```
 
 Release assets include build-provenance attestations. See
@@ -103,7 +105,7 @@ rules; this does not mean every consumer already uses it.
 
 ## Contract Set
 
-Release 0.16 publishes one catalogued `v1` contract set. These identifiers are
+Release 0.18.1 publishes one catalogued `v1` contract set. These identifiers are
 not compatible with every historical `v1` document. The
 machine-readable source of truth is
 [`catalog.v1.json`](src/robotics_runtime_contracts/schemas/catalog.v1.json).
@@ -122,8 +124,7 @@ Every public document uses JSON Schema Draft 2020-12, declares a
 the `urn:robotics-runtime-contracts:v1:*` namespace. Internal schema resources
 exist only to remove duplication and are not document roles.
 
-The working catalog adds `execution_trust_policy` and `robot_description` for
-the next release; these roles were not published in 0.16. See
+The published catalog includes `execution_trust_policy` and `robot_description`. See
 [product artifact roles](docs/product-artifact-roles.md) for their field and
 path conventions and [consumer examples](consumer-examples/README.md) for
 complete documents with real artifact byte digests.
@@ -162,6 +163,8 @@ validate_document(
 
 Promote an extension into the common catalog only after it has reusable
 semantics and evidence from more than one domain.
+The resolver integration and dependency review policy are recorded in
+[ADR 0010](docs/decisions/0010-keep-a-narrow-jsonschema-resolver-adapter.md).
 
 ## Merge patches and semantic diff
 
@@ -217,6 +220,7 @@ JSON profile. **It is not RFC 8785/JCS.** Existing contract integers, including
 nanoseconds beyond 2**53, remain exact JSON number tokens. No schemas or wire
 types change to satisfy JCS's binary64 domain. This is an explicit compatibility
 choice, not a fallback from a strict JCS implementation.
+See [ADR 0009](docs/decisions/0009-preserve-deterministic-json-and-exact-byte-bindings.md).
 
 The profile accepts built-in `dict`, `list`, `str`, `int`, `float`, `bool` and
 `None` values. Object keys must be strings. It emits UTF-8 without a BOM or
@@ -310,13 +314,13 @@ adopting a context-manager API. Paths must not be persisted for another process.
 
 ## Version Policy
 
-Known consumers include the acceptance harness and runtime infra. They use
-different contract generations; see the dated consumer table in
-[COMPATIBILITY.md](COMPATIBILITY.md) and the
-[0.15 to 0.16 migration guide](docs/migrations/0.15-to-0.16.md).
+The published harness 0.19.0 uses contracts 0.18.1. Runtime infra's current
+source foundation and historical OCI release have separate evidence scopes;
+see [COMPATIBILITY.md](COMPATIBILITY.md).
 Published schema names now permit only additive changes; breaking changes
 require a new schema major and migration notes. The structural compatibility
-gate is planned, so published schema changes remain deferred. Released tags
+gate checks bounded structural rules and public semantic regressions against
+published sources; it does not prove universal compatibility. Released tags
 and artifacts remain immutable. See [CHANGELOG.md](CHANGELOG.md).
 
 HIL and real-target contracts are observation-only. A valid document is not an
@@ -325,12 +329,17 @@ has been qualified.
 
 ## Development
 
+Run from the workspace root:
+
 ```bash
-uv sync --locked --all-groups
+uv sync --locked --all-packages --all-groups
 uv run pre-commit run --all-files --show-diff-on-failure
-uv run pytest
-uv build --no-sources
+uv run --directory packages/contracts pytest
+uv build --package robotics-runtime-contracts --no-sources
 ```
+
+Both packages share the root lockfile. Run their test suites in separate
+processes as described in the [workspace README](../../README.md).
 
 Consumer examples live in [`consumer-examples/`](consumer-examples/).
 Contributions must follow [CONTRIBUTING.md](CONTRIBUTING.md), and security

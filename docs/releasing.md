@@ -3,18 +3,26 @@
 The root `.github/workflows/release.yml` builds one package per candidate.
 `contracts-vX.Y.Z` selects `robotics-runtime-contracts`; `harness-vX.Y.Z` selects
 `robotics-acceptance-harness`. An RC tag uses `-rc.N`, for example
-`contracts-v0.17.0-rc.1`, corresponding to package version `0.17.0rc1`.
+`contracts-vX.Y.Z-rc.1`, corresponding to package version `X.Y.Zrc1`.
 The selected package's committed `pyproject.toml` version must match exactly.
 Tag pushes must resolve to the checked-out commit and be reachable from `origin/main`.
 
-## Current readiness and dry runs
+## Published pair and dry runs
 
-Contracts **0.17.0** is published. The next train is contracts **0.18.1**, then
-harness **0.19.0** bound to `robotics-runtime-contracts>=0.18,<0.19`. The contracts
-release commit also moves the harness workspace bound to that range. Harness
-`0.19.0` requires the completed `contracts-v0.18.1` release named in its changelog.
-A dry run of a candidate builds and installs both archives
-without publishing; it does not establish PyPI publisher registration.
+[Contracts 0.18.1](https://pypi.org/project/robotics-runtime-contracts/0.18.1/) and
+[harness 0.19.0](https://pypi.org/project/robotics-acceptance-harness/0.19.0/) are
+published. Their root GitHub release tags are
+[`contracts-v0.18.1`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.18.1)
+and [`harness-v0.19.0`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/harness-v0.19.0).
+Harness declares `robotics-runtime-contracts>=0.18,<0.19`; its release checks use
+the exact contracts 0.18.1 archive. Independent installs of both published packages,
+their public writer and CLI, installed file inventories and archive attestations
+were verified outside the workspace.
+
+This evidence establishes the package pair and archive identity. It does not
+qualify a released infra image or hardware target. Infra source integration and
+OCI publication have their own gates. A candidate dry run builds and installs
+both archives without publishing; it does not establish PyPI publisher registration.
 
 `workflow_dispatch` requires a `candidate` input and always runs in dry-run mode.
 Select the ref containing the reviewed source and matching version. It executes helper
@@ -66,9 +74,8 @@ It requires all of the following, even in dry-run mode:
 5. Successful isolated installation of the exact contracts version from PyPI, with its
    installed source and schema files matching the verified checkout byte for byte.
 
-The harness release preflight remains blocked until the exact contracts tag has
-completed publication on both PyPI and GitHub. Local builds alone do not establish
-release readiness.
+Each harness candidate requires the exact contracts tag to have completed
+publication on both PyPI and GitHub. Local builds alone do not establish release readiness.
 
 The plan records both commits and package tree IDs, the contracts requirement and source
 file SHA-256 digests. The clean-install check binds PyPI's contracts code and resources to
@@ -92,10 +99,11 @@ They check installed file inventories and digests, schema resource loading, API 
 of the copied consumer example, runtime writer round-trip, structured qualification
 diagnostics, the new role resources, and `robotics-contracts validate`. Harness additionally
 checks its existing `EvaluationContext`/`ProductEvaluator` exports and
-`robotics-acceptance explain`. Contracts has no `--version` option; no harness SDK is assumed
-before SPEC 56 introduces one. A temporary directory configured inside the workspace fails.
+`robotics-acceptance explain`. Contracts has no `--version` option. These checks
+exercise the existing public API; they do not establish a general consumer SDK.
+A temporary directory configured inside the workspace fails.
 
-## External setup before the first publication
+## External publication settings
 
 Repository code cannot complete or attest to the following account settings. A maintainer
 must verify them before enabling publication:
@@ -127,10 +135,10 @@ succeeds. Failed, cancelled or skipped prerequisites cannot publish a GitHub rel
 Both jobs consume the exact uploaded distributions; neither rebuilds them.
 
 PyPI Trusted Publishing emits its publish attestations. The GitHub job creates build
-provenance using `actions/attest`. Consumers must expect the new workflow identity
+provenance using `actions/attest`. Consumers must verify the workflow identity
 `https://github.com/mmkolpakov/robotics-runtime/.github/workflows/release.yml@refs/tags/<tag>`;
-infra's old identity constraints need their separately planned migration. Old package
-publishers and repositories are not removed or archived by this workflow.
+historical archives retain their original producer identity. Old package publishers
+and repositories are not removed or archived by this workflow.
 
 Publishing does not use `skip-existing`, overwrite assets, or move tags. If PyPI succeeds
 and the GitHub job fails, inspect the failed job and retained artifacts and rerun only that

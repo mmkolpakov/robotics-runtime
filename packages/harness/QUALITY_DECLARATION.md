@@ -9,6 +9,8 @@ The package uses Semantic Versioning and is currently pre-`1.0.0`. It therefore
 does not claim the stable-version requirement of REP-2004 Quality Level 3.
 Public interfaces and compatibility rules are listed in
 [Compatibility Policy](docs/compatibility.md).
+The published pair is harness 0.19.0 / contracts 0.18.1; the library dependency
+remains `robotics-runtime-contracts>=0.18,<0.19`.
 
 ## Change Control
 
@@ -33,6 +35,9 @@ YAML linting, and Markdown linting are required checks.
 Runtime dependencies are `junitparser`, `opentelemetry-proto`, `packaging`, and
 `robotics-runtime-contracts`. Live ROS observation uses the observer runtime
 environment instead of declaring ROS packages as Python dependencies.
+Both packages share the root [lockfile](../../uv.lock) for development.
+Release archive installs use the exact published contracts version outside the
+workspace; editable source fixtures provide a separate integration check.
 
 ## Platform Support
 

@@ -3,7 +3,7 @@
 The public producer APIs are in `robotics_runtime_contracts.writers` and
 `robotics_runtime_contracts.recordings`. They return validated dictionaries;
 `write_document` validates again and atomically replaces the output. Commands
-write compact UTF-8 using SPEC19's **project deterministic JSON profile, not
+write compact UTF-8 using the **project deterministic JSON profile, not
 RFC 8785/JCS**. Arrays preserve order. Artifact SHA-256 always hashes the original
 file bytes, including whitespace; it is not a JSON content hash.
 

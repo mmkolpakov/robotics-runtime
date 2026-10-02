@@ -75,7 +75,8 @@ artifact set requires updating this table.
 
 PyPI project `robotics-runtime-contracts` trusts owner `mmkolpakov`, repository
 `robotics-runtime`, workflow `release.yml` and environment `pypi`; version
-0.17.0 was published through it. Once enabled, a PyPI publication failure fails
+[0.18.1](https://pypi.org/project/robotics-runtime-contracts/0.18.1/) was published
+through it. Once enabled, a PyPI publication failure fails
 the release workflow and no GitHub Release is created.
 
 Release `robotics-runtime-contracts` before releasing a version of

@@ -59,7 +59,9 @@ quality level.
 
 The runtime dependencies are `jsonschema` with non-GPL format-validation extras,
 `referencing` and `PyYAML`. They are constrained in
-`pyproject.toml` and resolved in `uv.lock`. The package has no runtime ROS
+`pyproject.toml` and resolved in the [workspace lockfile](../../uv.lock).
+[ADR 0010](docs/decisions/0010-keep-a-narrow-jsonschema-resolver-adapter.md)
+records the narrow resolver adapter and upgrade regressions. The package has no runtime ROS
 dependency. Consumer-example tests use the current checkout; they do not certify
 compatibility with released harness/infra combinations.
 
