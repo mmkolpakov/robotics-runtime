@@ -9,13 +9,14 @@ Every YAML document declares its own `schema_version`. CI validates these
 documents with the public Python API from the current editable checkout:
 
 ```bash
-uv run pytest tests/test_consumer_examples.py
+uv run --directory packages/contracts pytest tests/test_consumer_examples.py
 ```
 
-These are 0.16-generation examples. They do not establish compatibility with
-infra's audited contracts 0.15.4 / harness 0.17.1 pair, and the fixture is not
-a live ROS execution test. Review the
-[migration guide](../docs/migrations/0.15-to-0.16.md) before adopting them.
+Run that command from the workspace root. These examples use the current 0.18.1
+catalog. They validate document links and original file-byte digests, not a
+live ROS execution or arbitrary infra image. Published package checks and
+consumer integration have separate evidence scopes; see
+[compatibility](../COMPATIBILITY.md).
 
 Consumers should copy only the document types they produce or consume.
 Identifiers, image references, timestamps, and ROS graph observations are

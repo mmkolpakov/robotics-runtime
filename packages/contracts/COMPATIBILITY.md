@@ -4,20 +4,21 @@ This policy covers the Python distribution and its JSON Schema contracts.
 
 ## Known Consumers
 
-The integration audit on 2026-09-03 recorded these baselines:
+The published package pair and infrastructure evidence have distinct scopes:
 
 | Consumer | Contracts pin | Scope of evidence |
 | --- | --- | --- |
-| Acceptance harness 0.18.0 (`614864d`) | `>=0.16,<0.17`, source `6c6b72a` (tree identical to `v0.16.0`) | Harness fixtures use the 0.16 catalog |
-| Runtime infra (`caa62ab`) with harness 0.17.1 (`2fbdaf7`) | 0.15.4 (`d0f2909`) | Infra foundation integration tests its pinned pair |
+| [Acceptance harness 0.19.0](https://pypi.org/project/robotics-acceptance-harness/0.19.0/) | `>=0.18,<0.19`; release checks pin 0.18.1 | Independent PyPI installs, public API/CLI checks and verified archive identities |
+| Current infra source foundation | contracts 0.18.1 / harness 0.19.0 | Integration of pinned sources; no current OCI release qualification |
+| [Infra OCI v0.8.0-rc.1](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.8.0-rc.1) | contracts 0.15.4 / harness 0.17.1 | Historical release only; it does not establish support for the current pair |
 
-This table is a dated snapshot, not a claim about current consumer branches.
-The 0.15 and 0.16 generations are incompatible. See the
+Library requirements permit a minor line; execution and release evidence must
+identify the exact installed pair. The 0.15 and 0.16 generations are incompatible. See the
 [migration guide](docs/migrations/0.15-to-0.16.md) and [changelog](CHANGELOG.md).
 
 ## Current Catalog
 
-Release 0.16 maps each document role to exactly one schema in
+Release 0.18.1 maps each document role to exactly one schema in
 [`catalog.v1.json`](src/robotics_runtime_contracts/schemas/catalog.v1.json).
 
 Superseded experimental readers and writers are removed rather than carried as
@@ -68,9 +69,7 @@ Public role schemas and internal reusable resources have disjoint IDs. Schema
 digests are derived from packaged bytes with `schema_digest()`.
 
 [`docs/schema-digests.json`](docs/schema-digests.json) records SHA-256 for all
-31 schema resources and the catalog, including the two new public roles and
-reviewed bundler byte changes
-since `v0.16.0` (`0c2c0f4`). The test compares
+schema resources and the catalog. The test compares
 raw packaged bytes and the complete file inventory with this checked-in
 snapshot. Whitespace changes, modified internal cores, missing files and new
 files all require review; JSON is not normalized before hashing.
@@ -90,17 +89,19 @@ released Git sources with the candidate using bounded D10 structural rules and
 public API semantic regressions. Unsupported cases require explicit review;
 neither this finite check nor a digest comparison proves universal compatibility.
 
-This repository validates its own fixtures and consumer examples against the
-current checkout. It has no three-repository integration fixture or consumer
-release gate. Consumer repositories must supply integration evidence when
-adopting a new release.
+This workspace validates package fixtures and consumer examples against the
+current checkout. Clean release installs separately check wheel and sdist
+contents outside the workspace. Neither gate establishes that an arbitrary
+consumer or published infra image supports the pair; consumers must retain
+their integration evidence when adopting a release.
 
 ## Neutrality
 
 Common contracts do not select a robot or product. They model ROS 2/SROS2 and
 runtime-specific constraints; concrete provider identities and capabilities are
-observed data. Scenario extensions support digest-pinned, reverse-domain schemas.
-Other roles' extension objects currently lack that validation.
+observed data. All public roles support digest-pinned, reverse-domain extension
+schemas. Seven existing roles retain unpinned legacy extensions only when
+`extension_schemas` is absent; the [README](README.md#extensions) lists that boundary.
 
 Moving an extension into the common contract requires reusable semantics,
 positive and negative fixtures, and an architecture decision.

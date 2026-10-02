@@ -13,6 +13,19 @@ Package source and history live in `packages/contracts` and `packages/harness`.
 Historical release tags use the `contracts-legacy/` and `harness-legacy/` prefixes.
 Package-specific documentation remains alongside each package.
 
+The published pair is
+[contracts 0.18.1](https://pypi.org/project/robotics-runtime-contracts/0.18.1/) and
+[harness 0.19.0](https://pypi.org/project/robotics-acceptance-harness/0.19.0/).
+Harness declares `robotics-runtime-contracts>=0.18,<0.19`; release verification
+uses the exact contracts 0.18.1 distribution. Both releases use tags in this
+workspace and its [release procedure](docs/releasing.md).
+
+Clean archive installs, source integration fixtures and live ROS observer tests
+establish different boundaries. Package publication does not qualify an infra
+image, arbitrary consumer, model backend or physical target. The current infra
+foundation uses pinned sources; its older published OCI release is a separate
+artifact. See the package [compatibility policy](packages/contracts/COMPATIBILITY.md).
+
 ## Development
 
 Use Python 3.12–3.14 and uv. The workspace has one lockfile and installs both

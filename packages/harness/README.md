@@ -27,7 +27,7 @@ runtime contracts -> acceptance harness -----------+
 
 - [robotics-runtime-contracts](https://github.com/mmkolpakov/robotics-runtime/tree/main/packages/contracts)
   owns document structure and verdict semantics.
-- This repository owns observation and evaluation.
+- This package owns observation and evaluation.
 - [robotics-runtime-infra](https://github.com/mmkolpakov/robotics-runtime-infra)
   owns runtime, simulator, middleware, recorder, and hardware provider adapters.
 - Product repositories own scenes, robots, models, behavior, and business
@@ -51,7 +51,17 @@ schemas are checked for compatible changes against the release baseline.
 
 ## Install
 
-Development uses the exact contracts revision recorded in `uv.lock`:
+The published pair is
+[harness 0.19.0](https://pypi.org/project/robotics-acceptance-harness/0.19.0/) with
+[contracts 0.18.1](https://pypi.org/project/robotics-runtime-contracts/0.18.1/):
+
+```bash
+uv venv
+uv pip install robotics-acceptance-harness==0.19.0 robotics-runtime-contracts==0.18.1
+```
+
+Development uses both packages from the shared workspace and the dependency
+graph in the root `uv.lock`:
 
 ```bash
 git clone https://github.com/mmkolpakov/robotics-runtime.git
@@ -64,6 +74,9 @@ cd packages/harness
 Release consumers should install the published wheel together with the locked
 contracts wheel and verify release provenance as described in
 [`docs/supply-chain.md`](docs/supply-chain.md).
+Independent package installs and archive checks establish this pair. They do
+not qualify an infra image, accelerator backend, arbitrary product evaluator
+or physical target; those require their own execution evidence.
 
 ## Quick Start
 
@@ -352,12 +365,14 @@ package installation and refuses physical targets.
 
 ## Development
 
+Run from the workspace root; the package test suites run in separate processes:
+
 ```bash
-uv sync --locked --all-groups
+uv sync --locked --all-packages --all-groups
 uv run pre-commit run --all-files
-uv run coverage run --branch -m pytest
-uv run coverage report --fail-under=80
-uv build --no-sources
+uv run --directory packages/harness coverage run --branch -m pytest
+uv run --directory packages/harness coverage report --fail-under=80
+uv build --package robotics-acceptance-harness --no-sources
 ```
 
 See [compatibility](docs/compatibility.md), [architecture decisions](docs/decisions/README.md),

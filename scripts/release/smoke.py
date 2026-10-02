@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import runpy
 import subprocess
 import sys
 import sysconfig
@@ -38,9 +39,9 @@ def verify_installed_sources(plan: dict[str, Any]) -> None:
         origin = installed.read_text("direct_url.json")
         if origin is not None:
             direct = json.loads(origin)
-            # Only the artifact under test may have a local archive origin.
+            # Only explicitly supplied test archives may have a local origin.
             if (
-                installed.metadata["Name"] != plan["package"]
+                installed.metadata["Name"] not in plan.get("archive_packages", [plan["package"]])
                 or "archive_info" not in direct
                 or "dir_info" in direct
                 or "vcs_info" in direct
@@ -120,6 +121,12 @@ def main() -> None:
             ],
             check=True,
         )
+    if "consumer_provenance" in plan:
+        workspace = Path(plan["workspace"])
+        assert sys.flags.isolated and not Path.cwd().resolve().is_relative_to(workspace)
+        assert not any(Path(path).resolve().is_relative_to(workspace) for path in sys.path)
+        report = runpy.run_path("consumer.py")["verify_consumers"](plan)
+        Path("consumer-report.json").write_text(json.dumps(report, indent=2) + "\n", "utf-8")
     print(json.dumps({"package": plan["package"], "version": plan["version"], "smoke": "passed"}))
 
 

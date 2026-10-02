@@ -86,12 +86,15 @@ def clean_environment() -> dict[str, str]:
 
 
 def clean_install(
-    artifact: Path,
+    artifact: Path | None,
     plan: ReleasePlan,
     *,
     workspace: Path,
     interpreter: str,
     uv: str,
+    additional_artifacts: tuple[Path, ...] = (),
+    consumer_fixtures: Path | None = None,
+    consumer_provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     env = clean_environment()
     with tempfile.TemporaryDirectory(prefix="robotics-release-") as temporary:
@@ -100,10 +103,25 @@ def clean_install(
             raise ReleaseError(
                 "clean install directory must be outside the workspace; fix TMPDIR/TEMP"
             )
-        dist = root / artifact.name
-        shutil.copyfile(artifact, dist)
+        archives = (() if artifact is None else (artifact,)) + additional_artifacts
+        copied = []
+        for archive in archives:
+            dist = root / archive.name
+            shutil.copyfile(archive, dist)
+            copied.append(str(dist))
         shutil.copyfile(Path(__file__).with_name("smoke.py"), root / "smoke.py")
-        (root / "plan.json").write_text(json.dumps(asdict(plan)), encoding="utf-8")
+        smoke_plan = asdict(plan)
+        if consumer_fixtures is not None:
+            shutil.copytree(consumer_fixtures, root / "infra-fixtures")
+            shutil.copyfile(
+                workspace / "tests/workspace/installed_consumer.py", root / "consumer.py"
+            )
+            smoke_plan.update(
+                consumer_provenance=consumer_provenance,
+                workspace=str(workspace.resolve()),
+                archive_packages=[distribution_metadata(path)[0] for path in archives],
+            )
+        (root / "plan.json").write_text(json.dumps(smoke_plan), encoding="utf-8")
         shutil.copytree(
             workspace / "packages/contracts/consumer-examples/minimal-simulation", root / "examples"
         )
@@ -121,10 +139,10 @@ def clean_install(
                 "--no-sources",
                 "--default-index",
                 "https://pypi.org/simple",
-                str(dist),
+                *(copied or [f"{plan.package}=={plan.version}"]),
             ],
         ]
-        if plan.contracts_version:
+        if plan.contracts_version and not additional_artifacts:
             commands[-1].append(f"robotics-runtime-contracts=={plan.contracts_version}")
         commands += [
             [uv, "--no-config", "pip", "check", "--python", str(python)],
@@ -132,7 +150,14 @@ def clean_install(
         ]
         for command in commands:
             subprocess.run(command, cwd=root, env=env, check=True)
-        return {"artifact": artifact.name, "status": "passed", "outside_workspace": True}
+        result = {
+            "artifact": artifact.name if artifact is not None else "published-pair",
+            "status": "passed",
+            "outside_workspace": True,
+        }
+        if consumer_fixtures is not None:
+            result["consumer"] = json.loads((root / "consumer-report.json").read_text("utf-8"))
+        return result
 
 
 def main() -> int:

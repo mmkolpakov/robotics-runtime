@@ -188,14 +188,23 @@ def verify_changelog(text: str, version: Version, contracts_tag: str) -> None:
         raise ReleaseError(f"harness CHANGELOG section {version} must reference {contracts_tag}")
 
 
-def source_files(repo: Path, key: str) -> dict[str, str]:
+def source_files(repo: Path, key: str, *, ref: str | None = None) -> dict[str, str]:
     prefix = f"packages/{key}/src/"
-    paths = git(repo, "ls-files", "-z", "--", prefix).split("\0")
-    return {
-        path.removeprefix(prefix): sha256((repo / path).read_bytes()).hexdigest()
-        for path in paths
-        if path
-    }
+    arguments = (
+        ("ls-files", "-z", "--", prefix)
+        if ref is None
+        else ("ls-tree", "-r", "--name-only", "-z", ref, "--", prefix)
+    )
+    paths = git(repo, *arguments).split("\0")
+
+    def content(path: str) -> bytes:
+        if ref is None:
+            return (repo / path).read_bytes()
+        return subprocess.run(
+            ["git", "-C", str(repo), "show", f"{ref}:{path}"], capture_output=True, check=True
+        ).stdout
+
+    return {path.removeprefix(prefix): sha256(content(path)).hexdigest() for path in paths if path}
 
 
 def create_plan(repo: Path, candidate: str, *, event: str, repository: str = "") -> ReleasePlan:

@@ -7,7 +7,7 @@ and clients, and an active lifecycle node queried through its real `GetState`
 service. The observer's own topic subscription is excluded from the count.
 
 The positive and negative CLI tests invoke `create-run` and `verify` in separate processes with
-the installed harness. It uses the contracts 0.16 / harness 0.18 simulation
+the installed workspace harness. It uses the current package simulation
 fixtures, changes their expected graph and observation window, and observes a
 real stepped clock. No observer factory, ROS module, executor, or clock is mocked.
 
@@ -91,8 +91,7 @@ log directory, and the live entrypoint places pytest's cache in the artifact
 directory. The harness's result file permissions are preserved.
 
 The image uses the official `ros:jazzy-ros-base` image pinned by digest.
-`osrf/ros:jazzy-ros-base` in SPEC step 2 does not exist on Docker Hub (checked
-2026-09-07). It installs ROS interfaces explicitly and creates a clean
+It installs ROS interfaces explicitly and creates a clean
 `/usr/bin/python3 -m venv --system-site-packages` environment to use Jazzy's
 apt-installed Python bindings. Python dependencies come from the existing lock.
 The image runs the installed package and does not copy the host's virtualenv.

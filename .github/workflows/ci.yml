@@ -112,10 +112,18 @@ jobs:
 
   consumers:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Check out the qualified infra fixture producer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: mmkolpakov/robotics-runtime-infra
+          ref: dfbf26e99d3d569f9d25bdc260510220d4dd2872
+          path: .consumer-infra
           persist-credentials: false
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
         with:
@@ -125,7 +133,25 @@ jobs:
           cache-dependency-glob: uv.lock
       - run: uv sync --locked --all-packages --all-groups
       - name: Validate producer examples and consumer fixtures together
-        run: uv run --no-sync pytest tests/workspace
+        run: uv run --no-sync python -m pytest tests/workspace
+      - name: Verify candidate wheels outside the workspace
+        run: >-
+          uv run --no-sync python -m scripts.release.verify_consumers
+          --mode candidate --infra .consumer-infra --python 3.12
+          --report artifacts/consumers/candidate.json
+      - name: Verify the exact published package pair outside the workspace
+        run: >-
+          uv run --no-sync python -m scripts.release.verify_consumers
+          --mode published --infra .consumer-infra --python 3.12
+          --report artifacts/consumers/published.json
+      - name: Upload installed consumer verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: installed-consumers-${{ github.sha }}
+          path: artifacts/consumers/
+          if-no-files-found: warn
+          retention-days: 7
 
   live-ros:
     runs-on: ubuntu-24.04
