@@ -9,6 +9,7 @@ from typing import Any
 
 from robotics_runtime_contracts import hardware_clock_within_policy
 
+from robotics_acceptance_harness.errors import HarnessError
 from robotics_acceptance_harness.metrics import MetricPoint, MetricSample
 from robotics_acceptance_harness.timing import utc_datetime_from_unix_ns
 
@@ -34,8 +35,10 @@ _SUPPORTED_SOURCES = {
 }
 
 
-class HardwareTimingInputError(ValueError):
+class HardwareTimingInputError(HarnessError, ValueError):
     """Raised when hardware timing evidence is incomplete or contradictory."""
+
+    error_id = "HardwareTimingInputError.failed"
 
 
 @dataclass(frozen=True, slots=True)

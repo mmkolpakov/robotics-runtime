@@ -121,6 +121,20 @@ in `simulation_realtime`; other time modes report `0`.
 minimum and no failed or error runs were observed. Tolerated failed or error
 runs still allow `passed` when every threshold is met.
 
+Modeled library failures inherit from the public `HarnessError` base, with an
+explicit `error_id` and `exit_code` (normally `2`). Existing exception classes
+retain their identifiers and their `ValueError`, `RuntimeError`, or `TimeoutError`
+compatibility. Invalid values supplied to the harness raise `HarnessInputError`
+with `input.invalid`.
+
+The command boundary translates dependency failures before the CLI handles
+`HarnessError`: contract errors retain their identifier, I/O errors use
+`input.io_error`, invalid dependency values use `input.invalid`, and unexpected
+exceptions use `internal.error`. Diagnostics retain the original exception type,
+message, and any JSON paths; exception chaining preserves the original cause.
+Readiness, bundle, and evidence errors expose structured `(json_path, message)`
+pairs through `diagnostic_issues`. `KeyboardInterrupt` and `SystemExit` propagate.
+
 ## Live Observation
 
 Runtime infrastructure starts the workload, recorder, and telemetry collector.

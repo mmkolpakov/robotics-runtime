@@ -11,6 +11,7 @@ from typing import Any, Protocol, cast
 from uuid import uuid4
 
 from robotics_acceptance_harness.documents import DocumentBundle
+from robotics_acceptance_harness.errors import HarnessError, HarnessInputError
 from robotics_acceptance_harness.evaluation import EvaluationContext, evaluate_acceptance
 from robotics_acceptance_harness.evidence import (
     EvidenceValidationError,
@@ -73,8 +74,10 @@ class WindowedClockObserver(Protocol):
     def stop_clock_observation(self) -> tuple[ClockSample, ...]: ...
 
 
-class VerificationError(RuntimeError):
+class VerificationError(HarnessError, RuntimeError):
     """Raised when an execution cannot produce an acceptance result."""
+
+    error_id = "VerificationError.failed"
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,9 +200,9 @@ def _wait_for_evidence(
     sleep_fn: Callable[[float], None],
 ) -> VerifiedEvidence:
     if not isfinite(timeout_sec) or timeout_sec < 0:
-        raise ValueError("evidence timeout must be finite and nonnegative")
+        raise HarnessInputError("evidence timeout must be finite and nonnegative")
     if not isfinite(poll_interval_sec) or poll_interval_sec <= 0:
-        raise ValueError("evidence poll interval must be finite and positive")
+        raise HarnessInputError("evidence poll interval must be finite and positive")
     source = Path(path).expanduser().resolve()
     deadline_ns = now_ns() + int(timeout_sec * 1_000_000_000)
     while True:

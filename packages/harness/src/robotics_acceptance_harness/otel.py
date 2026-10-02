@@ -16,6 +16,7 @@ from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import (
 from opentelemetry.proto.metrics.v1.metrics_pb2 import AggregationTemporality, DataPointFlags
 
 from robotics_acceptance_harness._evidence_files import EvidenceReadError, open_evidence
+from robotics_acceptance_harness.errors import HarnessError
 from robotics_acceptance_harness.metrics import (
     HistogramSample,
     MetricAttribute,
@@ -27,8 +28,10 @@ from robotics_acceptance_harness.metrics import (
 OTLP_JSON_LINES_MEDIA_TYPE = "application/x-ndjson"
 
 
-class MetricInputError(ValueError):
+class MetricInputError(HarnessError, ValueError):
     """Raised when an OTLP JSON file cannot be interpreted as metric samples."""
+
+    error_id = "MetricInputError.failed"
 
 
 def _require_message_objects(value: object, descriptor: Descriptor, path: str) -> dict[str, Any]:
