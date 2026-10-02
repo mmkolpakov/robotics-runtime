@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -650,6 +651,17 @@ def test_otlp_span_destination_topic_is_retained(tmp_path: Path) -> None:
     }
     path.write_text(json.dumps(record) + "\n", encoding="utf-8")
 
-    (loaded,) = load_otlp_json_traces(path, expected_run_id="run", expected_domain_id="source")
+    (loaded,) = load_otlp_json_traces(
+        path,
+        expected_run_id="run",
+        expected_domain_id="source",
+        expected_sha256=sha256(path.read_bytes()).hexdigest(),
+        max_raw_evidence_bytes=path.stat().st_size,
+    )
+    assert (loaded,) == load_otlp_json_traces(
+        path,
+        expected_run_id="run",
+        expected_domain_id="source",
+    )
 
     assert loaded.destination == "/cmd_vel"

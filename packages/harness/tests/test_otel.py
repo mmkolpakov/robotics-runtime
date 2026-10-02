@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
@@ -91,7 +92,12 @@ def test_loads_standard_otlp_json_number_points(tmp_path: Path) -> None:
     path = tmp_path / "metrics.json"
     path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
 
-    samples = load_otlp_json_metrics(path)
+    samples = load_otlp_json_metrics(
+        path,
+        expected_sha256=sha256(path.read_bytes()).hexdigest(),
+        max_raw_evidence_bytes=path.stat().st_size,
+    )
+    assert samples == load_otlp_json_metrics(path)
 
     assert all(isinstance(sample, MetricSample) for sample in samples)
     scalar_samples = [sample for sample in samples if isinstance(sample, MetricSample)]

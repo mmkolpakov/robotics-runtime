@@ -154,10 +154,17 @@ def load_otlp_json_traces(
     expected_domain_id: str,
     expected_sha256: str | None = None,
     evidence_root: Path | None = None,
+    max_raw_evidence_bytes: int | None = None,
 ) -> tuple[TraceSpan, ...]:
     """Read official newline-delimited OTLP/JSON Collector trace output."""
 
-    source, lines = read_otlp_json_lines(path, expected_sha256, TraceInputError, evidence_root)
+    source, lines = read_otlp_json_lines(
+        path,
+        expected_sha256,
+        TraceInputError,
+        evidence_root,
+        max_raw_evidence_bytes=max_raw_evidence_bytes,
+    )
 
     spans: list[TraceSpan] = []
     seen: set[tuple[str, str]] = set()

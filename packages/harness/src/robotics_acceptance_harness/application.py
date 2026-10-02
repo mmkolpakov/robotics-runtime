@@ -35,6 +35,7 @@ from robotics_acceptance_harness.metrics import (
 )
 from robotics_acceptance_harness.otel import (
     OTLP_JSON_LINES_MEDIA_TYPE,
+    _validate_raw_evidence_budget,
     load_otlp_json_metrics,
     select_metric_points,
 )
@@ -243,9 +244,11 @@ def run_verification(
     sleep_fn: Callable[[float], None] = sleep,
     utc_now: Callable[[], datetime] = _utc_now,
     poll_interval_sec: float = 0.05,
+    max_raw_evidence_bytes: int | None = None,
 ) -> VerificationOutputs:
     """Attach to a running execution and produce canonical acceptance outputs."""
 
+    _validate_raw_evidence_budget(max_raw_evidence_bytes)
     scenario = bundle.scenario_data
     execution = scenario["execution"]
     physical = execution["target_environment"] in {"hil", "real_robot"}
@@ -364,6 +367,7 @@ def run_verification(
             metrics_path,
             expected_sha256=metrics_evidence_sha256,
             evidence_root=evidence.index.path.parent,
+            max_raw_evidence_bytes=max_raw_evidence_bytes,
         ),
         run_id=run_id,
         domain_id=domain_id,
@@ -506,9 +510,11 @@ def evaluate_from_evidence(
     window_start_ns: int,
     window_end_ns: int,
     output_dir: str | Path,
+    max_raw_evidence_bytes: int | None = None,
 ) -> VerificationOutputs:
     """Evaluate finalized playback evidence without attaching to a ROS graph."""
 
+    _validate_raw_evidence_budget(max_raw_evidence_bytes)
     if window_end_ns <= window_start_ns:
         raise VerificationError("offline evaluation window must have positive duration")
     run_context = load_run_context(
@@ -537,6 +543,7 @@ def evaluate_from_evidence(
                 metrics_path,
                 expected_sha256=str(metric_link["sha256"]),
                 evidence_root=evidence.index.path.parent,
+                max_raw_evidence_bytes=max_raw_evidence_bytes,
             ),
             run_id=run_id,
             domain_id=domain_id,

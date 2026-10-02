@@ -16,7 +16,7 @@ from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import (
 from opentelemetry.proto.metrics.v1.metrics_pb2 import AggregationTemporality, DataPointFlags
 
 from robotics_acceptance_harness._evidence_files import EvidenceReadError, open_evidence
-from robotics_acceptance_harness.errors import HarnessError
+from robotics_acceptance_harness.errors import HarnessError, HarnessInputError
 from robotics_acceptance_harness.metrics import (
     HistogramSample,
     MetricAttribute,
@@ -66,20 +66,37 @@ def parse_otlp_request[RequestT: Message](payload: object, request: RequestT) ->
     return ParseDict(document, request)
 
 
+def _validate_raw_evidence_budget(max_raw_evidence_bytes: int | None) -> None:
+    if max_raw_evidence_bytes is not None and (
+        isinstance(max_raw_evidence_bytes, bool)
+        or not isinstance(max_raw_evidence_bytes, int)
+        or max_raw_evidence_bytes <= 0
+    ):
+        raise HarnessInputError("max_raw_evidence_bytes must be a positive integer or None")
+
+
 def read_otlp_json_lines(
     path: str | Path,
     expected_sha256: str | None,
     error_type: type[ValueError],
     evidence_root: Path | None = None,
+    *,
+    max_raw_evidence_bytes: int | None = None,
 ) -> tuple[Path, list[str]]:
     """Read and integrity-check newline-delimited OTLP JSON."""
 
+    _validate_raw_evidence_budget(max_raw_evidence_bytes)
     source = Path(path).expanduser().resolve()
     try:
         with open_evidence(source, evidence_root or source.parent) as stream:
             before = fstat(stream.fileno())
+            if max_raw_evidence_bytes is not None and before.st_size > max_raw_evidence_bytes:
+                raise EvidenceReadError("OTLP raw evidence exceeds max_raw_evidence_bytes")
+            # The declared size is within the budget; one extra byte detects growth.
             payload_bytes = stream.read(before.st_size + 1)
             after = fstat(stream.fileno())
+        if max_raw_evidence_bytes is not None and len(payload_bytes) > max_raw_evidence_bytes:
+            raise EvidenceReadError("OTLP raw evidence exceeds max_raw_evidence_bytes")
         if len(payload_bytes) != before.st_size or (
             before.st_size,
             before.st_mtime_ns,
@@ -155,10 +172,17 @@ def load_otlp_json_metrics(
     *,
     expected_sha256: str | None = None,
     evidence_root: Path | None = None,
+    max_raw_evidence_bytes: int | None = None,
 ) -> tuple[MetricPoint, ...]:
     """Read newline-delimited OTLP JSON emitted by the Collector file exporter."""
 
-    source, lines = read_otlp_json_lines(path, expected_sha256, MetricInputError, evidence_root)
+    source, lines = read_otlp_json_lines(
+        path,
+        expected_sha256,
+        MetricInputError,
+        evidence_root,
+        max_raw_evidence_bytes=max_raw_evidence_bytes,
+    )
     samples: list[MetricPoint] = []
 
     for line_number, line in enumerate(lines, start=1):

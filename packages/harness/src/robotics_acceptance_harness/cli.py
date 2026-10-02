@@ -38,6 +38,7 @@ from robotics_acceptance_harness.hardware_timing import evaluate_hardware_timing
 from robotics_acceptance_harness.metrics import MetricSample
 from robotics_acceptance_harness.otel import (
     OTLP_JSON_LINES_MEDIA_TYPE,
+    _validate_raw_evidence_budget,
     load_otlp_json_metrics,
     select_metric_points,
 )
@@ -289,6 +290,14 @@ def _parser() -> argparse.ArgumentParser:
     )
     otel_summary.add_argument("--otel-metrics", required=True, metavar="PATH")
 
+    for command_parser in (verify, evaluate, transport_evaluate, timing, otel_summary):
+        command_parser.add_argument(
+            "--max-raw-evidence-bytes",
+            type=int,
+            metavar="BYTES",
+            help="Maximum raw bytes per OTLP file; omitted means no raw-file limit.",
+        )
+
     for command_parser in (
         create_run,
         explain,
@@ -397,6 +406,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     try:
         with command_error_boundary():
+            _validate_raw_evidence_budget(getattr(arguments, "max_raw_evidence_bytes", None))
             if arguments.command == "create-run":
                 run_id = create_run_context(
                     arguments.scenario,
@@ -443,7 +453,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 0
 
             if arguments.command == "otel-summary":
-                samples = load_otlp_json_metrics(arguments.otel_metrics)
+                samples = load_otlp_json_metrics(
+                    arguments.otel_metrics,
+                    max_raw_evidence_bytes=arguments.max_raw_evidence_bytes,
+                )
                 print(
                     json.dumps(
                         {
@@ -488,6 +501,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         metrics_path,
                         expected_sha256=str(metric_link["sha256"]),
                         evidence_root=evidence.index.path.parent,
+                        max_raw_evidence_bytes=arguments.max_raw_evidence_bytes,
                     ),
                     run_id=arguments.run_id,
                     domain_id=arguments.domain_id,
@@ -554,6 +568,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         "--receipt-dependency",
                     ),
                     clock_relation_paths=arguments.clock_relation,
+                    max_raw_evidence_bytes=arguments.max_raw_evidence_bytes,
                     observation_output_dir=arguments.observation_output,
                     output_path=arguments.output,
                     extension_schemas=load_extension_schemas(arguments.extension_schema),
@@ -580,6 +595,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     receipt_dependency_paths=arguments.receipt_dependency,
                     evaluator_receipts=evaluator_receipts,
                     otel_metrics_path=arguments.otel_metrics,
+                    max_raw_evidence_bytes=arguments.max_raw_evidence_bytes,
                     window_start_ns=arguments.window_start_ns,
                     window_end_ns=arguments.window_end_ns,
                     output_dir=arguments.output,
@@ -596,6 +612,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     receipt_dependency_paths=arguments.receipt_dependency,
                     evaluator_receipts=evaluator_receipts,
                     otel_metrics_path=arguments.otel_metrics,
+                    max_raw_evidence_bytes=arguments.max_raw_evidence_bytes,
                     measurement_complete_path=arguments.measurement_complete,
                     output_dir=arguments.output,
                 )

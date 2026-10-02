@@ -101,6 +101,14 @@ robotics-acceptance create-run \
 
 Run `robotics-acceptance COMMAND --help` for the complete option set.
 
+`verify`, `evaluate`, `transport-evaluate`, `timing-check` and `otel-summary`
+accept `--max-raw-evidence-bytes BYTES`, a positive integer limit for each raw
+OTLP file. Their library entry points accept the optional
+`max_raw_evidence_bytes` keyword (`None` or a positive non-bool integer).
+Omission preserves unlimited raw-file size;
+an explicit limit rejects oversized or growing inputs before parsing a prefix.
+This bounds raw materialization per file, not aggregate evidence or process memory.
+
 ## Commands
 
 | Command | Purpose | Controls the workload |
