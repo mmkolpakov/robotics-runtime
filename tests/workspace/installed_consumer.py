@@ -56,9 +56,14 @@ def cli(module: str, arguments: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 def verify_negative_inputs(fixtures: Path, specifications: list[str]) -> list[str]:
-    wrong_role = [specifications[0].replace("scenario:", "runtime_manifest:", 1)]
+    # Keep the complete inventory so missing links cannot explain this refusal.
+    wrong_role = specifications.copy()
+    wrong_role[0] = wrong_role[0].replace("scenario:", "runtime_manifest:", 1)
     report = inspect_qualification_artifacts(wrong_role)
-    assert not report.valid and report.diagnostics
+    assert not report.valid and len(report.diagnostics) == 1
+    diagnostic = report.diagnostics[0]
+    assert diagnostic.error_id == "qualification.invalid"
+    assert diagnostic.check == "artifact.load"
     missing = inspect_qualification_artifacts(specifications[1:])
     assert not missing.valid and missing.diagnostics
     missing_file = inspect_qualification_artifacts(["scenario:scenario.json=absent.yaml"])
@@ -104,7 +109,10 @@ def verify_negative_inputs(fixtures: Path, specifications: list[str]) -> list[st
     validate_document(scenario, extension_schemas={uri: schema})
     extended = write_document(scenario, "extended-scenario.json", extension_schemas={uri: schema})
     refused = cli("robotics_runtime_contracts.cli", ["--format", "json", "validate", str(extended)])
-    assert refused.returncode == 1 and "was not supplied" in refused.stderr
+    assert refused.returncode == 1, refused.stderr
+    refusal = json.loads(refused.stderr)["error"]
+    assert refusal["error_id"] == "extension.validation_failed"
+    assert refusal["path"] == "$.extension_schemas"
     return [
         "wrong_role",
         "missing_subject",
@@ -167,7 +175,7 @@ def verify_offline_outputs(fixtures: Path) -> dict[str, Any]:
     )
     assert evaluated.returncode == 1, evaluated.stderr
     result = load_mapping(output / "acceptance-result.json")
-    validate_role(result, "domain_result")
+    validate_role(result, "acceptance_result")
     assert result["evaluation_mode"] == "offline" and result["status"] != "passed"
     assert {"$.clock_observation", "$.observed_ros_graph", "$.shutdown"}.issubset(
         result["unevaluated"]
