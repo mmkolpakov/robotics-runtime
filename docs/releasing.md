@@ -9,13 +9,12 @@ Tag pushes must resolve to the checked-out commit and be reachable from `origin/
 
 ## Current readiness and dry runs
 
-The current candidate is **contracts 0.17.0rc1**. Dispatch
-`contracts-v0.17.0-rc.1` on its reviewed branch to build and install both archives
-without publishing. A successful candidate run does not establish PyPI publisher
-registration or a stable release. Harness remains **0.18.0** during development;
-its temporary workspace bound admits this contracts candidate. Before the stable
-contracts release, replace that bound with `>=0.17,<0.18`. Harness `0.19.0` also
-requires its own version, changelog and completed contracts release (SPEC 37).
+Contracts **0.17.0** is published. The next train is contracts **0.18.1**, then
+harness **0.19.0** bound to `robotics-runtime-contracts>=0.18,<0.19`. The contracts
+release commit also moves the harness workspace bound to that range. Harness
+`0.19.0` requires the completed `contracts-v0.18.1` release named in its changelog.
+A dry run of a candidate builds and installs both archives
+without publishing; it does not establish PyPI publisher registration.
 
 `workflow_dispatch` requires a `candidate` input and always runs in dry-run mode.
 Select the ref containing the reviewed source and matching version. It executes helper
@@ -33,7 +32,7 @@ uv sync --locked --only-group dev --no-install-workspace --python 3.12
 PY="$UV_PROJECT_ENVIRONMENT/bin/python"
 "$PY" -m pytest tests/release
 "$PY" -m scripts.release.plan \
-  --candidate contracts-v0.17.0-rc.1 --event workflow_dispatch \
+  --candidate contracts-v0.18.1 --event workflow_dispatch \
   --repository mmkolpakov/robotics-runtime --output artifacts/release/plan.json
 uv build --package robotics-runtime-contracts --no-sources --out-dir artifacts/release/dist
 "$PY" -m scripts.release.verify_install \
@@ -54,7 +53,7 @@ It requires all of the following, even in dry-run mode:
 
 1. Exactly one unconditional, index-based contracts dependency with the selected minor's
    lower bound and exclusive next-minor upper bound. Harness `0.19.*` specifically requires
-   `robotics-runtime-contracts>=0.17,<0.18` and a stable contracts `0.17.*` version.
+   `robotics-runtime-contracts>=0.18,<0.19` and a stable contracts `0.18.*` version.
 2. The exact root tag `contracts-vX.Y.Z`, with a published, stable, non-draft GitHub release
    in `mmkolpakov/robotics-runtime`. Imported `contracts-legacy/*` tags do not satisfy this.
 3. An identical Git tree for `packages/contracts/src` and an identical `[project]` table in
@@ -67,14 +66,9 @@ It requires all of the following, even in dry-run mode:
 5. Successful isolated installation of the exact contracts version from PyPI, with its
    installed source and schema files matching the verified checkout byte for byte.
 
-The imported harness tree has no such changelog or root contracts release tag. Its full
-release preflight is therefore blocked until those prerequisites are completed; successful
-local builds alone do not establish release readiness.
-During local validation on 2026-09-08, contracts wheel and sdist clean installs passed.
-Harness wheel and sdist builds passed, but its wheel installation failed because PyPI
-could not resolve `robotics-runtime-contracts==0.16.0` (the project JSON endpoint returned
-HTTP 404). Harness sdist installation was not attempted after that shared dependency
-blocker. No workspace or local-wheel substitute was used for the contracts dependency.
+The harness release preflight remains blocked until the exact contracts tag has
+completed publication on both PyPI and GitHub. Local builds alone do not establish
+release readiness.
 
 The plan records both commits and package tree IDs, the contracts requirement and source
 file SHA-256 digests. The clean-install check binds PyPI's contracts code and resources to

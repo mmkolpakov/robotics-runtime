@@ -131,7 +131,7 @@ def test_harness_archive_requirement_must_match_the_released_minor(
         tmp_path,
         name="robotics-acceptance-harness",
         version="0.19.0",
-        dependencies=("robotics-runtime-contracts>=0.16,<0.17",),
+        dependencies=("robotics-runtime-contracts>=0.17,<0.18",),
     )
     harness = replace(
         plan,
@@ -139,8 +139,8 @@ def test_harness_archive_requirement_must_match_the_released_minor(
         key="harness",
         package="robotics-acceptance-harness",
         version="0.19.0",
-        contracts_version="0.17.0",
-        contracts_requirement="robotics-runtime-contracts<0.18,>=0.17",
+        contracts_version="0.18.0",
+        contracts_requirement="robotics-runtime-contracts<0.19,>=0.18",
     )
     with pytest.raises(ReleaseError, match="requirement must be"):
         verify.validate_distributions(tmp_path, harness)
