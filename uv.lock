@@ -975,7 +975,7 @@ provides-extras = ["pytest"]
 
 [[package]]
 name = "robotics-runtime-contracts"
-version = "0.18.0"
+version = "0.18.1"
 source = { editable = "packages/contracts" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },
@@ -985,15 +985,19 @@ dependencies = [
 
 [package.optional-dependencies]
 mcap = [
+    { name = "lz4" },
     { name = "mcap" },
+    { name = "zstandard" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "jsonschema", extras = ["format-nongpl"], specifier = ">=4.26,<5" },
+    { name = "lz4", marker = "extra == 'mcap'", specifier = ">=4,<5" },
     { name = "mcap", marker = "extra == 'mcap'", specifier = ">=1.4,<2" },
     { name = "pyyaml", specifier = ">=6.0.3,<7" },
     { name = "referencing", specifier = ">=0.37,<1" },
+    { name = "zstandard", marker = "extra == 'mcap'", specifier = ">=0.25,<1" },
 ]
 provides-extras = ["mcap"]
 

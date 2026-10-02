@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import struct
 import sys
 from pathlib import Path
 
 import pytest
+from mcap.opcode import Opcode
 from mcap.writer import CompressionType, IndexType, Writer
 
 from robotics_runtime_contracts import file_sha256, load_mapping, validate_document
@@ -191,4 +193,24 @@ def test_oversized_chunks_are_rejected_before_decompression(
     with pytest.raises(WriterError, match="uncompressed bytes") as error:
         recording_summary_from_mcap(source)
 
+    assert error.value.error_id == "writer.invalid_mcap"
+
+
+def test_nested_chunk_length_is_bounded_before_upstream_allocation(tmp_path: Path) -> None:
+    def envelope(opcode: Opcode, body: bytes) -> bytes:
+        return struct.pack("<BQ", opcode, len(body)) + body
+
+    # The outer envelope is tiny, but the nested data length requests 1 GiB.
+    body = struct.pack("<QQQIIQ", 0, 0, 1, 0, 0, 1024**3) + b"x"
+    magic = b"\x89MCAP0\r\n"
+    source = tmp_path / "nested-length.mcap"
+    source.write_bytes(
+        magic
+        + envelope(Opcode.CHUNK, body)
+        + envelope(Opcode.DATA_END, struct.pack("<I", 0))
+        + envelope(Opcode.FOOTER, struct.pack("<QQI", 0, 0, 0))
+        + magic
+    )
+    with pytest.raises(WriterError, match="read requests 1073741824 bytes") as error:
+        recording_summary_from_mcap(source)
     assert error.value.error_id == "writer.invalid_mcap"

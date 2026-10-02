@@ -7,7 +7,7 @@ import os
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from pathlib import Path
-from tempfile import NamedTemporaryFile
+from tempfile import TemporaryDirectory
 from typing import Any
 from urllib.parse import urlsplit
 from urllib.request import url2pathname
@@ -52,12 +52,6 @@ def write_document(
     return write_bytes_atomically(dumps_canonical(dict(document)), output)
 
 
-def _new_file_mode() -> int:
-    mask = os.umask(0o022)
-    os.umask(mask)
-    return 0o666 & ~mask
-
-
 def write_bytes_atomically(content: bytes, output: str | Path) -> Path:
     """Replace ``output`` in one rename; keep the previous file on failure.
 
@@ -66,20 +60,14 @@ def write_bytes_atomically(content: bytes, output: str | Path) -> Path:
     """
     destination = Path(output).expanduser().resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary: Path | None = None
-    try:
-        with NamedTemporaryFile(
-            dir=destination.parent, prefix=f".{destination.name}.", suffix=".tmp", delete=False
-        ) as stream:
-            temporary = Path(stream.name)
+    with TemporaryDirectory(dir=destination.parent, prefix=f".{destination.name}.") as staging:
+        temporary = Path(staging) / "document"
+        # Ordinary exclusive creation applies the process umask without changing it.
+        with temporary.open("xb") as stream:
             stream.write(content)
             stream.flush()
-            os.fchmod(stream.fileno(), _new_file_mode())
             os.fsync(stream.fileno())
         os.replace(temporary, destination)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
     return destination
 
 
