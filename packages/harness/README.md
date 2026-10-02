@@ -25,7 +25,7 @@ runtime contracts -> acceptance harness -----------+
                           +-> result JSON + JUnit + evidence links
 ```
 
-- [robotics-runtime-contracts](https://github.com/mmkolpakov/robotics-runtime-contracts)
+- [robotics-runtime-contracts](https://github.com/mmkolpakov/robotics-runtime/tree/main/packages/contracts)
   owns document structure and verdict semantics.
 - This repository owns observation and evaluation.
 - [robotics-runtime-infra](https://github.com/mmkolpakov/robotics-runtime-infra)
