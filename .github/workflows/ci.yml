@@ -133,7 +133,7 @@ jobs:
           cache-dependency-glob: uv.lock
       - run: uv sync --locked --all-packages --all-groups
       - name: Validate producer examples and consumer fixtures together
-        run: uv run --no-sync pytest tests/workspace
+        run: uv run --no-sync python -m pytest tests/workspace
       - name: Verify candidate wheels outside the workspace
         run: >-
           uv run --no-sync python -m scripts.release.verify_consumers
