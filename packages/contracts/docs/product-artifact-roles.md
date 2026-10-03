@@ -52,8 +52,9 @@ Deployment must replace example identities with reviewed, measured identities.
 
 ## Robot description
 
-Role `robot_description` selects `robot-description.v1`. It describes an artifact
-exported by CAD, rather than embedding or validating URDF/SDF contents. The
+Role `robot_description` selects `robot-description.v1`. It describes an authored
+source artifact and a ready-to-load description, rather than embedding or
+validating URDF/SDF contents. The
 product root is the directory containing `sim/` and `ros/`; a manifest normally
 lives at `sim/robot-description.json`. **All `path` fields are relative to that
 product root, not to the manifest or description package.**
@@ -61,7 +62,7 @@ product root, not to the manifest or description package.**
 | Field | Contract |
 | --- | --- |
 | `robot_id` | Common identifier, independent of robot hardware or product family. |
-| `source` | Exactly one of `path` (local CAD source artifact) or `uri` (absolute source artifact URI), plus required `sha256`. Optional `revision` is a full 40-character Git revision. The revision never replaces the file hash. |
+| `source` | Exactly one of `path` (local authored source artifact, including URDF/SDF) or `uri` (absolute source artifact URI), plus required `sha256`. Optional `revision` is a full 40-character Git revision. The revision never replaces the file hash. |
 | `package` | `{name, path}`: lowercase ROS package name and the directory containing `package.xml`. |
 | `description` | `{format, path, sha256}`; format is `urdf` or `sdf`, identifying the ready-to-load XML file. Expand Xacro and hash the resulting URDF first. |
 | `meshes[]` | `{path, sha256}` for each external mesh artifact. Empty is allowed for analytic geometry. Coordinates are in metres; convert CAD units when exporting. |

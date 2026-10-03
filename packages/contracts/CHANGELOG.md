@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.18.2
+
+- Add an optional per-file raw-evidence byte limit to MCAP summary APIs and the
+  CLI. Reject invalid limits before reading evidence; omission preserves existing
+  behavior and record/chunk bounds.
+- Clarify that robot-description source artifacts may be authored URDF/SDF,
+  while filesystem and XML admission remain the consumer's responsibility.
+
 ## 0.18.1
 
 - Reject CLI and writer outputs that alias an input, including hard links,

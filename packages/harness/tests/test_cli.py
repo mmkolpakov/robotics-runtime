@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from robotics_runtime_contracts.serialization import load_mapping
 
 from robotics_acceptance_harness.cli import main
 from robotics_acceptance_harness.hardware_timing import HardwareTimingObservation
@@ -651,3 +652,50 @@ def test_evaluate_forwards_offline_window(
     assert captured["window_start_ns"] == 100
     assert captured["window_end_ns"] == 200
     assert json.loads(capsys.readouterr().out)["status"] == "incomplete"
+
+
+@pytest.mark.parametrize("command", ["explain", "verify"])
+def test_cli_rejects_robot_binding_before_observation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+) -> None:
+    scenario = load_mapping(FIXTURES / "scenario.yaml")
+    scenario["workload"] = {"robot_description_sha256": "a" * 64}
+    runtime = load_mapping(FIXTURES / "runtime.yaml")
+    runtime["workload"]["robot_description"] = {"sha256": "b" * 64}
+    scenario_path, runtime_path = tmp_path / "scenario.json", tmp_path / "runtime.json"
+    scenario_path.write_text(json.dumps(scenario), encoding="utf-8")
+    runtime_path.write_text(json.dumps(runtime), encoding="utf-8")
+
+    def unexpected_observation(**arguments: object) -> None:
+        pytest.fail("robot-description mismatch must fail before ROS observation")
+
+    monkeypatch.setattr("robotics_acceptance_harness.cli.run_verification", unexpected_observation)
+    arguments = [command, "--scenario", str(scenario_path), "--runtime", str(runtime_path)]
+    if command == "verify":
+        arguments.extend(
+            [
+                "--run-id",
+                "run-6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+                "--domain-id",
+                "primary",
+                "--run-context",
+                str(tmp_path / "acceptance-run.json"),
+                "--evidence-index",
+                str(tmp_path / "evidence-index.json"),
+                "--otel-metrics",
+                str(tmp_path / "otel-metrics.json"),
+                "--measurement-complete",
+                str(tmp_path / "measurement-complete.json"),
+                "--output",
+                str(tmp_path / "results"),
+            ]
+        )
+    assert main(arguments) == 2
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert "[BundleValidationError.failed]" in captured.err
+    assert "$.runtime.workload.robot_description.sha256" in captured.err
+    assert not (tmp_path / "results").exists()

@@ -10,10 +10,12 @@ from typing import Any, NotRequired, TypedDict, cast
 
 from robotics_runtime_contracts import (
     ProviderRequirementError,
+    RobotDescriptionBindingError,
     loads_mapping,
     schema_for_role,
     validate_document,
     validate_provider_requirements,
+    validate_robot_description_binding,
     validate_role,
 )
 from robotics_runtime_contracts.serialization import read_document_bytes
@@ -242,6 +244,18 @@ def _validate_provider_alignment(
         raise BundleValidationError("$.runtime.provider_bindings", str(error)) from error
 
 
+def _validate_robot_description_alignment(
+    scenario: ScenarioDocument,
+    runtime: RuntimeDocument,
+) -> None:
+    try:
+        validate_robot_description_binding(scenario, runtime)
+    except RobotDescriptionBindingError as error:
+        raise BundleValidationError(
+            "$.runtime.workload.robot_description.sha256", str(error)
+        ) from error
+
+
 def _validate_model_alignment(
     scenario: ScenarioDocument,
     runtime: RuntimeDocument,
@@ -364,6 +378,7 @@ def load_bundle(
         runtime_data["evaluator_bindings"],
     )
     _validate_model_alignment(scenario_data, runtime_data, model)
+    _validate_robot_description_alignment(scenario_data, runtime_data)
     _validate_dataset_alignment(scenario_data, dataset)
     checked_at = now or datetime.now(UTC)
     issues = evaluate_physical_authorization(
