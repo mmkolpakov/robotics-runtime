@@ -6,12 +6,17 @@ from random import Random
 
 import pytest
 
+from robotics_acceptance_harness.errors import HarnessError, HarnessInputError
+from robotics_acceptance_harness.readiness import ReadinessIssue
 from robotics_acceptance_harness.timing import (
     ClockMeasurementWindow,
     ClockSample,
+    TimingObservation,
     TimingValidationError,
+    _evaluate_timing,
     _measurement_realtime_factor,
     _measurement_realtime_factor_upper,
+    _TimingEvaluation,
     evaluate_timing,
     utc_datetime_from_unix_ns,
 )
@@ -295,3 +300,214 @@ def test_rtf_bounds_match_an_exhaustive_integer_window_oracle() -> None:
             )
         assert _measurement_realtime_factor(samples, window, width) == min(lowers)
         assert _measurement_realtime_factor_upper(samples, window, width) == min(uppers)
+
+
+def test_timing_result_pass_preserves_public_observation() -> None:
+    execution = {"time_mode": "simulation_realtime"}
+    policy = {"min_realtime_factor": 0.95, "max_deadline_miss_ratio": 0.01}
+    samples = (
+        ClockSample(0, 0, deadline_miss_ratio=0.01),
+        ClockSample(1_000_000_000, 950_000_000, deadline_miss_ratio=0),
+    )
+    expected = TimingObservation(True, 0.0, 0.0, 0.95, 0.01, 0.0, 1.0)
+    evaluation = _evaluate_timing(execution, policy, samples)
+    assert type(evaluation) is _TimingEvaluation
+    assert evaluation.observation == expected
+    assert evaluation.violations == evaluation.insufficient == evaluation.issues == ()
+    assert evaluation.unevaluated == ()
+    assert evaluation.message == ""
+    assert evaluate_timing(execution, policy, samples) == expected
+
+
+@pytest.mark.parametrize(
+    ("source_end", "expected", "violations", "failed", "message"),
+    [
+        pytest.param(
+            1_000_000_000,
+            TimingObservation(True, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0),
+            (),
+            False,
+            "$.time_policy.max_deadline_miss_ratio: "
+            "deadline_miss_ratio was not observed for every sample",
+            id="insufficient",
+        ),
+        pytest.param(
+            0,
+            TimingObservation(True, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            (
+                ReadinessIssue(
+                    "$.time_policy.min_realtime_factor",
+                    "minimum window or integral RTF is at most 0.0; recorded lower bound is 0.0",
+                ),
+            ),
+            True,
+            "$.time_policy.min_realtime_factor: minimum window or integral RTF is at most 0.0; "
+            "recorded lower bound is 0.0; $.time_policy.max_deadline_miss_ratio: "
+            "deadline_miss_ratio was not observed for every sample",
+            id="mixed",
+        ),
+    ],
+)
+def test_timing_result_preserves_uncertainty_and_proven_failure(
+    source_end: int,
+    expected: TimingObservation,
+    violations: tuple[ReadinessIssue, ...],
+    failed: bool,
+    message: str,
+) -> None:
+    execution = {"time_mode": "simulation_realtime"}
+    policy = {"min_realtime_factor": 0.95, "max_deadline_miss_ratio": 0.01}
+    samples = (ClockSample(0, 0), ClockSample(1_000_000_000, source_end))
+    insufficient = (
+        ReadinessIssue(
+            "$.time_policy.max_deadline_miss_ratio",
+            "deadline_miss_ratio was not observed for every sample",
+        ),
+    )
+    evaluation = _evaluate_timing(execution, policy, samples)
+    assert evaluation.observation == expected
+    assert evaluation.violations == violations
+    assert evaluation.insufficient == insufficient
+    assert evaluation.unevaluated == ("$.clock_observation.deadline_miss_ratio",)
+    assert evaluation.message == message
+    with pytest.raises(TimingValidationError) as caught:
+        evaluate_timing(execution, policy, samples)
+    assert caught.value.observation == expected
+    assert caught.value.issues == (*violations, *insufficient)
+    assert caught.value.failed is failed
+    assert caught.value.unevaluated == ("$.clock_observation.deadline_miss_ratio",)
+    assert caught.value.args == (message,)
+
+
+def test_timing_result_preserves_a_proven_step_violation() -> None:
+    execution = {"time_mode": "simulation_stepped"}
+    policy = {"step_size_sec": 0.001, "max_skipped_steps": 0}
+    samples = (ClockSample(0, 0), ClockSample(1_000_000, 3_000_000))
+    expected = TimingObservation(True, 0.0, 0.0, 0.0, 0.0, 0.0, 1000.0)
+    issues = (ReadinessIssue("$.time_policy.max_skipped_steps", "sample 1 skipped 2 steps"),)
+    evaluation = _evaluate_timing(execution, policy, samples)
+    assert evaluation.observation == expected
+    assert evaluation.violations == issues
+    assert evaluation.insufficient == ()
+    assert evaluation.unevaluated == ()
+    with pytest.raises(TimingValidationError) as caught:
+        evaluate_timing(execution, policy, samples)
+    assert caught.value.observation == expected
+    assert caught.value.issues == issues
+    assert caught.value.failed is True
+    assert caught.value.unevaluated == ()
+    assert caught.value.args == ("$.time_policy.max_skipped_steps: sample 1 skipped 2 steps",)
+
+
+@pytest.mark.parametrize("mode", ["playback_clocked", "simulation_stepped"])
+def test_empty_non_realtime_result_preserves_early_failure(mode: str) -> None:
+    expected = TimingObservation(False, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    issues = (ReadinessIssue("$.time_policy", "no clock samples"),)
+    evaluation = _evaluate_timing({"time_mode": mode}, {}, ())
+    assert evaluation.observation == expected
+    assert evaluation.violations == issues
+    assert evaluation.insufficient == ()
+    assert evaluation.unevaluated == ()
+    with pytest.raises(TimingValidationError) as caught:
+        evaluate_timing({"time_mode": mode}, {}, ())
+    assert caught.value.observation == expected
+    assert caught.value.issues == issues
+    assert caught.value.failed is True
+    assert caught.value.unevaluated == ()
+    assert caught.value.args == ("$.time_policy: no clock samples",)
+
+
+def test_empty_realtime_result_retains_independent_deadline_and_uncertainty() -> None:
+    execution = {"time_mode": "simulation_realtime"}
+    policy = {"min_realtime_factor": 0.95, "max_deadline_miss_ratio": 0.01}
+    window = ClockMeasurementWindow(0, 30_000_000_000, deadline_miss_ratio=0)
+    expected = TimingObservation(False, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    insufficient = (
+        ReadinessIssue(
+            "$.clock_observation.monotonic", "no clock samples; monotonicity unavailable"
+        ),
+        ReadinessIssue("$.time_policy.min_realtime_factor", "need two clock samples"),
+        ReadinessIssue(
+            "$.time_policy.min_realtime_factor",
+            "RTF bound [0.0, inf] does not determine whether the minimum 0.95 is met; "
+            "numeric RTF is a lower bound, not a measured violation",
+        ),
+    )
+    message = (
+        "$.clock_observation.monotonic: no clock samples; monotonicity unavailable; "
+        "$.time_policy.min_realtime_factor: need two clock samples; "
+        "$.time_policy.min_realtime_factor: RTF bound [0.0, inf] does not determine whether "
+        "the minimum 0.95 is met; numeric RTF is a lower bound, not a measured violation"
+    )
+    evaluation = _evaluate_timing(execution, policy, (), measurement_window=window)
+    assert evaluation.observation == expected
+    assert evaluation.violations == ()
+    assert evaluation.insufficient == insufficient
+    assert evaluation.message == message
+    with pytest.raises(TimingValidationError) as caught:
+        evaluate_timing(execution, policy, (), measurement_window=window)
+    assert caught.value.failed is False
+    assert caught.value.observation == expected
+    assert caught.value.issues == insufficient
+    assert caught.value.unevaluated == (
+        "$.clock_observation.monotonic",
+        "$.clock_observation.real_time_factor",
+    )
+    assert caught.value.args == (message,)
+
+
+def test_timing_error_constructor_keeps_public_diagnostics_and_issue_order() -> None:
+    observation = TimingObservation(False, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    error = TimingValidationError(
+        (ReadinessIssue("$.time_policy", "first"),),
+        observation,
+        insufficient_issues=(
+            ReadinessIssue("$.time_policy.min_realtime_factor", "second"),
+            ReadinessIssue("$.time_policy.max_deadline_miss_ratio", "third"),
+            ReadinessIssue("$.time_policy.min_realtime_factor", "fourth"),
+            ReadinessIssue("$.clock_observation.monotonic", "fifth"),
+        ),
+    )
+    expected_message = (
+        "$.time_policy: first; $.time_policy.min_realtime_factor: second; "
+        "$.time_policy.max_deadline_miss_ratio: third; $.time_policy.min_realtime_factor: fourth; "
+        "$.clock_observation.monotonic: fifth"
+    )
+    assert type(error) is TimingValidationError
+    assert isinstance(error, HarnessError)
+    assert isinstance(error, ValueError)
+    assert error.error_id == "TimingValidationError.failed"
+    assert error.failed is True
+    assert error.observation is observation
+    assert error.issues == (
+        ReadinessIssue("$.time_policy", "first"),
+        ReadinessIssue("$.time_policy.min_realtime_factor", "second"),
+        ReadinessIssue("$.time_policy.max_deadline_miss_ratio", "third"),
+        ReadinessIssue("$.time_policy.min_realtime_factor", "fourth"),
+        ReadinessIssue("$.clock_observation.monotonic", "fifth"),
+    )
+    assert error.unevaluated == (
+        "$.clock_observation.deadline_miss_ratio",
+        "$.clock_observation.monotonic",
+        "$.clock_observation.real_time_factor",
+    )
+    assert error.diagnostic_issues == (
+        ("$.time_policy", "first"),
+        ("$.time_policy.min_realtime_factor", "second"),
+        ("$.time_policy.max_deadline_miss_ratio", "third"),
+        ("$.time_policy.min_realtime_factor", "fourth"),
+        ("$.clock_observation.monotonic", "fifth"),
+    )
+    assert str(error) == expected_message
+    assert error.args == (expected_message,)
+
+
+@pytest.mark.parametrize("window_sec", [0.5, float("nan"), float("inf")])
+@pytest.mark.parametrize("internal", [False, True])
+def test_invalid_rtf_window_remains_an_input_error(internal: bool, window_sec: float) -> None:
+    evaluate = _evaluate_timing if internal else evaluate_timing
+    with pytest.raises(HarnessInputError) as caught:
+        evaluate({"time_mode": "simulation_realtime"}, {}, (), rtf_window_sec=window_sec)
+    assert type(caught.value) is HarnessInputError
+    assert caught.value.error_id == "input.invalid"
+    assert caught.value.args == ("RTF window must be finite and at least one second",)

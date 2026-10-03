@@ -58,8 +58,7 @@ from robotics_acceptance_harness.timing import (
     ClockMeasurementWindow,
     ClockSample,
     TimingObservation,
-    TimingValidationError,
-    evaluate_timing,
+    _evaluate_timing,
     utc_datetime_from_unix_ns,
 )
 
@@ -405,30 +404,29 @@ def run_verification(
             raw_clock_samples,
             metric_samples,
         )
-        try:
-            timing = evaluate_timing(
-                execution,
-                scenario["time_policy"],
-                clock_samples,
-                measurement_window=ClockMeasurementWindow(
-                    measurement_started_monotonic_ns,
-                    measurement_finished_monotonic_ns,
-                    deadline_miss_ratio=(
-                        _maximum_deadline_ratio(metric_samples)
-                        if execution["time_mode"] == "simulation_realtime"
-                        else None
-                    ),
+        timing_evaluation = _evaluate_timing(
+            execution,
+            scenario["time_policy"],
+            clock_samples,
+            measurement_window=ClockMeasurementWindow(
+                measurement_started_monotonic_ns,
+                measurement_finished_monotonic_ns,
+                deadline_miss_ratio=(
+                    _maximum_deadline_ratio(metric_samples)
+                    if execution["time_mode"] == "simulation_realtime"
+                    else None
                 ),
-            )
-        except TimingValidationError as error:
-            timing = error.observation
-            timing_unevaluated = error.unevaluated
+            ),
+        )
+        timing = timing_evaluation.observation
+        if timing_evaluation.violations or timing_evaluation.insufficient:
+            timing_unevaluated = timing_evaluation.unevaluated
             timing_failure = AssertionEvaluation(
                 assertion_id="time-policy",
-                status="failed" if error.failed else "skipped",
+                status="failed" if timing_evaluation.violations else "skipped",
                 observed_value=None,
                 unit="1",
-                message=str(error),
+                message=timing_evaluation.message,
             )
     assertions = list(
         evaluate_acceptance(
