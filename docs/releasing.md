@@ -9,13 +9,13 @@ Tag pushes must resolve to the checked-out commit and be reachable from `origin/
 
 ## Published pair and dry runs
 
-[Contracts 0.18.1](https://pypi.org/project/robotics-runtime-contracts/0.18.1/) and
-[harness 0.19.0](https://pypi.org/project/robotics-acceptance-harness/0.19.0/) are
+[Contracts 0.18.2](https://pypi.org/project/robotics-runtime-contracts/0.18.2/) and
+[harness 0.19.1](https://pypi.org/project/robotics-acceptance-harness/0.19.1/) are
 published. Their root GitHub release tags are
-[`contracts-v0.18.1`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.18.1)
-and [`harness-v0.19.0`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/harness-v0.19.0).
+[`contracts-v0.18.2`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.18.2)
+and [`harness-v0.19.1`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/harness-v0.19.1).
 Harness declares `robotics-runtime-contracts>=0.18,<0.19`; its release checks use
-the exact contracts 0.18.1 archive. Independent installs of both published packages,
+the exact contracts 0.18.2 archive. Independent installs of both published packages,
 their public writer and CLI, installed file inventories and archive attestations
 were verified outside the workspace.
 
@@ -40,7 +40,7 @@ uv sync --locked --only-group dev --no-install-workspace --python 3.12
 PY="$UV_PROJECT_ENVIRONMENT/bin/python"
 "$PY" -m pytest tests/release
 "$PY" -m scripts.release.plan \
-  --candidate contracts-v0.18.1 --event workflow_dispatch \
+  --candidate contracts-v0.18.2 --event workflow_dispatch \
   --repository mmkolpakov/robotics-runtime --output artifacts/release/plan.json
 uv build --package robotics-runtime-contracts --no-sources --out-dir artifacts/release/dist
 "$PY" -m scripts.release.verify_install \

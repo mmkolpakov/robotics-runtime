@@ -14,10 +14,10 @@ Historical release tags use the `contracts-legacy/` and `harness-legacy/` prefix
 Package-specific documentation remains alongside each package.
 
 The published pair is
-[contracts 0.18.1](https://pypi.org/project/robotics-runtime-contracts/0.18.1/) and
-[harness 0.19.0](https://pypi.org/project/robotics-acceptance-harness/0.19.0/).
+[contracts 0.18.2](https://pypi.org/project/robotics-runtime-contracts/0.18.2/) and
+[harness 0.19.1](https://pypi.org/project/robotics-acceptance-harness/0.19.1/).
 Harness declares `robotics-runtime-contracts>=0.18,<0.19`; release verification
-uses the exact contracts 0.18.1 distribution. Both releases use tags in this
+uses the exact contracts 0.18.2 distribution. Both releases use tags in this
 workspace and its [release procedure](docs/releasing.md).
 
 Clean archive installs, source integration fixtures and live ROS observer tests
