@@ -33,17 +33,12 @@ class TimingValidationError(HarnessError, ValueError):
         *,
         insufficient_issues: tuple[ReadinessIssue, ...] = (),
     ) -> None:
-        self.failed = bool(issues)
-        self.issues = (*issues, *insufficient_issues)
-        self.observation = observation
-        fields = {
-            "$.time_policy.min_realtime_factor": "$.clock_observation.real_time_factor",
-            "$.time_policy.max_deadline_miss_ratio": "$.clock_observation.deadline_miss_ratio",
-        }
-        self.unevaluated = tuple(
-            sorted({fields.get(issue.json_path, issue.json_path) for issue in insufficient_issues})
-        )
-        super().__init__("; ".join(f"{issue.json_path}: {issue.message}" for issue in self.issues))
+        evaluation = _TimingEvaluation(observation, issues, insufficient_issues)
+        self.failed = bool(evaluation.violations)
+        self.issues = evaluation.issues
+        self.observation = evaluation.observation
+        self.unevaluated = evaluation.unevaluated
+        super().__init__(evaluation.message)
 
     @property
     def diagnostic_issues(self) -> tuple[tuple[str, str], ...]:
@@ -90,6 +85,31 @@ class TimingObservation:
     deadline_miss_ratio: float
     max_message_age_ms: float
     clock_hz: float
+
+
+@dataclass(frozen=True, slots=True)
+class _TimingEvaluation:
+    observation: TimingObservation
+    violations: tuple[ReadinessIssue, ...]
+    insufficient: tuple[ReadinessIssue, ...]
+
+    @property
+    def issues(self) -> tuple[ReadinessIssue, ...]:
+        return (*self.violations, *self.insufficient)
+
+    @property
+    def unevaluated(self) -> tuple[str, ...]:
+        fields = {
+            "$.time_policy.min_realtime_factor": "$.clock_observation.real_time_factor",
+            "$.time_policy.max_deadline_miss_ratio": "$.clock_observation.deadline_miss_ratio",
+        }
+        return tuple(
+            sorted({fields.get(issue.json_path, issue.json_path) for issue in self.insufficient})
+        )
+
+    @property
+    def message(self) -> str:
+        return "; ".join(f"{issue.json_path}: {issue.message}" for issue in self.issues)
 
 
 @dataclass
@@ -344,23 +364,15 @@ def _clock_progress(samples: Sequence[ClockSample], issues: _TimingIssues) -> tu
     return monotonic, transitions * 1_000_000_000 / elapsed_ns if elapsed_ns > 0 else 0.0
 
 
-def evaluate_timing(
+def _evaluate_timing(
     execution: Mapping[str, Any],
     time_policy: Mapping[str, Any],
     samples: Sequence[ClockSample],
     *,
     rtf_window_sec: float = 1.0,
     measurement_window: ClockMeasurementWindow | None = None,
-) -> TimingObservation:
-    """Evaluate timing; full measurement claims require explicit monotonic bounds.
-
-    Without measurement_window, the low-level API evaluates only the supplied
-    observed span, retaining its historical endpoint-based diagnostic behavior.
-    Application verification always supplies the actual measurement window.
-    Its independent deadline gauge can be supplied even when no clock callback
-    arrived. Uncertain bounds raise an error with failed=False and unevaluated
-    paths; legacy numeric slots retain bounds or explicitly unavailable zeros.
-    """
+) -> _TimingEvaluation:
+    """Return observations, proven violations and unavailable conclusions separately."""
 
     if not isfinite(rtf_window_sec) or rtf_window_sec < 1.0:
         raise HarnessInputError("RTF window must be finite and at least one second")
@@ -368,9 +380,8 @@ def evaluate_timing(
     mode = execution["time_mode"]
     if not samples and mode != "simulation_realtime":
         observation = TimingObservation(False, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-        raise TimingValidationError(
-            (ReadinessIssue("$.time_policy", "no clock samples"),),
-            observation,
+        return _TimingEvaluation(
+            observation, (ReadinessIssue("$.time_policy", "no clock samples"),), ()
         )
 
     issues = _TimingIssues()
@@ -456,8 +467,38 @@ def evaluate_timing(
         max_message_age_ms=max_message_age_ms,
         clock_hz=clock_hz,
     )
-    if issues.violations or issues.insufficient:
+    return _TimingEvaluation(observation, tuple(issues.violations), tuple(issues.insufficient))
+
+
+def evaluate_timing(
+    execution: Mapping[str, Any],
+    time_policy: Mapping[str, Any],
+    samples: Sequence[ClockSample],
+    *,
+    rtf_window_sec: float = 1.0,
+    measurement_window: ClockMeasurementWindow | None = None,
+) -> TimingObservation:
+    """Evaluate timing; full measurement claims require explicit monotonic bounds.
+
+    Without measurement_window, the low-level API evaluates only the supplied
+    observed span, retaining its historical endpoint-based diagnostic behavior.
+    Application verification always supplies the actual measurement window.
+    Its independent deadline gauge can be supplied even when no clock callback
+    arrived. Uncertain bounds raise an error with failed=False and unevaluated
+    paths; legacy numeric slots retain bounds or explicitly unavailable zeros.
+    """
+
+    evaluation = _evaluate_timing(
+        execution,
+        time_policy,
+        samples,
+        rtf_window_sec=rtf_window_sec,
+        measurement_window=measurement_window,
+    )
+    if evaluation.violations or evaluation.insufficient:
         raise TimingValidationError(
-            tuple(issues.violations), observation, insufficient_issues=tuple(issues.insufficient)
+            evaluation.violations,
+            evaluation.observation,
+            insufficient_issues=evaluation.insufficient,
         )
-    return observation
+    return evaluation.observation
