@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.19.1
+
+Requires contracts 0.18 (`>=0.18,<0.19`), with release prerequisite
+[contracts-v0.18.2](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.18.2).
+
+- Reject missing or mismatched scenario/runtime robot-description bindings when
+  loading an execution bundle, before explanation or live observation. Preserve
+  optional bindings and leave filesystem/XML admission with the consumer.
+- Add optional per-file raw-evidence byte limits to acceptance, aggregation,
+  OTLP and trace processing. Preserve existing behavior when no limit is supplied.
+
 ## 0.19.0
 
 The first harness release from the `robotics-runtime` workspace requires
