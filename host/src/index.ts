@@ -4,3 +4,6 @@ export { Loader } from '@cordisjs/plugin-loader';
 export { Include } from '@cordisjs/plugin-include';
 export { createHost } from './host.js';
 export type { HostOptions } from './host.js';
+export * from './plugins/jobs/index.js';
+export * from './plugins/documents/index.js';
+export * from './plugins/evaluation/index.js';

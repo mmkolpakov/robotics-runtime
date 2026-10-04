@@ -28,3 +28,13 @@ jobs:
       - run: npm test
       - run: npm run check:boundary
       - run: npm audit --audit-level=high
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
+        with:
+          version: "0.11.28"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install the existing Python workspace for worker integration
+        working-directory: .
+        run: uv sync --locked --all-packages
+      - run: npm run test:workers
