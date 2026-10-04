@@ -1,0 +1,38 @@
+{
+  "commit": "dc02c62897372514537cf241f06dc71b9f960c44",
+  "tag": "contracts-v0.18.2",
+  "files": {
+    "contracts-v0.18.2/inventory.json": {
+      "sha256": "ba1d80429d84a9ef3e060678c0fa470c0934568ce5c293a1459bf5bf3f250758",
+      "size_bytes": 107778
+    },
+    "contracts-v0.18.2/documents.json": {
+      "sha256": "986a28f4349ae4f2092b6e5ef450669924a1eda19f9990f4d66840687a73c906",
+      "size_bytes": 458333
+    },
+    "contracts-v0.18.2/contexts.json": {
+      "sha256": "bee0840e8a72af8a1af89403dbf07f5ecdea06c00d07c2fd828d97aa66bdd568",
+      "size_bytes": 370835
+    },
+    "raw-syntax.json": {
+      "sha256": "605ff13a701578f67ad00cfa856f08fab504c525a478bd3210c43d790b0a91e2",
+      "size_bytes": 11401
+    },
+    "legacy-alias.json": {
+      "sha256": "602088db353304559938c44e42e94e9b79db8456ac751dfd4019f4b3fb082c2c",
+      "size_bytes": 2345
+    },
+    "legacy-shortfall.json": {
+      "sha256": "07dae3f85aed3441462285d4fc7436c07830a5af4b888f98ccb89f903b5f604b",
+      "size_bytes": 1136
+    },
+    "provenance.json": {
+      "sha256": "42fe305304802122455d5c66ea36b35aa5441c732acaf61946bc37180a9d751b",
+      "size_bytes": 851
+    },
+    "legacy-corpus.json": {
+      "sha256": "48d8e3f3024f91b91b9eafc14b1d09660b552f04b68c425b0ae9611e0aaeac55",
+      "size_bytes": 215008
+    }
+  }
+}

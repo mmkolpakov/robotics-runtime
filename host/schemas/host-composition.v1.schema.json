@@ -1,0 +1,439 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:robotics:host:composition:v1",
+  "title": "Host composition observations",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "profile",
+    "host",
+    "providers",
+    "lifecycle"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sha256",
+        "config_ref"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "config_ref": {
+          "$ref": "#/$defs/artifactRef"
+        }
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package",
+        "version",
+        "node",
+        "package_lock_ref"
+      ],
+      "properties": {
+        "package": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "node": {
+          "type": "string",
+          "minLength": 1
+        },
+        "package_lock_ref": {
+          "$ref": "#/$defs/artifactRef"
+        }
+      }
+    },
+    "providers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/provider"
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "phases",
+        "resource_outcomes",
+        "evidence_refs",
+        "errors"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "passed",
+            "error",
+            "incomplete"
+          ]
+        },
+        "phases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "phase",
+              "status"
+            ],
+            "properties": {
+              "phase": {
+                "enum": [
+                  "preloading",
+                  "ready",
+                  "measuring",
+                  "closing-measurement",
+                  "capturing-last-state",
+                  "draining-recorders",
+                  "exporting-evidence",
+                  "disposing",
+                  "verifying-cleanup",
+                  "completed",
+                  "error",
+                  "retained"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "passed",
+                  "error"
+                ]
+              },
+              "diagnostic": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "resource_outcomes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "owner_id",
+              "attempted",
+              "released",
+              "evidence_refs"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "owner_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "attempted": {
+                "type": "boolean"
+              },
+              "released": {
+                "type": "boolean"
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/artifactRef"
+                }
+              },
+              "diagnostic": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cleanup_error": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uri",
+        "sha256",
+        "size_bytes"
+      ],
+      "properties": {
+        "uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "identity",
+        "bindings",
+        "capabilities",
+        "endpoints",
+        "time",
+        "lifecycle_refs",
+        "cleanup_refs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "package",
+            "version",
+            "config_ref"
+          ],
+          "properties": {
+            "package": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "image_digest": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "scene_ref": {
+              "$ref": "#/$defs/artifactRef"
+            },
+            "config_ref": {
+              "$ref": "#/$defs/artifactRef"
+            }
+          }
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "service",
+              "provider",
+              "evidence_ref"
+            ],
+            "properties": {
+              "service": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_ref": {
+                "$ref": "#/$defs/artifactRef"
+              }
+            }
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "declared",
+            "effective",
+            "qualification_refs"
+          ],
+          "properties": {
+            "declared": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "effective": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "qualification_refs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/artifactRef"
+              }
+            }
+          }
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "evidence_ref"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_ref": {
+                "$ref": "#/$defs/artifactRef"
+              }
+            }
+          }
+        },
+        "time": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "authority",
+              "domain",
+              "epoch",
+              "native_unit",
+              "precision",
+              "native_observation_ref",
+              "coordinates"
+            ],
+            "properties": {
+              "authority": {
+                "type": "string",
+                "minLength": 1
+              },
+              "domain": {
+                "type": "string",
+                "minLength": 1
+              },
+              "epoch": {
+                "type": "string",
+                "minLength": 1
+              },
+              "native_unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "precision": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "representation",
+                  "description"
+                ],
+                "properties": {
+                  "representation": {
+                    "enum": [
+                      "float64",
+                      "integer",
+                      "decimal"
+                    ]
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "native_observation_ref": {
+                "$ref": "#/$defs/artifactRef"
+              },
+              "coordinates": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "frame",
+                  "units",
+                  "axes"
+                ],
+                "properties": {
+                  "frame": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "units": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "axes": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "lifecycle_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          }
+        },
+        "cleanup_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          }
+        }
+      }
+    }
+  }
+}

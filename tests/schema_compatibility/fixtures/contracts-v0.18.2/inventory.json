@@ -1,0 +1,2413 @@
+{
+  "tag": "contracts-v0.18.2",
+  "commit": "dc02c62897372514537cf241f06dc71b9f960c44",
+  "roots": [
+    "packages/contracts/tests/fixtures",
+    "packages/contracts/consumer-examples",
+    "packages/harness/tests/fixtures",
+    "packages/harness/tests/live/fixtures"
+  ],
+  "entries": [
+    {
+      "path": "packages/contracts/tests/fixtures/campaign/valid/legacy-shortfall.json",
+      "size_bytes": 1136,
+      "raw_sha256": "07dae3f85aed3441462285d4fc7436c07830a5af4b888f98ccb89f903b5f604b",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "campaign_summary",
+      "document": "fixture/packages/contracts/tests/fixtures/campaign/valid/legacy-shortfall.json",
+      "fixture_intent": "accept",
+      "value_sha256": "daf7ef4dc5cfe5a8d559e5b276679893354998ac2510b6587ba4e156e2d99a80",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/dataset/invalid/s3-without-version.yaml",
+      "size_bytes": 1060,
+      "raw_sha256": "20cc89b9b47df6ed5a1ed8bdb28d02890288ffef749b95a5313015a798bf1da7",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "dataset_manifest",
+      "document": "fixture/packages/contracts/tests/fixtures/dataset/invalid/s3-without-version.yaml",
+      "fixture_intent": "reject",
+      "value_sha256": "71d0b245e8de9697ecc6b82c4699973191af13505342d66f3bcebe0abaa4bd4a",
+      "outcome": {
+        "status": "rejected",
+        "exception": "ContractValidationError",
+        "error_id": "schema.validation_failed",
+        "path": "$.artifact",
+        "message": "$.artifact: 'immutable_revision' is a required property"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/dataset/valid/camera-mcap.yaml",
+      "size_bytes": 1418,
+      "raw_sha256": "7b5422640fba550cd61bb972ca98bd49590acd836c6431c5c83ba5f57ec28289",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "dataset_manifest",
+      "document": "fixture/packages/contracts/tests/fixtures/dataset/valid/camera-mcap.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "5b547f1783adfafea7dd929225bd44b170bf1c2ce4ea324d7388e2cae5867228",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/evidence-index/invalid/unconfirmed-s3.yaml",
+      "size_bytes": 857,
+      "raw_sha256": "bc25a6f1221ea4b22b95c395bd9e4751d59f5b4c60902934a4755d43c97684ec",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "evidence_index",
+      "document": "fixture/packages/contracts/tests/fixtures/evidence-index/invalid/unconfirmed-s3.yaml",
+      "fixture_intent": "reject",
+      "value_sha256": "7bed228b57b15e75f744876e7b19a638aaed03a64975b8d3952b19a9c1183bd7",
+      "outcome": {
+        "status": "rejected",
+        "exception": "ContractValidationError",
+        "error_id": "schema.validation_failed",
+        "path": "$.artifacts[0]",
+        "message": "$.artifacts[0]: 'immutable_revision' is a required property"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/evidence-index/valid/mixed.yaml",
+      "size_bytes": 1501,
+      "raw_sha256": "da5f90d55268a3654d910f060ed0d55d3e2aec921d05e6e487409195c74587c8",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "evidence_index",
+      "document": "fixture/packages/contracts/tests/fixtures/evidence-index/valid/mixed.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "64e5607ba71331f8a45376cf88fc70f39e0c051d5cf8222a63c6353b0afd693d",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/execution-trust-policy/invalid/no-approver.json",
+      "size_bytes": 687,
+      "raw_sha256": "f02fea1b2e1755c7049093c3dbc1a2092be4e74afc95d379a7f04b8bb0769481",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "execution_trust_policy",
+      "document": "fixture/packages/contracts/tests/fixtures/execution-trust-policy/invalid/no-approver.json",
+      "fixture_intent": "reject",
+      "value_sha256": "2d9a039a2afb0031e1f491e879b7662c7817883dae53de1b9b65917d365e195d",
+      "outcome": {
+        "status": "rejected",
+        "exception": "ContractValidationError",
+        "error_id": "schema.validation_failed",
+        "path": "$.principals",
+        "message": "$.principals: [{'role': 'operator', 'identity': 'operator@example.org', 'issuer': 'https://token.actions.githubusercontent.com'}, {'role': 'operator', 'identity': 'safety@example.org', 'issuer': 'https://token.actions.githubusercontent.com'}] does not contain items matching the given schema"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/execution-trust-policy/invalid/overlong-lifetime.json",
+      "size_bytes": 687,
+      "raw_sha256": "86f56f54e46aa2ce3528d205c29a2c7f6cff868fb3454b2cf75909f42813b6e3",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "execution_trust_policy",
+      "document": "fixture/packages/contracts/tests/fixtures/execution-trust-policy/invalid/overlong-lifetime.json",
+      "fixture_intent": "reject",
+      "value_sha256": "94dee312ba2ab4fc6ecdb8f3f0d553a204f6f89004a0098baf7a73ab9cf2de65",
+      "outcome": {
+        "status": "rejected",
+        "exception": "ContractValidationError",
+        "error_id": "schema.validation_failed",
+        "path": "$.max_permit_lifetime_seconds",
+        "message": "$.max_permit_lifetime_seconds: 1801 is greater than the maximum of 1800"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/execution-trust-policy/invalid/unfilled-target.json",
+      "size_bytes": 623,
+      "raw_sha256": "b34247b1baf129bed0fb145c4466204dc4b7226e7514f2177b2cb533d33e43db",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "execution_trust_policy",
+      "document": "fixture/packages/contracts/tests/fixtures/execution-trust-policy/invalid/unfilled-target.json",
+      "fixture_intent": "reject",
+      "value_sha256": "36848caf9c7973e9501cd52995be3367faffa74a1016bb6c8d5c9a99b8d13a5c",
+      "outcome": {
+        "status": "rejected",
+        "exception": "ContractValidationError",
+        "error_id": "schema.validation_failed",
+        "path": "$.targets[0].identity_sha256",
+        "message": "$.targets[0].identity_sha256: '' does not match '^[a-f0-9]{64}$'"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/execution-trust-policy/valid/hil.json",
+      "size_bytes": 687,
+      "raw_sha256": "06de9400b37458c439219637d01440ef22302f61286e4453d9ef88bc1fd17eb7",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "execution_trust_policy",
+      "document": "fixture/packages/contracts/tests/fixtures/execution-trust-policy/valid/hil.json",
+      "fixture_intent": "accept",
+      "value_sha256": "b3469d1fb80fa19c5ec64cff639eeb61616b03cf2ab86d96f8aa5042215201e6",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/execution-trust-policy/valid/infra-example.json",
+      "size_bytes": 701,
+      "raw_sha256": "136d747318e09da5d919feb33cf0c99672c6ad6d9464078c850d69877c0d4091",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "execution_trust_policy",
+      "document": "fixture/packages/contracts/tests/fixtures/execution-trust-policy/valid/infra-example.json",
+      "fixture_intent": "accept",
+      "value_sha256": "1b7315fefc1d537372ece48deaeb6b03da113421a5bac0a853e71f3e20fcef3a",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/model-artifact/invalid/portable-tensorrt.yaml",
+      "size_bytes": 1614,
+      "raw_sha256": "b26903c91db49d655fb855e14f58e874adb3c0fac538a8cd1a85c1f633740f7e",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "model_artifact_manifest",
+      "document": "fixture/packages/contracts/tests/fixtures/model-artifact/invalid/portable-tensorrt.yaml",
+      "fixture_intent": "reject",
+      "value_sha256": "dc7b322bb9895db6276fd6073464e0cb11f645e6f9e2e2f574724477d7f331cb",
+      "outcome": {
+        "status": "rejected",
+        "exception": "SemanticValidationError",
+        "error_id": "semantic.validation_failed",
+        "path": "$.compatibility.hardware",
+        "message": "$.compatibility.hardware: portable artifacts must not declare a hardware allow-list"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/model-artifact/valid/onnx.yaml",
+      "size_bytes": 1856,
+      "raw_sha256": "4b1c7cc7904dc2e7bbe65406d6a3e71bc5e07a85b39d3a40ed3f3bd3cc133b5f",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "model_artifact_manifest",
+      "document": "fixture/packages/contracts/tests/fixtures/model-artifact/valid/onnx.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "49645f5d9cb9559c8c7500b72ea53657e121ebbcad04281eea0a8d55688a98b5",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/model-artifact/valid/tensorrt.yaml",
+      "size_bytes": 2057,
+      "raw_sha256": "322871350cfa26f805d689e95dd965d42aa4459badec3d85003ab23ea52b2100",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "model_artifact_manifest",
+      "document": "fixture/packages/contracts/tests/fixtures/model-artifact/valid/tensorrt.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "706b028fdc77727fee2caeb0274d16d7eef8ba1422c5c9674ef119920bf6d8ad",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/physical/valid/hil-permit.yaml",
+      "size_bytes": 1070,
+      "raw_sha256": "21f191370b6a8fb32f49709079d1118b4c1e508a3daf6fc3f75479d382e2163f",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "execution_permit",
+      "document": "fixture/packages/contracts/tests/fixtures/physical/valid/hil-permit.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "7d926a3810b082700bcb3d2ea8bbc243d2329bc1daa1994ca5b9c018da496c56",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/physical/valid/hil-result.yaml",
+      "size_bytes": 3202,
+      "raw_sha256": "058f9fdf2edd5cc88affe2a4d9f86e5fea80d5e0b7cd2617a095a4e01d544fd6",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_result",
+      "document": "fixture/packages/contracts/tests/fixtures/physical/valid/hil-result.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "2201c95c9affaf689fe94530a9262bba4ec4aab4446e520d17d755920ed953d7",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/physical/valid/hil-runtime.yaml",
+      "size_bytes": 2746,
+      "raw_sha256": "2e7e0a8d44b92c9020b1e3a68edc5700ca60cd2e3a97cc686b4e3ef4356089ef",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "runtime_manifest",
+      "document": "fixture/packages/contracts/tests/fixtures/physical/valid/hil-runtime.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "76e356247b4fb587d382148545fc07ce7716179261ae1646a043514e19a00845",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/physical/valid/hil-scenario.yaml",
+      "size_bytes": 1816,
+      "raw_sha256": "16878b8e3c29f53d255d1b7883bf3f708552e77a4e6dd58b9eabc989b1f32b97",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_scenario",
+      "document": "fixture/packages/contracts/tests/fixtures/physical/valid/hil-scenario.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "1da31181e288365d107d08d8df308086af4be493a76959e8f4a773591b36cd1f",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/physical/valid/hil-verification.yaml",
+      "size_bytes": 1316,
+      "raw_sha256": "4cdeaae4556483873c42e230f0db7ef534d2c403c424aa0afa0aa086301cc694",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "execution_verification",
+      "document": "fixture/packages/contracts/tests/fixtures/physical/valid/hil-verification.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "9138991d529ed875f8408432d931343a88df2591db1caf55c0df5e76ec378161",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/aggregate.json",
+      "size_bytes": 620,
+      "raw_sha256": "5d4096d7a5df1417b80d893b001ced3e6c3f865c45dfca751ca97904147a03f9",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_aggregate",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "acceptance_aggregate",
+        "subject_name": "acceptance-aggregate.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/aggregate.json",
+      "fixture_intent": "accept",
+      "value_sha256": "d17fb8e4b62d312206ccadb92c284a925df6f7fc6858b9883de22373158f90cb",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/artifacts.json",
+      "size_bytes": 2708,
+      "raw_sha256": "0e7d081d77cb531f91bc43bbad062701b14d0fdbd537efeec08d8412c317c608",
+      "classification": "composition_descriptor_context",
+      "reason": "Ordered kind/subject/file inventory for native qualification descriptor composition; capture context, not a role-validation omission.",
+      "value": [
+        {
+          "file": "scenario.json",
+          "kind": "scenario",
+          "subject_name": "scenario.json"
+        },
+        {
+          "file": "run.json",
+          "kind": "acceptance_run",
+          "subject_name": "acceptance-run.json"
+        },
+        {
+          "file": "runtime.json",
+          "kind": "runtime_manifest",
+          "subject_name": "runtime-manifests/primary.json"
+        },
+        {
+          "file": "result.json",
+          "kind": "domain_result",
+          "subject_name": "results/primary.json"
+        },
+        {
+          "file": "aggregate.json",
+          "kind": "acceptance_aggregate",
+          "subject_name": "acceptance-aggregate.json"
+        },
+        {
+          "file": "evidence-index.json",
+          "kind": "evidence_index",
+          "subject_name": "evidence-indexes/primary.json"
+        },
+        {
+          "file": "recording-summary.json",
+          "kind": "recording_summary",
+          "subject_name": "recording-summaries/primary.json"
+        },
+        {
+          "file": "model.json",
+          "kind": "model_manifest",
+          "subject_name": "provenance/model.json"
+        },
+        {
+          "file": "dataset.json",
+          "kind": "dataset_manifest",
+          "subject_name": "provenance/dataset.json"
+        },
+        {
+          "file": "dataset.mcap",
+          "kind": "recording",
+          "subject_name": "datasets/baseline.mcap"
+        },
+        {
+          "file": "output.mcap",
+          "kind": "recording",
+          "subject_name": "evidence/output.mcap"
+        },
+        {
+          "file": "detector.onnx",
+          "kind": "other_evidence",
+          "subject_name": "models/detector.onnx"
+        },
+        {
+          "file": "conformance.json",
+          "kind": "other_evidence",
+          "subject_name": "models/conformance.json"
+        },
+        {
+          "file": "sample.bin",
+          "kind": "other_evidence",
+          "subject_name": "models/sample.bin"
+        },
+        {
+          "file": "qos-overrides.yaml",
+          "kind": "other_evidence",
+          "subject_name": "datasets/qos-overrides.yaml"
+        },
+        {
+          "file": "provider-config.json",
+          "kind": "other_evidence",
+          "subject_name": "providers/config.json"
+        },
+        {
+          "file": "provider-profile.json",
+          "kind": "qualification_profile",
+          "subject_name": "providers/qualification-profile.json"
+        },
+        {
+          "file": "provider-conformance.json",
+          "kind": "provider_conformance",
+          "subject_name": "providers/conformance-result.json"
+        },
+        {
+          "file": "evaluator-package.whl",
+          "kind": "package",
+          "subject_name": "evaluators/package.whl"
+        },
+        {
+          "file": "evaluator-statement.json",
+          "kind": "attestation",
+          "subject_name": "evaluators/statement.json"
+        },
+        {
+          "file": "evaluator-verification.bundle",
+          "kind": "verification",
+          "subject_name": "evaluators/verification.bundle"
+        },
+        {
+          "file": "evaluator-trust.json",
+          "kind": "policy",
+          "subject_name": "policy/evaluator-trust.json"
+        },
+        {
+          "file": "evaluator-verification.json",
+          "kind": "artifact_verification",
+          "subject_name": "evaluators/verification.json"
+        },
+        {
+          "file": "evaluator-receipt.json",
+          "kind": "artifact_receipt",
+          "subject_name": "evaluators/receipt.json"
+        },
+        {
+          "file": "evidence-statement.json",
+          "kind": "attestation",
+          "subject_name": "evidence/statement.json"
+        },
+        {
+          "file": "evidence-verification.bundle",
+          "kind": "verification",
+          "subject_name": "evidence/verification.bundle"
+        },
+        {
+          "file": "evidence-verification.json",
+          "kind": "artifact_verification",
+          "subject_name": "evidence/verification.json"
+        },
+        {
+          "file": "evidence-receipt.json",
+          "kind": "artifact_receipt",
+          "subject_name": "evidence/receipt.json"
+        }
+      ]
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/conformance.json",
+      "size_bytes": 16,
+      "raw_sha256": "1ea63e7fda68e7ce49b013af8410102e9228f7591e79ef602dd23d95556d03bc",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "other_evidence",
+        "subject_name": "models/conformance.json"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/dataset.json",
+      "size_bytes": 1443,
+      "raw_sha256": "89240213fea3f8862bdf223b6fd01855d9ff49cac9d1d976f8e21ba61c4fc684",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "dataset_manifest",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "dataset_manifest",
+        "subject_name": "provenance/dataset.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/dataset.json",
+      "fixture_intent": "accept",
+      "value_sha256": "2d0e8ec763a9e6a18719f6abcacd7698351ced4baee465cc6eeb3625ddc8ce8f",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/dataset.mcap",
+      "size_bytes": 30,
+      "raw_sha256": "ec4dd68b8e8275ced54bedf6ce41aacebe89a75b7ca68ce3e3a937688ecf9105",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "recording",
+        "subject_name": "datasets/baseline.mcap"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/detector.onnx",
+      "size_bytes": 22,
+      "raw_sha256": "1cdd868efdf8325bf8d1728eb6074b24af133a72b6d5810d64acfcff88901b7d",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "other_evidence",
+        "subject_name": "models/detector.onnx"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/evaluator-package.whl",
+      "size_bytes": 24,
+      "raw_sha256": "a9f3c61cefdc82ae15ea38847921437b5bf521d6d5a05171226284fe597e7210",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "package",
+        "subject_name": "evaluators/package.whl"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/evaluator-receipt.json",
+      "size_bytes": 762,
+      "raw_sha256": "7284e73fe06ddba1b0286c53b41eb364459f8dbb1ce0ca5f60077627f38d0258",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "artifact_receipt",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "artifact_receipt",
+        "subject_name": "evaluators/receipt.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/evaluator-receipt.json",
+      "fixture_intent": "accept",
+      "value_sha256": "00ad6f5082a29b5dcb37c5c3e630804985f70ce593aed553b813fb5dc29349dc",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/evaluator-statement.json",
+      "size_bytes": 120,
+      "raw_sha256": "3c2a456f4a404c944235b41f3e7a2add3d8dca175ddccf84ffeaf8e0c78d5504",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "attestation",
+        "subject_name": "evaluators/statement.json"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/evaluator-trust.json",
+      "size_bytes": 77,
+      "raw_sha256": "ea4adcf48c6f2753d934016c1d02b4bb75d1024fd14ee1bcb56002f408d5b501",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "policy",
+        "subject_name": "policy/evaluator-trust.json"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/evaluator-verification.bundle",
+      "size_bytes": 37,
+      "raw_sha256": "2b060d205139c379748ba98a72cff7b516e7784508787c71533e67d1a7039950",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "verification",
+        "subject_name": "evaluators/verification.bundle"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/evaluator-verification.json",
+      "size_bytes": 990,
+      "raw_sha256": "6d52ab24561ae9614123c9c906788ef6dbe607bc3326ec7c257e884a09c09f7c",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "artifact_verification",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "artifact_verification",
+        "subject_name": "evaluators/verification.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/evaluator-verification.json",
+      "fixture_intent": "accept",
+      "value_sha256": "1f869a458c0ae4ed97cb35bbbd447e8ea538f1e60659894a5ef3d126fbfde8bf",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/evidence-index.json",
+      "size_bytes": 1015,
+      "raw_sha256": "50b0eb1d55a01f1a9d6b913e537d6de2fdde41c3220ef8fc197fa07552bd4677",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "evidence_index",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "evidence_index",
+        "subject_name": "evidence-indexes/primary.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/evidence-index.json",
+      "fixture_intent": "accept",
+      "value_sha256": "153075113b29b6bff4d3f073ba7a165e45cc4e2169469cbd8d51c16b45de94aa",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/evidence-receipt.json",
+      "size_bytes": 749,
+      "raw_sha256": "9de0a9f5fdc1808ed803c132e5070827c6865b504b25ba10bf6abd8a73e391ae",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "artifact_receipt",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "artifact_receipt",
+        "subject_name": "evidence/receipt.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/evidence-receipt.json",
+      "fixture_intent": "accept",
+      "value_sha256": "a7f54f95810b689ec14a6d3412364ba6cbee3a108d2efd29394ad6be9e9519ba",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/evidence-statement.json",
+      "size_bytes": 124,
+      "raw_sha256": "8dfb0d8aef4d907cfc6e50ffda7a334b7ea008b2d36665cfb1f0f10334ba7b88",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "attestation",
+        "subject_name": "evidence/statement.json"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/evidence-verification.bundle",
+      "size_bytes": 36,
+      "raw_sha256": "915b47bc71b5201e59e15ba79c0f58222dec055cd996a89fb905c1af5295d37d",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "verification",
+        "subject_name": "evidence/verification.bundle"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/evidence-verification.json",
+      "size_bytes": 925,
+      "raw_sha256": "507711a5115e079975b9a9b415ea73fcae6bf0bc2cda0f9f03cf3015a16ab2bc",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "artifact_verification",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "artifact_verification",
+        "subject_name": "evidence/verification.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/evidence-verification.json",
+      "fixture_intent": "accept",
+      "value_sha256": "c13e13159ae46393648aa1a4442bcbea5386fa8c127b3fe8f14bdf511879ec9c",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/model.json",
+      "size_bytes": 1737,
+      "raw_sha256": "026ed9af4bb1eb4ed07868acee4d8a5e66aa38767e2f9de5b2eb1b563c1764a5",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "model_artifact_manifest",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "model_manifest",
+        "subject_name": "provenance/model.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/model.json",
+      "fixture_intent": "accept",
+      "value_sha256": "10b64d343bd90544184cd1a6b11b3ca70534b1cdfd27839a91d9e88ee781fd34",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/output.mcap",
+      "size_bytes": 30,
+      "raw_sha256": "b55b1327d97412b150ada1a77be869545eb65bb65db52d0d69e6e6a5fb5138de",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "recording",
+        "subject_name": "evidence/output.mcap"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/provider-config.json",
+      "size_bytes": 68,
+      "raw_sha256": "86b6524c6363523874dcfa9c4d2db7c363095b9dfc56340397943104c672187b",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "other_evidence",
+        "subject_name": "providers/config.json"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/provider-conformance.json",
+      "size_bytes": 921,
+      "raw_sha256": "62aafdc9bdfe36c604af6b32afcb0c6e66c9c4777ea84d31ba002ba6e58f04ed",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "conformance_result",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "provider_conformance",
+        "subject_name": "providers/conformance-result.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/provider-conformance.json",
+      "fixture_intent": "accept",
+      "value_sha256": "b16979b140ddcc1d9d5d0ae4e8d75c40c5af494b3cc1833914c09de99a95c02a",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/provider-profile.json",
+      "size_bytes": 186,
+      "raw_sha256": "49b3e7b3036c5c86898f1ec656df532e00dd835461af85fff14a0cb70cca14d7",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "qualification_profile",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "qualification_profile",
+        "subject_name": "providers/qualification-profile.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/provider-profile.json",
+      "fixture_intent": "accept",
+      "value_sha256": "2c022e4a99fcc008adf85543f1d1410aba997949cb67bd1ce64f0f7fc2588ed7",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/qos-overrides.yaml",
+      "size_bytes": 46,
+      "raw_sha256": "6c05dab8e032bc5227a51622078080dc8a2552c6b5e4462c9335bbd23e6b3262",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "other_evidence",
+        "subject_name": "datasets/qos-overrides.yaml"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/recording-summary.json",
+      "size_bytes": 443,
+      "raw_sha256": "a1d70b5b2039b121adcebdfb7b5b2df5c6ca8561cb965d27db6e8292f9cdb279",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "recording_summary",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "recording_summary",
+        "subject_name": "recording-summaries/primary.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/recording-summary.json",
+      "fixture_intent": "accept",
+      "value_sha256": "22889d979f21e8b315b5d36e0e0f4e18487f5e85c0dcb4bde4944eaff3f8c314",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/result.json",
+      "size_bytes": 3174,
+      "raw_sha256": "3eff28bca88a254d47d7c2948ccaf52a16963d5783ea32e77dc6e8e616608150",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_result",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "domain_result",
+        "subject_name": "results/primary.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/result.json",
+      "fixture_intent": "accept",
+      "value_sha256": "e9a122376035a46d941731ab0629f2e8e270dedcf721ea03c824a340812cc33c",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/run.json",
+      "size_bytes": 376,
+      "raw_sha256": "e64fc82b112a01665a6e696587ada75dee646ce41c3cc197063a15d488129ba5",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_run",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "acceptance_run",
+        "subject_name": "acceptance-run.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/run.json",
+      "fixture_intent": "accept",
+      "value_sha256": "41aac450ddb4bd2b6da829a865463958f0e59c81d695391a917638a6724512c0",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/runtime.json",
+      "size_bytes": 3020,
+      "raw_sha256": "6f796b2fd0e933825201f10b8ef3adc32410bd56bc4619590a2bea627b366e43",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "runtime_manifest",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "runtime_manifest",
+        "subject_name": "runtime-manifests/primary.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/runtime.json",
+      "fixture_intent": "accept",
+      "value_sha256": "447f43f9bd3efb411ec6d0845b44430e0f8b8d8d23cd0314f05081ca7c1e24bd",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/sample.bin",
+      "size_bytes": 29,
+      "raw_sha256": "e8e2dd1bb4307c6811627b73554ffa8dc2735e40bcb29356c82e3d8f8257a9df",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "other_evidence",
+        "subject_name": "models/sample.bin"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/inference/scenario.json",
+      "size_bytes": 2814,
+      "raw_sha256": "9ed90d21bf272c4082211cbe42dc39fe0a7178b1a59d8b1a43bf93dc54acca3f",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_scenario",
+      "descriptor_context": {
+        "composition": "inference",
+        "kind": "scenario",
+        "subject_name": "scenario.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/inference/scenario.json",
+      "fixture_intent": "accept",
+      "value_sha256": "7564dcf770d8b947c08d1a6334794035afe307abf018a65b18bd65adf4a0e77c",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/aggregate.json",
+      "size_bytes": 630,
+      "raw_sha256": "1d39825675b51bd100fa6a5ea47952d686d59cb6bcd133b8c34733b59dbe0ea8",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_aggregate",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "acceptance_aggregate",
+        "subject_name": "acceptance-aggregate.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/physical/aggregate.json",
+      "fixture_intent": "accept",
+      "value_sha256": "5712b9c61163ed5cc4675a17ba170b23a7186426f09ea3545edfdd37a45ae962",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/approver.bundle",
+      "size_bytes": 26,
+      "raw_sha256": "caee6eef50bfb8a61d2373971fd9958c4ec98a243fcd51e0c6f0db2421470073",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "other_evidence",
+        "subject_name": "authorization/approver.bundle"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/artifacts.json",
+      "size_bytes": 2042,
+      "raw_sha256": "401fab222a9985dd43767eabaafd63d50a6c99f7b938e75eb93e4e3f733ed724",
+      "classification": "composition_descriptor_context",
+      "reason": "Ordered kind/subject/file inventory for native qualification descriptor composition; capture context, not a role-validation omission.",
+      "value": [
+        {
+          "file": "scenario.json",
+          "kind": "scenario",
+          "subject_name": "scenario.json"
+        },
+        {
+          "file": "run.json",
+          "kind": "acceptance_run",
+          "subject_name": "acceptance-run.json"
+        },
+        {
+          "file": "runtime.json",
+          "kind": "runtime_manifest",
+          "subject_name": "runtime-manifests/controller-domain.json"
+        },
+        {
+          "file": "result.json",
+          "kind": "domain_result",
+          "subject_name": "results/controller-domain.json"
+        },
+        {
+          "file": "aggregate.json",
+          "kind": "acceptance_aggregate",
+          "subject_name": "acceptance-aggregate.json"
+        },
+        {
+          "file": "evidence-index.json",
+          "kind": "evidence_index",
+          "subject_name": "evidence-indexes/controller-domain.json"
+        },
+        {
+          "file": "recording-summary.json",
+          "kind": "recording_summary",
+          "subject_name": "recording-summaries/controller-domain.json"
+        },
+        {
+          "file": "permit.json",
+          "kind": "execution_permit",
+          "subject_name": "authorization/permit.json"
+        },
+        {
+          "file": "verification.json",
+          "kind": "execution_verification",
+          "subject_name": "authorization/verification.json"
+        },
+        {
+          "file": "trust-policy.json",
+          "kind": "policy",
+          "subject_name": "policy/trust.json"
+        },
+        {
+          "file": "execution.rego",
+          "kind": "policy",
+          "subject_name": "policy/execution.rego"
+        },
+        {
+          "file": "sros2-policy.xml",
+          "kind": "policy",
+          "subject_name": "policy/sros2.xml"
+        },
+        {
+          "file": "preflight.json",
+          "kind": "other_evidence",
+          "subject_name": "authorization/preflight.json"
+        },
+        {
+          "file": "statement.json",
+          "kind": "other_evidence",
+          "subject_name": "authorization/statement.json"
+        },
+        {
+          "file": "operator.bundle",
+          "kind": "other_evidence",
+          "subject_name": "authorization/operator.bundle"
+        },
+        {
+          "file": "approver.bundle",
+          "kind": "other_evidence",
+          "subject_name": "authorization/approver.bundle"
+        },
+        {
+          "file": "hardware-clock.json",
+          "kind": "other_evidence",
+          "subject_name": "evidence/hardware-clock.json"
+        },
+        {
+          "file": "observation.mcap",
+          "kind": "recording",
+          "subject_name": "evidence/observation.mcap"
+        },
+        {
+          "file": "provider-config.json",
+          "kind": "other_evidence",
+          "subject_name": "providers/config.json"
+        },
+        {
+          "file": "provider-profile.json",
+          "kind": "qualification_profile",
+          "subject_name": "providers/qualification-profile.json"
+        },
+        {
+          "file": "provider-conformance.json",
+          "kind": "provider_conformance",
+          "subject_name": "providers/conformance-result.json"
+        }
+      ]
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/evidence-index.json",
+      "size_bytes": 1201,
+      "raw_sha256": "d94e480674cfcc1ea61906944fdec6f83cad14800153a572f7c08aa293beab15",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "evidence_index",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "evidence_index",
+        "subject_name": "evidence-indexes/controller-domain.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/physical/evidence-index.json",
+      "fixture_intent": "accept",
+      "value_sha256": "71d7fcf0cb41fad79e3b2c3551c3ab9bc275cd2ed4a1d198b4d37a263b466255",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/execution.rego",
+      "size_bytes": 50,
+      "raw_sha256": "a5cb3d7583277759a059779eb6b7afa66336794458c758032f8553e359223e27",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "policy",
+        "subject_name": "policy/execution.rego"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/hardware-clock.json",
+      "size_bytes": 32,
+      "raw_sha256": "73b2d93497d7b063c8ee198a73d73e26f265bfd380b41393ca9d2f12f41dd32a",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "other_evidence",
+        "subject_name": "evidence/hardware-clock.json"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/observation.mcap",
+      "size_bytes": 34,
+      "raw_sha256": "1badcdad7b9ef8b51ac152345aed8a5692202d78e6f0cb27540a0ab7775a82cb",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "recording",
+        "subject_name": "evidence/observation.mcap"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/operator.bundle",
+      "size_bytes": 26,
+      "raw_sha256": "93568a4e263ad2319812df5b1c65f4e86c2ded90a372b677f3ea37f80de62ca3",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "other_evidence",
+        "subject_name": "authorization/operator.bundle"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/permit.json",
+      "size_bytes": 1099,
+      "raw_sha256": "6317d89ac170d7ee14b17a855423fd0f1a7efb5f622763b91e3649c2e2727474",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "execution_permit",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "execution_permit",
+        "subject_name": "authorization/permit.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/physical/permit.json",
+      "fixture_intent": "accept",
+      "value_sha256": "898145393254ce8752950a58dd1b60da3faa7d6c2f2ac815f59f917977516651",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/preflight.json",
+      "size_bytes": 24,
+      "raw_sha256": "c48ae3cb1482390cad331148b93dc98d681e9c70e3a09257ce1b5c832376a7e9",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "other_evidence",
+        "subject_name": "authorization/preflight.json"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/provider-config.json",
+      "size_bytes": 64,
+      "raw_sha256": "25c5583ead53a7fe0f9155741562381880feecff44f8019315ec9331f8ef81c9",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "other_evidence",
+        "subject_name": "providers/config.json"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/provider-conformance.json",
+      "size_bytes": 777,
+      "raw_sha256": "98e3507187e0a996c2a64afe3a83a11942ca5a885d30731077997c40d29671c5",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "conformance_result",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "provider_conformance",
+        "subject_name": "providers/conformance-result.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/physical/provider-conformance.json",
+      "fixture_intent": "accept",
+      "value_sha256": "55faecd4bdc23115dd9da65b3bf8de0f6aa90b678b6b9cb6a95ccf2baa06fdd2",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/provider-profile.json",
+      "size_bytes": 192,
+      "raw_sha256": "a9092db2cb72c954ae04d74934950ea38d8e430e2c6d50ffc907e2cc7d41a6f9",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "qualification_profile",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "qualification_profile",
+        "subject_name": "providers/qualification-profile.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/physical/provider-profile.json",
+      "fixture_intent": "accept",
+      "value_sha256": "98ca6f436787b45ecd8071da3fd06680a1bb05369f64b624788051599251dd03",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/recording-summary.json",
+      "size_bytes": 443,
+      "raw_sha256": "cfc060220a12fd9e2af78c5a167937cd0e12f428438c74a0f7cd86b163a1d4ef",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "recording_summary",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "recording_summary",
+        "subject_name": "recording-summaries/controller-domain.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/physical/recording-summary.json",
+      "fixture_intent": "accept",
+      "value_sha256": "977d48cad0d391fce5a78b1b7dc2060991fffc1833da3329c58133f1d5778cc3",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/result.json",
+      "size_bytes": 3483,
+      "raw_sha256": "ab2c6ca060e5e9e726e62ecda4dff71bf4510ed19de3a40deb8d4e019a56a676",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_result",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "domain_result",
+        "subject_name": "results/controller-domain.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/physical/result.json",
+      "fixture_intent": "accept",
+      "value_sha256": "f4376fbe88a05db6103daa61f9bb3e46da065447c940812894393ac0c65036b2",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/run.json",
+      "size_bytes": 407,
+      "raw_sha256": "bb2790efa70b4ce7df28d43ca538ca0380679e5f52ba2decb53bae270caf4a2f",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_run",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "acceptance_run",
+        "subject_name": "acceptance-run.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/physical/run.json",
+      "fixture_intent": "accept",
+      "value_sha256": "7acb2305a459d70856d851470703c70eee9aeab31915660770f2caba415ad615",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/runtime.json",
+      "size_bytes": 2794,
+      "raw_sha256": "228a82ea8570be357de61051e360ab6780bd1d8c2c97de3646fb56dcf57d0f06",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "runtime_manifest",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "runtime_manifest",
+        "subject_name": "runtime-manifests/controller-domain.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/physical/runtime.json",
+      "fixture_intent": "accept",
+      "value_sha256": "3c8ceda2fe1324d9dd4a175c110406d6869f782b02bd233abaeb75e821a3cb6d",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/scenario.json",
+      "size_bytes": 1814,
+      "raw_sha256": "6648c69bb1e0058c6ba233fa0003c7da4e1a4b898ef2aca543d2104ead133fab",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_scenario",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "scenario",
+        "subject_name": "scenario.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/physical/scenario.json",
+      "fixture_intent": "accept",
+      "value_sha256": "432e3929995040e3c8aae3c2a24d7c1847eac8ca9dfc70929b327fc1be126dee",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/sros2-policy.xml",
+      "size_bytes": 22,
+      "raw_sha256": "65e4965c8bdc876d1b5b43623cbd784a962bd2bac470a5f9ddd8c9f9c7c84110",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "policy",
+        "subject_name": "policy/sros2.xml"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/statement.json",
+      "size_bytes": 21,
+      "raw_sha256": "1419af132b8b1d5c824069737cd28bad498322b4bc691f5b774e6a211d4f6ba6",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "other_evidence",
+        "subject_name": "authorization/statement.json"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/trust-policy.json",
+      "size_bytes": 43,
+      "raw_sha256": "ebf641b9736cfbb450ff34ca3068ddb5130669496993c41319d0760971c65b76",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "policy",
+        "subject_name": "policy/trust.json"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/physical/verification.json",
+      "size_bytes": 1328,
+      "raw_sha256": "c40d98d2ecfab5a814862cc4a428818b006c98d4f76cfde50ac2f6a01e9ff74a",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "execution_verification",
+      "descriptor_context": {
+        "composition": "physical",
+        "kind": "execution_verification",
+        "subject_name": "authorization/verification.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/physical/verification.json",
+      "fixture_intent": "accept",
+      "value_sha256": "9ae006d30b6b253c04ec92329cafb76f39cb0bcbfb77967c3c4b0382ff6cd2ea",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/aggregate.json",
+      "size_bytes": 950,
+      "raw_sha256": "e9f18d04d3c4438da06dc2f3b6dee1fdc8b88e2d20d98cd40d5f424389a9680d",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_aggregate",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "acceptance_aggregate",
+        "subject_name": "acceptance-aggregate.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/aggregate.json",
+      "fixture_intent": "accept",
+      "value_sha256": "66e81d87abded2a7505a305372ab7e6f8f1c8ea3eb12a7a35553607f357ce59b",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/artifacts.json",
+      "size_bytes": 2385,
+      "raw_sha256": "94a3dc67e0703afa1e571c904154c06b8ebefb8952b2ec0b421b1727bb8ac5c5",
+      "classification": "composition_descriptor_context",
+      "reason": "Ordered kind/subject/file inventory for native qualification descriptor composition; capture context, not a role-validation omission.",
+      "value": [
+        {
+          "file": "scenario.json",
+          "kind": "scenario",
+          "subject_name": "scenario.json"
+        },
+        {
+          "file": "control-runtime.json",
+          "kind": "runtime_manifest",
+          "subject_name": "runtime-manifests/control.json"
+        },
+        {
+          "file": "control-result.json",
+          "kind": "domain_result",
+          "subject_name": "results/control.json"
+        },
+        {
+          "file": "control-evidence-index.json",
+          "kind": "evidence_index",
+          "subject_name": "evidence-indexes/control.json"
+        },
+        {
+          "file": "control-summary.json",
+          "kind": "recording_summary",
+          "subject_name": "recording-summaries/control.json"
+        },
+        {
+          "file": "control.mcap",
+          "kind": "recording",
+          "subject_name": "evidence/control.mcap"
+        },
+        {
+          "file": "control.otlp.jsonl",
+          "kind": "traces",
+          "subject_name": "evidence/control.otlp.jsonl"
+        },
+        {
+          "file": "worker-runtime.json",
+          "kind": "runtime_manifest",
+          "subject_name": "runtime-manifests/worker.json"
+        },
+        {
+          "file": "worker-result.json",
+          "kind": "domain_result",
+          "subject_name": "results/worker.json"
+        },
+        {
+          "file": "worker-evidence-index.json",
+          "kind": "evidence_index",
+          "subject_name": "evidence-indexes/worker.json"
+        },
+        {
+          "file": "worker-summary.json",
+          "kind": "recording_summary",
+          "subject_name": "recording-summaries/worker.json"
+        },
+        {
+          "file": "worker.mcap",
+          "kind": "recording",
+          "subject_name": "evidence/worker.mcap"
+        },
+        {
+          "file": "worker.otlp.jsonl",
+          "kind": "traces",
+          "subject_name": "evidence/worker.otlp.jsonl"
+        },
+        {
+          "file": "run.json",
+          "kind": "acceptance_run",
+          "subject_name": "acceptance-run.json"
+        },
+        {
+          "file": "aggregate.json",
+          "kind": "acceptance_aggregate",
+          "subject_name": "acceptance-aggregate.json"
+        },
+        {
+          "file": "channel.json",
+          "kind": "channel_contract",
+          "subject_name": "evidence/control-commands.json"
+        },
+        {
+          "file": "channel-observation.json",
+          "kind": "channel_observation",
+          "subject_name": "evidence/control-commands-observation.json"
+        },
+        {
+          "file": "causal-chain.json",
+          "kind": "causal_chain_contract",
+          "subject_name": "evidence/control-chain.json"
+        },
+        {
+          "file": "transport.json",
+          "kind": "transport_qualification",
+          "subject_name": "transport-qualification.json"
+        },
+        {
+          "file": "bridge-config.json",
+          "kind": "other_evidence",
+          "subject_name": "config/bridge.json"
+        },
+        {
+          "file": "clock-relation.json",
+          "kind": "clock_relation",
+          "subject_name": "evidence/control-worker-clock.json"
+        },
+        {
+          "file": "provider-config.json",
+          "kind": "other_evidence",
+          "subject_name": "providers/config.json"
+        },
+        {
+          "file": "provider-profile.json",
+          "kind": "qualification_profile",
+          "subject_name": "providers/qualification-profile.json"
+        },
+        {
+          "file": "provider-conformance.json",
+          "kind": "provider_conformance",
+          "subject_name": "providers/conformance-result.json"
+        }
+      ]
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/bridge-config.json",
+      "size_bytes": 16,
+      "raw_sha256": "9ed86580a6d73075a4de9a241e9710ca771edc9a136a39a66658c7fcb23a3c2e",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "other_evidence",
+        "subject_name": "config/bridge.json"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/causal-chain.json",
+      "size_bytes": 357,
+      "raw_sha256": "9cbead405c6a4fd63fae151b042869e76eb64edd5e364c9789e3ab8c752c4a9a",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "causal_chain",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "causal_chain_contract",
+        "subject_name": "evidence/control-chain.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/causal-chain.json",
+      "fixture_intent": "accept",
+      "value_sha256": "05bd2176efff01977a109d613c0acedd2f1a416c71ea43f5d32b2e6f92b376a3",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/channel-observation.json",
+      "size_bytes": 539,
+      "raw_sha256": "58ea9514c4fb71063cfd733191177fb89dabafcaba72e3a0f9730f3db82ba6fa",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "transport_channel_observation",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "channel_observation",
+        "subject_name": "evidence/control-commands-observation.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/channel-observation.json",
+      "fixture_intent": "accept",
+      "value_sha256": "2718bf93bb9968229c88e4a90a565f26128c0e6aa5f8019a93584c6a73ab848d",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/channel.json",
+      "size_bytes": 1309,
+      "raw_sha256": "ea000ac31225a1e7fcba17929712af38634fb8c6c45c5a5d548c944b00fe1bf4",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "transport_channel",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "channel_contract",
+        "subject_name": "evidence/control-commands.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/channel.json",
+      "fixture_intent": "accept",
+      "value_sha256": "bfc8e9efb5dcffe2cf8c5c1c32f227cab0428e89baccfdff819d0d15008a8931",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/clock-relation.json",
+      "size_bytes": 650,
+      "raw_sha256": "9a355a6ff99e398745009282d64bc4befc98feae43f29db82396cd82603b35f5",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "clock_relation",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "clock_relation",
+        "subject_name": "evidence/control-worker-clock.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/clock-relation.json",
+      "fixture_intent": "accept",
+      "value_sha256": "d9e371f5d559314c883bc9693b7d1bad2adbe9d09bdbc913a591447c5e764572",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/control-evidence-index.json",
+      "size_bytes": 1194,
+      "raw_sha256": "7265d2bd2ba96d6bc19e20cdfe805b4567893a16c74b7cf173ef5b2179514b1b",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "evidence_index",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "evidence_index",
+        "subject_name": "evidence-indexes/control.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/control-evidence-index.json",
+      "fixture_intent": "accept",
+      "value_sha256": "d68d39044e7e273087937410d8c9154437696d4befbd24af206958df0d60a096",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/control-result.json",
+      "size_bytes": 2644,
+      "raw_sha256": "75078fa761b70832e661754e12723c413e5c8ce95550f692dffd7ca5fce63143",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_result",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "domain_result",
+        "subject_name": "results/control.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/control-result.json",
+      "fixture_intent": "accept",
+      "value_sha256": "2aabd67d8460aede9075a234e7fb0b94c6437000aa6ff2322cb494a129adc121",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/control-runtime.json",
+      "size_bytes": 2272,
+      "raw_sha256": "5dd473d487db926f2b04f6c2f33af442f6b227cca8062fe210fa298d2c348938",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "runtime_manifest",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "runtime_manifest",
+        "subject_name": "runtime-manifests/control.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/control-runtime.json",
+      "fixture_intent": "accept",
+      "value_sha256": "971a0e21998632d13de9426c499be05a725b5633a197fb17bfedea58256b90bf",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/control-summary.json",
+      "size_bytes": 443,
+      "raw_sha256": "13637107229d7dbed9ee4f84dfceb433181dd74d94460d28da4e855e36023dc9",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "recording_summary",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "recording_summary",
+        "subject_name": "recording-summaries/control.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/control-summary.json",
+      "fixture_intent": "accept",
+      "value_sha256": "cf61efe4444a24e5319d49802b5025162cc9252546e01e5986cc115866a3d854",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/control.mcap",
+      "size_bytes": 25,
+      "raw_sha256": "f4fe82e98d662edf14ad4c1d770bc391096715a0766d86a6b6ff9214f8b85ce6",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "recording",
+        "subject_name": "evidence/control.mcap"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/control.otlp.jsonl",
+      "size_bytes": 73,
+      "raw_sha256": "52fe4379e143aa73a0e8f4231bd2e2978c44a02f3672ccab063c87b0d586b45b",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "traces",
+        "subject_name": "evidence/control.otlp.jsonl"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/provider-config.json",
+      "size_bytes": 68,
+      "raw_sha256": "86b6524c6363523874dcfa9c4d2db7c363095b9dfc56340397943104c672187b",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "other_evidence",
+        "subject_name": "providers/config.json"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/provider-conformance.json",
+      "size_bytes": 921,
+      "raw_sha256": "e53cec7333c7112a6d6c20d3bd49877d1e79870392d79c13d7cdcf54ef11fad2",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "conformance_result",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "provider_conformance",
+        "subject_name": "providers/conformance-result.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/provider-conformance.json",
+      "fixture_intent": "accept",
+      "value_sha256": "a402a9435f9bd567babbe97e44c07e72c1fec4d0b50bad3adc88de86e986fe88",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/provider-profile.json",
+      "size_bytes": 186,
+      "raw_sha256": "49b3e7b3036c5c86898f1ec656df532e00dd835461af85fff14a0cb70cca14d7",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "qualification_profile",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "qualification_profile",
+        "subject_name": "providers/qualification-profile.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/provider-profile.json",
+      "fixture_intent": "accept",
+      "value_sha256": "2c022e4a99fcc008adf85543f1d1410aba997949cb67bd1ce64f0f7fc2588ed7",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/run.json",
+      "size_bytes": 417,
+      "raw_sha256": "babbd1fb3f04c1962f167a58813e1d827bd9dbb93b2defdca744fd9bd8e61f6c",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_run",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "acceptance_run",
+        "subject_name": "acceptance-run.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/run.json",
+      "fixture_intent": "accept",
+      "value_sha256": "8bb6c6ebaf99e1164bf78df64d9eff96e829b8292eda8ef6618d6e057da5c1e3",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/scenario.json",
+      "size_bytes": 2428,
+      "raw_sha256": "9b1c47e35a72f456a04da6775816626e2baf26f134ab3c896b1176b55f51bef9",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_scenario",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "scenario",
+        "subject_name": "scenario.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/scenario.json",
+      "fixture_intent": "accept",
+      "value_sha256": "3de50ea82c88fb7ec4415c74cbf2a0bb61c0755b02b94fb54265685c6115676e",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/transport.json",
+      "size_bytes": 2769,
+      "raw_sha256": "3d4204e67f966f842275666d64d95ae58b347a94990bca614a6c78d333010dfc",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "transport_qualification_result",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "transport_qualification",
+        "subject_name": "transport-qualification.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/transport.json",
+      "fixture_intent": "accept",
+      "value_sha256": "48a31c910932a8f05d3cecc15f693d832bb30e885105698e85cba7a5f2fc8e06",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/worker-evidence-index.json",
+      "size_bytes": 1189,
+      "raw_sha256": "df0fbfb927fa53f83b1b770b9dc8fa73f6dd150b4b006539bad4d349b058bc2f",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "evidence_index",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "evidence_index",
+        "subject_name": "evidence-indexes/worker.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/worker-evidence-index.json",
+      "fixture_intent": "accept",
+      "value_sha256": "7eb18c71f5b6f224a7077bacf9712fd98094bd722945b278ed71c5c2338e89af",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/worker-result.json",
+      "size_bytes": 2641,
+      "raw_sha256": "58731c9ee90f765f5ff5548823a06242f5009317b60e8341b039b518b265fe31",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_result",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "domain_result",
+        "subject_name": "results/worker.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/worker-result.json",
+      "fixture_intent": "accept",
+      "value_sha256": "a8f3cd26f6bcb65cefaeba2e97083a669cb7f61d1e8eef5eda61fb15bb892aa3",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/worker-runtime.json",
+      "size_bytes": 2271,
+      "raw_sha256": "456e050e0f43fe9be99e6d46337fb684663b28643bada5a9fb9b9aa93ade9728",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "runtime_manifest",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "runtime_manifest",
+        "subject_name": "runtime-manifests/worker.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/worker-runtime.json",
+      "fixture_intent": "accept",
+      "value_sha256": "183245d13b60b48b0beeb0871c6fa68d806c58bdee4a04fb8da62cc0ca3055cd",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/worker-summary.json",
+      "size_bytes": 443,
+      "raw_sha256": "f9e99d28e3d1b800db274270d149b39bbe87e118d3655c2f9059952c1749b0fd",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "recording_summary",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "recording_summary",
+        "subject_name": "recording-summaries/worker.json"
+      },
+      "document": "fixture/packages/contracts/tests/fixtures/qualification/transport/worker-summary.json",
+      "fixture_intent": "accept",
+      "value_sha256": "52e957f05c37ea93c7b440dad46ae9db7950da1aeca75cadad0db017257ac692",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/worker.mcap",
+      "size_bytes": 24,
+      "raw_sha256": "d2fb8049b5c34591bf1dc1c43419b163d057e69bd6d4dbcc3fe5204f7047b850",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "recording",
+        "subject_name": "evidence/worker.mcap"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/qualification/transport/worker.otlp.jsonl",
+      "size_bytes": 72,
+      "raw_sha256": "8088ea70d167678d946e46ec0eb573ddcea9d0c2d6bfa3168b088dfb04a4d186",
+      "classification": "raw_qualification_asset",
+      "reason": "No published role document; retain exact raw SHA/size/kind/subject in composition and separate raw corpus. Descriptor semantics do not verify bytes/signatures.",
+      "descriptor_context": {
+        "composition": "transport",
+        "kind": "traces",
+        "subject_name": "evidence/worker.otlp.jsonl"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/result/valid/passed.yaml",
+      "size_bytes": 2565,
+      "raw_sha256": "83d8c264058681a12bf102e0393e888fa432189d9c54b54cf75906a7edc99e11",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_result",
+      "document": "fixture/packages/contracts/tests/fixtures/result/valid/passed.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "7d64b389941d07e42f62ce7aa5c2a7633e26067ee6e8056187355316c3a8e6cb",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/robot-description/invalid/escaping-path.json",
+      "size_bytes": 940,
+      "raw_sha256": "a245385e93a62a2307df9bb41b5cd6dec9e4b1e9a9a3ea8a47d5a86c7dc71737",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "robot_description",
+      "document": "fixture/packages/contracts/tests/fixtures/robot-description/invalid/escaping-path.json",
+      "fixture_intent": "reject",
+      "value_sha256": "480740c7e48c586708827815bb9f8df15463a9c8932092ec55a0344a7e3073c9",
+      "outcome": {
+        "status": "rejected",
+        "exception": "ContractValidationError",
+        "error_id": "schema.validation_failed",
+        "path": "$.description.path",
+        "message": "$.description.path: '../outside.urdf' does not match '^(?!.*(?:^|/)\\\\.\\\\.?(?:/|$))[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*(?![\\\\s\\\\S])'"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/robot-description/invalid/prefixed-source-hash.json",
+      "size_bytes": 967,
+      "raw_sha256": "218f638c31372609fbb41d3d3e82ff19d1c3897fdbde75978f705ee975cd5d5e",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "robot_description",
+      "document": "fixture/packages/contracts/tests/fixtures/robot-description/invalid/prefixed-source-hash.json",
+      "fixture_intent": "reject",
+      "value_sha256": "93378e16eb5217797c4a74086b98bc92f8b1eeee9a1b74bc496934c7184e8421",
+      "outcome": {
+        "status": "rejected",
+        "exception": "ContractValidationError",
+        "error_id": "schema.validation_failed",
+        "path": "$.source.sha256",
+        "message": "$.source.sha256: 'sha256:52e5ac9990a65f67cce8683a8c892b144e63233c1dccd4f3a0c7e7acd88d5077' is too long"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/robot-description/invalid/unexpanded-xacro.json",
+      "size_bytes": 961,
+      "raw_sha256": "043340632ab1e1d0be65a2ab494446022244a184c628e44208730ebefcc06527",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "robot_description",
+      "document": "fixture/packages/contracts/tests/fixtures/robot-description/invalid/unexpanded-xacro.json",
+      "fixture_intent": "reject",
+      "value_sha256": "e98db10fed224c4a876b9b3b9b9134f5619da4d6ebf001480026fad419262c11",
+      "outcome": {
+        "status": "rejected",
+        "exception": "ContractValidationError",
+        "error_id": "schema.validation_failed",
+        "path": "$.description.format",
+        "message": "$.description.format: 'xacro' is not one of ['urdf', 'sdf']"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/robot-description/valid/sdf.json",
+      "size_bytes": 805,
+      "raw_sha256": "c6ae5c1818f0f6efb108feabc2356a9d8b9bb4eee993e7811f973cfc42e106d7",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "robot_description",
+      "document": "fixture/packages/contracts/tests/fixtures/robot-description/valid/sdf.json",
+      "fixture_intent": "accept",
+      "value_sha256": "b53dd90aa2bfb7c5b56426d3eff0d9f75eec06c075997ff37e0b76036713ce1d",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/robot-description/valid/urdf.json",
+      "size_bytes": 960,
+      "raw_sha256": "5a5117624d9e7ee8b4e03c96d7f318b9df47012c8387638128fb19cca0c8b605",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "robot_description",
+      "document": "fixture/packages/contracts/tests/fixtures/robot-description/valid/urdf.json",
+      "fixture_intent": "accept",
+      "value_sha256": "3714b9cc1be8d817eb68abb69af443c829d36a30fcaddedac7345d22796cc531",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/run/valid/simulation.yaml",
+      "size_bytes": 400,
+      "raw_sha256": "392a41d609a001eb7feefb467ee923d37c71516b10eda17ba52d2003a999927c",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_run",
+      "document": "fixture/packages/contracts/tests/fixtures/run/valid/simulation.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "c82738b4e51065086fb9be9383e7812d4b2ec67c717188bb32f620e11c1cae26",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/runtime/invalid/cuda-without-accelerator.yaml",
+      "size_bytes": 2394,
+      "raw_sha256": "fa58f7f843e998f1977c701b7dbfd10497afaba326ff4de9427e9ec6fde7286e",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "runtime_manifest",
+      "document": "fixture/packages/contracts/tests/fixtures/runtime/invalid/cuda-without-accelerator.yaml",
+      "fixture_intent": "reject",
+      "value_sha256": "afc89c1c97b01e2869ddacfcdf388e2f606e783554a633f2be95ec55b5fb563a",
+      "outcome": {
+        "status": "rejected",
+        "exception": "ContractValidationError",
+        "error_id": "schema.validation_failed",
+        "path": "$.workload.kind",
+        "message": "$.workload.kind: 'none' was expected"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/runtime/invalid/none-with-model.yaml",
+      "size_bytes": 1549,
+      "raw_sha256": "a28d63b9ac11694eeabd66b70bf4829354da1fcf6841e1ac3e871c7ff9f5533f",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "runtime_manifest",
+      "document": "fixture/packages/contracts/tests/fixtures/runtime/invalid/none-with-model.yaml",
+      "fixture_intent": "reject",
+      "value_sha256": "9c7f9dad6159c1c0cbb1fd8bcc4efe3e1ad61520c3de9739a7be93b479117a11",
+      "outcome": {
+        "status": "rejected",
+        "exception": "ContractValidationError",
+        "error_id": "schema.validation_failed",
+        "path": "$.workload.kind",
+        "message": "$.workload.kind: 'inference' was expected"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/runtime/valid/cpu-simulation.yaml",
+      "size_bytes": 2532,
+      "raw_sha256": "3039ae683a8b9c39cefa6327f5dcd5f5e7ed9fe9cee27111cb939ba511380654",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "runtime_manifest",
+      "document": "fixture/packages/contracts/tests/fixtures/runtime/valid/cpu-simulation.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "bd6ba45613cbc94fe9aed57c38388d417b3bbf939cfee307dd4bc5f5bf050c85",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/runtime/valid/no-inference-simulation.yaml",
+      "size_bytes": 2074,
+      "raw_sha256": "0b5228ad3145f8d37fb4cafd9df2a6aa6e5591a8a07fa89c25033d1a2d047546",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "runtime_manifest",
+      "document": "fixture/packages/contracts/tests/fixtures/runtime/valid/no-inference-simulation.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "82e28de4e025eeb68227c8aa4ca2876ce0d8f6e12b5128f63855a9ba3cd17cb4",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/scenario/invalid/playback-without-dataset.yaml",
+      "size_bytes": 1567,
+      "raw_sha256": "e44973c71ad6bdf206b3db57ebc25d29e18eed47227d2c106fd3a33c9a4a422d",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_scenario",
+      "document": "fixture/packages/contracts/tests/fixtures/scenario/invalid/playback-without-dataset.yaml",
+      "fixture_intent": "reject",
+      "value_sha256": "f62bcefbc011517ee0c091953c06b806251fb1bddee21e3de4ca9783b57cde87",
+      "outcome": {
+        "status": "rejected",
+        "exception": "ContractValidationError",
+        "error_id": "schema.validation_failed",
+        "path": "$",
+        "message": "$: 'dataset_manifest_sha256' is a required property"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/scenario/valid/playback.yaml",
+      "size_bytes": 1667,
+      "raw_sha256": "d12980156474b9b9753e34743481d54dd18f3bea729ada9107661e3972fdb516",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_scenario",
+      "document": "fixture/packages/contracts/tests/fixtures/scenario/valid/playback.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "ed681e5a47336c6411f55b180633dfa5af28f7d69cb1c3571adcf5cf07e879f1",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/tests/fixtures/scenario/valid/simulation-realtime.yaml",
+      "size_bytes": 2205,
+      "raw_sha256": "9965d8675b16996cb36b3efdc51e7d0ce55a59366f340cb5aae3689e3e8f069d",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_scenario",
+      "document": "fixture/packages/contracts/tests/fixtures/scenario/valid/simulation-realtime.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "314b5b2ba2da6b864591a6ac502c2a34632a340481315480d98820d5772fbec1",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/consumer-examples/README.md",
+      "size_bytes": 2972,
+      "raw_sha256": "2b851f2ba7b538d0f28dfa958b31dd28cd5d0e5e8e732e9796f47e3dbb806f79",
+      "classification": "documentation",
+      "reason": "Consumer instructions, not semantic input."
+    },
+    {
+      "path": "packages/contracts/consumer-examples/execution-trust-policy/target-identity.txt",
+      "size_bytes": 18,
+      "raw_sha256": "ee3244180559bd445405a361a9db30fa3c11717b298f2c86a8013662c8eb0c51",
+      "classification": "raw_product_asset",
+      "reason": "Consumer geometry/package/source/identity dependency, not a document role; retain raw provenance separately."
+    },
+    {
+      "path": "packages/contracts/consumer-examples/execution-trust-policy/trust-policy.json",
+      "size_bytes": 687,
+      "raw_sha256": "06de9400b37458c439219637d01440ef22302f61286e4453d9ef88bc1fd17eb7",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "execution_trust_policy",
+      "document": "fixture/packages/contracts/consumer-examples/execution-trust-policy/trust-policy.json",
+      "fixture_intent": "accept",
+      "value_sha256": "b3469d1fb80fa19c5ec64cff639eeb61616b03cf2ab86d96f8aa5042215201e6",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/consumer-examples/flight-controller/README.md",
+      "size_bytes": 1497,
+      "raw_sha256": "0f2df5cc91dcb46a569f1af39afb6f9de5614e1462ce0d7e4e13b3c706b98a31",
+      "classification": "documentation",
+      "reason": "Consumer instructions, not semantic input."
+    },
+    {
+      "path": "packages/contracts/consumer-examples/flight-controller/qualification-profile.json",
+      "size_bytes": 553,
+      "raw_sha256": "afe66f27cde852bccc98495d31f7b34fc365eb4697c67430a77168f5febd30a6",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "qualification_profile",
+      "document": "fixture/packages/contracts/consumer-examples/flight-controller/qualification-profile.json",
+      "fixture_intent": "accept",
+      "value_sha256": "45c038030c6563f42db36a6d879a55dc0617ab02b4e0ce8a5405049a2f9e9899",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/consumer-examples/minimal-simulation/acceptance-aggregate.yaml",
+      "size_bytes": 596,
+      "raw_sha256": "d243b0e4da215ae0a40d7345c2854eb479a2220b7e53d0340d7d4f528e364925",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_aggregate",
+      "document": "fixture/packages/contracts/consumer-examples/minimal-simulation/acceptance-aggregate.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "50892bbbefcaf9409362f9e1b1372dc0fa1351eef43f72af72b6f4a703b906c2",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/consumer-examples/minimal-simulation/acceptance-result.yaml",
+      "size_bytes": 2511,
+      "raw_sha256": "eb9c078ed05a7ee1ad87f11ad121a824097649d655fc5a83a24d050f236ad111",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_result",
+      "document": "fixture/packages/contracts/consumer-examples/minimal-simulation/acceptance-result.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "1aba9a3ecbcd65c888873e93b298bfbaf4451a2161f1a005b19261bde712df34",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/consumer-examples/minimal-simulation/acceptance-run.yaml",
+      "size_bytes": 358,
+      "raw_sha256": "4ecb596ac09bb68b7c828c7aad3712738738f6485474a3430785ea09c1e4adc6",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_run",
+      "document": "fixture/packages/contracts/consumer-examples/minimal-simulation/acceptance-run.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "a189e2672d563bca3b36d85119d266a73324fd9554c7d2d70b6e6ad8a6e35a49",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/consumer-examples/minimal-simulation/evidence/time-authority.json",
+      "size_bytes": 252,
+      "raw_sha256": "57c087f21f9185e09d3bf8e6592332451c8d5a57760807f011ee44d804bef598",
+      "classification": "raw_time_authority_evidence",
+      "reason": "Schema-free example observation payload bound as raw evidence; preserve raw identity, not validate_role."
+    },
+    {
+      "path": "packages/contracts/consumer-examples/minimal-simulation/evidence-index.yaml",
+      "size_bytes": 712,
+      "raw_sha256": "67e9f52299963d5ed7e602e79292ef43309da7b0187513a3fe7362dec79f9ced",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "evidence_index",
+      "document": "fixture/packages/contracts/consumer-examples/minimal-simulation/evidence-index.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "601b4a46a7c30f81ca350f7c7a034c002ad6a51b4c9badb6ab62161198c5cf2a",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/consumer-examples/minimal-simulation/runtime-manifest.yaml",
+      "size_bytes": 2002,
+      "raw_sha256": "759c6555f4ed98ad3974cd41821ec21e49d36cb64d16a5fdf430dc1d14915ccc",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "runtime_manifest",
+      "document": "fixture/packages/contracts/consumer-examples/minimal-simulation/runtime-manifest.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "53c4f320dfa92ace41ac22b156a393227aa76de658080e609e805626dc2f3c8e",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/consumer-examples/minimal-simulation/scenario.yaml",
+      "size_bytes": 2017,
+      "raw_sha256": "6971f903d4d734723158ad510e98caba99d7375132eba3ecad980677ea7816b8",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_scenario",
+      "document": "fixture/packages/contracts/consumer-examples/minimal-simulation/scenario.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "6e3f0643233470b8c7121c0d729553b8844680db13e53c308aacc95f3fb35d02",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/consumer-examples/robot-description/cad/body.scad",
+      "size_bytes": 106,
+      "raw_sha256": "52e5ac9990a65f67cce8683a8c892b144e63233c1dccd4f3a0c7e7acd88d5077",
+      "classification": "raw_product_asset",
+      "reason": "Consumer geometry/package/source/identity dependency, not a document role; retain raw provenance separately."
+    },
+    {
+      "path": "packages/contracts/consumer-examples/robot-description/ros/unit_description/CMakeLists.txt",
+      "size_bytes": 182,
+      "raw_sha256": "62fdbc3f8c176bf96a01a031e998de322fc3c1be393c79b6ab405acabc3e76fc",
+      "classification": "raw_product_asset",
+      "reason": "Consumer geometry/package/source/identity dependency, not a document role; retain raw provenance separately."
+    },
+    {
+      "path": "packages/contracts/consumer-examples/robot-description/ros/unit_description/meshes/body.obj",
+      "size_bytes": 254,
+      "raw_sha256": "2fbb3f7e4529b449eb3ba74bf6d845d476be7ceca9df21544a2325a0d269a89f",
+      "classification": "raw_product_asset",
+      "reason": "Consumer geometry/package/source/identity dependency, not a document role; retain raw provenance separately."
+    },
+    {
+      "path": "packages/contracts/consumer-examples/robot-description/ros/unit_description/package.xml",
+      "size_bytes": 400,
+      "raw_sha256": "4352f43a8b68eeed6bcd2edf79cd88b04fb1105ab5b961ded8ee55ccd5fe1293",
+      "classification": "raw_product_asset",
+      "reason": "Consumer geometry/package/source/identity dependency, not a document role; retain raw provenance separately."
+    },
+    {
+      "path": "packages/contracts/consumer-examples/robot-description/ros/unit_description/sdf/body.sdf",
+      "size_bytes": 531,
+      "raw_sha256": "c2637610919cd3169c4f0222a8a31cd6642391633e5a98c264d1e24f0c3c290e",
+      "classification": "raw_product_asset",
+      "reason": "Consumer geometry/package/source/identity dependency, not a document role; retain raw provenance separately."
+    },
+    {
+      "path": "packages/contracts/consumer-examples/robot-description/ros/unit_description/urdf/body.urdf",
+      "size_bytes": 485,
+      "raw_sha256": "ff6ba45e2dfafaaa617e1a2d0db16f8fe36da9ba33018b207f0753efb3ce9c9f",
+      "classification": "raw_product_asset",
+      "reason": "Consumer geometry/package/source/identity dependency, not a document role; retain raw provenance separately."
+    },
+    {
+      "path": "packages/contracts/consumer-examples/robot-description/sim/robot-description-sdf.json",
+      "size_bytes": 805,
+      "raw_sha256": "c6ae5c1818f0f6efb108feabc2356a9d8b9bb4eee993e7811f973cfc42e106d7",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "robot_description",
+      "document": "fixture/packages/contracts/consumer-examples/robot-description/sim/robot-description-sdf.json",
+      "fixture_intent": "accept",
+      "value_sha256": "b53dd90aa2bfb7c5b56426d3eff0d9f75eec06c075997ff37e0b76036713ce1d",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/contracts/consumer-examples/robot-description/sim/robot-description.json",
+      "size_bytes": 960,
+      "raw_sha256": "5a5117624d9e7ee8b4e03c96d7f318b9df47012c8387638128fb19cca0c8b605",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "robot_description",
+      "document": "fixture/packages/contracts/consumer-examples/robot-description/sim/robot-description.json",
+      "fixture_intent": "accept",
+      "value_sha256": "3714b9cc1be8d817eb68abb69af443c829d36a30fcaddedac7345d22796cc531",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/harness/tests/fixtures/histograms/cumulative-baseline.jsonl",
+      "size_bytes": 627,
+      "raw_sha256": "86a32b98043965c5e55bce64f0aa355916c30231f526feed2fc43be8a1db9eb5",
+      "classification": "raw_observation_evidence",
+      "reason": "OTLP/raw observation stream, not a document role; separate raw evidence corpus."
+    },
+    {
+      "path": "packages/harness/tests/fixtures/histograms/cumulative-reset.jsonl",
+      "size_bytes": 629,
+      "raw_sha256": "8fed38015a44dbe970dd326d5b08fab93ed525f5ca354bcfcec77091a3f92611",
+      "classification": "raw_observation_evidence",
+      "reason": "OTLP/raw observation stream, not a document role; separate raw evidence corpus."
+    },
+    {
+      "path": "packages/harness/tests/fixtures/histograms/delta.jsonl",
+      "size_bytes": 328,
+      "raw_sha256": "e96bd1b6a16399e6a4214bcf7a6d8079598186e6c60b4b74a078d9cd5e0fc81b",
+      "classification": "raw_observation_evidence",
+      "reason": "OTLP/raw observation stream, not a document role; separate raw evidence corpus."
+    },
+    {
+      "path": "packages/harness/tests/fixtures/physical/hil-permit.json",
+      "size_bytes": 1237,
+      "raw_sha256": "407a59cbd730247a873117066239440c6128b724bee8d6d60ca4db41c80dfa58",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "execution_permit",
+      "document": "fixture/packages/harness/tests/fixtures/physical/hil-permit.json",
+      "fixture_intent": "accept",
+      "value_sha256": "949c71da85f7e71d134fe66efffe57874b65e72ce2062383ab0d2ad752d4e25a",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/harness/tests/fixtures/physical/hil-runtime.json",
+      "size_bytes": 3679,
+      "raw_sha256": "b018ee312788d9d18e2899f401eea538e5c7416d22cabda696525ac7a7839cb4",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "runtime_manifest",
+      "document": "fixture/packages/harness/tests/fixtures/physical/hil-runtime.json",
+      "fixture_intent": "accept",
+      "value_sha256": "2828a9b286a22a88a0ee6065acaa2c571cf9709fa876fc34c1bdac75ec7b4d55",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/harness/tests/fixtures/physical/hil-scenario.yaml",
+      "size_bytes": 1816,
+      "raw_sha256": "16878b8e3c29f53d255d1b7883bf3f708552e77a4e6dd58b9eabc989b1f32b97",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_scenario",
+      "document": "fixture/packages/harness/tests/fixtures/physical/hil-scenario.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "1da31181e288365d107d08d8df308086af4be493a76959e8f4a773591b36cd1f",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/harness/tests/fixtures/physical/hil-verification.json",
+      "size_bytes": 1523,
+      "raw_sha256": "993b16dfa4ee41359be5831f1756fededa50fb0d3cac8241da87903881fdfba8",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "execution_verification",
+      "document": "fixture/packages/harness/tests/fixtures/physical/hil-verification.json",
+      "fixture_intent": "accept",
+      "value_sha256": "4bd1bc6e7e1981d642e3f20c682bb57e162ae5f1e38642459dc5f08e02f23612",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/harness/tests/fixtures/simulation/runtime.yaml",
+      "size_bytes": 2066,
+      "raw_sha256": "cf5cef41853b93547800aa64327331b6effdca30506dd1920091d79c842ec1da",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "runtime_manifest",
+      "document": "fixture/packages/harness/tests/fixtures/simulation/runtime.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "53d470ee4ca5b4afa3657a781153e8197e37367c13330dbfa447e60a8ed41330",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/harness/tests/fixtures/simulation/scenario.yaml",
+      "size_bytes": 1629,
+      "raw_sha256": "8194f11ca132d7698fd788761173c831960123127e34f663b204cb4c5edafc42",
+      "classification": "semantic_document",
+      "reason": "Public role document; freeze JSON values and baseline public outcome.",
+      "role": "acceptance_scenario",
+      "document": "fixture/packages/harness/tests/fixtures/simulation/scenario.yaml",
+      "fixture_intent": "accept",
+      "value_sha256": "540f578006dadbdad1748eb607d579bc785ff5259d86d78e5594face6d10c0f7",
+      "outcome": {
+        "status": "accepted"
+      }
+    },
+    {
+      "path": "packages/harness/tests/live/fixtures/metric-golden.json",
+      "size_bytes": 193,
+      "raw_sha256": "dc4b8492ee3d805ade4336a485e8562b665c9563220d9dadba6a347230592e56",
+      "classification": "live_expected_golden",
+      "reason": "Live metric expectation data, not a catalog contract role; retain in separate native live/metric test corpus."
+    },
+    {
+      "path": "packages/harness/tests/live/fixtures/qualification-golden.json",
+      "size_bytes": 280,
+      "raw_sha256": "8482f9b901a5b9d8d035e2e024397aebcb250cf74ce46017209498d98866bb28",
+      "classification": "live_expected_golden",
+      "reason": "Live metric expectation data, not a catalog contract role; retain in separate native live/metric test corpus."
+    }
+  ]
+}

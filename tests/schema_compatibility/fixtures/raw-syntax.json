@@ -1,0 +1,321 @@
+{
+  "baseline_commit": "dc02c62897372514537cf241f06dc71b9f960c44",
+  "cases": [
+    {
+      "id": "syntax/0",
+      "operation": "syntax",
+      "source_name": "case-0.yaml",
+      "raw": "value: 1\nvalue: 2\n",
+      "raw_sha256": "257f2b834e1cb827eaf32f85fd8470e66c28a9124dea18174951b54bede93575",
+      "expected": {
+        "status": "rejected",
+        "exception": "DocumentParseError",
+        "error_id": "input.duplicate_key",
+        "path": "$.value",
+        "message": "duplicate object key: 'value'"
+      }
+    },
+    {
+      "id": "syntax/1",
+      "operation": "syntax",
+      "source_name": "case-1.yaml",
+      "raw": "value: &cycle [*cycle]\n",
+      "raw_sha256": "a2064eae65bb83f904ed76174de6bb325bdc444a9f21981ba175b3f48b3a8803",
+      "expected": {
+        "status": "rejected",
+        "exception": "DocumentParseError",
+        "error_id": "input.yaml_alias",
+        "path": null,
+        "message": "YAML aliases are not allowed"
+      }
+    },
+    {
+      "id": "syntax/2",
+      "operation": "syntax",
+      "source_name": "case-2.yaml",
+      "raw": "value: .inf\n",
+      "raw_sha256": "e6cea5a9407619d1faf2d5f51354624bfc0a940bb9aa66b0e657c7762d49dac7",
+      "expected": {
+        "status": "rejected",
+        "exception": "NonFiniteNumberError",
+        "error_id": "input.non_finite_number",
+        "path": "$.value",
+        "message": "$.value: non-finite numbers are not valid JSON"
+      }
+    },
+    {
+      "id": "syntax/3",
+      "operation": "syntax",
+      "source_name": "case-3.yaml",
+      "raw": "value: !!timestamp 2026-09-09T00:00:00Z\n",
+      "raw_sha256": "e80f0f9763443106b2c5afac4fa58e37942d733ab304911420d17fd40a5dd786",
+      "expected": {
+        "status": "rejected",
+        "exception": "DocumentParseError",
+        "error_id": "input.parse_failed",
+        "path": "$.value",
+        "message": "unsupported or invalid YAML core tag: tag:yaml.org,2002:timestamp"
+      }
+    },
+    {
+      "id": "syntax/4",
+      "operation": "syntax",
+      "source_name": "case-4.yaml",
+      "raw": "value: {1: coerced}\n",
+      "raw_sha256": "56e30ddf5b15ad4c51791761b9fdb142e96bdd5eec903cbcd33d3c236361a9a4",
+      "expected": {
+        "status": "rejected",
+        "exception": "DocumentParseError",
+        "error_id": "input.parse_failed",
+        "path": "$.value",
+        "message": "object keys must be strings"
+      }
+    },
+    {
+      "id": "syntax/5",
+      "operation": "syntax",
+      "source_name": "case-5.yaml",
+      "raw": "value: !!set {a: null}\n",
+      "raw_sha256": "c3271a1a7eea9b9126c5e30a543055c7a6185c0138ae851cf25523f79c29a930",
+      "expected": {
+        "status": "rejected",
+        "exception": "DocumentParseError",
+        "error_id": "input.parse_failed",
+        "path": "$.value",
+        "message": "unsupported or invalid YAML core tag: tag:yaml.org,2002:set"
+      }
+    },
+    {
+      "id": "syntax/6",
+      "operation": "syntax",
+      "source_name": "case-6.yaml",
+      "raw": "build: {<<: {tool: onnx}, tool: 17, tool: onnx}\n",
+      "raw_sha256": "f6e3933f481ac2ce1d19f5bd9686018e32dcf4daf9869d27d4d8bb6e9b224fed",
+      "expected": {
+        "status": "rejected",
+        "exception": "DocumentParseError",
+        "error_id": "input.duplicate_key",
+        "path": "$.build.tool",
+        "message": "duplicate object key: 'tool'"
+      }
+    },
+    {
+      "id": "syntax/7",
+      "operation": "syntax",
+      "source_name": "case-7.yaml",
+      "raw": "build: {!!merge <<: {tool: onnx}, tool: 17, tool: onnx}\n",
+      "raw_sha256": "c7b794462482294267b0d64466cd6c8d680a83e3a7d80279ea67a7edd857d1d2",
+      "expected": {
+        "status": "rejected",
+        "exception": "DocumentParseError",
+        "error_id": "input.parse_failed",
+        "path": "$.build",
+        "message": "unsupported or invalid YAML core tag: tag:yaml.org,2002:merge"
+      }
+    },
+    {
+      "id": "syntax/8",
+      "operation": "syntax",
+      "source_name": "case-8.yaml",
+      "raw": "value: !!int 1_000\n",
+      "raw_sha256": "13617dd8232be2631b66595a7f693c84ddd8e7b5bf7d17dc1495867d7d5ea466",
+      "expected": {
+        "status": "rejected",
+        "exception": "DocumentParseError",
+        "error_id": "input.parse_failed",
+        "path": "$.value",
+        "message": "unsupported or invalid YAML core tag: tag:yaml.org,2002:int"
+      }
+    },
+    {
+      "id": "syntax/9",
+      "operation": "syntax",
+      "source_name": "case-9.yaml",
+      "raw": "build: {version: !!str {!!value ignored: !native 1.20.1}}\n",
+      "raw_sha256": "07c56060a794b208d48c80b5bc163deb4f7acbe716fbeca75fc1093c7f29a2cf",
+      "expected": {
+        "status": "rejected",
+        "exception": "DocumentParseError",
+        "error_id": "input.parse_failed",
+        "path": "$.build.version",
+        "message": "unsupported or invalid YAML core tag: tag:yaml.org,2002:str"
+      }
+    },
+    {
+      "id": "syntax/10",
+      "operation": "syntax",
+      "source_name": "case-10.yaml",
+      "raw": "%YAML 1.1\n---\nvalue: 010\n",
+      "raw_sha256": "3c82db94ac625dfc374a307db087e7a2e6b75506c71ff840fd6a72a9a9d177ab",
+      "expected": {
+        "value": {
+          "value": 10
+        },
+        "roundtrip": {
+          "value": 10
+        },
+        "status": "accepted"
+      }
+    },
+    {
+      "id": "syntax/11",
+      "operation": "syntax",
+      "source_name": "case-11.json",
+      "raw": "{\"value\": 1, \"value\": 2}",
+      "raw_sha256": "f2f0d8500112e9a73d47c5f12c79f60613b4f5683c1525f1e174d566a458457c",
+      "expected": {
+        "status": "rejected",
+        "exception": "DocumentParseError",
+        "error_id": "input.duplicate_key",
+        "path": "$.value",
+        "message": "duplicate object key: 'value'"
+      }
+    },
+    {
+      "id": "syntax/12",
+      "operation": "syntax",
+      "source_name": "case-12.json",
+      "raw": "{\"value\": NaN}",
+      "raw_sha256": "ddd5f29a6fa7df6d4b876ddb85d19982fec60048b6e9f4cd8526d94b412464c1",
+      "expected": {
+        "status": "rejected",
+        "exception": "NonFiniteNumberError",
+        "error_id": "input.non_finite_number",
+        "path": "$.value",
+        "message": "$.value: non-finite numbers are not valid JSON"
+      }
+    },
+    {
+      "id": "syntax/13",
+      "operation": "syntax",
+      "source_name": "case-13.json",
+      "raw": "{\"value\": 1,}",
+      "raw_sha256": "aa3ce2ccde5ccf6101d637a94f64a47cea5e9c391f3707bde88bffb87a2694f4",
+      "expected": {
+        "status": "rejected",
+        "exception": "DocumentParseError",
+        "error_id": "input.parse_failed",
+        "path": null,
+        "message": "cannot parse case-13.json: Expecting property name enclosed in double quotes: line 1 column 13 (char 12)"
+      }
+    },
+    {
+      "id": "syntax/14",
+      "operation": "syntax",
+      "source_name": "case-14.yaml",
+      "raw": "source: [yes, 010, true, 1.25, null, \"2026-09-09\"]\n",
+      "raw_sha256": "1f2a2ea53b79a39f775373f1b95721c4dcb26aa222b7bb7a420e1f8c4cd7c28f",
+      "expected": {
+        "value": {
+          "source": [
+            "yes",
+            10,
+            true,
+            1.25,
+            null,
+            "2026-09-09"
+          ]
+        },
+        "roundtrip": {
+          "source": [
+            "yes",
+            10,
+            true,
+            1.25,
+            null,
+            "2026-09-09"
+          ]
+        },
+        "status": "accepted"
+      }
+    },
+    {
+      "id": "syntax/15",
+      "operation": "syntax",
+      "source_name": "case-15.yaml",
+      "raw": "build: {<<: {tool: onnx}, tool: different}\n",
+      "raw_sha256": "26fc1de69aa58547b030be2c3436313e4adf7cbff02bcd5491bdbf729b0b0a22",
+      "expected": {
+        "value": {
+          "build": {
+            "<<": {
+              "tool": "onnx"
+            },
+            "tool": "different"
+          }
+        },
+        "roundtrip": {
+          "build": {
+            "<<": {
+              "tool": "onnx"
+            },
+            "tool": "different"
+          }
+        },
+        "status": "accepted"
+      }
+    },
+    {
+      "id": "syntax/16",
+      "operation": "syntax",
+      "source_name": "case-16.yaml",
+      "raw": "---\nschema_version: model-artifact-manifest.v1\nsource:\n  uri: oci://ghcr.io/example/models/detector@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n  sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n  size_bytes: 1\n  format: onnx\n  media_type: application/onnx\n  runtime_family: onnx\n  execution_provider: reference\n  inputs: &id001\n    - name: images\n      element_type: float32\n      shape:\n        - batch\n        - 3\n        - 640\n        - 640\n  outputs: &id002\n    - name: detections\n      element_type: float32\n      shape:\n        - batch\n        - candidates\n        - 6\ntarget:\n  uri: oci://ghcr.io/example/models/detector@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n  sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n  size_bytes: 1\n  format: onnx\n  media_type: application/onnx\n  runtime_family: onnxruntime_cpu\n  execution_provider: CPUExecutionProvider\n  inputs: *id001\n  outputs: *id002\nbuild:\n  tool: onnx\n  version: 1.20.1\n  configuration_sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n  source_artifact_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nnumerical_conformance:\n  report_sha256: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\n  reference_artifact_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n  sample_dataset_sha256: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\n  absolute_tolerance: 0\n  relative_tolerance: 0\n  passed: true\ncompatibility:\n  portable: true\n  hardware: []\nmodel_id: org.example.detector.onnx\n",
+      "raw_sha256": "ecb9650ec09f533a0ca93b5c6361e53b39cb025727b43a9f0b4f2c80f62e43eb",
+      "expected": {
+        "status": "rejected",
+        "exception": "DocumentParseError",
+        "error_id": "input.yaml_alias",
+        "path": null,
+        "message": "YAML aliases are not allowed"
+      }
+    },
+    {
+      "id": "syntax/17",
+      "operation": "syntax",
+      "source_name": "case-17.yaml",
+      "raw": "value: 1_000\n",
+      "raw_sha256": "faddbdb875457ab36192339adf852bc4751d77b1cec83a13499e9023ee344490",
+      "expected": {
+        "value": {
+          "value": "1_000"
+        },
+        "roundtrip": {
+          "value": "1_000"
+        },
+        "status": "accepted"
+      }
+    },
+    {
+      "id": "syntax/18",
+      "operation": "syntax",
+      "source_name": "case-18.yaml",
+      "raw": "value: 0b10\n",
+      "raw_sha256": "06e5fcba3b38d35e88148bba77cd1eb9ad87cf1b337313439e1926e218a5eff0",
+      "expected": {
+        "value": {
+          "value": "0b10"
+        },
+        "roundtrip": {
+          "value": "0b10"
+        },
+        "status": "accepted"
+      }
+    },
+    {
+      "id": "syntax/19",
+      "operation": "syntax",
+      "source_name": "case-19.yaml",
+      "raw": "value: 2026-09-09T00:00:00Z\n",
+      "raw_sha256": "5eaf881f9c41540b7d8c6fd20c74b11bfb06007bdd189a42b78da7da1c156825",
+      "expected": {
+        "value": {
+          "value": "2026-09-09T00:00:00Z"
+        },
+        "roundtrip": {
+          "value": "2026-09-09T00:00:00Z"
+        },
+        "status": "accepted"
+      }
+    }
+  ]
+}

@@ -9,7 +9,7 @@ The package uses Semantic Versioning and is currently pre-`1.0.0`. It therefore
 does not claim the stable-version requirement of REP-2004 Quality Level 3.
 Public interfaces and compatibility rules are listed in
 [Compatibility Policy](docs/compatibility.md).
-The published pair is harness 0.19.0 / contracts 0.18.1; the library dependency
+The published pair is harness 0.19.1 / contracts 0.18.2; the library dependency
 remains `robotics-runtime-contracts>=0.18,<0.19`.
 
 ## Change Control
@@ -45,7 +45,11 @@ CI tests document-only commands on Linux with Python 3.12 through 3.14. A
 separate Linux job exercises live observation with real ROS 2 Jazzy and an
 OpenTelemetry Collector, including a lifecycle transition during measurement.
 These fixtures do not qualify every robot, hardware provider, or REP-2000 Tier 1
-platform, which is another reason not to claim Quality Level 3.
+platform, which is another reason not to claim Quality Level 3. This declaration
+retains the published pair's scope: infra R9 accepted its separate B2 stock
+profile with 0.18.1/0.19.0, while R10's released B3 run with 0.18.2/0.19.1
+remains unaccepted. Source changes and the planned plugin host do not expand
+the quality claim of these immutable package releases.
 
 ## Security
 

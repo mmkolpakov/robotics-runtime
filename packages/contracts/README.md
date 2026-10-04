@@ -31,13 +31,13 @@ they do not select a schema.
 ## Install
 
 Python 3.12 through 3.14 is supported. The current published version is
-[0.18.1 on PyPI](https://pypi.org/project/robotics-runtime-contracts/0.18.1/), with
+[0.18.2 on PyPI](https://pypi.org/project/robotics-runtime-contracts/0.18.2/), with
 archives in the root workspace's
-[tagged release](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.18.1):
+[tagged release](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.18.2):
 
 ```bash
 uv venv
-uv pip install robotics-runtime-contracts==0.18.1
+uv pip install robotics-runtime-contracts==0.18.2
 ```
 
 Release assets include build-provenance attestations. See
@@ -113,7 +113,7 @@ evidence or process memory; existing MCAP record/chunk limits still apply.
 
 ## Contract Set
 
-Release 0.18.1 publishes one catalogued `v1` contract set. These identifiers are
+Release 0.18.2 publishes one catalogued `v1` contract set. These identifiers are
 not compatible with every historical `v1` document. The
 machine-readable source of truth is
 [`catalog.v1.json`](src/robotics_runtime_contracts/schemas/catalog.v1.json).
@@ -322,9 +322,11 @@ adopting a context-manager API. Paths must not be persisted for another process.
 
 ## Version Policy
 
-The published harness 0.19.0 uses contracts 0.18.1. Runtime infra's current
-source foundation and historical OCI release have separate evidence scopes;
-see [COMPATIBILITY.md](COMPATIBILITY.md).
+The published harness 0.19.1 uses contracts 0.18.2. Both releases come from
+workspace source `dc02c62897372514537cf241f06dc71b9f960c44`. Later source
+changes have not been published under these versions. Infra's accepted R9
+stock profile and published R10 have separate evidence scopes; R10's released
+B3 run is not accepted. See [COMPATIBILITY.md](COMPATIBILITY.md).
 Published schema names now permit only additive changes; breaking changes
 require a new schema major and migration notes. The structural compatibility
 gate checks bounded structural rules and public semantic regressions against

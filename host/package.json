@@ -1,0 +1,68 @@
+{
+  "name": "@robotics-runtime/host",
+  "version": "0.1.0-rc.0",
+  "private": true,
+  "type": "module",
+  "description": "Cordis composition host for robotics runtime workers",
+  "engines": {
+    "node": "24.21.0",
+    "npm": "11.19.0"
+  },
+  "packageManager": "npm@11.19.0",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    },
+    "./plugins/jobs": {
+      "types": "./dist/src/plugins/jobs/index.d.ts",
+      "import": "./dist/src/plugins/jobs/index.js"
+    },
+    "./plugins/documents": {
+      "types": "./dist/src/plugins/documents/index.d.ts",
+      "import": "./dist/src/plugins/documents/index.js"
+    },
+    "./plugins/evaluation": {
+      "types": "./dist/src/plugins/evaluation/index.d.ts",
+      "import": "./dist/src/plugins/evaluation/index.js"
+    },
+    "./plugins/admission": {
+      "types": "./dist/src/plugins/admission/index.d.ts",
+      "import": "./dist/src/plugins/admission/index.js"
+    },
+    "./plugins/application-lifecycle": {
+      "types": "./dist/src/plugins/application-lifecycle/index.d.ts",
+      "import": "./dist/src/plugins/application-lifecycle/index.js"
+    },
+    "./plugins/run-owner": {
+      "types": "./dist/src/plugins/run-owner/index.d.ts",
+      "import": "./dist/src/plugins/run-owner/index.js"
+    }
+  },
+  "files": [
+    "dist/src",
+    "schemas",
+    "producers"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "check:boundary": "node tools/check-boundary.mjs",
+    "test:workers": "npm run build && node --test dist/test/*.integration.js"
+  },
+  "dependencies": {
+    "@cordisjs/plugin-include": "1.1.0",
+    "@cordisjs/plugin-loader": "1.0.0-rc.7",
+    "@cordisjs/plugin-logger-console": "1.0.0",
+    "@standard-schema/spec": "1.1.0",
+    "cordis": "4.0.0-rc.10",
+    "cosmokit": "1.8.1",
+    "execa": "10.0.1",
+    "js-yaml": "4.3.2",
+    "schemastery": "3.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "typescript": "7.0.2"
+  }
+}

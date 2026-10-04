@@ -17,14 +17,15 @@ from referencing.exceptions import Unresolvable
 
 from scripts import check_schema_compatibility as gate
 from scripts.bundle_schemas import DIALECT, ROOT, Schema, read_schemas
-from scripts.schema_compatibility import history, semantic
-from scripts.schema_compatibility.probe import fixture_document
+from scripts.schema_compatibility import history, semantic, snapshot
+from scripts.schema_compatibility.probe import execute
 from scripts.schema_compatibility.structure import (
     Context,
     Expansion,
     ReviewRequired,
     check_structure,
     compare,
+    token,
 )
 
 
@@ -66,7 +67,7 @@ def test_actual_published_git_baseline_and_semantics(published: Path) -> None:
     assert release.commit in result
     assert "retained schemas" in result
     if release.tag == history.LEGACY_TAG:
-        assert "29 retained schemas; 16 semantic cases" in result
+        assert "29 retained schemas; 67 semantic cases" in result
 
 
 @pytest.mark.parametrize(
@@ -373,9 +374,10 @@ def test_semantic_gate_replays_published_qualification_documents(
     published: Path, tmp_path: Path
 ) -> None:
     names = semantic.published_documents(published)
-    assert "tests/fixtures/qualification/transport/clock-relation.json" in names
-    assert any(name.startswith("consumer-examples/") for name in names)
-    assert not any("/invalid/" in name for name in names)
+    assert "packages/contracts/tests/fixtures/qualification/transport/clock-relation.json" in names
+    assert any(name.startswith("packages/contracts/consumer-examples/") for name in names)
+    assert any("/invalid/" in name for name in names)
+    assert any(name.startswith("packages/harness/tests/fixtures/") for name in names)
     candidate = tmp_path / "candidate"
     shutil.copytree(ROOT / "packages/contracts/src", candidate / "src")
     path = candidate / "src/robotics_runtime_contracts/semantics.py"
@@ -392,100 +394,150 @@ def test_semantic_probe_uses_selected_source_despite_pythonpath(
     published: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("PYTHONPATH", str(ROOT / "packages/contracts/src"))
-    response = semantic.probe(published / "src", {"documents": semantic.regressions()})
+    documents = semantic.regressions()
+    request = {
+        "documents": documents,
+        "cases": [{"id": name, "operation": "document", "document": name} for name in documents],
+    }
+    response = execute(published / "src", request)
     assert Path(response["origin"]).is_relative_to(published)
-    assert response["documents"] == semantic.regressions()
+    assert response["documents"] == documents
+    assert all(value == {"status": "accepted"} for value in response["outcomes"].values())
 
 
-def test_published_alias_fixture_is_validated_as_values_without_rewriting_bytes(
-    published: Path, tmp_path: Path
-) -> None:
-    # Keep this regression even after a newer release removes fixture aliases.
-    frozen_bytes = history.git(
+def test_published_alias_values_are_frozen_without_rewriting_raw_bytes(tmp_path: Path) -> None:
+    frozen = semantic.regressions()["regression/legacy-alias.json"]
+    assert frozen["model_id"] == "org.example.detector.onnx"
+    assert frozen["source"]["inputs"][0]["shape"] == ["batch", 3, 640, 640]
+    assert frozen["target"]["inputs"] == frozen["source"]["inputs"]
+    raw = history.git(
         ROOT, "show", f"{history.LEGACY_COMMIT}:tests/fixtures/model-artifact/valid/onnx.yaml"
     )
     original = tmp_path / "onnx.yaml"
-    original.write_bytes(frozen_bytes)
-    assert b"*id001" in frozen_bytes
-    response = semantic.probe(published / "src", {"files": {"onnx": str(original)}})
-    document = response["documents"]["onnx"]
-    assert document == fixture_document(original)
-    assert original.read_bytes() == frozen_bytes
-    # The current public file loader still rejects aliases: compatibility of
-    # document values does not weaken its input syntax or resource limits.
-    from robotics_runtime_contracts import load_mapping
-    from robotics_runtime_contracts.serialization import DocumentParseError
+    original.write_bytes(raw)
+    from robotics_runtime_contracts import DocumentParseError, load_mapping
 
     with pytest.raises(DocumentParseError, match="aliases"):
         load_mapping(original)
-    candidate = ROOT / "packages/contracts/src"
-    assert semantic.probe(candidate, {"documents": response["documents"]})["documents"] == {
-        "onnx": document
+    assert original.read_bytes() == raw
+    release = history.Baseline(history.LEGACY_TAG, history.LEGACY_COMMIT, "")
+    old = history.extract(ROOT, release, tmp_path / "historical")
+    request = {
+        "documents": {"alias": frozen},
+        "cases": [{"id": "alias", "operation": "document", "document": "alias"}],
     }
+    expected = {"alias": {"status": "accepted"}}
+    semantic.compare_request(old / "src", request, expected)
+    semantic.compare_request(ROOT / "packages/contracts/src", request, expected)
 
 
-def test_fixture_decoder_preserves_yaml12_json_values(tmp_path: Path) -> None:
-    path = tmp_path / "values.yaml"
-    path.write_text(
-        'source: &values [yes, 010, true, 1.25, null, "2026-09-09"]\ncopy: *values\n',
-        encoding="utf-8",
+def test_corpus_classifies_all_four_roots_and_preserves_contexts() -> None:
+    inventory, documents, contexts = snapshot.read_corpus()
+    assert len(inventory["entries"]) == 139
+    assert len({entry["path"] for entry in inventory["entries"]}) == 139
+    assert inventory["roots"] == [
+        "packages/contracts/tests/fixtures",
+        "packages/contracts/consumer-examples",
+        "packages/harness/tests/fixtures",
+        "packages/harness/tests/live/fixtures",
+    ]
+    fixtures = [entry for entry in inventory["entries"] if "document" in entry]
+    assert len(fixtures) == 92
+    assert sum(entry["outcome"]["status"] == "rejected" for entry in fixtures) == 12
+    assert (
+        len(
+            [
+                entry
+                for entry in inventory["entries"]
+                if entry["classification"] == "composition_descriptor_context"
+            ]
+        )
+        == 3
     )
-    assert fixture_document(path) == {
-        "source": ["yes", 10, True, 1.25, None, "2026-09-09"],
-        "copy": ["yes", 10, True, 1.25, None, "2026-09-09"],
+    ids = {case["id"] for case in contexts["cases"]}
+    assert len(ids) == 288
+    assert len([name for name in ids if name.startswith("role/")]) == 26
+    assert len([name for name in ids if name.startswith("qualification/contradiction/")]) == 16
+    assert {
+        "workload/missing",
+        "workload/mismatch",
+        "workload/match",
+        "workload/unpinned-absent",
+        "workload/unpinned-present",
+    } <= ids
+    for entry in fixtures:
+        assert entry["document"] in documents
+        assert entry["outcome"] == contexts["expected"][entry["document"]]
+
+
+def test_negative_fixture_cannot_silently_become_accepted(tmp_path: Path) -> None:
+    candidate = tmp_path / "candidate"
+    shutil.copytree(ROOT / "packages/contracts/src", candidate / "src")
+    path = candidate / "src/robotics_runtime_contracts/__init__.py"
+    source = path.read_text()
+    needle = "    ensure_finite_numbers(document)\n"
+    assert source.count(needle) == 1
+    source = source.replace(
+        needle,
+        '    if document.get("schema_version") == "dataset-manifest.v1":\n        return\n'
+        + needle,
+    )
+    path.write_text(source)
+    _, documents, contexts = snapshot.read_corpus()
+    identifier = "fixture/packages/contracts/tests/fixtures/dataset/invalid/s3-without-version.yaml"
+    case = next(case for case in contexts["cases"] if case["id"] == identifier)
+    request = {"documents": {case["document"]: documents[case["document"]]}, "cases": [case]}
+    with pytest.raises(ReviewRequired, match="s3-without-version"):
+        semantic.compare_request(
+            candidate / "src", request, {identifier: contexts["expected"][identifier]}
+        )
+
+
+def test_workload_link_refusal_cannot_be_lost_with_unchanged_schemas(tmp_path: Path) -> None:
+    candidate = tmp_path / "candidate"
+    shutil.copytree(ROOT / "packages/contracts/src", candidate / "src")
+    path = candidate / "src/robotics_runtime_contracts/workloads.py"
+    source = path.read_text()
+    needle = '    expected = scenario.get("workload", {}).get("robot_description_sha256")\n'
+    assert source.count(needle) == 1
+    path.write_text(source.replace(needle, "    return\n" + needle))
+    _, documents, contexts = snapshot.read_corpus()
+    case = next(case for case in contexts["cases"] if case["id"] == "workload/mismatch")
+    request = {
+        "documents": {name: documents[name] for name in [case["scenario"], case["runtime"]]},
+        "cases": [case],
     }
+    with pytest.raises(ReviewRequired, match="workload/mismatch"):
+        semantic.compare_request(
+            candidate / "src", request, {case["id"]: contexts["expected"][case["id"]]}
+        )
+
+
+def test_unexpected_probe_error_is_not_an_expected_rejection() -> None:
+    request = {"documents": {}, "cases": [{"id": "unknown", "operation": "unknown"}]}
+    with pytest.raises(ReviewRequired, match="Unknown corpus operation"):
+        execute(ROOT / "packages/contracts/src", request)
+
+
+def test_raw_syntax_is_a_separate_fixed_public_loader_and_dumper_corpus(published: Path) -> None:
+    request = snapshot.syntax_request()
+    assert len(request["cases"]) == 20
+    expected = {case["id"]: case["expected"] for case in request["cases"]}
+    assert expected["syntax/14"]["value"] == {"source": ["yes", 10, True, 1.25, None, "2026-09-09"]}
+    assert expected["syntax/16"]["status"] == "rejected"
+    assert expected["syntax/16"]["error_id"] == "input.yaml_alias"
+    semantic.compare_request(published / "src", request, expected)
+    semantic.compare_request(ROOT / "packages/contracts/src", request, expected)
 
 
 @pytest.mark.parametrize("value", ["1_000", "0b10", "2026-09-09T00:00:00Z"])
-def test_fixture_decoder_keeps_core_strings_accepted_by_public_writer(
-    published: Path, tmp_path: Path, value: str
-) -> None:
-    from robotics_runtime_contracts import load_mapping
+def test_public_writer_keeps_core_strings(value: str) -> None:
+    from robotics_runtime_contracts import loads_mapping
     from robotics_runtime_contracts.serialization import dumps_yaml
 
-    original = published / "tests/fixtures/model-artifact/valid/onnx.yaml"
-    document = fixture_document(original)
-    document["build"]["version"] = value
-    path = tmp_path / "core-string.yaml"
-    path.write_text(dumps_yaml(document), encoding="utf-8")
-    assert load_mapping(path) == document
-    assert fixture_document(path) == document
-    response = semantic.probe(published / "src", {"files": {"core-string": str(path)}})
-    assert response["documents"]["core-string"]["build"]["version"] == value
-
-
-def test_merge_key_is_a_literal_core_string(tmp_path: Path) -> None:
-    path = tmp_path / "literal.yaml"
-    path.write_text("build: {<<: {tool: onnx}, tool: different}\n", encoding="utf-8")
-    assert fixture_document(path) == {"build": {"<<": {"tool": "onnx"}, "tool": "different"}}
-
-
-@pytest.mark.parametrize(
-    "suffix,source",
-    [
-        ("yaml", "value: 1\nvalue: 2\n"),
-        ("yaml", "value: &cycle [*cycle]\n"),
-        ("yaml", "value: .inf\n"),
-        ("yaml", "value: !!timestamp 2026-09-09T00:00:00Z\n"),
-        ("yaml", "value: {1: coerced}\n"),
-        ("yaml", "value: !!set {a: null}\n"),
-        ("yaml", "build: {<<: {tool: onnx}, tool: 17, tool: onnx}\n"),
-        ("yaml", "build: {!!merge <<: {tool: onnx}, tool: 17, tool: onnx}\n"),
-        ("yaml", "value: !!int 1_000\n"),
-        ("yaml", "build: {version: !!str {!!value ignored: !native 1.20.1}}\n"),
-        ("yaml", "%YAML 1.1\n---\nvalue: 010\n"),
-        ("json", '{"value": 1, "value": 2}'),
-        ("json", '{"value": NaN}'),
-        ("json", '{"value": 1,}'),
-    ],
-)
-def test_fixture_decoder_rejects_ambiguous_or_non_json_values(
-    tmp_path: Path, suffix: str, source: str
-) -> None:
-    path = tmp_path / f"invalid.{suffix}"
-    path.write_text(source, encoding="utf-8")
-    with pytest.raises(ValueError, match=f"invalid.{suffix}: fixture decoding failed"):
-        fixture_document(path)
+    document = {"version": value, "time_ns": 9007199254740993, "boolean": True, "float": 1.0}
+    assert loads_mapping(dumps_yaml(document)) == document
+    assert isinstance(loads_mapping(dumps_yaml(document))["float"], float)
 
 
 def test_missing_or_corrupt_semantic_regressions_fail(
@@ -499,6 +551,18 @@ def test_missing_or_corrupt_semantic_regressions_fail(
     (tmp_path / "x.json").write_text("{}", encoding="utf-8")
     with pytest.raises(ReviewRequired, match="bytes changed"):
         semantic.regressions()
+
+
+def test_frozen_corpus_identity_fails_before_public_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shutil.copytree(snapshot.FIXTURES, tmp_path / "fixtures")
+    fixture_root = tmp_path / "fixtures"
+    path = fixture_root / "contracts-v0.18.2/documents.json"
+    path.write_bytes(path.read_bytes() + b" ")
+    monkeypatch.setattr(snapshot, "FIXTURES", fixture_root)
+    with pytest.raises(ReviewRequired, match="Frozen corpus bytes changed"):
+        snapshot.read_corpus()
 
 
 def init_repo(root: Path) -> None:
@@ -624,3 +688,91 @@ def test_boolean_reference_targets_and_escaped_pointers(value: bool) -> None:
     after = schema({"$defs": {"renamed": value}, "$ref": "#/$defs/renamed"})
     comparison(before, after)
     assert Expansion({"document": before}).root(before) is value
+
+
+def test_retained_raw_fixture_change_fails_before_semantic_probe(
+    published: Path, tmp_path: Path
+) -> None:
+    root = tmp_path / "baseline"
+    shutil.copytree(published.parents[1], root)
+    raw = root / "packages/contracts/tests/fixtures/dataset/valid/camera-mcap.yaml"
+    raw.write_bytes(raw.read_bytes() + b"\n")
+    with pytest.raises(ReviewRequired, match="Frozen fixture bytes changed.*camera-mcap"):
+        snapshot.capture(root, published / "src")
+
+
+def test_historical_corpus_keeps_all_inventory_bytes_and_json_values(tmp_path: Path) -> None:
+    release = history.Baseline(history.LEGACY_TAG, history.LEGACY_COMMIT, "")
+    published = history.extract(ROOT, release, tmp_path / "historical")
+    captured = snapshot.capture_legacy(published, published / "src")
+    corpus = snapshot.legacy_corpus()
+    assert len(corpus["entries"]) == 105
+    assert len(captured["request"]["cases"]) == 67
+    semantic.compare_request(
+        ROOT / "packages/contracts/src", captured["request"], captured["expected"]
+    )
+
+
+def test_release_corpus_retains_raw_identity_and_source_plan(tmp_path: Path) -> None:
+    root = tmp_path / "source"
+    history.git(ROOT, "clone", "--quiet", "--no-hardlinks", str(ROOT), str(root))
+    # Local search indexes are not producer, package or corpus inputs.
+    (root / ".codegraph").mkdir()
+    (root / ".codegraph/index").write_bytes(b"local index")
+    plan = {
+        "candidate": "contracts-v0.18.3",
+        "commit": history.git(root, "rev-parse", "HEAD").decode().strip(),
+        "tree": history.git(root, "rev-parse", "HEAD^{tree}").decode().strip(),
+        "contracts_commit": history.git(root, "rev-parse", "HEAD").decode().strip(),
+    }
+    output = tmp_path / "release-corpus"
+    snapshot.write_release(root, plan, output)
+    provenance = json.loads((output / "semantic-provenance.json").read_bytes())
+    assert {name: provenance[name] for name in plan} == plan
+    for name, identity in provenance["files"].items():
+        raw = (output / name).read_bytes()
+        assert len(raw) == identity["size_bytes"]
+        assert sha256(raw).hexdigest() == identity["sha256"]
+    inventory = json.loads((output / "semantic-inventory.json").read_bytes())
+    assert inventory["commit"] == plan["commit"]
+    assert inventory["tag"] == plan["candidate"]
+    for entry in inventory["entries"]:
+        path = root / entry["path"]
+        assert entry["raw_sha256"] == sha256(path.read_bytes()).hexdigest()
+    _, documents, _ = snapshot.read_corpus()
+    historical = snapshot.historical_snapshot()
+    expected_documents = {**documents, **historical["request"]["documents"]}
+    assert token(json.loads((output / "semantic-documents.json").read_bytes())) == token(
+        expected_documents
+    )
+    contexts = json.loads((output / "semantic-contexts.json").read_bytes())
+    assert len(contexts["cases"]) == 355
+    assert len(contexts["expected"]) == 355
+    assert len({case["id"] for case in contexts["cases"]}) == 355
+    emitted = {
+        "documents": json.loads((output / "semantic-documents.json").read_bytes()),
+        "cases": contexts["cases"],
+    }
+    semantic.compare_request(root / "packages/contracts/src", emitted, contexts["expected"])
+    assert len(inventory["historical"]["entries"]) == 105
+    with pytest.raises(FileExistsError):
+        snapshot.write_release(root, plan, output)
+
+    producer = root / "scripts/schema_compatibility/probe.py"
+    original = producer.read_bytes()
+    producer.write_bytes(original + b"# temporary fixture edit")
+    with pytest.raises(ReviewRequired, match="Release corpus source must be clean"):
+        snapshot.write_release(root, plan, tmp_path / "dirty-corpus")
+    assert not (tmp_path / "dirty-corpus").exists()
+    producer.write_bytes(original)
+    (root / "json.py").write_bytes(b"# unreviewed importable input")
+    with pytest.raises(ReviewRequired, match="Release corpus source must be clean"):
+        snapshot.write_release(root, plan, tmp_path / "untracked-corpus")
+    assert not (tmp_path / "untracked-corpus").exists()
+
+
+def test_release_corpus_rejects_a_mismatched_source_plan(tmp_path: Path) -> None:
+    plan = {"commit": "0" * 40, "tree": "0" * 40}
+    with pytest.raises(ReviewRequired, match="source differs from the validated plan"):
+        snapshot.write_release(ROOT, plan, tmp_path / "mismatched")
+    assert not (tmp_path / "mismatched").exists()

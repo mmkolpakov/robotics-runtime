@@ -12,8 +12,10 @@ documents with the public Python API from the current editable checkout:
 uv run --directory packages/contracts pytest tests/test_consumer_examples.py
 ```
 
-Run that command from the workspace root. These examples use the current 0.18.1
-catalog. They validate document links and original file-byte digests, not a
+Run that command from the workspace root. These examples use the current 0.18.2
+catalog, shared with the published harness 0.19.1. Versioned fixtures retain
+their original bytes and historical release identities. These examples
+validate document links and original file-byte digests, not a
 live ROS execution or arbitrary infra image. Published package checks and
 consumer integration have separate evidence scopes; see
 [compatibility](../COMPATIBILITY.md).

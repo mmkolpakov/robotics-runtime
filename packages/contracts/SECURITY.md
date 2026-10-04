@@ -20,7 +20,7 @@ subjects. The governing decision is
 ## Reporting a Vulnerability
 
 Report vulnerabilities through
-[GitHub private vulnerability reporting](https://github.com/mmkolpakov/robotics-runtime-contracts/security/advisories/new).
+[GitHub private vulnerability reporting](https://github.com/mmkolpakov/robotics-runtime/security/advisories/new).
 Do not disclose a vulnerability in a public issue.
 
 Include the affected version, a minimal reproduction, and the expected security

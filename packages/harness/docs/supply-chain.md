@@ -7,11 +7,15 @@ publication environments. GitHub release creation requires successful PyPI
 publication; a local build or dry run does not establish a published release.
 
 The current published archives are
-[`harness-v0.19.0`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/harness-v0.19.0)
-and [PyPI 0.19.0](https://pypi.org/project/robotics-acceptance-harness/0.19.0/).
+[`harness-v0.19.1`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/harness-v0.19.1)
+and [PyPI 0.19.1](https://pypi.org/project/robotics-acceptance-harness/0.19.1/).
 Their attestations and installed inventories were verified with contracts
-0.18.1 outside the workspace. This establishes package identity and the tested
-pair, not a released infra image or target qualification.
+0.18.2 outside the workspace. Both packages were published from source
+`dc02c62897372514537cf241f06dc71b9f960c44`. Later source changes do not replace
+those released bytes or attestations. This establishes package identity and
+the tested pair. Infra R9's accepted B2 profile uses the historical
+0.18.1/0.19.0 pair; R10 uses 0.18.2/0.19.1 but its released B3 run remains
+unaccepted. See [compatibility](compatibility.md) for those execution scopes.
 
 ## Release Artifact Assessment
 
@@ -39,13 +43,13 @@ Trusted Publishing and GitHub provenance gates; neither rebuilds the archives.
 ## Release Verification
 
 Download a published wheel or source archive and verify its attestation before
-installation. For harness `0.19.0`:
+installation. For harness `0.19.1`:
 
 ```bash
 gh attestation verify \
   --repo mmkolpakov/robotics-runtime \
   --signer-workflow mmkolpakov/robotics-runtime/.github/workflows/release.yml \
-  robotics_acceptance_harness-0.19.0-py3-none-any.whl
+  robotics_acceptance_harness-0.19.1-py3-none-any.whl
 ```
 
 The repository does not claim SLSA Source-track conformance or Build L3.
