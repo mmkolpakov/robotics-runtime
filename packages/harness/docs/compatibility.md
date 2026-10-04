@@ -4,11 +4,14 @@
 
 The `0.19.x` harness line requires Python `>=3.12,<3.15` and
 `robotics-runtime-contracts>=0.18,<0.19`.
-[Harness 0.19.0](https://pypi.org/project/robotics-acceptance-harness/0.19.0/) and
-[contracts 0.18.1](https://pypi.org/project/robotics-runtime-contracts/0.18.1/)
-are published from the root workspace under `harness-v0.19.0` and
-`contracts-v0.18.1`. Independent installs outside the workspace checked the
-exact pair, its public API/CLI and installed archive contents.
+[Harness 0.19.1](https://pypi.org/project/robotics-acceptance-harness/0.19.1/) and
+[contracts 0.18.2](https://pypi.org/project/robotics-runtime-contracts/0.18.2/)
+are published from the root workspace under `harness-v0.19.1` and
+`contracts-v0.18.2`. Independent installs outside the workspace checked the
+exact pair, its public API/CLI and installed archive contents. Both releases
+come from workspace source `dc02c62897372514537cf241f06dc71b9f960c44`. Later
+source changes, including runtime main `d9dad3d`, have not been published under
+these version numbers.
 
 The packages are pre-1.0. Each public document family has one canonical `v1`;
 superseded experimental v2-v5 schemas and compatibility branches are intentionally
@@ -33,10 +36,20 @@ Provider qualification belongs to runtime infrastructure. A new provider is
 compatible when it emits the existing canonical documents and passes the same
 conformance suite.
 
-The current infra foundation integrates pinned sources for this pair. The
-older published OCI `v0.8.0-rc.1` belongs to contracts 0.15.4 / harness 0.17.1;
-it does not qualify the current pair. Source fixtures, archive checks and live
-observer tests do not establish arbitrary consumer or hardware qualification.
+Infra's accepted B2 stock profile belongs to
+[R9 `v0.9.0-rc.1`](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.9.0-rc.1)
+and contracts 0.18.1 / harness 0.19.0. It covers one ROS domain, UInt64 and one
+finalized MCAP recording.
+[R10 `v0.10.0-rc.1`](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.10.0-rc.1)
+uses 0.18.2/0.19.1 and has verified release identities; its
+[released B3 run](https://github.com/mmkolpakov/robotics-runtime-infra/actions/runs/37157837270)
+passed entity checks, then failed with a 107 ms exact-step overshoot and a
+JointState timeout. B3 remains unaccepted. The infrastructure
+[compatibility policy](https://github.com/mmkolpakov/robotics-runtime-infra/blob/main/docs/compatibility.md)
+distinguishes caller, tooling and image-source commits. Historical
+`v0.8.0-rc.1` remains bound to 0.15.4/0.17.1. Source fixtures, archive checks
+and live observer tests do not establish arbitrary consumer or hardware
+qualification.
 
 The Python-only commands work without ROS. Live observation requires the ROS 2
 packages and message interfaces declared by the runtime. Exact provider and

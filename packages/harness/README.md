@@ -52,12 +52,12 @@ schemas are checked for compatible changes against the release baseline.
 ## Install
 
 The published pair is
-[harness 0.19.0](https://pypi.org/project/robotics-acceptance-harness/0.19.0/) with
-[contracts 0.18.1](https://pypi.org/project/robotics-runtime-contracts/0.18.1/):
+[harness 0.19.1](https://pypi.org/project/robotics-acceptance-harness/0.19.1/) with
+[contracts 0.18.2](https://pypi.org/project/robotics-runtime-contracts/0.18.2/):
 
 ```bash
 uv venv
-uv pip install robotics-acceptance-harness==0.19.0 robotics-runtime-contracts==0.18.1
+uv pip install robotics-acceptance-harness==0.19.1 robotics-runtime-contracts==0.18.2
 ```
 
 Development uses both packages from the shared workspace and the dependency
@@ -74,7 +74,12 @@ cd packages/harness
 Release consumers should install the published wheel together with the locked
 contracts wheel and verify release provenance as described in
 [`docs/supply-chain.md`](docs/supply-chain.md).
-Independent package installs and archive checks establish this pair. They do
+Both published packages come from workspace source
+`dc02c62897372514537cf241f06dc71b9f960c44`; later source changes are separate
+from these immutable archives. Independent package installs and archive checks
+establish this pair. Infra R9's B2 stock profile uses 0.18.1/0.19.0; R10 uses
+the current pair, but its released B3 run failed and is not accepted. See
+[compatibility](docs/compatibility.md) for the evidence boundaries. They do
 not qualify an infra image, accelerator backend, arbitrary product evaluator
 or physical target; those require their own execution evidence.
 

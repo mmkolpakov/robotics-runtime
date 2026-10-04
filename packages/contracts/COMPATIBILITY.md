@@ -8,9 +8,22 @@ The published package pair and infrastructure evidence have distinct scopes:
 
 | Consumer | Contracts pin | Scope of evidence |
 | --- | --- | --- |
-| [Acceptance harness 0.19.0](https://pypi.org/project/robotics-acceptance-harness/0.19.0/) | `>=0.18,<0.19`; release checks pin 0.18.1 | Independent PyPI installs, public API/CLI checks and verified archive identities |
-| Current infra source foundation | contracts 0.18.1 / harness 0.19.0 | Integration of pinned sources; no current OCI release qualification |
+| [Acceptance harness 0.19.1](https://pypi.org/project/robotics-acceptance-harness/0.19.1/) | `>=0.18,<0.19`; release checks pin 0.18.2 | Independent PyPI installs, public API/CLI checks and verified archive identities |
+| [Infra R9 v0.9.0-rc.1](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.9.0-rc.1) | contracts 0.18.1 / harness 0.19.0 | Accepted B2 stock profile: one ROS domain, UInt64 and one finalized MCAP recording |
+| [Infra R10 v0.10.0-rc.1](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.10.0-rc.1) | contracts 0.18.2 / harness 0.19.1 | Published image and archive identities verified; released B3 execution is not accepted |
 | [Infra OCI v0.8.0-rc.1](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.8.0-rc.1) | contracts 0.15.4 / harness 0.17.1 | Historical release only; it does not establish support for the current pair |
+
+The current Python pair was published from workspace source
+`dc02c62897372514537cf241f06dc71b9f960c44`. Runtime main
+`d9dad3d5599486646efe86347d5a7e2ab8951e04` contains later source changes; it
+is not the source of those released bytes. Infra R10's image source is
+`d6dc8a1c6b976faacab7b371821e9af54b9883c2`. Its
+[released B3 run](https://github.com/mmkolpakov/robotics-runtime-infra/actions/runs/37157837270)
+passed entity checks, then failed with a 107 ms exact-step overshoot and a
+JointState timeout. Source tests and release provenance do not turn that
+execution into a passed qualification. The infrastructure
+[compatibility policy](https://github.com/mmkolpakov/robotics-runtime-infra/blob/main/docs/compatibility.md)
+records its caller and tooling identities separately.
 
 Library requirements permit a minor line; execution and release evidence must
 identify the exact installed pair. The 0.15 and 0.16 generations are incompatible. See the
@@ -18,7 +31,7 @@ identify the exact installed pair. The 0.15 and 0.16 generations are incompatibl
 
 ## Current Catalog
 
-Release 0.18.1 maps each document role to exactly one schema in
+Release 0.18.2 maps each document role to exactly one schema in
 [`catalog.v1.json`](src/robotics_runtime_contracts/schemas/catalog.v1.json).
 
 Superseded experimental readers and writers are removed rather than carried as
