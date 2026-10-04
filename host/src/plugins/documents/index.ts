@@ -2,6 +2,12 @@ import { Service } from 'cordis';
 import type { Context } from 'cordis';
 import type { JobRequest, JobResult } from '../jobs/index.js';
 export interface WorkerCommand { executable: string; prefixArgs?: readonly string[]; cwd?: string; env?: Readonly<Record<string, string>>; extendEnv?: boolean; }
+export function requireWorkerCommand(command: WorkerCommand): WorkerCommand {
+  if (!command || typeof command.executable !== 'string' || !command.executable.trim()) {
+    throw new TypeError('a configured worker executable is required');
+  }
+  return command;
+}
 export interface ExtensionSchema { uri: string; path: string; }
 export type WorkerLimits = Pick<JobRequest, 'timeoutMs' | 'maxBufferBytes' | 'cancelSignal'>;
 export function extensionArguments(schemas: readonly ExtensionSchema[] = []): string[] {
@@ -18,7 +24,12 @@ declare module 'cordis' { interface Context { documents: Documents; } }
 /** Python owns parsing, subject rules and exact writer. */
 export class Documents extends Service {
   static inject = ['jobs'];
-  constructor(ctx: Context, readonly command: WorkerCommand = { executable: 'robotics-contracts' }) { super(ctx, 'documents'); }
+  readonly command: WorkerCommand;
+  constructor(ctx: Context, command: WorkerCommand) {
+    const configured = requireWorkerCommand(command);
+    super(ctx, 'documents');
+    this.command = configured;
+  }
   validate(paths: readonly string[], options: WorkerLimits & { schema?: string; extensionSchemas?: readonly ExtensionSchema[] } = {}): Promise<JobResult> {
     return this.ctx.jobs.run(workerRequest(this.command, ['--format', 'json', 'validate', ...paths,
       ...(options.schema ? ['--schema', options.schema] : []), ...extensionArguments(options.extensionSchemas)], options));

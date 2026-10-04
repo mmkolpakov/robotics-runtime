@@ -1,6 +1,6 @@
 import { Service } from 'cordis';
 import type { Context } from 'cordis';
-import { extensionArguments, workerRequest } from '../documents/index.js';
+import { extensionArguments, requireWorkerCommand, workerRequest } from '../documents/index.js';
 import type { ExtensionSchema, WorkerCommand, WorkerLimits } from '../documents/index.js';
 import type { JobResult } from '../jobs/index.js';
 declare module 'cordis' { interface Context { evaluation: Evaluation; } }
@@ -17,7 +17,12 @@ function integerNs(value: string | bigint): string {
 /** Delegates evaluation and JSON/JUnit/diagnostics to the installed public harness. */
 export class Evaluation extends Service {
   static inject = ['jobs'];
-  constructor(ctx: Context, readonly command: WorkerCommand = { executable: 'robotics-acceptance' }) { super(ctx, 'evaluation'); }
+  readonly command: WorkerCommand;
+  constructor(ctx: Context, command: WorkerCommand) {
+    const configured = requireWorkerCommand(command);
+    super(ctx, 'evaluation');
+    this.command = configured;
+  }
   execute(args: readonly string[], limits: WorkerLimits = {}): Promise<JobResult> {
     return this.ctx.jobs.run(workerRequest(this.command, args, limits));
   }

@@ -19,7 +19,10 @@ test('installed commands own exact files, integer ns, evaluation JSON/JUnit and 
   await ctx.plugin(Jobs, { timeoutMs: 30000, maxBufferBytes: 1048576 });
   await ctx.plugin(Documents, { executable: contracts });
   await ctx.plugin(Evaluation, { executable: acceptance });
+  process.env.RR_PARENT_PRIVATE_SENTINEL = 'private-sentinel';
   try {
+    const environment = await ctx.jobs.run({ executable: python, args: ['-c', 'import os; print("RR_PARENT_PRIVATE_SENTINEL" in os.environ)'] });
+    assert.equal(environment.ok, true); assert.equal(environment.stdout.trim(), 'False');
     assert.equal((await ctx.documents.execute(['--help'])).ok, true);
     assert.equal((await ctx.evaluation.execute(['--version'])).ok, true);
     const source = join(root, 'packages/harness/tests/fixtures/simulation/runtime.yaml');
@@ -54,5 +57,5 @@ test('installed commands own exact files, integer ns, evaluation JSON/JUnit and 
     assert.equal(broken.ok, false); assert.match(await readFile(join(directory, 'broken-diagnostic.json'), 'utf8'), /error/);
     const limited = await ctx.evaluation.evaluate({ ...input, outputDirectory: join(directory, 'limited'), diagnosticOutput: join(directory, 'limited-diagnostic.json'), maxRawEvidenceBytes: 1 });
     assert.equal(limited.ok, false); assert.match(await readFile(join(directory, 'limited-diagnostic.json'), 'utf8'), /max_raw_evidence_bytes/);
-  } finally { await ctx.fiber.dispose(); await rm(directory, { recursive: true, force: true }); }
+  } finally { delete process.env.RR_PARENT_PRIVATE_SENTINEL; await ctx.fiber.dispose(); await rm(directory, { recursive: true, force: true }); }
 });

@@ -75,3 +75,6 @@ writer. It verifies retained local file references, adds the pinned extension de
 unsigned template and validates the existing generic role. It never rewrites a signed input. Native
 seconds and integer timestamps remain in their original evidence files; host metadata records their
 representation instead of inventing exact nanoseconds.
+
+Documents and Evaluation require WorkerCommand configuration with a nonempty executable; no Python
+command is inferred. Use an absolute executable or provide an explicit env.PATH for a named tool.
