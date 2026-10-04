@@ -8,7 +8,8 @@
     "dockerfile",
     "github-actions",
     "pep621",
-    "pre-commit"
+    "pre-commit",
+    "npm"
   ],
   "pre-commit": {
     "enabled": true
@@ -21,16 +22,40 @@
   "prHourlyLimit": 2,
   "packageRules": [
     {
-      "matchPackageNames": ["ruff", "astral-sh/ruff-pre-commit"],
+      "matchPackageNames": [
+        "ruff",
+        "astral-sh/ruff-pre-commit"
+      ],
       "groupName": "Ruff package and hooks"
     },
     {
-      "matchPackageNames": ["check-jsonschema", "python-jsonschema/check-jsonschema"],
+      "matchPackageNames": [
+        "check-jsonschema",
+        "python-jsonschema/check-jsonschema"
+      ],
       "groupName": "check-jsonschema package and hooks"
     },
     {
-      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin",
+        "pinDigest"
+      ],
       "groupName": "non-major dependencies"
+    },
+    {
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "cordis",
+        "@cordisjs/plugin-loader",
+        "@cordisjs/plugin-include"
+      ],
+      "groupName": "Cordis host cohort",
+      "rangeStrategy": "pin"
     }
   ],
   "labels": [
