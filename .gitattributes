@@ -3,3 +3,7 @@
 *.jpg binary
 *.mcap binary
 *.whl binary
+
+host/proto/** linguist-vendored
+host/src/generated/** linguist-generated
+docs/architecture/generated/** linguist-generated
