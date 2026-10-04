@@ -35,7 +35,7 @@ test('installed commands own exact files, integer ns, evaluation JSON/JUnit and 
     await writeFile(malformed, '{"schema_version":"runtime-manifest.v1"}');
     const invalid = await ctx.documents.validate([malformed]);
     assert.equal(invalid.ok, false); assert.match(invalid.stderr, /error_id/);
-    const prepared = await ctx.jobs.run({ executable: python, args: [join(root, 'host/producers/worker_fixture.py'), '--source-root', root, '--output', directory] });
+    const prepared = await ctx.jobs.run({ executable: python, args: [join(root, 'host/test/producers/worker_fixture.py'), '--source-root', root, '--output', directory] });
     assert.equal(prepared.ok, true, prepared.stderr);
     const input = {
       scenario: join(root, 'packages/harness/tests/fixtures/simulation/scenario.yaml'), runtime: source,

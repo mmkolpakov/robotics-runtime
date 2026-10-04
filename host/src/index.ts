@@ -7,3 +7,7 @@ export type { HostOptions } from './host.js';
 export * from './plugins/jobs/index.js';
 export * from './plugins/documents/index.js';
 export * from './plugins/evaluation/index.js';
+export * from './plugins/admission/index.js';
+export * from './plugins/application-lifecycle/index.js';
+export * from './plugins/application-lifecycle/composition.js';
+export * from './plugins/run-owner/index.js';

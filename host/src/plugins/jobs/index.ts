@@ -39,8 +39,8 @@ export class Jobs extends Service {
     const task = (async (): Promise<JobResult> => {
       const result = await execa(request.executable, [...request.args], {
         ...(request.cwd === undefined ? {} : { cwd: request.cwd }),
-        ...(request.env === undefined ? {} : { env: { ...request.env } }),
-        ...(request.extendEnv === undefined ? {} : { extendEnv: request.extendEnv }),
+        env: { ...(request.env ?? {}) },
+        extendEnv: request.extendEnv ?? false, killDescendants: true,
         timeout, maxBuffer, cancelSignal, reject: false, shell: false,
         encoding: 'utf8', forceKillAfterDelay: this.killTimeoutMs,
       });

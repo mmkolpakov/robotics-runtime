@@ -25,6 +25,18 @@
     "./plugins/evaluation": {
       "types": "./dist/src/plugins/evaluation/index.d.ts",
       "import": "./dist/src/plugins/evaluation/index.js"
+    },
+    "./plugins/admission": {
+      "types": "./dist/src/plugins/admission/index.d.ts",
+      "import": "./dist/src/plugins/admission/index.js"
+    },
+    "./plugins/application-lifecycle": {
+      "types": "./dist/src/plugins/application-lifecycle/index.d.ts",
+      "import": "./dist/src/plugins/application-lifecycle/index.js"
+    },
+    "./plugins/run-owner": {
+      "types": "./dist/src/plugins/run-owner/index.d.ts",
+      "import": "./dist/src/plugins/run-owner/index.js"
     }
   },
   "files": [
@@ -36,7 +48,7 @@
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/test/*.test.js",
     "check:boundary": "node tools/check-boundary.mjs",
-    "test:workers": "npm run build && node --test dist/test/worker-boundary.integration.js"
+    "test:workers": "npm run build && node --test dist/test/*.integration.js"
   },
   "dependencies": {
     "@cordisjs/plugin-include": "1.1.0",

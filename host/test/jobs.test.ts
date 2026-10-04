@@ -30,3 +30,48 @@ test('disposing jobs owner cancels and reaps its child', async () => {
   const child = ctx.jobs.run({ executable: process.execPath, args: ['-e', 'setInterval(()=>{},100)'] });
   await fiber.dispose(); assert.equal((await child).canceled, true);
 });
+
+test('worker environment withholds inherited secrets and admits explicit values', async () => {
+  const ctx = new Context(); const fiber = ctx.plugin(Jobs); await fiber.await();
+  process.env.RR_PARENT_PRIVATE_SENTINEL = 'private-sentinel';
+  try {
+    const withheld = await ctx.jobs.run({ executable: process.execPath, args: ['-e', 'process.stdout.write(String(Object.hasOwn(process.env,"RR_PARENT_PRIVATE_SENTINEL")))'] });
+    assert.equal(withheld.stdout, 'false');
+    const explicit = await ctx.jobs.run({ executable: process.execPath, args: ['-e', 'process.stdout.write(process.env.RR_ALLOWED_VALUE ?? "")'], env: { RR_ALLOWED_VALUE: 'approved' } });
+    assert.equal(explicit.stdout, 'approved');
+  } finally { delete process.env.RR_PARENT_PRIVATE_SENTINEL; await fiber.dispose(); }
+});
+
+test('native Execa killDescendants cancels the observed process group', async () => {
+  const { mkdtemp, readFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { setTimeout: pause } = await import('node:timers/promises');
+  const directory = await mkdtemp(join(tmpdir(), 'rr-descendants-'));
+  const pidPath = join(directory, 'pid');
+  const ctx = new Context(); const fiber = ctx.plugin(Jobs, { timeoutMs: 5000 }); await fiber.await();
+  const abort = new AbortController();
+  let pid: number | undefined;
+  try {
+    const child = ctx.jobs.run({ executable: process.execPath, cancelSignal: abort.signal, args: ['-e',
+      'const {spawn}=require("node:child_process"); const fs=require("node:fs"); const child=spawn(process.execPath,["-e","setInterval(()=>{},100)"],{stdio:"ignore"}); fs.writeFileSync(process.argv[1],String(child.pid)); setInterval(()=>{},100);',
+      pidPath] });
+    for (let attempt = 0; attempt < 100; attempt++) {
+      try { pid = Number(await readFile(pidPath, 'utf8')); break; } catch { await pause(10); }
+    }
+    assert.ok(pid && Number.isSafeInteger(pid));
+    process.kill(pid, 0);
+    abort.abort();
+    assert.equal((await child).canceled, true);
+    let terminated = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      try { process.kill(pid, 0); } catch { terminated = true; break; }
+      await pause(10);
+    }
+    assert.equal(terminated, true, 'the observed descendant must no longer exist');
+  } finally {
+    abort.abort(); await fiber.dispose();
+    if (pid) { try { process.kill(pid, 'SIGKILL'); } catch {} }
+    await rm(directory, { recursive: true, force: true });
+  }
+});
