@@ -29,7 +29,7 @@ export class Admission extends Service {
     for (const input of config.profiles) {
       if (!input.id || this.profiles.has(input.id)) throw new Error('trusted profile IDs must be unique and nonempty');
       const profile = freezeClosure(structuredClone(input));
-      
+
       this.profiles.set(profile.id, Object.freeze(profile));
     }
   }

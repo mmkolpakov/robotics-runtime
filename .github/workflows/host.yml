@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     container:
+      options: --init
       image: node:24.21.0-trixie-slim@sha256:b64fccfbcd1ae10d11b969a868b50e1c2530a7054813d5cdea04ac3bce551697
     defaults:
       run:

@@ -58,4 +58,3 @@ export function hooks(run: OwnedRun, directory: string, trace: string[]): Comple
   return { closeMeasurement: stage('close'), captureLastState: stage('capture'), drainRecorders: stage('drain'),
     exportEvidence: async () => { trace.push('export'); const path = join(directory, 'retained-resource.bin'); await writeFile(path, await readFile(join(directory, 'resource'))); return [await referenceFile(path)]; } };
 }
-
