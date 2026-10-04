@@ -1,35 +1,95 @@
 # Robotics runtime
 
-Shared development workspace for the robotics runtime contracts and acceptance harness.
-The packages retain separate versions and distribution names:
+Contracts and evidence tools for composing and qualifying robotic software.
 
-- `robotics-runtime-contracts` validates execution, evidence, and qualification documents.
-- `robotics-acceptance-harness` observes existing executions and evaluates their evidence.
+The workspace contains two independently versioned Python packages:
 
-Runtime images and deployment compositions are maintained in
-[robotics-runtime-infra](https://github.com/mmkolpakov/robotics-runtime-infra).
+- **robotics-runtime-contracts** validates execution, evidence and qualification
+  documents, and writes artifacts without changing signed bytes.
+- **robotics-acceptance-harness** observes an existing execution and evaluates
+  retained evidence. It does not launch services or control a robot.
 
-Package source and history live in `packages/contracts` and `packages/harness`.
-Historical release tags use the `contracts-legacy/` and `harness-legacy/` prefixes.
-Package-specific documentation remains alongside each package.
+[robotics-runtime-infra](https://github.com/mmkolpakov/robotics-runtime-infra)
+owns worker images, simulator providers, deployment and execution qualification.
+Product repositories own robot models, scenes, control logic and vision models.
+
+## Start with the part you need
+
+Use contracts to validate files independently of ROS or a simulator. Use the
+harness to evaluate evidence for a supported qualification profile. Use infra
+to launch a composition and record what actually ran.
 
 The published pair is
 [contracts 0.18.2](https://pypi.org/project/robotics-runtime-contracts/0.18.2/) and
-[harness 0.19.1](https://pypi.org/project/robotics-acceptance-harness/0.19.1/).
-Harness declares `robotics-runtime-contracts>=0.18,<0.19`; release verification
-uses the exact contracts 0.18.2 distribution. Both releases use tags in this
-workspace and its [release procedure](docs/releasing.md).
+[harness 0.19.1](https://pypi.org/project/robotics-acceptance-harness/0.19.1/):
 
-Clean archive installs, source integration fixtures and live ROS observer tests
-establish different boundaries. Package publication does not qualify an infra
-image, arbitrary consumer, model backend or physical target. The current infra
-foundation uses pinned sources; its older published OCI release is a separate
-artifact. See the package [compatibility policy](packages/contracts/COMPATIBILITY.md).
+```bash
+python -m pip install robotics-runtime-contracts==0.18.2 robotics-acceptance-harness==0.19.1
+robotics-contracts --help
+robotics-acceptance --help
+```
+
+Package reference:
+[contracts](packages/contracts/README.md),
+[harness](packages/harness/README.md),
+[consumer examples](packages/contracts/consumer-examples/README.md).
+
+Harness requires contracts `>=0.18,<0.19`; release checks install the exact
+published pair outside the workspace. Package installation does not qualify
+a simulator, image, accelerator or physical target.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    product["Product profile / application"]
+    host["Composition host<br/>plugins, readiness, resource ownership"]
+    workers["Infra providers / native workers"]
+    contracts["Contracts<br/>documents, exact bytes, references"]
+    harness["Harness<br/>observations, evaluation, reports"]
+    native["Native control / media API"]
+
+    product -. configuration .-> host
+    host -. lifecycle .-> workers
+    product --> native
+    workers -->|retained facts and files| contracts
+    contracts --> harness
+```
+
+The selected host uses upstream Cordis for plugin loading, service bindings and
+managed effects. The host coordinates resources; commands and frames use
+native SDK and media connections. Its implementation and simulator providers
+are separate from the published Python pair.
+
+Common document/evaluation code does not require Gazebo, Isaac Sim, Webots or
+ROS. Engine-specific APIs and assets belong to selected infra providers.
+Simulator support does not imply the same physics, frame output or autopilot
+integration in every backend.
+
+The [architecture reference](docs/architecture.md) describes repository
+boundaries, native API lines, time and evidence ownership, and qualification.
+Current public compatibility is recorded in
+[harness compatibility](packages/harness/docs/compatibility.md) and the package
+[compatibility policy](packages/contracts/COMPATIBILITY.md).
+
+## Host development
+
+The source host uses the pinned Node version in `host/.node-version`.
+Its own lockfile is separate from the Python workspace:
+
+```bash
+npm --prefix host ci --ignore-scripts
+npm --prefix host test
+npm --prefix host run check:boundary
+```
+
+See [host configuration and worker integration](host/README.md).
+The host is a source component; a new published host/provider composition
+requires its own consumer qualification.
 
 ## Development
 
-Use Python 3.12–3.14 and uv. The workspace has one lockfile and installs both
-packages as editable distributions:
+Use Python 3.12–3.14 and uv. One workspace lock installs both packages:
 
 ```bash
 uv sync --locked --all-packages --all-groups
@@ -41,19 +101,21 @@ uv run --directory packages/harness mypy src tests
 uv run python scripts/ci/check_complexity.py
 ```
 
-Run the package test suites in separate processes: each package has its own
-`tests` support module. Both distributions can be built independently:
+Run the package suites in separate processes: each has a `tests` support module.
+Build distributions independently:
 
 ```bash
 uv build --package robotics-runtime-contracts --no-sources
 uv build --package robotics-acceptance-harness --no-sources
 ```
 
-The workspace source override is a development setting. Wheels retain normal
-versioned package dependencies and are checked in clean environments outside the
-workspace before publication.
+The editable workspace override is for development. Wheels retain normal
+versioned dependencies and are verified in clean consumer environments before
+publication. Shared CI checks Python 3.12, 3.13 and 3.14 and
+[live ROS observer behavior](packages/harness/docs/live-tests.md) on Jazzy.
 
-The shared CI checks both packages on Python 3.12, 3.13 and 3.14, and runs the
-[live ROS observer tests](packages/harness/docs/live-tests.md) on ROS 2 Jazzy.
-[Function complexity budgets](quality/README.md) keep existing debt visible
-and reject new violations or increases until the affected modules are refactored.
+[Complexity budgets](quality/README.md) keep existing debt visible.
+[Release procedure](docs/releasing.md) explains package tags, artifacts and
+consumer verification. Source history lives in `packages/contracts` and
+`packages/harness`; older tags have `contracts-legacy/` and
+`harness-legacy/` prefixes.
