@@ -1,0 +1,11 @@
+import { readFile, mkdir, writeFile, chmod } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+const identity = JSON.parse(await readFile(new URL('./mavsdk-server.v4.0.3.json', import.meta.url), 'utf8'));
+const response = await fetch(identity.url, { signal: AbortSignal.timeout(120000) });
+if (!response.ok) throw new Error('official server download failed: ' + response.status);
+const raw = Buffer.from(await response.arrayBuffer());
+if (raw.length !== identity.size_bytes || createHash('sha256').update(raw).digest('hex') !== identity.sha256) throw new Error('official server identity mismatch');
+await mkdir('.tools', { recursive: true });
+await writeFile('.tools/mavsdk_server', raw);
+await chmod('.tools/mavsdk_server', 0o755);
+console.log('verified MAVSDK server ' + identity.version + ' ' + identity.sha256);

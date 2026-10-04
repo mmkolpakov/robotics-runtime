@@ -11,3 +11,5 @@ export * from './plugins/admission/index.js';
 export * from './plugins/application-lifecycle/index.js';
 export * from './plugins/application-lifecycle/composition.js';
 export * from './plugins/run-owner/index.js';
+export * from './plugins/mavsdk/index.js';
+export * from './plugins/media-endpoint/index.js';

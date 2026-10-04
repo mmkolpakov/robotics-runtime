@@ -1,0 +1,22 @@
+{
+  "repository": "https://github.com/mavlink/MAVSDK-Proto",
+  "commit": "5c81ecfeb6110cf74ba75ae50b78a1b265c05670",
+  "files": {
+    "action/action.proto": {
+      "sha256": "dee0a1fd9ab95aca2445a4cc4b6647fee2ccd5052ded83b58b55e25a12d9be6f",
+      "size_bytes": 14390
+    },
+    "core/core.proto": {
+      "sha256": "f44d9f0a6b4803abc3d830109d18f7c87908030fbe3c9200754a9638ef872c0a",
+      "size_bytes": 3427
+    },
+    "mavsdk_options.proto": {
+      "sha256": "568fadb5ef6c4539b39dd171ec0998c6bfbe4bc8782c7d20942052aed50ce0ff",
+      "size_bytes": 399
+    },
+    "telemetry/telemetry.proto": {
+      "sha256": "275b8b7ea59b7d48fd37229c8659a713fa4f43a3405946d680ea3fad3b2beeb0",
+      "size_bytes": 39548
+    }
+  }
+}
