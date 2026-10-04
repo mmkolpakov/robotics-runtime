@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, writeFile, rm } from 'node:fs/promises';
+import { readFile, writeFile, rm, symlink, link } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { Jobs } from '../src/plugins/jobs/index.js';
 import { Documents } from '../src/plugins/documents/index.js';
@@ -50,6 +50,18 @@ test('host extension uses existing generic role, verifies actual refs and reject
       '--composition', sidecar, '--schema', schema, '--output', conformance] });
     assert.equal(producedConformance.ok, true, producedConformance.stderr);
     assert.equal((await ctx.documents.validate([conformance], { extensionSchemas: [{ uri: HOST_EXTENSION_SCHEMA_URI, path: schema }] })).ok, true);
+    const retainedBytes = await readFile(value.readyPath);
+    for (const alias of ['exact', 'symlink', 'hardlink'] as const) {
+      const outputAlias = alias === 'exact' ? value.readyPath : join(value.directory, alias + '.json');
+      if (alias === 'symlink') await symlink(value.readyPath, outputAlias);
+      if (alias === 'hardlink') await link(value.readyPath, outputAlias);
+      const refusedAlias = await ctx.jobs.run({ executable: python, args: [join(root, 'host/producers/attach_composition.py'),
+        '--template', template, '--composition', sidecar, '--schema', schema, '--output', outputAlias] });
+      assert.equal(refusedAlias.ok, false, 'retained evidence output alias must be rejected: ' + alias);
+      assert.match(refusedAlias.stderr, /overwrite|input/i);
+      assert.deepEqual(await readFile(value.readyPath), retainedBytes);
+      assert.equal((await referenceFile(value.readyPath)).sha256, readyRef.sha256);
+    }
     const undeclared = await ctx.documents.validate([document]);
     assert.equal(undeclared.ok, false); assert.match(undeclared.stderr, /extension/);
     const tamperedSchema = join(value.directory, 'schema.json'); await writeFile(tamperedSchema, Buffer.concat([await readFile(schema), Buffer.from(' ')]));

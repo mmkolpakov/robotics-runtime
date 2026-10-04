@@ -15,10 +15,11 @@ NAMESPACE = "org.robotics.runtime.host"
 SCHEMA_URI = "urn:robotics:host:composition:v1"
 
 
-def verify_references(value: object) -> None:
+def verify_references(value: object) -> set[Path]:
+    references: set[Path] = set()
     if isinstance(value, list):
         for child in value:
-            verify_references(child)
+            references.update(verify_references(child))
     elif isinstance(value, dict):
         if {"uri", "sha256", "size_bytes"} <= value.keys():
             parts = urlsplit(value["uri"])
@@ -26,10 +27,13 @@ def verify_references(value: object) -> None:
                 raise ValueError("host producer requires local retained file evidence")
             path = Path(url2pathname(parts.path))
             raw = path.read_bytes()
+            references.add(path.resolve())
             if sha256(raw).hexdigest() != value["sha256"] or len(raw) != value["size_bytes"]:
                 raise ValueError(f"observed reference does not match retained bytes: {path}")
         for child in value.values():
-            verify_references(child)
+            references.update(verify_references(child))
+
+    return references
 
 
 def main() -> None:
@@ -43,7 +47,8 @@ def main() -> None:
     schema = args.schema.read_bytes()
     document = dict(load_mapping(args.template))
     composition = load_mapping(args.composition)
-    verify_references(composition)
+    references = verify_references(composition)
+    protect_inputs(args.output, [args.template, args.composition, args.schema, *references])
     extensions = dict(document.get("extensions", {}))
     if NAMESPACE in extensions:
         raise ValueError("host composition already exists")
