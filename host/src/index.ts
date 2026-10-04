@@ -1,4 +1,4 @@
-export { Context, Service, FiberState } from 'cordis';
+export { Context, Service } from 'cordis';
 export type { Fiber, Plugin } from 'cordis';
 export { Loader } from '@cordisjs/plugin-loader';
 export { Include } from '@cordisjs/plugin-include';
@@ -13,3 +13,4 @@ export * from './plugins/application-lifecycle/composition.js';
 export * from './plugins/run-owner/index.js';
 export * from './plugins/mavsdk/index.js';
 export * from './plugins/media-endpoint/index.js';
+export { isDisposed } from './fiber-state.js';
