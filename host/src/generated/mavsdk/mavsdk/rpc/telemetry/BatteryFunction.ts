@@ -1,0 +1,23 @@
+// Original file: proto/telemetry/telemetry.proto
+
+export const BatteryFunction = {
+  BATTERY_FUNCTION_UNKNOWN: 'BATTERY_FUNCTION_UNKNOWN',
+  BATTERY_FUNCTION_ALL: 'BATTERY_FUNCTION_ALL',
+  BATTERY_FUNCTION_PROPULSION: 'BATTERY_FUNCTION_PROPULSION',
+  BATTERY_FUNCTION_AVIONICS: 'BATTERY_FUNCTION_AVIONICS',
+  BATTERY_FUNCTION_PAYLOAD: 'BATTERY_FUNCTION_PAYLOAD',
+} as const;
+
+export type BatteryFunction =
+  | 'BATTERY_FUNCTION_UNKNOWN'
+  | 0
+  | 'BATTERY_FUNCTION_ALL'
+  | 1
+  | 'BATTERY_FUNCTION_PROPULSION'
+  | 2
+  | 'BATTERY_FUNCTION_AVIONICS'
+  | 3
+  | 'BATTERY_FUNCTION_PAYLOAD'
+  | 4
+
+export type BatteryFunction__Output = typeof BatteryFunction[keyof typeof BatteryFunction]

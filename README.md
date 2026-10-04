@@ -40,21 +40,15 @@ a simulator, image, accelerator or physical target.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    product["Product profile / application"]
-    host["Composition host<br/>plugins, readiness, resource ownership"]
-    workers["Infra providers / native workers"]
-    contracts["Contracts<br/>documents, exact bytes, references"]
-    harness["Harness<br/>observations, evaluation, reports"]
-    native["Native control / media API"]
+These C4 views cover the joint platform in both repositories. The Python pair
+is published separately; the composition host and candidate providers require
+their own release qualification.
 
-    product -. configuration .-> host
-    host -. lifecycle .-> workers
-    product --> native
-    workers -->|retained facts and files| contracts
-    contracts --> harness
-```
+![C4 Context: users and external systems](docs/architecture/generated/Context.svg)
+
+![C4 Container: executable applications and retained data](docs/architecture/generated/Container.svg)
+
+[Diagram sources, sequence and deployment](docs/architecture/README.md).
 
 The selected host uses upstream Cordis for plugin loading, service bindings and
 managed effects. The host coordinates resources; commands and frames use

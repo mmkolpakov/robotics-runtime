@@ -86,3 +86,42 @@ command is inferred. Use an absolute executable or provide an explicit env.PATH 
 Lifecycle deadlines are checked during admission before any provider Fiber starts. Owner IDs remain
 reserved until disposal and independent resource verification finish. Runtime JavaScript numbers and
 coercible objects are rejected by the nanos API before any worker is launched.
+
+MAVSDK uses grpc-js 1.14.5 and proto-loader 0.8.1 with official proto inputs pinned to commit
+5c81ecfeb6110cf74ba75ae50b78a1b265c05670. The official type generator emits ESM .js imports; runtime
+loader flags match generation and decoded int64 values remain strings. Mavsdk exposes native
+generated Core/Action/Telemetry clients. waitForReady proves transport; Core connection state,
+native health and operation result remain separate observations. No flight controller or simulator
+API is introduced.
+
+Native streams use cancellation and finite deadlines, and owner disposal closes their native
+channels. The selected native channel pool is local to the owner and ambient HTTP proxy selection is
+disabled. An initial TCP connection to a blackholed endpoint can outlive grpc-js logical channel
+shutdown in this upstream version; only configured local owned endpoints are qualified here.
+Unreachable remote TCP cleanup is not accepted by the current qualification.
+
+MediaEndpoint invokes producers/media_worker.py through the existing finite Jobs route. The separate
+GI worker calls Gst.parse_launch, set_state/get_state and native GstBus EOS/ERROR. Native frames
+stay inside the configured pipeline and sink. The worker emits native state, error, exact int64
+position and NULL cleanup facts. A ready marker supports cancellation after actual PLAYING
+observation. Output files are admitted exclusively before execution so retained inputs cannot be
+overwritten.
+
+Run npm run generate:mavsdk to verify official proto identities and regenerate types. The verified
+MAVSDK server installer uses tools/mavsdk-server.v4.0.3.json and stores the binary only in .tools.
+Native HOME tests additionally require the infra C12 GI image localhost/rr-c-media:c12-locked, its
+recorded APT closure, project Tini and the hash-locked pymavlink fixture environment. Run npm run
+test:native after preparing those inputs. These native tests are separate from test:workers so the
+Node/Python CI job does not pretend that a GI media image is installed.
+
+The observed server is MAVSDK 4.0.3, SHA-256
+7cd0a2995460983e82fe2cf0ef187aba852bb849168ce972a139680f3611c0d8. Its gRPC endpoint starts after
+discovery. The heartbeat fixture uses pymavlink 2.4.50 and records the generated codec source hash;
+it proves discovery only. Native GStreamer 1.24.2 emitted a 27648-byte synthetic RGB payload, EOS,
+missing-input ERROR, bounded timeout and canceled-state NULL cleanup. Vehicle health, flight action
+effects, real cameras, RTSP and GPU rendering are outside these C12 observations.
+
+For HOME preparation, provide uv at /usr/local/bin/uv and the pinned infra media image, then run npm
+run prepare:native and npm run fetch:mavsdk-server before npm run test:native. The setup installs
+only a project test environment inside the worker container. Native output facts and synthetic
+payloads are retained in artifacts/host/c12 for independent review.

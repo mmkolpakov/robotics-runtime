@@ -1,0 +1,44 @@
+stateDiagram-v2
+    state "preloading" as Preloading
+    state "ready" as Ready
+    state "measuring" as Measuring
+    state "closing-measurement" as Closing
+    state "capturing-last-state" as Capturing
+    state "draining-recorders" as Draining
+    state "exporting-evidence" as Exporting
+    state "retained" as Retained
+    state "disposing" as Disposing
+    state "verifying-cleanup" as Verifying
+    state "completed" as Completed
+    state "error" as Error
+    [*] --> Preloading: admitted immutable profile
+    Preloading --> Ready: required readiness and references
+    Preloading --> Closing: startup failure calls finish without hooks
+    Ready --> Measuring: beginMeasurement
+    Ready --> Closing: finish before measurement records an error
+    Measuring --> Closing: finish with callbacks
+    Closing --> Capturing: close producer attempted / absence recorded
+    Capturing --> Draining: last-state producer attempted / absence recorded
+    Draining --> Exporting: drain producer attempted / absence recorded
+    Retained --> Exporting: explicit retryExport
+    Exporting --> Retained: failed / empty export
+    Exporting --> Disposing: nonempty retained references returned
+    Disposing --> Verifying: disposal attempted
+    Verifying --> Completed: no accumulated errors, nonempty resource outcomes
+    Verifying --> Error: errors or incomplete resource evidence
+    Completed --> [*]
+    Error --> [*]
+    note right of Retained
+        Resources and ID stay reserved.
+        finish returns its cached result.
+        retryExport replaces the cache,
+        retains previous errors and can
+        recover cleanup, not a passed run.
+    end note
+    note right of Error
+        Error does not prove release.
+        Release requires DISPOSED and
+        attempted/released outcomes
+        with nonempty evidence refs.
+        Cleanup failure can retain the ID.
+    end note

@@ -145,7 +145,7 @@ export class OwnedRun {
     }
     let disposalComplete = false;
     this.phase = 'disposing';
-    try { await within(() => this.fiber.dispose(), deadline); disposalComplete = this.fiber.state === FiberState.DISPOSED; this.phases.push({ phase: 'disposing', status: 'passed' }); }
+    try { await within(() => this.fiber.dispose(), deadline); disposalComplete = this.fiber.state === FiberState.DISPOSED; if (!disposalComplete) throw new Error('Cordis dispose resolved without observed DISPOSED state'); this.phases.push({ phase: 'disposing', status: 'passed' }); }
     catch (error) { this.errors.push(reason(error)); this.phases.push({ phase: 'disposing', status: 'error', diagnostic: reason(error) }); }
     this.phase = 'verifying-cleanup';
     const resourceOutcomes = this.resources ? await this.resources.verify(deadline) : [];

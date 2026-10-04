@@ -1,0 +1,30 @@
+graph LR
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["System Context View: Robotics runtime platform"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    1["<div style='font-weight: bold'>Integrator</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>Selects a profile, launches<br />software and verifies<br />retained evidence.</div>"]
+    style 1 fill:#ffffff,stroke:#444444,color:#444444
+    2["<div style='font-weight: bold'>Product application</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Consumer-owned robot, NSU,<br />vision and control behavior.</div>"]
+    style 2 fill:#eeeeee,stroke:#a6a6a6,color:#333333
+    3["<div style='font-weight: bold'>Simulation engines</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Native Gazebo, Webots or<br />Isaac runtime; per-profile<br />capabilities.</div>"]
+    style 3 fill:#eeeeee,stroke:#a6a6a6,color:#333333
+    4["<div style='font-weight: bold'>Native control endpoint</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Consumer-selected MAVSDK<br />server; transport, peer and<br />command effect are separate<br />facts.</div>"]
+    style 4 fill:#eeeeee,stroke:#a6a6a6,color:#333333
+    5["<div style='font-weight: bold'>Native media source</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Selected camera/RTSP source<br />or finite fixture; no<br />portable frame semantics are<br />assumed.</div>"]
+    style 5 fill:#eeeeee,stroke:#a6a6a6,color:#333333
+    6["<div style='font-weight: bold'>Artifact registries</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Published package/image<br />assets and attestations.</div>"]
+    style 6 fill:#eeeeee,stroke:#a6a6a6,color:#333333
+    7["<div style='font-weight: bold'>Robotics runtime platform</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Joint runtime/infra platform:<br />source composition host,<br />published document/evaluation<br />tools and separately<br />qualified providers.</div>"]
+    style 7 fill:#35546f,stroke:#253a4d,color:#ffffff
+
+    1-. "<div>Runs and verifies selected<br />workloads</div><div style='font-size: 70%'></div>" .->7
+    2-. "<div>Supplies configuration and<br />consumes qualification</div><div style='font-size: 70%'></div>" .->7
+    2-. "<div>Uses native control and<br />telemetry</div><div style='font-size: 70%'></div>" .->4
+    7-. "<div>Integrates selected native<br />runtimes</div><div style='font-size: 70%'></div>" .->3
+    7-. "<div>Connects the selected native<br />SDK</div><div style='font-size: 70%'></div>" .->4
+    7-. "<div>Consumes the selected media<br />endpoint</div><div style='font-size: 70%'></div>" .->5
+    7-. "<div>Installs and verifies<br />immutable artifacts</div><div style='font-size: 70%'></div>" .->6
+
+  end

@@ -1,0 +1,50 @@
+graph LR
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Deployment View: Robotics runtime platform - Home"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    subgraph 35 ["Home workstation"]
+      style 35 fill:#ffffff,stroke:#444444,color:#444444
+
+      subgraph 36 ["dev WSL"]
+        style 36 fill:#ffffff,stroke:#444444,color:#444444
+
+        37["<div style='font-weight: bold'>Rootless container engine</div><div style='font-size: 70%; margin-top: 0px'>[Infrastructure Node: Podman 4.9.3 / Compose 5.3.1]</div><div style='font-size: 80%; margin-top:10px'>Owned project socket and<br />namespace mapping.</div>"]
+        style 37 fill:#ffffff,stroke:#444444,color:#444444
+        38["<div style='font-weight: bold'>Composition host</div><div style='font-size: 70%; margin-top: 0px'>[Container: Node 24 / Cordis / Execa]</div><div style='font-size: 80%; margin-top:10px'>Source host: plugin loading,<br />readiness, resource ownership<br />and finite jobs.</div>"]
+        style 38 fill:#e6edf3,stroke:#a1a5aa,color:#172431
+        39["<div style='font-weight: bold'>Document worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Python CLI]</div><div style='font-size: 80%; margin-top:10px'>Finite Python application<br />using published contracts<br />APIs; environment supplied by<br />infra.</div>"]
+        style 39 fill:#e6edf3,stroke:#a1a5aa,color:#172431
+        41["<div style='font-weight: bold'>Evaluation worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Python CLI]</div><div style='font-size: 80%; margin-top:10px'>Finite Python application<br />using published harness APIs;<br />ROS observer is attach-only.</div>"]
+        style 41 fill:#e6edf3,stroke:#a1a5aa,color:#172431
+        43["<div style='font-weight: bold'>Native provider worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Native simulator / Python or C++]</div><div style='font-size: 80%; margin-top:10px'>Candidate integrations:<br />selected backend native API<br />and observed facts; each has<br />its own qualification.</div>"]
+        style 43 fill:#e6edf3,stroke:#a1a5aa,color:#172431
+        45["<div style='font-weight: bold'>Media consumer worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Python GI / GStreamer]</div><div style='font-size: 80%; margin-top:10px'>Source finite GStreamer<br />worker; decoding and frame<br />bytes stay outside the host.</div>"]
+        style 45 fill:#e6edf3,stroke:#a1a5aa,color:#172431
+        47[("<div style='font-weight: bold'>Retained evidence</div><div style='font-size: 70%; margin-top: 0px'>[Container: Files / object storage]</div><div style='font-size: 80%; margin-top:10px'>Exact payloads and<br />references. Infra publishes<br />signed qualification bundles<br />after release verification.</div>")]
+        style 47 fill:#e6edf3,stroke:#a1a5aa,color:#172431
+      end
+
+      subgraph 53 ["Native Windows target"]
+        style 53 fill:#ffffff,stroke:#444444,color:#444444
+
+        54["<div style='font-weight: bold'>Native provider worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Native simulator / Python or C++]</div><div style='font-size: 80%; margin-top:10px'>Candidate integrations:<br />selected backend native API<br />and observed facts; each has<br />its own qualification.</div>"]
+        style 54 fill:#e6edf3,stroke:#a1a5aa,color:#172431
+      end
+
+    end
+
+    38-. "<div>Invokes bounded<br />validation/writer jobs</div><div style='font-size: 70%'>[argv/files/exit]</div>" .->39
+    38-. "<div>Invokes bounded evaluation<br />jobs</div><div style='font-size: 70%'>[argv/files/exit]</div>" .->41
+    38-. "<div>Owns startup, readiness and<br />teardown</div><div style='font-size: 70%'>[Compose/finite jobs]</div>" .->43
+    38-. "<div>Invokes bounded native<br />pipeline work</div><div style='font-size: 70%'>[argv/files/exit]</div>" .->45
+    38-. "<div>Verifies export and cleanup<br />outcomes</div><div style='font-size: 70%'>[File references]</div>" .->47
+    39-. "<div>Validates and writes linked<br />documents</div><div style='font-size: 70%'>[Files]</div>" .->47
+    41-. "<div>Reads observations and writes<br />results</div><div style='font-size: 70%'>[Files/JSON/JUnit]</div>" .->47
+    43-. "<div>Retains observations before<br />reset/disposal</div><div style='font-size: 70%'>[Exact payloads]</div>" .->47
+    45-. "<div>Retains native reports and<br />configured file outputs</div><div style='font-size: 70%'>[Exact files]</div>" .->47
+    38-. "<div>Owns startup, readiness and<br />teardown</div><div style='font-size: 70%'>[Compose/finite jobs]</div>" .->54
+    54-. "<div>Retains observations before<br />reset/disposal</div><div style='font-size: 70%'>[Exact payloads]</div>" .->47
+
+  end

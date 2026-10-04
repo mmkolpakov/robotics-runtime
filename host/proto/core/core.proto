@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package mavsdk.rpc.core;
+
+option java_package = "io.mavsdk.core";
+option java_outer_classname = "CoreProto";
+
+// Access to the connection state and core configurations
+service CoreService {
+    /*
+     * Subscribe to 'connection state' updates.
+     */
+    rpc SubscribeConnectionState(SubscribeConnectionStateRequest) returns(stream ConnectionStateResponse) {}
+    /*
+     * Set timeout of MAVLink transfers.
+     *
+     * The default timeout used is generally (0.5 seconds) seconds.
+     * If MAVSDK is used on the same host this timeout can be reduced, while
+     * if MAVSDK has to communicate over links with high latency it might
+     * need to be increased to prevent timeouts.
+     */
+    rpc SetMavlinkTimeout(SetMavlinkTimeoutRequest) returns(SetMavlinkTimeoutResponse) {}
+    /*
+     * Feed the heartbeat watchdog.
+     *
+     * MAVSDK can be configured with a heartbeat watchdog (deadman timer).
+     * While configured, the periodic heartbeats sent by MAVSDK are only sent
+     * as long as this keeps being called within the timeout period. If the
+     * watchdog times out, heartbeats stop until it is fed again.
+     *
+     * Call this at least twice per timeout period. Heartbeats are sent at 1 Hz
+     * and the deadline is only checked when one is due, so feeding exactly once
+     * per period leaves no margin and a single late feed already drops a
+     * heartbeat.
+     *
+     * This allows MAVSDK's heartbeats to reflect the liveness of the client:
+     * if the client hangs or dies, heartbeats stop.
+     *
+     * Has no effect if no watchdog is configured (e.g. with the
+     * --heartbeat-watchdog-timeout option of mavsdk_server, or
+     * SetHeartbeatWatchdogTimeout).
+     */
+    rpc FeedHeartbeatWatchdog(FeedHeartbeatWatchdogRequest) returns(FeedHeartbeatWatchdogResponse) {}
+    /*
+     * Set the heartbeat watchdog timeout.
+     *
+     * When timeout_s is greater than 0, the periodic heartbeats sent by MAVSDK
+     * are only sent as long as FeedHeartbeatWatchdog is called at least once
+     * per timeout period. If the watchdog times out, heartbeats stop until it
+     * is fed again.
+     *
+     * When timeout_s is 0, the watchdog is disabled and heartbeats follow the
+     * usual policy (always_send_heartbeats or a connected system).
+     *
+     * Values greater than 0 and less than 2 are rejected: heartbeats are sent
+     * at 1 Hz, so a timeout shorter than two heartbeat periods cannot be met
+     * reliably.
+     *
+     * This is an alternative to configuring the watchdog at mavsdk_server
+     * startup with the --heartbeat-watchdog-timeout option.
+     */
+    rpc SetHeartbeatWatchdogTimeout(SetHeartbeatWatchdogTimeoutRequest) returns(SetHeartbeatWatchdogTimeoutResponse) {}
+}
+
+message SubscribeConnectionStateRequest {}
+message ConnectionStateResponse {
+    ConnectionState connection_state = 1; // Connection state
+}
+
+message SetMavlinkTimeoutRequest {
+    double timeout_s = 1; // Timeout in seconds
+}
+message SetMavlinkTimeoutResponse {}
+
+message FeedHeartbeatWatchdogRequest {}
+message FeedHeartbeatWatchdogResponse {}
+
+message SetHeartbeatWatchdogTimeoutRequest {
+    double timeout_s = 1; // Timeout in seconds. 0 disables the watchdog. Minimum 2 when enabled.
+}
+message SetHeartbeatWatchdogTimeoutResponse {}
+
+// Connection state type.
+message ConnectionState {
+    bool is_connected = 2; // Whether the vehicle got connected or disconnected
+}
