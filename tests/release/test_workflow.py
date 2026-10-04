@@ -83,3 +83,47 @@ def test_validated_artifacts_are_handed_to_publication_without_rebuilding() -> N
         assert not any("uv build" in step.get("run", "") for step in steps)
     publish = jobs["publish-pypi"]["steps"][1]
     assert publish["with"] == {"packages-dir": "dist/", "attestations": "true"}
+
+
+def test_semantic_corpus_is_retained_and_attested_outside_pypi_distributions() -> None:
+    jobs = workflow()["jobs"]
+    steps = jobs["build"]["steps"]
+    capture = next(
+        step
+        for step in steps
+        if step.get("name") == "Capture the source-bound compatibility corpus outside distributions"
+    )
+    assert "scripts.schema_compatibility.snapshot" in capture["run"]
+    assert "--plan artifacts/release/plan.json --output artifacts/release/corpus" in capture["run"]
+    upload = next(
+        step for step in steps if step.get("name") == "Upload validated compatibility corpus"
+    )
+    assert upload["with"]["path"] == "artifacts/release/corpus/*.json"
+    assert "if" not in upload
+    release = jobs["github-release"]["steps"]
+    download = next(
+        step for step in release if step.get("name") == "Download validated compatibility corpus"
+    )
+    assert download["with"]["name"] == upload["with"]["name"].replace("steps.plan", "needs.build")
+    attest = next(step for step in release if step.get("name") == "Attest verified distributions")
+    assert attest["with"]["subject-path"].splitlines() == ["dist/*", "corpus/*.json"]
+    create = next(
+        step
+        for step in release
+        if step.get("name") == "Create the release without overwriting existing assets"
+    )
+    verify = next(step for step in release if step.get("name") == "Verify immutable release assets")
+    assert "dist/* corpus/*.json --verify-tag" in create["run"]
+    assert "for artifact in dist/* corpus/*.json; do" in verify["run"]
+    assert jobs["publish-pypi"]["steps"][1]["with"]["packages-dir"] == "dist/"
+
+
+def test_release_requires_published_compatibility_before_build_and_capture() -> None:
+    steps = workflow()["jobs"]["build"]["steps"]
+    names = [step.get("name") for step in steps]
+    compatibility = names.index("Require published schema and semantic compatibility")
+    assert "scripts.check_schema_compatibility" in steps[compatibility]["run"]
+    assert compatibility < names.index("Build the selected package without workspace sources")
+    assert compatibility < names.index(
+        "Capture the source-bound compatibility corpus outside distributions"
+    )

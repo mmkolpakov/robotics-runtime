@@ -4,5 +4,14 @@
     "path": "packages/contracts/tests/fixtures/campaign/valid/legacy-shortfall.json",
     "blob": "f1bb2d8c43937e77768a6feb3d3b1ced8489839d",
     "sha256": "07dae3f85aed3441462285d4fc7436c07830a5af4b888f98ccb89f903b5f604b"
+  },
+  "legacy-alias.json": {
+    "commit": "0c2c0f4d37ef97fc6818ac61c66cdcef0bec3940",
+    "path": "tests/fixtures/model-artifact/valid/onnx.yaml",
+    "raw_sha256": "ecb9650ec09f533a0ca93b5c6361e53b39cb025727b43a9f0b4f2c80f62e43eb",
+    "decoder_commit": "d9dad3d5599486646efe86347d5a7e2ab8951e04",
+    "decoder_path": "scripts/schema_compatibility/probe.py",
+    "decoder_sha256": "806d339483bbff39d6bc19d47c05305e4ac5c687b2eb5742b6b783a4329cffa7",
+    "sha256": "602088db353304559938c44e42e94e9b79db8456ac751dfd4019f4b3fb082c2c"
   }
 }

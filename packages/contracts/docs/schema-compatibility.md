@@ -41,8 +41,9 @@ legacy tag separately. Tag protection and release provenance remain release
 workflow/repository responsibilities.
 
 Legacy source is read from `src/`; workspace releases use `packages/contracts/src/`.
-The gate extracts those exact Git sources and released `tests/fixtures` into a
-temporary directory. It does not install an editable baseline or modify the
+The gate extracts those exact Git sources, contracts fixtures and consumer
+examples into a temporary directory. Workspace releases also provide the
+harness's regular and live fixtures. It does not install an editable baseline or modify the
 checkout, package versions, schemas, fixtures or digests.
 
 ## Automated D10 domain
@@ -102,31 +103,91 @@ schema solver.
 
 ## Semantic regressions and byte tripwires
 
-The released public loader parses every JSON/YAML file directly under a released
-fixture `valid/` directory. The released public `validate_document` must accept
-each document before the current public API receives the same parsed JSON value.
-This exercises schema validation, Python semantic checks and extension checks;
-no invalid baseline case is silently discarded. The validators run in separate
-`python -I -B` processes with the selected source prepended explicitly and the
-import origin checked. Input mutation fails the probe. Dependencies come from
-the current locked development environment; incompatible historical runtime
-dependencies fail explicitly and need review, rather than substituting the
-current validator for the old one.
+The reviewed JSON corpus is stored under
+`tests/schema_compatibility/fixtures/contracts-v0.18.2/`, bound to published
+source `dc02c62897372514537cf241f06dc71b9f960c44`. Its 139-file inventory
+classifies every contracts fixture, consumer example, harness fixture and live
+fixture. There are 92 public role documents, including 12 expected refusals,
+and three composition descriptor contexts. Raw qualification, product,
+observation, time-authority and golden assets keep their own classifications
+and original byte digests.
 
-The initial corpus contains 15 published valid fixtures plus the exact legacy
-campaign shortfall regression from commit
-`ae89248d2fb7d842766a0c70eeb6380619801974`. Its frozen copy and byte provenance live
-under `tests/schema_compatibility/fixtures/`. It asserts that the previously
-valid `failed` verdict with two passed runs and a minimum of three remains valid.
-The campaign algorithm is not copied into this checker. Future semantic fixes
-should add historical valid witnesses here when not already covered by released
-fixtures. This finite corpus cannot prove all Python semantics compatible.
+Both selected APIs receive the same frozen JSON documents, artifact
+descriptors, extension schema bytes and contexts. Neither semantic probe
+parses YAML or silently drops an invalid fixture. The 288 current cases cover
+document/role validation, all 26 public roles, pinned and legacy extension
+behavior, qualification links with 16 contradiction cases, and matching,
+missing, mismatched and unpinned robot-description workload bindings. Outcomes
+retain acceptance/refusal, exception class, error identifier, JSON path and
+message, plus qualification diagnostics and blocked checks.
 
-`tests/test_schema_compatibility.py` includes old-valid/new-invalid witnesses for
-required fields, removed properties, types, typed enums/constants, patterns,
-ranges, closed objects, conditionals and evaluated annotations. A separate
-mutation changes only the public semantic dispatch while retaining all schema
-bytes; the public API probe must fail on the campaign witness.
+A separately retained 67-case legacy corpus records values and complete raw
+inventory from `contracts-legacy/v0.16.0`. Its old decoder's identity remains
+data in the provenance; the decoder is not imported or executed. Alias values
+can therefore remain valid semantic witnesses while the current public loader
+continues to reject alias syntax. The exact campaign shortfall from commit
+`ae89248d2fb7d842766a0c70eeb6380619801974` and the historical alias regression
+retain their original byte provenance. The campaign algorithm is not copied
+into the checker.
+
+Twenty additional raw/syntax witnesses call each selected package's public
+loader and dumper with identical bytes. They cover accepted JSON/YAML scalar
+values and typed roundtrips, duplicate keys, aliases, non-core tags,
+non-string keys, malformed syntax and non-finite values. Current restrictions
+are not retroactive legacy loader requirements. The current workspace gate
+reports 375 cases; a legacy-only baseline replays 67 historical semantic cases.
+
+The validators run in separate `python -I -B` processes with the selected source
+prepended explicitly and the import origin checked. Input mutation and
+unexpected programming/infrastructure exceptions fail the probe; only native
+contract errors are expected refusals. Dependencies come from the current
+locked development environment. The corpus's stored file hashes and typed
+JSON-value hashes are checked before probing. Released raw asset bytes are
+checked against their inventory; missing, added or reclassified files require
+review. Documentation has no semantic or artifact binding here, so capture
+records its observed source bytes separately. The original frozen corpus is
+never regenerated by a test or capture command.
+
+`tests/test_schema_compatibility.py` includes old-valid/new-invalid structural
+witnesses and mutations that change public semantic behavior while retaining
+schema bytes. It also proves that a negative fixture cannot become accepted,
+a workload binding refusal cannot disappear, raw fixture changes are detected,
+and the historical JSON corpus preserves all 105 original inventory entries.
+These finite cases do not prove all Python semantics compatible.
+
+## Source-bound release corpus
+
+The release workflow runs the existing compatibility gate, builds and checks
+the archives, then captures the reviewed corpus outside the distribution
+directory:
+
+```bash
+"$RELEASE_PYTHON" -m scripts.schema_compatibility.snapshot \
+  --plan artifacts/release/plan.json --output artifacts/release/corpus
+```
+
+The output contains `semantic-inventory.json`, `semantic-documents.json`,
+`semantic-contexts.json`, `raw-syntax.json` and `semantic-provenance.json`.
+Provenance binds their exact SHA-256 digests and sizes to the release plan's
+candidate, commit, tree and contracts source. Capture checks the actual
+commit/tree and requires a clean checkout before writing. The local `.codegraph/`
+search index is the sole path excluded from that check; untracked importable
+files outside it are rejected. The observed
+inventory records that candidate source identity and
+retains the frozen baseline provenance plus the 105-file historical inventory.
+The semantic files contain all 355 current and historical contexts. Historical
+release witness identifiers use a separate `historical/` namespace to preserve
+distinct cases without collisions; document values and raw digests stay exact.
+The 20 raw/syntax witnesses remain separate.
+
+The workflow hands these exact files to the GitHub release job, attests and
+verifies them with the distribution assets, and leaves the PyPI package
+directory restricted to wheels and sdists. Capture refuses to overwrite an
+existing output directory.
+
+This snapshot records JSON semantics and link outcomes with separate syntax
+witnesses. Raw artifact integrity and signature verification remain independent
+checks; semantic JSON is never substituted for signed or digest-bound bytes.
 
 The digest snapshot remains an independent accidental-change tripwire. An
 intentional digest update requires this gate, relevant consumer tests and release

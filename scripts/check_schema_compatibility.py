@@ -31,7 +31,7 @@ def check(root: Path) -> str:
             json.loads((old_path / "catalog.v1.json").read_bytes()),
             json.loads((new_path / "catalog.v1.json").read_bytes()),
         )
-        cases = check_semantics(published, candidate)
+        cases = check_semantics(published, candidate, legacy=not release.prefix)
     return f"{release.tag} ({release.commit}): {count} retained schemas; {cases} semantic cases"
 
 
