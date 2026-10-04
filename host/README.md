@@ -52,16 +52,20 @@ owner and immutable package/image storage; Cordis scoping does not sandbox execu
 RunOwner creates an isolated native Fiber tree with distinct service symbols. Required imports must
 have a Fiber, required Fibers must be ACTIVE, bindings must exist and each backend must return
 observed readiness evidence. A pending dependency, failed import, callback error or bounded probe
-timeout yields RunStartupError with the complete cleanup report. Run IDs are reserved before
+timeout yields RunStartupError with a failure report and its OwnedRun. Run IDs are reserved before
 asynchronous admission.
 
 An OwnedRun starts in preload, becomes ready, and enters measurement only through
 beginMeasurement(). finish(hooks) awaits measurement close, last-state capture, recorder drain and
-evidence export before disposing its Fiber. Providers register only their own resources through
+evidence export before disposing its Fiber. Failed export returns incomplete, retains resources and
+keeps the owner ID reserved. Providers register only their own resources through
 ctx.runResources.track(). After dispose, independent resource probes return released state and
 retained evidence references. Physical cleanup errors and native errors caught by Cordis remain in
 the completion report. Completion has passed, error or incomplete status; a run without a
-measurement or cleanup proof cannot pass. Call finish before disposing the enclosing host.
+measurement or cleanup proof cannot pass. Call finish before disposing the enclosing host. A
+retained run permits explicit retryExport(exportEvidence); earlier failure diagnostics remain in the
+completed report. RunStartupError.run supports exporting startup diagnostics before retrying
+teardown.
 
 The single host-owned schema is schemas/host-composition.v1.schema.json, namespace
 org.robotics.runtime.host, URI urn:robotics:host:composition:v1. It records observed bindings,
@@ -78,3 +82,7 @@ representation instead of inventing exact nanoseconds.
 
 Documents and Evaluation require WorkerCommand configuration with a nonempty executable; no Python
 command is inferred. Use an absolute executable or provide an explicit env.PATH for a named tool.
+
+Lifecycle deadlines are checked during admission before any provider Fiber starts. Owner IDs remain
+reserved until disposal and independent resource verification finish. Runtime JavaScript numbers and
+coercible objects are rejected by the nanos API before any worker is launched.

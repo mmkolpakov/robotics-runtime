@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 export interface ArtifactRef { uri: string; sha256: string; size_bytes: number; }
 export type RunPhase = 'preloading' | 'ready' | 'measuring' | 'closing-measurement' | 'capturing-last-state' |
-  'draining-recorders' | 'exporting-evidence' | 'disposing' | 'verifying-cleanup' | 'completed' | 'error';
+  'draining-recorders' | 'exporting-evidence' | 'disposing' | 'verifying-cleanup' | 'completed' | 'retained' | 'error';
 export interface PhaseObservation { phase: RunPhase; status: 'passed' | 'error'; diagnostic?: string; }
 export interface CompletionHooks {
   closeMeasurement(signal: AbortSignal): Promise<readonly ArtifactRef[]>;
@@ -19,8 +19,13 @@ export async function referenceFile(path: string): Promise<ArtifactRef> {
   if (!facts.isFile() || facts.size !== raw.length) throw new Error('evidence file changed during capture');
   return { uri: pathToFileURL(file).href, sha256: createHash('sha256').update(raw).digest('hex'), size_bytes: raw.length };
 }
-export async function within<T>(work: (signal: AbortSignal) => Promise<T>, deadlineMs: number, cancel?: AbortSignal): Promise<T> {
+export function lifecycleDeadline(value: number | undefined): number {
+  const deadlineMs = value ?? 30000;
   if (!Number.isSafeInteger(deadlineMs) || deadlineMs <= 0 || deadlineMs > 2147483647) throw new RangeError('invalid lifecycle deadline');
+  return deadlineMs;
+}
+export async function within<T>(work: (signal: AbortSignal) => Promise<T>, deadlineMs: number, cancel?: AbortSignal): Promise<T> {
+  lifecycleDeadline(deadlineMs);
   const abort = new AbortController();
   const signal = cancel ? AbortSignal.any([abort.signal, cancel]) : abort.signal;
   let timer: ReturnType<typeof setTimeout> | undefined;

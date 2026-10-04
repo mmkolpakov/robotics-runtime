@@ -3,6 +3,7 @@ import type { Context } from 'cordis';
 import { readFile, lstat, realpath } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
+import { lifecycleDeadline } from '../application-lifecycle/index.js';
 
 export interface ImmutableFile { path: string; sha256: string; }
 export interface RequiredBinding { entryId: string; service: string; }
@@ -35,6 +36,7 @@ export class Admission extends Service {
   async admit(id: string): Promise<AdmittedProfile> {
     const profile = this.profiles.get(id);
     if (!profile) throw new Error(`profile is not trusted: ${id}`);
+    const deadlineMs = lifecycleDeadline(profile.deadlineMs);
     const profilePath = resolve(profile.profilePath);
     let profileSha256: string | undefined;
     const seen = new Set<string>();
@@ -54,7 +56,7 @@ export class Admission extends Service {
       if (path === profilePath) profileSha256 = digest;
     }
     if (!profileSha256) throw new Error('the Include profile must be in the pinned closure');
-    const result: AdmittedProfile = Object.freeze({ ...profile, profilePath, profileSha256 });
+    const result: AdmittedProfile = Object.freeze({ ...profile, profilePath, profileSha256, deadlineMs });
     this.issued.add(result);
     return result;
   }

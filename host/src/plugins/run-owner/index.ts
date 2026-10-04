@@ -38,6 +38,12 @@ export class RunResources extends Service {
       catch (error) { record.cleanupError = reason(error); throw error; }
     }, `resource:${resource.id}`);
   }
+  pending(): ResourceOutcome[] {
+    return [...this.records.values()].map(record => ({
+      id: record.resource.id, ownerId: this.ownerId, attempted: record.attempted, released: false,
+      evidenceRefs: [], diagnostic: 'destructive cleanup deferred until retained evidence export succeeds',
+    }));
+  }
   async verify(deadlineMs: number): Promise<ResourceOutcome[]> {
     return Promise.all([...this.records.values()].map(async record => {
       try {
@@ -74,7 +80,7 @@ export class OwnedRun {
   loader!: Loader;
   private completion: Promise<RunCompletion> | undefined;
   private readonly stopLogging: () => unknown;
-  constructor(readonly owner: Context, readonly runId: string, readonly profile: AdmittedProfile) {
+  constructor(readonly owner: Context, readonly runId: string, readonly profile: AdmittedProfile, private readonly releaseOwner: () => void) {
     this.stopLogging = owner.logger.exporter({ export: (message: Message) => {
       if (message.type !== 'error' || !descends(message.fiber?.deref(), this.fiber)) return;
       if (this.capturedErrors.length < 1000) this.capturedErrors.push(message.args.map(reason).join(' '));
@@ -88,6 +94,17 @@ export class OwnedRun {
   finish(hooks?: CompletionHooks): Promise<RunCompletion> {
     return this.completion ??= this.complete(hooks);
   }
+  retryExport(exportEvidence: CompletionHooks['exportEvidence']): Promise<RunCompletion> {
+    if (this.phase !== 'retained') throw new Error('only retained runs can retry export');
+    this.phase = 'exporting-evidence';
+    return this.completion = this.exportAndCleanup(exportEvidence);
+  }
+  private retained(diagnostic: string): RunCompletion {
+    this.phase = 'retained';
+    this.phases.push({ phase: 'retained', status: 'error', diagnostic });
+    return { runId: this.runId, status: 'incomplete', phases: [...this.phases],
+      resourceOutcomes: this.resources?.pending() ?? [], evidenceRefs: [...this.evidenceRefs], errors: [...this.errors] };
+  }
   private async complete(hooks?: CompletionHooks): Promise<RunCompletion> {
     const deadline = this.profile.deadlineMs ?? 30000;
     if (this.phase !== 'measuring') this.errors.push('measurement was not started');
@@ -95,7 +112,6 @@ export class OwnedRun {
       ['closing-measurement', hooks?.closeMeasurement],
       ['capturing-last-state', hooks?.captureLastState],
       ['draining-recorders', hooks?.drainRecorders],
-      ['exporting-evidence', hooks?.exportEvidence],
     ] as const;
     for (const [phase, work] of stages) {
       this.phase = phase;
@@ -111,8 +127,25 @@ export class OwnedRun {
         this.errors.push(diagnostic); this.phases.push({ phase, status: 'error', diagnostic });
       }
     }
+    return this.exportAndCleanup(hooks?.exportEvidence);
+  }
+  private async exportAndCleanup(exportEvidence?: CompletionHooks['exportEvidence']): Promise<RunCompletion> {
+    const deadline = this.profile.deadlineMs ?? 30000;
+    this.phase = 'exporting-evidence';
+    try {
+      if (!exportEvidence) throw new Error('evidence export producer is missing');
+      const references = await within(signal => exportEvidence(signal), deadline);
+      if (!references.length) throw new Error('evidence export returned no retained references');
+      this.evidenceRefs.push(...references);
+      this.phases.push({ phase: 'exporting-evidence', status: 'passed' });
+    } catch (error) {
+      const diagnostic = reason(error);
+      this.errors.push(diagnostic); this.phases.push({ phase: 'exporting-evidence', status: 'error', diagnostic });
+      return this.retained('evidence export failed; destructive cleanup is deferred');
+    }
+    let disposalComplete = false;
     this.phase = 'disposing';
-    try { await within(() => this.fiber.dispose(), deadline); this.phases.push({ phase: 'disposing', status: 'passed' }); }
+    try { await within(() => this.fiber.dispose(), deadline); disposalComplete = this.fiber.state === FiberState.DISPOSED; this.phases.push({ phase: 'disposing', status: 'passed' }); }
     catch (error) { this.errors.push(reason(error)); this.phases.push({ phase: 'disposing', status: 'error', diagnostic: reason(error) }); }
     this.phase = 'verifying-cleanup';
     const resourceOutcomes = this.resources ? await this.resources.verify(deadline) : [];
@@ -126,12 +159,13 @@ export class OwnedRun {
     const status = this.errors.length ? 'error' : resourceOutcomes.length ? 'passed' : 'incomplete';
     this.phase = status === 'passed' ? 'completed' : 'error';
     this.phases.push({ phase: this.phase, status: status === 'passed' ? 'passed' : 'error' });
+    if (disposalComplete && resourceOutcomes.every(outcome => outcome.attempted && outcome.released && outcome.evidenceRefs.length > 0)) this.releaseOwner();
     return { runId: this.runId, status, phases: [...this.phases], resourceOutcomes,
       evidenceRefs: [...this.evidenceRefs], errors: [...this.errors] };
   }
 }
 export class RunStartupError extends Error {
-  constructor(message: string, readonly completion: RunCompletion) { super(message); this.name = 'RunStartupError'; }
+  constructor(message: string, readonly completion: RunCompletion, readonly run: OwnedRun) { super(message); this.name = 'RunStartupError'; }
 }
 
 /** Owns one isolated native Fiber tree. Backend operations remain provider-specific. */
@@ -147,7 +181,7 @@ export class RunOwner extends Service {
       profile = await this.ctx.admission.admit(profileId);
       this.ctx.admission.assertIssued(profile);
     } catch (error) { this.active.delete(runId); throw error; }
-    const run = new OwnedRun(this.ctx, runId, profile);
+    const run = new OwnedRun(this.ctx, runId, profile, () => this.active.delete(runId));
     let scope = this.ctx;
     for (const name of new Set(['loader', 'runResources', 'baseUrl', ...profile.isolatedServices, ...profile.requiredBindings.map(item => item.service)])) {
       scope = scope.isolate(name, Symbol(runId + ':' + name));
@@ -166,7 +200,6 @@ export class RunOwner extends Service {
       run.loader = loader;
       run.includeId = await loader.create({ name: '@cordisjs/plugin-include', config: { path: profile.profilePath } });
       await loader.await();
-      ctx.effect(() => () => { this.active.delete(runId); });
     });
     try {
       await within(() => run.fiber.await(), profile.deadlineMs ?? 30000);
@@ -183,14 +216,14 @@ export class RunOwner extends Service {
         const backend: unknown = run.context.get(binding.service);
         if (!backend || typeof (backend as BackendProbe).ready !== 'function') throw new Error(`required backend binding is missing: ${binding.service}`);
         const observed = await within(signal => (backend as BackendProbe).ready(signal), profile.deadlineMs ?? 30000);
-        if (!observed.ready || !observed.evidenceRefs.length) throw new Error(`backend has no observed readiness: ${binding.service}`);
         run.evidenceRefs.push(...observed.evidenceRefs);
+        if (!observed.ready || !observed.evidenceRefs.length) throw new Error(`backend has no observed readiness: ${binding.service}`);
       }
       run.phase = 'ready'; run.phases.push({ phase: 'preloading', status: 'passed' }, { phase: 'ready', status: 'passed' });
       return run;
     } catch (error) {
-      run.errors.push(reason(error)); run.phases.push({ phase: 'preloading', status: 'error', diagnostic: reason(error) }); this.active.delete(runId);
-      throw new RunStartupError(reason(error), await run.finish());
+      run.errors.push(reason(error)); run.phases.push({ phase: 'preloading', status: 'error', diagnostic: reason(error) });
+      throw new RunStartupError(reason(error), await run.finish(), run);
     }
   }
 }

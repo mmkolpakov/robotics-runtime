@@ -10,6 +10,7 @@ export interface OfflineEvaluation extends WorkerLimits {
   outputDirectory: string; diagnosticOutput: string; extensionSchemas?: readonly ExtensionSchema[]; maxRawEvidenceBytes?: number;
 }
 function integerNs(value: string | bigint): string {
+  if (typeof value !== 'string' && typeof value !== 'bigint') throw new TypeError('nanoseconds must be a decimal string or bigint; JavaScript numbers are rejected');
   const raw = String(value);
   if (!/^(0|[1-9][0-9]*)$/.test(raw)) throw new TypeError('nanoseconds must be an unsigned decimal string or bigint');
   return raw;

@@ -112,7 +112,8 @@
                   "disposing",
                   "verifying-cleanup",
                   "completed",
-                  "error"
+                  "error",
+                  "retained"
                 ]
               },
               "status": {

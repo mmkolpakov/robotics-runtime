@@ -30,12 +30,20 @@ test('required missing import, PENDING and false backend probe are rejected with
   for (const mode of ['missing', 'pending', 'not-ready'] as const) {
     const value = await fixture(mode); const ctx = await host([value.descriptor]);
     try {
+      let failed: RunStartupError | undefined;
       await assert.rejects(ctx.runOwner.start(value.runId, value.runId), (error: unknown) => {
-        assert.ok(error instanceof RunStartupError); assert.equal(error.completion.status, 'error');
-        assert.ok(error.completion.phases.some(item => item.phase === 'verifying-cleanup'));
-        if (mode === 'not-ready') assert.ok(error.completion.resourceOutcomes.every(item => item.released));
+        if (error instanceof RunStartupError) failed = error;
+        assert.ok(error instanceof RunStartupError); assert.equal(error.completion.status, 'incomplete');
+        assert.ok(error.completion.phases.some(item => item.phase === 'retained'));
+        if (mode === 'not-ready') assert.ok(error.completion.resourceOutcomes.every(item => !item.attempted && !item.released));
         return true;
       });
+      assert.ok(failed);
+      const diagnostic = join(value.directory, 'startup-diagnostic.json');
+      await writeFile(diagnostic, JSON.stringify({ error: failed.message }));
+      const retried = await failed.run.retryExport(async () => [await referenceFile(diagnostic)]);
+      assert.equal(retried.status, 'error');
+      assert.ok(retried.resourceOutcomes.every(item => item.attempted && item.released));
     } finally { await ctx.fiber.dispose(); await rm(value.directory, { recursive: true, force: true }); }
   }
 });
@@ -89,14 +97,22 @@ test('native readiness callback error and timeout remain errors with independent
   for (const mode of ['probe-error', 'probe-timeout'] as const) {
     const value = await fixture(mode); const ctx = await host([value.descriptor]);
     try {
+      let failed: RunStartupError | undefined;
       await assert.rejects(ctx.runOwner.start(value.runId, value.runId), (error: unknown) => {
+        if (error instanceof RunStartupError) failed = error;
         assert.ok(error instanceof RunStartupError);
         assert.match(error.message, /probe failed|deadline exceeded/);
-        assert.equal(error.completion.status, 'error');
-        assert.ok(error.completion.resourceOutcomes.every(item => item.attempted && item.released));
+        assert.equal(error.completion.status, 'incomplete');
+        assert.ok(error.completion.resourceOutcomes.every(item => !item.attempted && !item.released));
         assert.ok(error.completion.phases.some(item => item.phase === 'preloading' && item.status === 'error'));
         return true;
       });
+      assert.ok(failed);
+      const diagnostic = join(value.directory, 'startup-diagnostic.json');
+      await writeFile(diagnostic, JSON.stringify({ error: failed.message }));
+      const retried = await failed.run.retryExport(async () => [await referenceFile(diagnostic)]);
+      assert.equal(retried.status, 'error');
+      assert.ok(retried.resourceOutcomes.every(item => item.attempted && item.released));
     } finally { await ctx.fiber.dispose(); await rm(value.directory, { recursive: true, force: true }); }
   }
 });
@@ -121,5 +137,62 @@ test('same run ID is reserved before asynchronous admission', async () => {
     await assert.rejects(ctx.runOwner.start(value.runId, value.runId), /already owned/);
     const run = await started; run.beginMeasurement();
     assert.equal((await run.finish(hooks(run, value.directory, []))).status, 'passed');
+  } finally { await ctx.fiber.dispose(); await rm(value.directory, { recursive: true, force: true }); }
+});
+
+test('invalid deadline is refused before starting any provider effect', async () => {
+  const { setTimeout: pause } = await import('node:timers/promises');
+  for (const deadlineMs of [0, -1, 0.5, 2147483648]) {
+    const value = await fixture(); const ctx = await host([{ ...value.descriptor, deadlineMs }]);
+    try {
+      await assert.rejects(ctx.runOwner.start(value.runId, value.runId), /invalid lifecycle deadline/);
+      await pause(100);
+      await assert.rejects(access(value.resourcePath));
+      await assert.rejects(access(value.readyPath));
+    } finally { await ctx.fiber.dispose(); await rm(value.directory, { recursive: true, force: true }); }
+  }
+});
+
+test('owner ID remains reserved throughout delayed native cleanup and verification', async () => {
+  const { setTimeout: pause } = await import('node:timers/promises');
+  const value = await fixture();
+  const modulePath = join(value.directory, 'provider.mjs');
+  await chmod(modulePath, 0o644);
+  await writeFile(modulePath, (await readFile(modulePath, 'utf8')).replace('cleanup:async()=>{', 'cleanup:async()=>{await new Promise(done=>setTimeout(done,250));'));
+  await chmod(modulePath, 0o444);
+  const identity = await referenceFile(modulePath);
+  const descriptor = { ...value.descriptor, files: value.descriptor.files.map(file => file.path === modulePath ? { ...file, sha256: identity.sha256 } : file) };
+  const ctx = await host([descriptor]);
+  try {
+    const first = await ctx.runOwner.start(value.runId, value.runId); first.beginMeasurement();
+    const finishing = first.finish(hooks(first, value.directory, []));
+    await pause(40);
+    await assert.rejects(ctx.runOwner.start(value.runId, value.runId), /already owned/);
+    assert.equal((await finishing).status, 'passed');
+    const second = await ctx.runOwner.start(value.runId, value.runId); second.beginMeasurement();
+    await access(value.resourcePath);
+    assert.equal((await second.finish(hooks(second, value.directory, []))).status, 'passed');
+  } finally { await ctx.fiber.dispose(); await rm(value.directory, { recursive: true, force: true }); }
+});
+
+test('failed export retains raw resource and owner until explicit export retry completes cleanup', async () => {
+  const value = await fixture(); const ctx = await host([value.descriptor]);
+  try {
+    const run = await ctx.runOwner.start(value.runId, value.runId); run.beginMeasurement();
+    const stages = hooks(run, value.directory, []);
+    const incomplete = await run.finish({ ...stages, exportEvidence: async () => { throw new Error('export storage unavailable'); } });
+    assert.equal(incomplete.status, 'incomplete'); assert.equal(run.phase, 'retained');
+    assert.ok(incomplete.errors.includes('export storage unavailable'));
+    assert.ok(incomplete.resourceOutcomes.every(item => !item.attempted && !item.released));
+    await access(value.resourcePath);
+    await assert.rejects(access(join(value.directory, 'retained-resource.bin')));
+    await assert.rejects(ctx.runOwner.start(value.runId, value.runId), /already owned/);
+    const retried = await run.retryExport(stages.exportEvidence);
+    assert.equal(retried.status, 'error');
+    assert.ok(retried.errors.includes('export storage unavailable'));
+    assert.ok(retried.resourceOutcomes.every(item => item.attempted && item.released));
+    await assert.rejects(access(value.resourcePath));
+    await access(join(value.directory, 'retained-resource.bin'));
+    await access(value.cleanupPath);
   } finally { await ctx.fiber.dispose(); await rm(value.directory, { recursive: true, force: true }); }
 });
