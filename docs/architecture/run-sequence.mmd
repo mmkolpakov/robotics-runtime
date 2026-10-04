@@ -1,0 +1,66 @@
+sequenceDiagram
+    actor Integrator
+    participant Consumer as Consumer coordinator
+    participant Owner as RunOwner / OwnedRun
+    participant Provider as Selected native provider
+    participant Store as Retained files
+    participant Evaluator as Python evaluator
+    Integrator->>Consumer: Select trusted profile and workload
+    Consumer->>Owner: start(profileId, runId)
+    Owner->>Owner: Reserve ID, admit immutable closure and deadline
+    alt Admission rejected
+        Owner-->>Consumer: Error, release reservation, no provider effects
+    else Admission accepted
+        Owner->>Provider: Load bindings, ready(signal)
+        alt Startup or readiness fails
+            Provider-->>Owner: Error / missing observed readiness
+            Owner-->>Consumer: RunStartupError with retained OwnedRun
+            Note over Consumer,Owner: Startup failure calls finish without hooks, finish is cached
+            Note over Owner,Provider: Resources and ID stay reserved until explicit export recovery
+            opt Consumer recovers available startup evidence
+                Consumer->>Owner: retryExport(exportEvidence)
+                Owner->>Consumer: Persist evidence through callback
+                Owner->>Provider: Dispose acquired resources
+                Owner->>Provider: verifyCleanup(signal)
+                Provider-->>Owner: Observed release and references / failure
+                Owner-->>Consumer: Error completion, previous diagnostics remain
+                Note over Consumer,Owner: The original RunStartupError.completion stays an incomplete snapshot
+            end
+        else Native readiness observed
+            Provider-->>Owner: ready + exact evidence references
+            Owner-->>Consumer: OwnedRun in ready phase
+            Consumer->>Owner: beginMeasurement()
+            Note over Consumer,Owner: Marks the phase, the consumer starts workload and recorder
+            Consumer->>Provider: Run native workload and collect observations
+            Consumer->>Owner: finish(CompletionHooks)
+            Owner->>Consumer: closeMeasurement, captureLastState, drainRecorders
+            Consumer->>Provider: Close window, snapshot, drain native recorder
+            Provider-->>Consumer: Exact payload references / stage diagnostics
+            Consumer-->>Owner: Callback results
+            Owner->>Consumer: exportEvidence(signal)
+            Consumer->>Store: Persist payloads and verified references
+            alt Export fails or returns no references
+                Consumer-->>Owner: Export error
+                Owner-->>Consumer: incomplete, resources and ID retained
+                opt Consumer explicitly retries after fixing export
+                    Consumer->>Owner: retryExport(exportEvidence)
+                    Owner->>Consumer: exportEvidence(signal)
+                    Consumer->>Store: Retry persistence
+                    Consumer-->>Owner: References or export error
+                    Note over Consumer,Owner: Successful retry still reports error, prior export error is retained
+                end
+            else Export returns retained references
+                Consumer-->>Owner: Nonempty retained references
+            end
+            opt Export succeeded
+                Owner->>Provider: Dispose acquired resources through Fiber effects
+                Owner->>Provider: verifyCleanup(signal)
+                Provider-->>Owner: Observed release and evidence / cleanup failure
+                Note over Owner,Provider: Release ID requires DISPOSED + attempted/released outcomes + evidence
+                Owner-->>Consumer: RunCompletion, earlier errors remain recorded
+                Consumer->>Evaluator: Evaluate retained documents and facts
+                Evaluator-->>Consumer: Qualification result / diagnostics
+                Consumer-->>Integrator: Lifecycle outcome and separate qualification verdict
+            end
+        end
+    end

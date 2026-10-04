@@ -73,24 +73,18 @@ connections. Trusted immutable configuration supplies executable plugins.
 Scope isolation is not a security sandbox and disposal cannot reverse physical
 actions.
 
-```mermaid
-flowchart LR
-    admission["Admit identities / profile"]
-    ready["Start / observe readiness"]
-    measure["Measure native workload"]
-    capture["Close window / snapshot / drain"]
-    export["Export exact payload references"]
-    release["Dispose owned resources"]
-    outcome["Observe cleanup outcome"]
-    result["Evaluate / package"]
+![Run API and consumer callbacks](architecture/generated/run-sequence.svg)
 
-    admission --> ready --> measure --> capture --> export --> release --> outcome --> result
-```
+[State and recovery source](architecture/run-state.mmd), and the
+[C4 model and deployment view](architecture/README.md).
 
 Export precedes destructive reset/stop. A standard `STOPPED` state may reset
 simulation state; it is not synonymous with process disposal. Cleanup is verified
 from real process/container/stream outcomes, independently of a resolved plugin
-disposer. Failure preserves diagnostics and cannot produce a successful verdict.
+disposer. Failed export retains resources for explicit recovery. A cleanup failure remains
+visible even when disposal returns. The consumer invokes the evaluator separately
+after receiving the lifecycle report; a lifecycle outcome is not a qualification
+verdict.
 
 ## Qualification boundaries
 
