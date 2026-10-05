@@ -6,6 +6,7 @@ import json
 import shutil
 import subprocess
 from copy import deepcopy
+from dataclasses import asdict
 from hashlib import sha1, sha256
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from referencing.exceptions import Unresolvable
 
 from scripts import check_schema_compatibility as gate
 from scripts.bundle_schemas import DIALECT, ROOT, Schema, read_schemas
+from scripts.release.plan import create_plan, project
 from scripts.schema_compatibility import history, semantic, snapshot
 from scripts.schema_compatibility.probe import execute
 from scripts.schema_compatibility.structure import (
@@ -719,16 +721,24 @@ def test_release_corpus_retains_raw_identity_and_source_plan(tmp_path: Path) -> 
     # Local search indexes are not producer, package or corpus inputs.
     (root / ".codegraph").mkdir()
     (root / ".codegraph/index").write_bytes(b"local index")
-    plan = {
-        "candidate": "contracts-v0.18.3",
-        "commit": history.git(root, "rev-parse", "HEAD").decode().strip(),
-        "tree": history.git(root, "rev-parse", "HEAD^{tree}").decode().strip(),
-        "contracts_commit": history.git(root, "rev-parse", "HEAD").decode().strip(),
-    }
+    plan = asdict(
+        create_plan(
+            root, f"contracts-v{project(root, 'contracts')['version']}", event="workflow_dispatch"
+        )
+    )
+    assert (
+        plan["tree"] == history.git(root, "rev-parse", "HEAD:packages/contracts").decode().strip()
+    )
+    assert plan["tree"] != history.git(root, "rev-parse", "HEAD^{tree}").decode().strip()
     output = tmp_path / "release-corpus"
     snapshot.write_release(root, plan, output)
     provenance = json.loads((output / "semantic-provenance.json").read_bytes())
-    assert {name: provenance[name] for name in plan} == plan
+    for name in ("candidate", "commit", "tree", "contracts_commit"):
+        assert provenance[name] == plan[name]
+    assert (
+        provenance["repository_tree"]
+        == history.git(root, "rev-parse", "HEAD^{tree}").decode().strip()
+    )
     for name, identity in provenance["files"].items():
         raw = (output / name).read_bytes()
         assert len(raw) == identity["size_bytes"]
@@ -771,8 +781,18 @@ def test_release_corpus_retains_raw_identity_and_source_plan(tmp_path: Path) -> 
     assert not (tmp_path / "untracked-corpus").exists()
 
 
-def test_release_corpus_rejects_a_mismatched_source_plan(tmp_path: Path) -> None:
-    plan = {"commit": "0" * 40, "tree": "0" * 40}
+@pytest.mark.parametrize("changed", ["commit", "repository_tree", "other_package_tree"])
+def test_release_corpus_rejects_a_mismatched_source_plan(tmp_path: Path, changed: str) -> None:
+    plan = asdict(
+        create_plan(
+            ROOT, f"contracts-v{project(ROOT, 'contracts')['version']}", event="workflow_dispatch"
+        )
+    )
+    if changed == "commit":
+        plan["commit"] = "0" * 40
+    else:
+        ref = "HEAD^{tree}" if changed == "repository_tree" else "HEAD:packages/harness"
+        plan["tree"] = history.git(ROOT, "rev-parse", ref).decode().strip()
     with pytest.raises(ReviewRequired, match="source differs from the validated plan"):
         snapshot.write_release(ROOT, plan, tmp_path / "mismatched")
     assert not (tmp_path / "mismatched").exists()

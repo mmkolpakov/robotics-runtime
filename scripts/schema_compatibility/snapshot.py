@@ -151,7 +151,11 @@ def historical_snapshot() -> dict[str, Any]:
 def write_release(root: Path, plan: dict[str, Any], output: Path) -> None:
     commit = history.git(root, "rev-parse", "HEAD").decode().strip()
     tree = history.git(root, "rev-parse", "HEAD^{tree}").decode().strip()
-    if (plan["commit"], plan["tree"]) != (commit, tree):
+    key = plan.get("key")
+    if key not in {"contracts", "harness"}:
+        raise ReviewRequired("Release corpus plan must select a workspace package")
+    package_tree = history.git(root, "rev-parse", f"HEAD:packages/{key}").decode().strip()
+    if (plan["commit"], plan["tree"]) != (commit, package_tree):
         raise ReviewRequired("Release corpus source differs from the validated plan")
     dirty = history.git(
         root,
@@ -207,6 +211,7 @@ def write_release(root: Path, plan: dict[str, Any], output: Path) -> None:
         "candidate": plan["candidate"],
         "commit": plan["commit"],
         "tree": plan["tree"],
+        "repository_tree": tree,
         "contracts_commit": plan["contracts_commit"],
         "files": files,
         "baseline": json.loads((FIXTURES / "corpus-provenance.json").read_bytes()),

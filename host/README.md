@@ -67,6 +67,13 @@ retained run permits explicit retryExport(exportEvidence); earlier failure diagn
 completed report. RunStartupError.run supports exporting startup diagnostics before retrying
 teardown.
 
+referenceFile(path, {maxBytes}) streams retained bytes through one opened file handle and checks
+file identity, size and modification metadata before and after capture. maxBytes is optional;
+omitting it keeps the existing unlimited byte budget. Existing file aliases remain supported,
+but retargeting an alias during capture is rejected. Producers must close or seal the file before
+capture and keep it stable afterward. A byte reference does not qualify native export or verify
+the evidence contract; those checks remain with the provider and public Python tools.
+
 The single host-owned schema is schemas/host-composition.v1.schema.json, namespace
 org.robotics.runtime.host, URI urn:robotics:host:composition:v1. It records observed bindings,
 package/config identity, declared and effective capabilities, native endpoints, time
