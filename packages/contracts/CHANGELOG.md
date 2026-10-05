@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.18.3
+
+- Document the frozen semantic compatibility corpus and its source-bound release
+  snapshot assets. Keep the published package API and schema behavior unchanged.
+- Clarify supported schema-extension, package-consumer and source-identity
+  boundaries in package documentation.
+
 ## 0.18.2
 
 - Add an optional per-file raw-evidence byte limit to MCAP summary APIs and the
