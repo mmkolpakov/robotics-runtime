@@ -5,10 +5,16 @@ The model covers the joint platform implemented by `robotics-runtime` and
 and CLI applications, not additional software systems.
 
 [workspace.dsl](workspace.dsl) is the C4 source. Context shows users and external
-systems. Container shows executable applications and the retained data store;
-a C4 container is not a package or a Docker image. Deployment maps these
+systems. [Container](generated/Container.svg) shows the owned process composition
+and retained data; [ContainerDetail](generated/ContainerDetail.svg) keeps the
+complete consumer, controller, simulator and media interface graph. A C4 container
+is not a package or a Docker image. Deployment maps these
 applications onto the implemented WSL CPU route. Dashed candidate elements
-have not passed the full released consumer gates. Native Windows standalone
+have not passed the full released consumer gates. Box and arrow labels are kept
+short for README display; [the architecture reference](../architecture.md) and
+[host reference](../../host/README.md) describe native endpoints, producer
+verification, frame ownership, release scope and infra-supplied environments.
+Native Windows standalone
 diagnostics are separate from this route: they do not establish Compose control
 or evidence transport between WSL and a Windows worker. An AWS/EKS target requires
 its own deployment implementation and qualification.

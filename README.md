@@ -50,6 +50,9 @@ their own release qualification.
 
 ![C4 Container: executable applications and retained data](docs/architecture/generated/Container.svg)
 
+[Complete native and consumer interfaces](docs/architecture/generated/ContainerDetail.svg)
+shows controller, simulator and media relationships.
+
 [Diagram sources, sequence and deployment](docs/architecture/README.md).
 
 The selected host uses upstream Cordis for local plugin loading, service bindings

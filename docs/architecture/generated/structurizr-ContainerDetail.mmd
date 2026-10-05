@@ -1,13 +1,19 @@
-graph TB
+graph LR
   linkStyle default fill:#ffffff
 
-  subgraph diagram ["Process composition"]
+  subgraph diagram ["Native and consumer interfaces"]
     style diagram fill:#ffffff,stroke:#ffffff
 
     1["<div style='font-weight: bold'>Integrator</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>Selects profiles and verifies<br />evidence.</div>"]
     style 1 fill:#ffffff,stroke:#444444,color:#444444
     2["<div style='font-weight: bold'>Product application</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Robot, NSU, control and<br />vision behavior.</div>"]
     style 2 fill:#eeeeee,stroke:#a6a6a6,color:#333333
+    3["<div style='font-weight: bold'>Simulation engines</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Gazebo / Webots / Isaac;<br />profile-scoped.</div>"]
+    style 3 fill:#eeeeee,stroke:#a6a6a6,color:#333333
+    4["<div style='font-weight: bold'>Control endpoint</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>MAVSDK: separate transport,<br />peer and effect facts.</div>"]
+    style 4 fill:#eeeeee,stroke:#a6a6a6,color:#333333
+    5["<div style='font-weight: bold'>Media source</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Camera, RTSP or fixture;<br />native frame semantics.</div>"]
+    style 5 fill:#eeeeee,stroke:#a6a6a6,color:#333333
 
     subgraph 7 ["Robotics runtime platform"]
       style 7 fill:#ffffff,stroke:#253a4d,color:#253a4d
@@ -26,13 +32,17 @@ graph TB
       style 9 fill:#e6edf3,stroke:#a1a5aa,color:#172431
     end
 
+    2-. "<div>Control / telemetry</div><div style='font-size: 70%'></div>" .->4
     1-. "<div>Trusted profile</div><div style='font-size: 70%'>[Consumer CLI/API]</div>" .->8
     2-. "<div>Trusted coordinator</div><div style='font-size: 70%'>[Host API / files]</div>" .->8
     8-. "<div>Bounded document jobs</div><div style='font-size: 70%'>[argv/files/exit]</div>" .->9
     8-. "<div>Bounded evaluation jobs</div><div style='font-size: 70%'>[argv/files/exit]</div>" .->10
     8-. "<div>Startup / ready / teardown</div><div style='font-size: 70%'>[Compose/finite jobs]</div>" .->11
+    8-. "<div>Generated clients; consumer<br />policy</div><div style='font-size: 70%'>[MAVSDK / gRPC]</div>" .->4
     8-. "<div>Bounded media jobs</div><div style='font-size: 70%'>[argv/files/exit]</div>" .->12
+    12-. "<div>Declared input</div><div style='font-size: 70%'>[GStreamer / RTSP / fixture]</div>" .->5
     12-. "<div>Native reports / outputs</div><div style='font-size: 70%'>[Exact files]</div>" .->13
+    11-. "<div>Native SDK/controller</div><div style='font-size: 70%'>[Backend API]</div>" .->3
     11-. "<div>Retain before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" .->13
     9-. "<div>Validate / write documents</div><div style='font-size: 70%'>[Files]</div>" .->13
     10-. "<div>Read evidence / write results</div><div style='font-size: 70%'>[Files/JSON/JUnit]</div>" .->13
