@@ -1,60 +1,52 @@
 %%{init: {"state": {"useMaxWidth": false}}}%%
 stateDiagram-v2
+    direction TB
     state "preloading" as Preloading
     state "ready" as Ready
     state "measuring" as Measuring
-    state "closing-measurement" as Closing
-    state "capturing-last-state" as Capturing
-    state "draining-recorders" as Draining
+    state "Completion callbacks" as Callbacks {
+        state "closing-measurement" as Closing
+        state "capturing-last-state" as Capturing
+        state "draining-recorders" as Draining
+        Closing --> Capturing: settled or missing hook
+        Capturing --> Draining: settled or missing hook
+    }
     state "exporting-evidence" as Exporting
     state "retained" as Retained
     state "disposing" as Disposing
     state "verifying-cleanup" as Verifying
     state "completed" as Completed
     state "error" as Error
-    [*] --> Preloading: admitted immutable profile
-    Preloading --> Ready: required readiness and references
-    Preloading --> Closing: settled startup failure, finish without hooks
-    Preloading --> Retained: readiness deadline, producer still active
+    [*] --> Preloading: immutable profile admitted
+    Preloading --> Ready: observed readiness and references
+    Preloading --> Closing: settled startup failure
+    Preloading --> Retained: readiness callback still active
     Ready --> Measuring: beginMeasurement
-    Ready --> Closing: finish before measurement records an error
-    Measuring --> Closing: finish with callbacks
-    Closing --> Capturing: close settled / absence recorded
-    Closing --> Retained: close deadline, producer still active
-    Capturing --> Draining: last-state settled / absence recorded
-    Capturing --> Retained: capture deadline, producer still active
-    Draining --> Exporting: drain settled / absence recorded
-    Draining --> Retained: drain deadline, producer still active
-    Retained --> Closing: readiness settled, explicit recovery
-    Retained --> Capturing: close settled, explicit recovery
-    Retained --> Draining: capture settled, explicit recovery
-    Retained --> Exporting: drain or export settled, explicit recovery
-    Retained --> Retained: retry while producer still active
-    Exporting --> Retained: failed / unsettled / empty export
-    Exporting --> Disposing: nonempty retained references returned
+    Ready --> Closing: finish without measurement
+    Measuring --> Closing: finish
+    Callbacks --> Retained: deadline with active callback
+    Draining --> Exporting: settled or missing hook
+    Retained --> Callbacks: explicit recovery at saved cursor
+    Retained --> Exporting: callbacks settled, retry export
+    Exporting --> Retained: failed, active or empty export
+    Exporting --> Disposing: successful nonempty export
     Disposing --> Verifying: disposal attempted
-    Verifying --> Completed: no accumulated errors, nonempty resource outcomes
-    Verifying --> Error: errors or incomplete resource evidence
+    Verifying --> Completed: no errors, complete resource proof
+    Verifying --> Error: errors or missing proof
     Completed --> [*]
     Error --> [*]
     note right of Retained
-        Resources and ID stay reserved.
-        finish returns its cached result.
-        retryExport replaces the cache,
-        retains previous errors and can
-        resume unattempted stages after
-        producer settlement. Errors remain.
-        Active producers and failed export
-        block tracked cleanup even through
-        parent disposal. Forced context
-        disposal can consume teardown.
+        Resources and ID remain reserved.
+        Active callbacks block later work.
+        Explicit recovery waits for settlement,
+        then resumes unattempted stages.
+        Previous errors remain recorded.
+        finish keeps its cached report.
     end note
     note right of Error
-        Error does not prove release.
-        Release requires DISPOSED and
+        Release needs DISPOSED and
         attempted/released outcomes
-        with nonempty evidence refs.
-        Cleanup failure can retain the ID.
-        No terminal cleanup retry or crash
-        recovery, reservations are local.
+        with retained references.
+        No terminal cleanup retry.
+        Reservations are process-local.
     end note
