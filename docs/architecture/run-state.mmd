@@ -1,44 +1,52 @@
+%%{init: {"state": {"useMaxWidth": false}}}%%
 stateDiagram-v2
+    direction TB
     state "preloading" as Preloading
     state "ready" as Ready
     state "measuring" as Measuring
-    state "closing-measurement" as Closing
-    state "capturing-last-state" as Capturing
-    state "draining-recorders" as Draining
+    state "Completion callbacks" as Callbacks {
+        state "closing-measurement" as Closing
+        state "capturing-last-state" as Capturing
+        state "draining-recorders" as Draining
+        Closing --> Capturing: settled or missing hook
+        Capturing --> Draining: settled or missing hook
+    }
     state "exporting-evidence" as Exporting
     state "retained" as Retained
     state "disposing" as Disposing
     state "verifying-cleanup" as Verifying
     state "completed" as Completed
     state "error" as Error
-    [*] --> Preloading: admitted immutable profile
-    Preloading --> Ready: required readiness and references
-    Preloading --> Closing: startup failure calls finish without hooks
+    [*] --> Preloading: immutable profile admitted
+    Preloading --> Ready: observed readiness and references
+    Preloading --> Closing: settled startup failure
+    Preloading --> Retained: readiness callback still active
     Ready --> Measuring: beginMeasurement
-    Ready --> Closing: finish before measurement records an error
-    Measuring --> Closing: finish with callbacks
-    Closing --> Capturing: close producer attempted / absence recorded
-    Capturing --> Draining: last-state producer attempted / absence recorded
-    Draining --> Exporting: drain producer attempted / absence recorded
-    Retained --> Exporting: explicit retryExport
-    Exporting --> Retained: failed / empty export
-    Exporting --> Disposing: nonempty retained references returned
+    Ready --> Closing: finish without measurement
+    Measuring --> Closing: finish
+    Callbacks --> Retained: deadline with active callback
+    Draining --> Exporting: settled or missing hook
+    Retained --> Callbacks: explicit recovery at saved cursor
+    Retained --> Exporting: callbacks settled, retry export
+    Exporting --> Retained: error / active / empty
+    Exporting --> Disposing: success + refs
     Disposing --> Verifying: disposal attempted
-    Verifying --> Completed: no accumulated errors, nonempty resource outcomes
-    Verifying --> Error: errors or incomplete resource evidence
+    Verifying --> Completed: no errors, complete resource proof
+    Verifying --> Error: errors or missing proof
     Completed --> [*]
     Error --> [*]
     note right of Retained
-        Resources and ID stay reserved.
-        finish returns its cached result.
-        retryExport replaces the cache,
-        retains previous errors and can
-        recover cleanup, not a passed run.
+        Resources and ID remain reserved.
+        Active callbacks block later work.
+        Explicit recovery waits for settlement,
+        then resumes unattempted stages.
+        Previous errors remain recorded.
+        finish keeps its cached report.
     end note
     note right of Error
-        Error does not prove release.
-        Release requires DISPOSED and
+        Release needs DISPOSED and
         attempted/released outcomes
-        with nonempty evidence refs.
-        Cleanup failure can retain the ID.
+        with retained references.
+        No terminal cleanup retry.
+        Reservations are process-local.
     end note

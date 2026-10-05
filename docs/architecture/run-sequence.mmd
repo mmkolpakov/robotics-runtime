@@ -1,3 +1,4 @@
+%%{init: {"sequence": {"useMaxWidth": false}}}%%
 sequenceDiagram
     actor Integrator
     participant Consumer as Consumer coordinator
@@ -13,18 +14,28 @@ sequenceDiagram
     else Admission accepted
         Owner->>Provider: Load bindings, ready(signal)
         alt Startup or readiness fails
-            Provider-->>Owner: Error / missing observed readiness
+            Owner->>Owner: Startup error, missing readiness or deadline
             Owner-->>Consumer: RunStartupError with retained OwnedRun
             Note over Consumer,Owner: Startup failure calls finish without hooks, finish is cached
-            Note over Owner,Provider: Resources and ID stay reserved until explicit export recovery
+            Note over Owner,Provider: Active readiness producer blocks export and tracked cleanup
+            Note over Consumer,Owner: After settlement, explicit recovery resumes unattempted stages
             opt Consumer recovers available startup evidence
                 Consumer->>Owner: retryExport(exportEvidence)
-                Owner->>Consumer: Persist evidence through callback
-                Owner->>Provider: Dispose acquired resources
-                Owner->>Provider: verifyCleanup(signal)
-                Provider-->>Owner: Observed release and references / failure
-                Owner-->>Consumer: Error completion, previous diagnostics remain
+                Owner->>Consumer: exportEvidence(signal)
+                Consumer->>Store: Persist available startup evidence and verify export
+                alt Recovery export fails or returns no references
+                    Consumer-->>Owner: Callback error or empty descriptors
+                    Owner-->>Consumer: incomplete, resources and ID retained
+                    Note over Consumer,Owner: Further explicit export recovery is still possible
+                else Recovery returns nonempty retained descriptors
+                    Consumer-->>Owner: Nonempty retained descriptors
+                    Owner->>Provider: Dispose acquired resources
+                    Owner->>Provider: verifyCleanup(signal)
+                    Provider-->>Owner: Observed release and references / failure
+                    Owner-->>Consumer: Error completion, previous diagnostics remain
+                end
                 Note over Consumer,Owner: The original RunStartupError.completion stays an incomplete snapshot
+            Note over Owner,Provider: Forced parent disposal can consume teardown, no cleanup-retry API
             end
         else Native readiness observed
             Provider-->>Owner: ready + exact evidence references
@@ -35,24 +46,40 @@ sequenceDiagram
             Consumer->>Owner: finish(CompletionHooks)
             Owner->>Consumer: closeMeasurement, captureLastState, drainRecorders
             Consumer->>Provider: Close window, snapshot, drain native recorder
-            Provider-->>Consumer: Exact payload references / stage diagnostics
-            Consumer-->>Owner: Callback results
+            alt A completion producer reaches its deadline while still active
+                Owner-->>Consumer: incomplete, retain resources and ID
+                Note over Owner,Provider: No dependent callback or tracked cleanup while producer is active
+                Provider-->>Consumer: Interrupted callback eventually settles
+                Consumer-->>Owner: Late references or native failure retained
+                Consumer->>Owner: retryExport(exportEvidence) after settlement
+                Owner->>Consumer: Resume remaining unattempted callbacks
+                Note over Consumer,Owner: Earlier timeout and native errors remain, no callback replay
+            else Completion producers settled
+                Provider-->>Consumer: Exact payload references / stage diagnostics
+                Consumer-->>Owner: Callback results
+                Note over Consumer,Owner: Stage errors remain recorded
+            end
             Owner->>Consumer: exportEvidence(signal)
-            Consumer->>Store: Persist payloads and verified references
-            alt Export fails or returns no references
+            Consumer->>Store: Persist payloads and verify export in the producer
+            alt Export fails, is unsettled, or returns no references
                 Consumer-->>Owner: Export error
                 Owner-->>Consumer: incomplete, resources and ID retained
-                opt Consumer explicitly retries after fixing export
+                opt Consumer explicitly retries after export settles
                     Consumer->>Owner: retryExport(exportEvidence)
                     Owner->>Consumer: exportEvidence(signal)
                     Consumer->>Store: Retry persistence
-                    Consumer-->>Owner: References or export error
-                    Note over Consumer,Owner: Successful retry still reports error, prior export error is retained
+                    alt Retry export fails or returns no references
+                        Consumer-->>Owner: Callback error or empty descriptors
+                        Owner-->>Consumer: incomplete, resources and ID retained
+                    else Retry returns nonempty retained descriptors
+                        Consumer-->>Owner: Nonempty retained descriptors
+                        Note over Consumer,Owner: Prior export error remains, active export blocks another export
+                    end
                 end
             else Export returns retained references
-                Consumer-->>Owner: Nonempty retained references
+                Consumer-->>Owner: Nonempty retained descriptors
             end
-            opt Export succeeded
+            opt Nonempty export returned, initially or on retry
                 Owner->>Provider: Dispose acquired resources through Fiber effects
                 Owner->>Provider: verifyCleanup(signal)
                 Provider-->>Owner: Observed release and evidence / cleanup failure

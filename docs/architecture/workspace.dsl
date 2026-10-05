@@ -1,59 +1,59 @@
 workspace "Robotics execution and qualification" "Joint platform from robotics-runtime and robotics-runtime-infra; source host and candidate providers are separate from the published Python pair." {
     !identifiers hierarchical
     model {
-        integrator = person "Integrator" "Selects a profile, launches software and verifies retained evidence."
-        product = softwareSystem "Product application" "Consumer-owned robot, NSU, vision and control behavior." {
+        integrator = person "Integrator" "Selects profiles and verifies evidence."
+        product = softwareSystem "Product application" "Robot, NSU, control and vision behavior." {
             tags "External"
         }
-        simulators = softwareSystem "Simulation engines" "Native Gazebo, Webots or Isaac runtime; per-profile capabilities." {
+        simulators = softwareSystem "Simulation engines" "Gazebo / Webots / Isaac; profile-scoped." {
             tags "External"
         }
-        autopilot = softwareSystem "Native control endpoint" "Consumer-selected MAVSDK server; transport, peer and command effect are separate facts." {
+        autopilot = softwareSystem "MAVSDK endpoint" "MAVSDK: separate transport, peer and effect facts." {
             tags "External"
         }
-        mediaSource = softwareSystem "Native media source" "Selected camera/RTSP source or finite fixture; no portable frame semantics are assumed." {
+        mediaSource = softwareSystem "Media source" "Camera, RTSP or fixture; native frame semantics." {
             tags "External"
         }
-        registries = softwareSystem "Artifact registries" "Published package/image assets and attestations." {
+        registries = softwareSystem "Artifact registries" "Immutable packages, images and attestations." {
             tags "External"
         }
-        platform = softwareSystem "Robotics runtime platform" "Joint runtime/infra platform: source composition host, published document/evaluation tools and separately qualified providers." {
-            host = container "Composition host" "Source host: plugin loading, readiness, resource ownership and finite jobs." "Node 24 / Cordis / Execa"
-            documents = container "Document worker" "Finite Python application using published contracts APIs; environment supplied by infra." "Python CLI"
-            evaluation = container "Evaluation worker" "Finite Python application using published harness APIs; ROS observer is attach-only." "Python CLI"
-            native = container "Native provider worker" "Candidate integrations: selected backend native API and observed facts; each has its own qualification." "Native simulator / Python or C++" {
+        platform = softwareSystem "Robotics runtime platform" "Source host, published Python tools; providers per profile." {
+            host = container "Composition host" "Source plugins / finite jobs / ownership." "Node 24 / Cordis / Execa"
+            documents = container "Document worker" "Published contracts / writers." "Python CLI"
+            evaluation = container "Evaluation worker" "Published; ROS attach-only." "Python CLI"
+            native = container "Provider worker" "Candidate native APIs; qualify each profile." "Native SDK / Python or C++" {
                 tags "Candidate"
             }
-            media = container "Media consumer worker" "Source finite GStreamer worker; decoding and frame bytes stay outside the host." "Python GI / GStreamer"
-            evidence = container "Retained evidence" "Exact payloads and references. Infra publishes signed qualification bundles after release verification." "Files / object storage" {
+            media = container "Media worker" "Source GStreamer; native decode / frames." "Python GI / GStreamer"
+            evidence = container "Retained evidence" "Exact files; publisher identity verified separately." "Files / object storage" {
                 tags "Database"
             }
         }
-        integrator -> platform "Runs and verifies selected workloads"
-        product -> platform "Supplies configuration and consumes qualification"
-        product -> autopilot "Uses native control and telemetry"
-        platform -> simulators "Integrates selected native runtimes"
-        platform -> autopilot "Connects the selected native SDK"
-        platform -> mediaSource "Consumes the selected media endpoint"
-        platform -> registries "Installs and verifies immutable artifacts"
-        integrator -> platform.host "Selects a trusted profile" "Consumer CLI/API"
-        product -> platform.host "Runs its coordinator with trusted configuration" "Host API / files"
-        platform.host -> platform.documents "Invokes bounded validation/writer jobs" "argv/files/exit"
-        platform.host -> platform.evaluation "Invokes bounded evaluation jobs" "argv/files/exit"
-        platform.host -> platform.native "Owns startup, readiness and teardown" "Compose/finite jobs"
-        platform.host -> autopilot "Uses generated SDK clients; consumer owns command policy" "MAVSDK / gRPC"
-        platform.host -> platform.media "Invokes bounded native pipeline work" "argv/files/exit"
-        platform.media -> mediaSource "Consumes declared input" "GStreamer / RTSP or finite source"
-        platform.media -> platform.evidence "Retains native reports and configured file outputs" "Exact files"
-        platform.native -> simulators "Uses native SDK/controller" "Backend API"
-        platform.native -> platform.evidence "Retains observations before reset/disposal" "Exact payloads"
-        platform.documents -> platform.evidence "Validates and writes linked documents" "Files"
-        platform.evaluation -> platform.evidence "Reads observations and writes results" "Files/JSON/JUnit"
-        platform.host -> platform.evidence "Verifies export and cleanup outcomes" "File references"
+        integrator -> platform "Run and verify workloads"
+        product -> platform "Supply config; read verdicts"
+        product -> autopilot "Control / telemetry"
+        platform -> simulators "Selected native runtimes"
+        platform -> autopilot "Selected SDK"
+        platform -> mediaSource "Selected media"
+        platform -> registries "Install / verify"
+        integrator -> platform.host "Trusted profile" "Consumer CLI/API"
+        product -> platform.host "Trusted coordinator" "Host API / files"
+        platform.host -> platform.documents "Validate / write" "argv / files / exit"
+        platform.host -> platform.evaluation "Evaluate" "argv / files / exit"
+        platform.host -> platform.native "Startup / ready / teardown" "Compose / finite jobs"
+        platform.host -> autopilot "SDK clients / consumer policy" "MAVSDK / gRPC"
+        platform.host -> platform.media "Bounded media jobs" "argv / files / exit"
+        platform.media -> mediaSource "Declared input" "GStreamer / RTSP / fixture"
+        platform.media -> platform.evidence "Native reports / outputs" "Exact files"
+        platform.native -> simulators "Native SDK/controller" "Backend API"
+        platform.native -> platform.evidence "Retain before reset / dispose" "Exact payloads"
+        platform.documents -> platform.evidence "Validate / write docs" "Files"
+        platform.evaluation -> platform.evidence "Read evidence / write results" "Files / JSON / JUnit"
+        platform.host -> platform.evidence "Nonempty refs; observe cleanup" "Callback refs"
         deploymentEnvironment "Home" {
-            deploymentNode "Home workstation" "Existing workstation; source qualification is environment-scoped." "Windows / NVIDIA" {
-                deploymentNode "dev WSL" "Existing development environment." "Ubuntu 24.04 / WSL2" {
-                    infrastructureNode "Rootless container engine" "Owned project socket and namespace mapping." "Podman 4.9.3 / Compose 5.3.1"
+            deploymentNode "Home workstation" "Source WSL CPU topology; qualification is profile-scoped." "Windows / WSL2" {
+                deploymentNode "dev WSL" "Source components; native and media coverage is profile-scoped." "Ubuntu 24.04 / WSL2" {
+                    infrastructureNode "Rootless engine" "Owned socket; namespace mapping." "Podman 4.9.3 / Compose 5.3.1"
                     containerInstance platform.host
                     containerInstance platform.documents
                     containerInstance platform.evaluation
@@ -61,33 +61,55 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
                     containerInstance platform.media
                     containerInstance platform.evidence
                 }
-                deploymentNode "Native Windows target" "Isaac standalone target; Windows access confirmed, runtime qualification pending." "Windows / RTX 5070 Ti" {
-                    tags "Candidate"
-                    containerInstance platform.native {
-                        tags "Candidate"
-                    }
-                }
             }
         }
     }
     views {
         systemContext platform "Context" "Actors and system boundary." {
-            include *
-            autoLayout lr
+            title "Platform context"
+            include *?
+            autoLayout lr 10 50
         }
-        container platform "Container" "Executable processes and retained data; packages are not containers." {
-            include *
-            autoLayout lr
+        container platform "Container" "Owned processes and retained data; native interfaces are in ContainerDetail." {
+            title "Process composition"
+            include platform.host platform.documents platform.evaluation platform.native platform.media platform.evidence
+            autoLayout lr 10 50
         }
-        deployment platform "Home" "HomeDeployment" "Existing WSL plus candidate Windows GPU target." {
+        container platform "ContainerDetail" "Complete consumer, controller, simulator and media interface graph." {
+            title "Native and consumer interfaces"
             include *
-            autoLayout lr
+            autoLayout lr 50 30
+        }
+        deployment platform "Home" "HomeDeployment" "Source WSL CPU topology; this view is not a complete consumer qualification." {
+            title "Source WSL CPU topology"
+            include *
+            autoLayout tb 100 40
+        }
+        properties {
+            "structurizr.metadata" "false"
+            "structurizr.description" "false"
+            "structurizr.boundaryPadding" "20"
+            "structurizr.deploymentNodePadding" "20"
+            "structurizr.groupPadding" "20"
         }
         styles {
+            element "Element" {
+                width 380
+                height 380
+                fontSize 36
+            }
+            relationship "Relationship" {
+                fontSize 36
+                width 240
+            }
             element "Person" {
                 shape Person
+                width 420
+                fontSize 36
+                metadata false
             }
             element "Software System" {
+                fontSize 36
                 background "#35546f"
                 color "#ffffff"
             }
@@ -97,6 +119,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             }
             element "Database" {
                 shape Cylinder
+                height 440
             }
             element "External" {
                 background "#eeeeee"
