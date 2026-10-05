@@ -13,15 +13,23 @@ stateDiagram-v2
     state "error" as Error
     [*] --> Preloading: admitted immutable profile
     Preloading --> Ready: required readiness and references
-    Preloading --> Closing: startup failure calls finish without hooks
+    Preloading --> Closing: settled startup failure, finish without hooks
+    Preloading --> Retained: readiness deadline, producer still active
     Ready --> Measuring: beginMeasurement
     Ready --> Closing: finish before measurement records an error
     Measuring --> Closing: finish with callbacks
-    Closing --> Capturing: close producer attempted / absence recorded
-    Capturing --> Draining: last-state producer attempted / absence recorded
-    Draining --> Exporting: drain producer attempted / absence recorded
-    Retained --> Exporting: explicit retryExport
-    Exporting --> Retained: failed / empty export
+    Closing --> Capturing: close settled / absence recorded
+    Closing --> Retained: close deadline, producer still active
+    Capturing --> Draining: last-state settled / absence recorded
+    Capturing --> Retained: capture deadline, producer still active
+    Draining --> Exporting: drain settled / absence recorded
+    Draining --> Retained: drain deadline, producer still active
+    Retained --> Closing: readiness settled, explicit recovery
+    Retained --> Capturing: close settled, explicit recovery
+    Retained --> Draining: capture settled, explicit recovery
+    Retained --> Exporting: drain or export settled, explicit recovery
+    Retained --> Retained: retry while producer still active
+    Exporting --> Retained: failed / unsettled / empty export
     Exporting --> Disposing: nonempty retained references returned
     Disposing --> Verifying: disposal attempted
     Verifying --> Completed: no accumulated errors, nonempty resource outcomes
@@ -33,7 +41,12 @@ stateDiagram-v2
         finish returns its cached result.
         retryExport replaces the cache,
         retains previous errors and can
-        recover cleanup, not a passed run.
+        resume unattempted stages after
+        producer settlement. Errors remain.
+        Active producers and failed export
+        block tracked cleanup even through
+        parent disposal. Forced context
+        disposal can consume teardown.
     end note
     note right of Error
         Error does not prove release.
@@ -41,4 +54,6 @@ stateDiagram-v2
         attempted/released outcomes
         with nonempty evidence refs.
         Cleanup failure can retain the ID.
+        No terminal cleanup retry or crash
+        recovery, reservations are local.
     end note

@@ -25,7 +25,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
                 tags "Candidate"
             }
             media = container "Media worker" "Source GStreamer; native decode / frames." "Python GI / GStreamer"
-            evidence = container "Retained evidence" "Exact files; bundles signed after release checks." "Files / object storage" {
+            evidence = container "Retained evidence" "Exact files; publisher identity verified separately." "Files / object storage" {
                 tags "Database"
             }
         }
@@ -51,8 +51,8 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         platform.evaluation -> platform.evidence "Read evidence / write results" "Files / JSON / JUnit"
         platform.host -> platform.evidence "Nonempty refs; observe cleanup" "Callback refs"
         deploymentEnvironment "Home" {
-            deploymentNode "Home workstation" "Hosts the WSL CPU route." "Windows / WSL2" {
-                deploymentNode "dev WSL" "CPU qualification by profile." "Ubuntu 24.04 / WSL2" {
+            deploymentNode "Home workstation" "Source WSL CPU topology; qualification is profile-scoped." "Windows / WSL2" {
+                deploymentNode "dev WSL" "Source components; native and media coverage is profile-scoped." "Ubuntu 24.04 / WSL2" {
                     infrastructureNode "Rootless engine" "Owned socket; namespace mapping." "Podman 4.9.3 / Compose 5.3.1"
                     containerInstance platform.host
                     containerInstance platform.documents
@@ -80,8 +80,8 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             include *
             autoLayout lr 50 30
         }
-        deployment platform "Home" "HomeDeployment" "Implemented WSL CPU route with provider-specific qualification." {
-            title "WSL CPU deployment"
+        deployment platform "Home" "HomeDeployment" "Source WSL CPU topology; this view is not a complete consumer qualification." {
+            title "Source WSL CPU topology"
             include *
             autoLayout tb 100 40
         }

@@ -1,7 +1,7 @@
 graph TB
   linkStyle default fill:#ffffff
 
-  subgraph diagram ["WSL CPU deployment"]
+  subgraph diagram ["Source WSL CPU topology"]
     style diagram fill:#ffffff,stroke:#ffffff
 
     subgraph 35 ["Home workstation"]
@@ -22,7 +22,7 @@ graph TB
         style 43 fill:#e6edf3,stroke:#a1a5aa,color:#172431
         45["<div style='font-weight: bold'>Media worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Python GI / GStreamer]</div><div style='font-size: 80%; margin-top:10px'>Source GStreamer; native<br />decode / frames.</div>"]
         style 45 fill:#e6edf3,stroke:#a1a5aa,color:#172431
-        47[("<div style='font-weight: bold'>Retained evidence</div><div style='font-size: 70%; margin-top: 0px'>[Container: Files / object storage]</div><div style='font-size: 80%; margin-top:10px'>Exact files; bundles signed<br />after release checks.</div>")]
+        47[("<div style='font-weight: bold'>Retained evidence</div><div style='font-size: 70%; margin-top: 0px'>[Container: Files / object storage]</div><div style='font-size: 80%; margin-top:10px'>Exact files; publisher<br />identity verified separately.</div>")]
         style 47 fill:#e6edf3,stroke:#a1a5aa,color:#172431
       end
 
