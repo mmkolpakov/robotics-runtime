@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.19.2
+
+Requires contracts 0.18 (`>=0.18,<0.19`), with release prerequisite
+[contracts-v0.18.3](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.18.3).
+
+- Keep timing evaluation outcomes separate from invalid-input errors. Preserve
+  unavailable observations and proven violations through typed results, then
+  fold them into acceptance through the existing public status order.
+- Add regressions for missing timing samples, invalid timing metadata and the
+  distinction between completed timing failures and validation errors.
+
 ## 0.19.1
 
 Requires contracts 0.18 (`>=0.18,<0.19`), with release prerequisite
