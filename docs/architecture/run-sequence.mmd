@@ -14,7 +14,7 @@ sequenceDiagram
     else Admission accepted
         Owner->>Provider: Load bindings, ready(signal)
         alt Startup or readiness fails
-            Provider-->>Owner: Error / missing observed readiness
+            Owner->>Owner: Startup error, missing readiness or deadline
             Owner-->>Consumer: RunStartupError with retained OwnedRun
             Note over Consumer,Owner: Startup failure calls finish without hooks, finish is cached
             Note over Owner,Provider: Active readiness producer blocks export and tracked cleanup
@@ -46,15 +46,17 @@ sequenceDiagram
             Consumer->>Owner: finish(CompletionHooks)
             Owner->>Consumer: closeMeasurement, captureLastState, drainRecorders
             Consumer->>Provider: Close window, snapshot, drain native recorder
-            Provider-->>Consumer: Exact payload references / stage diagnostics
-            Consumer-->>Owner: Callback results
             alt A completion producer reaches its deadline while still active
                 Owner-->>Consumer: incomplete, retain resources and ID
                 Note over Owner,Provider: No dependent callback or tracked cleanup while producer is active
+                Provider-->>Consumer: Interrupted callback eventually settles
+                Consumer-->>Owner: Late references or native failure retained
                 Consumer->>Owner: retryExport(exportEvidence) after settlement
                 Owner->>Consumer: Resume remaining unattempted callbacks
                 Note over Consumer,Owner: Earlier timeout and native errors remain, no callback replay
             else Completion producers settled
+                Provider-->>Consumer: Exact payload references / stage diagnostics
+                Consumer-->>Owner: Callback results
                 Note over Consumer,Owner: Stage errors remain recorded
             end
             Owner->>Consumer: exportEvidence(signal)
