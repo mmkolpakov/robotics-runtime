@@ -1,4 +1,4 @@
-import { Context, Service, FiberState } from 'cordis';
+import { Context, Service, FiberState, symbols } from 'cordis';
 import type { Fiber, Message } from 'cordis';
 import Loader from '@cordisjs/plugin-loader';
 import { dirname } from 'node:path';
@@ -25,6 +25,48 @@ export interface RunCompletion {
 declare module 'cordis' { interface Context { runOwner: RunOwner; runResources: RunResources; } }
 const reason = (error: unknown) => error instanceof Error ? error.message : String(error);
 
+interface Producer { phase: RunPhase; interrupted: boolean; }
+const producers = new WeakMap<OwnedRun, Producer>();
+const cleanupAdmitted = new WeakSet<OwnedRun>();
+const resourceOwners = new WeakMap<object, OwnedRun>();
+function resourceIdentity(resource: RunResources): object {
+  const original: unknown = Reflect.get(resource, symbols.original);
+  return typeof original === 'object' && original !== null ? original : resource;
+}
+/** A deadline bounds the caller, but only the actual producer can establish quiescence. */
+async function produce<T>(run: OwnedRun, phase: RunPhase, work: (signal: AbortSignal) => Promise<T>,
+  deadlineMs: number, references: (value: T) => readonly ArtifactRef[], cancel?: AbortSignal): Promise<T> {
+  if (producers.has(run)) throw new Error('a lifecycle producer is still active');
+  let producer: Producer | undefined;
+  try {
+    return await within(signal => {
+      producer = { phase, interrupted: false };
+      const current = producer;
+      producers.set(run, current);
+      const interrupted = () => { current.interrupted = true; };
+      signal.addEventListener('abort', interrupted, { once: true });
+      const settled = (failure?: { error: unknown }) => {
+        signal.removeEventListener('abort', interrupted);
+        producers.delete(run);
+        if (failure && current.interrupted && failure.error !== signal.reason) {
+          run.errors.push(`producer ${phase} settled after interruption: ${reason(failure.error)}`);
+        }
+      };
+      try {
+        return Promise.resolve(work(signal)).then(value => {
+          try { run.evidenceRefs.push(...references(value)); }
+          catch (error) { settled({ error }); throw error; }
+          settled();
+          return value;
+        }, error => { settled({ error }); throw error; });
+      } catch (error) { settled({ error }); throw error; }
+    }, deadlineMs, cancel);
+  } catch (error) {
+    if (producer) producer.interrupted = true;
+    throw error;
+  }
+}
+
 export class RunResources extends Service {
   private readonly records = new Map<string, ResourceRecord>();
   constructor(ctx: Context, readonly ownerId: string) { super(ctx, 'runResources'); }
@@ -34,6 +76,15 @@ export class RunResources extends Service {
     const record: ResourceRecord = { resource, attempted: false };
     this.records.set(resource.id, record);
     this.ctx.effect(() => async () => {
+      const owner = resourceOwners.get(resourceIdentity(this));
+      const producer = owner && producers.get(owner);
+      if (owner && (producer || !cleanupAdmitted.has(owner))) {
+        const diagnostic = producer ? `resource ${resource.id} cleanup refused while producer ${producer.phase} is unsettled` :
+          `resource ${resource.id} cleanup refused before retained evidence export succeeds`;
+        record.cleanupError = diagnostic;
+        owner.errors.push(diagnostic);
+        throw new Error(diagnostic);
+      }
       record.attempted = true;
       try { await resource.cleanup(); }
       catch (error) { record.cleanupError = reason(error); throw error; }
@@ -43,6 +94,7 @@ export class RunResources extends Service {
     return [...this.records.values()].map(record => ({
       id: record.resource.id, ownerId: this.ownerId, attempted: record.attempted, released: false,
       evidenceRefs: [], diagnostic: 'destructive cleanup deferred until retained evidence export succeeds',
+      ...(record.cleanupError === undefined ? {} : { cleanupError: record.cleanupError }),
     }));
   }
   async verify(deadlineMs: number): Promise<ResourceOutcome[]> {
@@ -80,6 +132,8 @@ export class OwnedRun {
   context!: Context;
   loader!: Loader;
   private completion: Promise<RunCompletion> | undefined;
+  private stages: readonly (readonly [RunPhase, CompletionHooks['closeMeasurement'] | undefined])[] = [];
+  private nextStage = 0;
   private readonly stopLogging: () => unknown;
   constructor(readonly owner: Context, readonly runId: string, readonly profile: AdmittedProfile, private readonly releaseOwner: () => void) {
     this.stopLogging = owner.logger.exporter({ export: (message: Message) => {
@@ -97,8 +151,7 @@ export class OwnedRun {
   }
   retryExport(exportEvidence: CompletionHooks['exportEvidence']): Promise<RunCompletion> {
     if (this.phase !== 'retained') throw new Error('only retained runs can retry export');
-    this.phase = 'exporting-evidence';
-    return this.completion = this.exportAndCleanup(exportEvidence);
+    return this.completion = this.resume(exportEvidence);
   }
   private retained(diagnostic: string): RunCompletion {
     this.phase = 'retained';
@@ -107,42 +160,49 @@ export class OwnedRun {
       resourceOutcomes: this.resources?.pending() ?? [], evidenceRefs: [...this.evidenceRefs], errors: [...this.errors] };
   }
   private async complete(hooks?: CompletionHooks): Promise<RunCompletion> {
-    const deadline = this.profile.deadlineMs ?? 30000;
     if (this.phase !== 'measuring') this.errors.push('measurement was not started');
-    const stages = [
+    this.stages = [
       ['closing-measurement', hooks?.closeMeasurement],
       ['capturing-last-state', hooks?.captureLastState],
       ['draining-recorders', hooks?.drainRecorders],
-    ] as const;
-    for (const [phase, work] of stages) {
+    ];
+    return this.resume(hooks?.exportEvidence);
+  }
+  private async resume(exportEvidence?: CompletionHooks['exportEvidence']): Promise<RunCompletion> {
+    const pending = producers.get(this);
+    if (pending) return this.retained(`producer ${pending.phase} has not settled; export and cleanup are deferred`);
+    const deadline = this.profile.deadlineMs ?? 30000;
+    while (this.nextStage < this.stages.length) {
+      const [phase, work] = this.stages[this.nextStage++]!;
       this.phase = phase;
       if (!work) {
         const diagnostic = `lifecycle stage has no evidence producer: ${phase}`;
         this.errors.push(diagnostic); this.phases.push({ phase, status: 'error', diagnostic }); continue;
       }
       try {
-        this.evidenceRefs.push(...await within(signal => work(signal), deadline));
+        await produce(this, phase, signal => work(signal), deadline, references => references);
         this.phases.push({ phase, status: 'passed' });
       } catch (error) {
         const diagnostic = reason(error);
         this.errors.push(diagnostic); this.phases.push({ phase, status: 'error', diagnostic });
+        if (producers.has(this)) return this.retained(`producer ${phase} has not settled; dependent stages are deferred`);
       }
     }
-    return this.exportAndCleanup(hooks?.exportEvidence);
+    return this.exportAndCleanup(exportEvidence);
   }
   private async exportAndCleanup(exportEvidence?: CompletionHooks['exportEvidence']): Promise<RunCompletion> {
     const deadline = this.profile.deadlineMs ?? 30000;
     this.phase = 'exporting-evidence';
     try {
       if (!exportEvidence) throw new Error('evidence export producer is missing');
-      const references = await within(signal => exportEvidence(signal), deadline);
+      const references = await produce(this, 'exporting-evidence', signal => exportEvidence(signal), deadline, references => references);
       if (!references.length) throw new Error('evidence export returned no retained references');
-      this.evidenceRefs.push(...references);
+      cleanupAdmitted.add(this);
       this.phases.push({ phase: 'exporting-evidence', status: 'passed' });
     } catch (error) {
       const diagnostic = reason(error);
       this.errors.push(diagnostic); this.phases.push({ phase: 'exporting-evidence', status: 'error', diagnostic });
-      return this.retained('evidence export failed; destructive cleanup is deferred');
+      return this.retained(producers.has(this) ? 'evidence export producer has not settled; destructive cleanup is deferred' : 'evidence export failed; destructive cleanup is deferred');
     }
     let disposalComplete = false;
     this.phase = 'disposing';
@@ -200,6 +260,7 @@ export class RunOwner extends Service {
       const resources = ctx.get('runResources');
       if (!resources) throw new Error('run resource service is missing');
       run.resources = resources;
+      resourceOwners.set(resourceIdentity(resources), run);
       await ctx.plugin(Loader, { baseUrl });
       cancelSignal?.throwIfAborted();
       const loader = ctx.get('loader');
@@ -224,8 +285,8 @@ export class RunOwner extends Service {
         if (entry.fiber.state !== FiberState.ACTIVE) throw new Error(`required Fiber is not ACTIVE: ${binding.entryId}`);
         const backend: unknown = run.context.get(binding.service);
         if (!backend || typeof (backend as BackendProbe).ready !== 'function') throw new Error(`required backend binding is missing: ${binding.service}`);
-        const observed = await within(signal => (backend as BackendProbe).ready(signal), profile.deadlineMs ?? 30000, cancelSignal);
-        run.evidenceRefs.push(...observed.evidenceRefs);
+        const observed = await produce(run, 'preloading', signal => (backend as BackendProbe).ready(signal),
+          profile.deadlineMs ?? 30000, observed => observed.evidenceRefs, cancelSignal);
         if (!observed.ready || !observed.evidenceRefs.length) throw new Error(`backend has no observed readiness: ${binding.service}`);
       }
       cancelSignal?.throwIfAborted();

@@ -64,8 +64,20 @@ retained evidence references. Physical cleanup errors and native errors caught b
 the completion report. Completion has passed, error or incomplete status; a run without a
 measurement or cleanup proof cannot pass. Call finish before disposing the enclosing host. A
 retained run permits explicit retryExport(exportEvidence); earlier failure diagnostics remain in the
-completed report. RunStartupError.run supports exporting startup diagnostics before retrying
-teardown.
+completed report. A deadline requests cancellation and bounds the caller; it does not prove that a
+producer has stopped. An unsettled readiness, close, capture, drain or export callback keeps the run
+retained and its owner reserved. Export and destructive cleanup wait for observed callback settlement.
+Each callback must settle only after its own writes and observations have stopped; detached work is
+not covered by that promise. A retry while the producer is active remains incomplete. After
+settlement, explicit retryExport continues unattempted completion stages and exports evidence without
+replaying an already attempted callback. RunStartupError.run supports the same diagnostic recovery;
+the original startup report remains a snapshot. Do not dispose the enclosing host before this recovery.
+If enclosing disposal still occurs, RunResources refuses destructive cleanup while a managed producer
+is active or retained evidence export has not succeeded, and retains the cleanup error.
+Cordis may nevertheless dispose its context and other effects;
+this guard does not promise cancellation of detached work or reversibility of external effects.
+That consumed teardown has no cleanup-retry API, and reservations are process-local; neither limitation
+provides crash or distributed recovery.
 
 referenceFile(path, {maxBytes}) streams retained bytes through one opened file handle and checks
 file identity, size and modification metadata before and after capture. maxBytes is optional;
