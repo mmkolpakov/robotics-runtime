@@ -28,8 +28,8 @@ stateDiagram-v2
     Draining --> Exporting: settled or missing hook
     Retained --> Callbacks: explicit recovery at saved cursor
     Retained --> Exporting: callbacks settled, retry export
-    Exporting --> Retained: failed, active or empty export
-    Exporting --> Disposing: successful nonempty export
+    Exporting --> Retained: error / active / empty
+    Exporting --> Disposing: success + refs
     Disposing --> Verifying: disposal attempted
     Verifying --> Completed: no errors, complete resource proof
     Verifying --> Error: errors or missing proof
