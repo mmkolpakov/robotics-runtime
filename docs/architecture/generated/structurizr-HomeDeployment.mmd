@@ -1,4 +1,4 @@
-graph LR
+graph TB
   linkStyle default fill:#ffffff
 
   subgraph diagram ["WSL CPU deployment"]
@@ -10,31 +10,31 @@ graph LR
       subgraph 36 ["dev WSL"]
         style 36 fill:#ffffff,stroke:#444444,color:#444444
 
-        37["<div style='font-weight: bold'>Rootless container engine</div><div style='font-size: 70%; margin-top: 0px'>[Infrastructure Node: Podman 4.9.3 / Compose 5.3.1]</div><div style='font-size: 80%; margin-top:10px'>Owned socket; namespace<br />mapping.</div>"]
+        37["<div style='font-weight: bold'>Rootless engine</div><div style='font-size: 70%; margin-top: 0px'>[Infrastructure Node: Podman 4.9.3 / Compose 5.3.1]</div><div style='font-size: 80%; margin-top:10px'>Owned socket; namespace<br />mapping.</div>"]
         style 37 fill:#ffffff,stroke:#444444,color:#444444
-        38["<div style='font-weight: bold'>Composition host</div><div style='font-size: 70%; margin-top: 0px'>[Container: Node 24 / Cordis / Execa]</div><div style='font-size: 80%; margin-top:10px'>Source plugins, readiness,<br />ownership and finite jobs.</div>"]
+        38["<div style='font-weight: bold'>Composition host</div><div style='font-size: 70%; margin-top: 0px'>[Container: Node 24 / Cordis / Execa]</div><div style='font-size: 80%; margin-top:10px'>Source plugins / finite jobs<br />/ ownership.</div>"]
         style 38 fill:#e6edf3,stroke:#a1a5aa,color:#172431
-        39["<div style='font-weight: bold'>Document worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Python CLI]</div><div style='font-size: 80%; margin-top:10px'>Published contracts: validate<br />and write files.</div>"]
+        39["<div style='font-weight: bold'>Document worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Python CLI]</div><div style='font-size: 80%; margin-top:10px'>Published contracts /<br />writers.</div>"]
         style 39 fill:#e6edf3,stroke:#a1a5aa,color:#172431
-        41["<div style='font-weight: bold'>Evaluation worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Python CLI]</div><div style='font-size: 80%; margin-top:10px'>Published harness:<br />attach-only ROS and<br />evaluation.</div>"]
+        41["<div style='font-weight: bold'>Evaluation worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Python CLI]</div><div style='font-size: 80%; margin-top:10px'>Published; ROS attach-only.</div>"]
         style 41 fill:#e6edf3,stroke:#a1a5aa,color:#172431
-        43["<div style='font-weight: bold'>Native worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Native SDK / Python or C++]</div><div style='font-size: 80%; margin-top:10px'>Candidate native APIs;<br />qualify each profile.</div>"]
+        43["<div style='font-weight: bold'>Provider worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Native SDK / Python or C++]</div><div style='font-size: 80%; margin-top:10px'>Candidate native APIs;<br />qualify each profile.</div>"]
         style 43 fill:#e6edf3,stroke:#a1a5aa,color:#172431
-        45["<div style='font-weight: bold'>Media worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Python GI / GStreamer]</div><div style='font-size: 80%; margin-top:10px'>Source finite GStreamer;<br />native frames and decoding.</div>"]
+        45["<div style='font-weight: bold'>Media worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Python GI / GStreamer]</div><div style='font-size: 80%; margin-top:10px'>Source GStreamer; native<br />decode / frames.</div>"]
         style 45 fill:#e6edf3,stroke:#a1a5aa,color:#172431
-        47[("<div style='font-weight: bold'>Retained evidence</div><div style='font-size: 70%; margin-top: 0px'>[Container: Files / object storage]</div><div style='font-size: 80%; margin-top:10px'>Exact payloads; bundles<br />signed after release checks.</div>")]
+        47[("<div style='font-weight: bold'>Retained evidence</div><div style='font-size: 70%; margin-top: 0px'>[Container: Files / object storage]</div><div style='font-size: 80%; margin-top:10px'>Exact files; bundles signed<br />after release checks.</div>")]
         style 47 fill:#e6edf3,stroke:#a1a5aa,color:#172431
       end
 
     end
 
-    38-. "<div>Bounded document jobs</div><div style='font-size: 70%'>[argv/files/exit]</div>" .->39
-    38-. "<div>Bounded evaluation jobs</div><div style='font-size: 70%'>[argv/files/exit]</div>" .->41
-    38-. "<div>Startup / ready / teardown</div><div style='font-size: 70%'>[Compose/finite jobs]</div>" .->43
-    38-. "<div>Bounded media jobs</div><div style='font-size: 70%'>[argv/files/exit]</div>" .->45
-    38-. "<div>Nonempty refs; observe<br />cleanup</div><div style='font-size: 70%'>[Callback descriptors]</div>" .->47
-    39-. "<div>Validate / write documents</div><div style='font-size: 70%'>[Files]</div>" .->47
-    41-. "<div>Read evidence / write results</div><div style='font-size: 70%'>[Files/JSON/JUnit]</div>" .->47
+    38-. "<div>Validate / write</div><div style='font-size: 70%'>[argv / files / exit]</div>" .->39
+    38-. "<div>Evaluate</div><div style='font-size: 70%'>[argv / files / exit]</div>" .->41
+    38-. "<div>Startup / ready / teardown</div><div style='font-size: 70%'>[Compose / finite jobs]</div>" .->43
+    38-. "<div>Bounded media jobs</div><div style='font-size: 70%'>[argv / files / exit]</div>" .->45
+    38-. "<div>Nonempty refs; observe<br />cleanup</div><div style='font-size: 70%'>[Callback refs]</div>" .->47
+    39-. "<div>Validate / write docs</div><div style='font-size: 70%'>[Files]</div>" .->47
+    41-. "<div>Read evidence / write results</div><div style='font-size: 70%'>[Files / JSON / JUnit]</div>" .->47
     43-. "<div>Retain before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" .->47
     45-. "<div>Native reports / outputs</div><div style='font-size: 70%'>[Exact files]</div>" .->47
 

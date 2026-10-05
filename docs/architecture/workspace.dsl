@@ -8,7 +8,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         simulators = softwareSystem "Simulation engines" "Gazebo / Webots / Isaac; profile-scoped." {
             tags "External"
         }
-        autopilot = softwareSystem "Control endpoint" "MAVSDK: separate transport, peer and effect facts." {
+        autopilot = softwareSystem "MAVSDK endpoint" "MAVSDK: separate transport, peer and effect facts." {
             tags "External"
         }
         mediaSource = softwareSystem "Media source" "Camera, RTSP or fixture; native frame semantics." {
@@ -17,15 +17,15 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         registries = softwareSystem "Artifact registries" "Immutable packages, images and attestations." {
             tags "External"
         }
-        platform = softwareSystem "Robotics runtime platform" "Source host, published Python tools and profile-scoped providers." {
-            host = container "Composition host" "Source plugins, readiness, ownership and finite jobs." "Node 24 / Cordis / Execa"
-            documents = container "Document worker" "Published contracts: validate and write files." "Python CLI"
-            evaluation = container "Evaluation worker" "Published harness: attach-only ROS and evaluation." "Python CLI"
-            native = container "Native worker" "Candidate native APIs; qualify each profile." "Native SDK / Python or C++" {
+        platform = softwareSystem "Robotics runtime platform" "Source host, published Python tools; providers per profile." {
+            host = container "Composition host" "Source plugins / finite jobs / ownership." "Node 24 / Cordis / Execa"
+            documents = container "Document worker" "Published contracts / writers." "Python CLI"
+            evaluation = container "Evaluation worker" "Published; ROS attach-only." "Python CLI"
+            native = container "Provider worker" "Candidate native APIs; qualify each profile." "Native SDK / Python or C++" {
                 tags "Candidate"
             }
-            media = container "Media worker" "Source finite GStreamer; native frames and decoding." "Python GI / GStreamer"
-            evidence = container "Retained evidence" "Exact payloads; bundles signed after release checks." "Files / object storage" {
+            media = container "Media worker" "Source GStreamer; native decode / frames." "Python GI / GStreamer"
+            evidence = container "Retained evidence" "Exact files; bundles signed after release checks." "Files / object storage" {
                 tags "Database"
             }
         }
@@ -38,22 +38,22 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         platform -> registries "Install / verify"
         integrator -> platform.host "Trusted profile" "Consumer CLI/API"
         product -> platform.host "Trusted coordinator" "Host API / files"
-        platform.host -> platform.documents "Bounded document jobs" "argv/files/exit"
-        platform.host -> platform.evaluation "Bounded evaluation jobs" "argv/files/exit"
-        platform.host -> platform.native "Startup / ready / teardown" "Compose/finite jobs"
-        platform.host -> autopilot "Generated clients; consumer policy" "MAVSDK / gRPC"
-        platform.host -> platform.media "Bounded media jobs" "argv/files/exit"
+        platform.host -> platform.documents "Validate / write" "argv / files / exit"
+        platform.host -> platform.evaluation "Evaluate" "argv / files / exit"
+        platform.host -> platform.native "Startup / ready / teardown" "Compose / finite jobs"
+        platform.host -> autopilot "SDK clients / consumer policy" "MAVSDK / gRPC"
+        platform.host -> platform.media "Bounded media jobs" "argv / files / exit"
         platform.media -> mediaSource "Declared input" "GStreamer / RTSP / fixture"
         platform.media -> platform.evidence "Native reports / outputs" "Exact files"
         platform.native -> simulators "Native SDK/controller" "Backend API"
         platform.native -> platform.evidence "Retain before reset / dispose" "Exact payloads"
-        platform.documents -> platform.evidence "Validate / write documents" "Files"
-        platform.evaluation -> platform.evidence "Read evidence / write results" "Files/JSON/JUnit"
-        platform.host -> platform.evidence "Nonempty refs; observe cleanup" "Callback descriptors"
+        platform.documents -> platform.evidence "Validate / write docs" "Files"
+        platform.evaluation -> platform.evidence "Read evidence / write results" "Files / JSON / JUnit"
+        platform.host -> platform.evidence "Nonempty refs; observe cleanup" "Callback refs"
         deploymentEnvironment "Home" {
             deploymentNode "Home workstation" "Hosts the WSL CPU route." "Windows / WSL2" {
                 deploymentNode "dev WSL" "CPU qualification by profile." "Ubuntu 24.04 / WSL2" {
-                    infrastructureNode "Rootless container engine" "Owned socket; namespace mapping." "Podman 4.9.3 / Compose 5.3.1"
+                    infrastructureNode "Rootless engine" "Owned socket; namespace mapping." "Podman 4.9.3 / Compose 5.3.1"
                     containerInstance platform.host
                     containerInstance platform.documents
                     containerInstance platform.evaluation
@@ -67,13 +67,13 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
     views {
         systemContext platform "Context" "Actors and system boundary." {
             title "Platform context"
-            include *
-            autoLayout lr 80 30
+            include *?
+            autoLayout lr 10 50
         }
         container platform "Container" "Owned processes and retained data; native interfaces are in ContainerDetail." {
             title "Process composition"
-            include integrator product platform.host platform.documents platform.evaluation platform.native platform.media platform.evidence
-            autoLayout tb 140 40
+            include platform.host platform.documents platform.evaluation platform.native platform.media platform.evidence
+            autoLayout lr 10 50
         }
         container platform "ContainerDetail" "Complete consumer, controller, simulator and media interface graph." {
             title "Native and consumer interfaces"
@@ -83,29 +83,33 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         deployment platform "Home" "HomeDeployment" "Implemented WSL CPU route with provider-specific qualification." {
             title "WSL CPU deployment"
             include *
-            autoLayout lr 80 30
+            autoLayout tb 100 40
         }
         properties {
             "structurizr.metadata" "false"
             "structurizr.description" "false"
-            "structurizr.boundaryPadding" "30"
-            "structurizr.deploymentNodePadding" "30"
-            "structurizr.groupPadding" "30"
+            "structurizr.boundaryPadding" "20"
+            "structurizr.deploymentNodePadding" "20"
+            "structurizr.groupPadding" "20"
         }
         styles {
             element "Element" {
-                width 180
-                height 200
-                fontSize 24
+                width 380
+                height 380
+                fontSize 36
             }
             relationship "Relationship" {
-                fontSize 24
-                width 140
+                fontSize 36
+                width 240
             }
             element "Person" {
                 shape Person
+                width 420
+                fontSize 36
+                metadata false
             }
             element "Software System" {
+                fontSize 36
                 background "#35546f"
                 color "#ffffff"
             }
@@ -115,6 +119,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             }
             element "Database" {
                 shape Cylinder
+                height 440
             }
             element "External" {
                 background "#eeeeee"
