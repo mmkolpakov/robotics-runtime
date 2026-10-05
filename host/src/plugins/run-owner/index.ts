@@ -17,6 +17,7 @@ export interface ResourceOutcome extends CleanupObservation { id: string; ownerI
 interface ResourceRecord { resource: OwnedResource; attempted: boolean; cleanupError?: string; }
 export interface BackendReadiness { ready: boolean; evidenceRefs: readonly ArtifactRef[]; }
 export interface BackendProbe { ready(signal: AbortSignal): Promise<BackendReadiness>; }
+export interface RunStartOptions { cancelSignal?: AbortSignal; }
 export interface RunCompletion {
   runId: string; status: 'passed' | 'error' | 'incomplete'; phases: readonly PhaseObservation[];
   resourceOutcomes: readonly ResourceOutcome[]; evidenceRefs: readonly ArtifactRef[]; errors: readonly string[];
@@ -173,12 +174,15 @@ export class RunOwner extends Service {
   static inject = ['admission'];
   private readonly active = new Set<string>();
   constructor(ctx: Context) { super(ctx, 'runOwner'); }
-  async start(profileId: string, runId = randomUUID()): Promise<OwnedRun> {
+  async start(profileId: string, runId = randomUUID(), options: RunStartOptions = {}): Promise<OwnedRun> {
+    const cancelSignal = options.cancelSignal;
+    cancelSignal?.throwIfAborted();
     if (this.active.has(runId)) throw new Error('run ID is already owned');
     this.active.add(runId);
     let profile: AdmittedProfile;
     try {
-      profile = await this.ctx.admission.admit(profileId);
+      profile = await within(() => this.ctx.admission.admit(profileId), 30000, cancelSignal);
+      cancelSignal?.throwIfAborted();
       this.ctx.admission.assertIssued(profile);
     } catch (error) { this.active.delete(runId); throw error; }
     const run = new OwnedRun(this.ctx, runId, profile, () => this.active.delete(runId));
@@ -187,38 +191,44 @@ export class RunOwner extends Service {
       scope = scope.isolate(name, Symbol(runId + ':' + name));
     }
     run.fiber = scope.plugin(async (ctx: Context) => {
+      cancelSignal?.throwIfAborted();
       run.context = ctx;
       const baseUrl = pathToFileURL(dirname(profile.profilePath)).href + '/';
       ctx.provide('baseUrl', baseUrl);
       await ctx.plugin(RunResources, runId);
+      cancelSignal?.throwIfAborted();
       const resources = ctx.get('runResources');
       if (!resources) throw new Error('run resource service is missing');
       run.resources = resources;
       await ctx.plugin(Loader, { baseUrl });
+      cancelSignal?.throwIfAborted();
       const loader = ctx.get('loader');
       if (!loader) throw new Error('native loader binding is missing');
       run.loader = loader;
       run.includeId = await loader.create({ name: '@cordisjs/plugin-include', config: { path: profile.profilePath } });
+      cancelSignal?.throwIfAborted();
       await loader.await();
+      cancelSignal?.throwIfAborted();
     });
     try {
-      await within(() => run.fiber.await(), profile.deadlineMs ?? 30000);
+      await within(() => run.fiber.await(), profile.deadlineMs ?? 30000, cancelSignal);
       if (run.fiber.state !== FiberState.ACTIVE) throw new Error('run Fiber is not ACTIVE');
       const include = run.loader.resolve(run.includeId);
       if (!include.fiber) throw new Error('Include import has no Fiber');
-      await include.fiber.await();
+      await within(() => include.fiber!.await(), profile.deadlineMs ?? 30000, cancelSignal);
       if (include.fiber.state !== FiberState.ACTIVE) throw new Error('Include Fiber is not ACTIVE');
       for (const binding of profile.requiredBindings) {
         const entry = run.loader.resolve(`${run.includeId}:${binding.entryId}`);
         if (!entry.fiber) throw new Error(`required module import has no Fiber: ${binding.entryId}`);
-        await within(() => entry.fiber!.await(), profile.deadlineMs ?? 30000);
+        await within(() => entry.fiber!.await(), profile.deadlineMs ?? 30000, cancelSignal);
         if (entry.fiber.state !== FiberState.ACTIVE) throw new Error(`required Fiber is not ACTIVE: ${binding.entryId}`);
         const backend: unknown = run.context.get(binding.service);
         if (!backend || typeof (backend as BackendProbe).ready !== 'function') throw new Error(`required backend binding is missing: ${binding.service}`);
-        const observed = await within(signal => (backend as BackendProbe).ready(signal), profile.deadlineMs ?? 30000);
+        const observed = await within(signal => (backend as BackendProbe).ready(signal), profile.deadlineMs ?? 30000, cancelSignal);
         run.evidenceRefs.push(...observed.evidenceRefs);
         if (!observed.ready || !observed.evidenceRefs.length) throw new Error(`backend has no observed readiness: ${binding.service}`);
       }
+      cancelSignal?.throwIfAborted();
       run.phase = 'ready'; run.phases.push({ phase: 'preloading', status: 'passed' }, { phase: 'ready', status: 'passed' });
       return run;
     } catch (error) {

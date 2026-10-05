@@ -12,7 +12,7 @@ import type { OwnedRun } from '../src/plugins/run-owner/index.js';
 import { referenceFile } from '../src/plugins/application-lifecycle/index.js';
 import type { CompletionHooks } from '../src/plugins/application-lifecycle/index.js';
 
-export async function fixture(mode: 'good' | 'pending' | 'missing' | 'not-ready' | 'bad-cleanup' | 'logged-cleanup' | 'probe-error' | 'probe-timeout' = 'good') {
+export async function fixture(mode: 'good' | 'pending' | 'missing' | 'not-ready' | 'bad-cleanup' | 'logged-cleanup' | 'probe-error' | 'probe-timeout' | 'probe-cancel' = 'good') {
   const directory = await mkdtemp(join(tmpdir(), 'rr-owned-'));
   const runId = randomUUID();
   const modulePath = join(directory, 'provider.mjs');
@@ -32,7 +32,7 @@ async function provider(ctx,config) {
   verifyCleanup:async(signal)=>{signal.throwIfAborted(); const released=!(await exists(config.resourcePath)); await writeFile(config.cleanupPath,JSON.stringify({released,ownerId:config.ownerId})); return {released,evidenceRefs:[await ref(config.cleanupPath)]};}
  });
  if(config.mode==='logged-cleanup')ctx.effect(()=>async()=>{throw new Error('native caught cleanup failure');});
- ctx.provide('backend',{ready:async(signal)=>{signal.throwIfAborted(); if(config.mode==='probe-error')throw new Error('native readiness probe failed'); if(config.mode==='probe-timeout')return await new Promise(()=>{}); const present=await exists(config.resourcePath); await writeFile(config.readyPath,JSON.stringify({present,native_seconds:0.001,representation:'float64'})); return {ready:present&&config.mode!=='not-ready',evidenceRefs:[await ref(config.readyPath)]};}});
+ ctx.provide('backend',{ready:async(signal)=>{signal.throwIfAborted(); if(config.mode==='probe-error')throw new Error('native readiness probe failed'); if(config.mode==='probe-timeout')return await new Promise(()=>{}); if(config.mode==='probe-cancel'){await writeFile(config.readyPath,'entered readiness probe'); return await new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));} const present=await exists(config.resourcePath); await writeFile(config.readyPath,JSON.stringify({present,native_seconds:0.001,representation:'float64'})); return {ready:present&&config.mode!=='not-ready',evidenceRefs:[await ref(config.readyPath)]};}});
 }
 provider.inject=${JSON.stringify(mode==='pending'?['runResources','absentBackend']:['runResources'])};
 export default provider;

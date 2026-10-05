@@ -196,3 +196,75 @@ test('failed export retains raw resource and owner until explicit export retry c
     await access(value.cleanupPath);
   } finally { await ctx.fiber.dispose(); await rm(value.directory, { recursive: true, force: true }); }
 });
+
+test('already canceled startup creates no provider effect and does not reserve its owner ID', async () => {
+  const value = await fixture(); const ctx = await host([value.descriptor]);
+  const cancel = new AbortController(); cancel.abort(new Error('operator canceled before startup'));
+  try {
+    await assert.rejects(ctx.runOwner.start(value.runId, value.runId, { cancelSignal: cancel.signal }), /operator canceled before startup/);
+    await assert.rejects(access(value.resourcePath));
+    const run = await ctx.runOwner.start(value.runId, value.runId); run.beginMeasurement();
+    assert.equal((await run.finish(hooks(run, value.directory, []))).status, 'passed');
+  } finally { await ctx.fiber.dispose(); await rm(value.directory, { recursive: true, force: true }); }
+});
+
+test('startup cancellation reaches the native probe and retains resources until diagnostic export', async () => {
+  const { setTimeout: pause } = await import('node:timers/promises');
+  const value = await fixture('probe-cancel'); const ctx = await host([value.descriptor]);
+  const cancel = new AbortController();
+  try {
+    const options = { cancelSignal: cancel.signal };
+    const started = ctx.runOwner.start(value.runId, value.runId, options);
+    options.cancelSignal = new AbortController().signal;
+    let failed: RunStartupError | undefined;
+    const rejected = assert.rejects(started, (error: unknown) => {
+      assert.ok(error instanceof RunStartupError);
+      failed = error; assert.match(error.message, /operator canceled during startup/);
+      assert.equal(error.completion.status, 'incomplete'); return true;
+    });
+    const deadline = performance.now() + 800;
+    while (performance.now() < deadline) {
+      try { await access(value.readyPath); break; } catch { await pause(10); }
+    }
+    assert.equal(await readFile(value.readyPath, 'utf8'), 'entered readiness probe');
+    cancel.abort(new Error('operator canceled during startup'));
+    await rejected; assert.ok(failed);
+    assert.equal(failed.run.phase, 'retained'); await access(value.resourcePath);
+    await assert.rejects(ctx.runOwner.start(value.runId, value.runId), /already owned/);
+    const diagnostic = join(value.directory, 'cancellation.json');
+    await writeFile(diagnostic, JSON.stringify({ error: failed.message }));
+    const completion = await failed.run.retryExport(async () => [await referenceFile(diagnostic)]);
+    assert.equal(completion.status, 'error');
+    assert.ok(completion.resourceOutcomes.every(item => item.attempted && item.released));
+    await assert.rejects(access(value.resourcePath)); await access(diagnostic);
+  } finally { await ctx.fiber.dispose(); await rm(value.directory, { recursive: true, force: true }); }
+});
+
+test('canceled delayed Include cannot create a resource after retained export and cleanup', async () => {
+  const { setTimeout: pause } = await import('node:timers/promises');
+  const value = await fixture();
+  const modulePath = join(value.directory, 'provider.mjs');
+  await chmod(modulePath, 0o644);
+  await writeFile(modulePath, "await new Promise(done => setTimeout(done, 180));\n" + await readFile(modulePath, 'utf8'));
+  await chmod(modulePath, 0o444);
+  const identity = await referenceFile(modulePath);
+  const descriptor = { ...value.descriptor, files: value.descriptor.files.map(file => file.path === modulePath ? { ...file, sha256: identity.sha256 } : file) };
+  const ctx = await host([descriptor]); const cancel = new AbortController();
+  try {
+    let failed: RunStartupError | undefined;
+    const started = ctx.runOwner.start(value.runId, value.runId, { cancelSignal: cancel.signal });
+    const rejected = assert.rejects(started, (error: unknown) => {
+      assert.ok(error instanceof RunStartupError); failed = error; return true;
+    });
+    await pause(30); cancel.abort(new Error('operator canceled during Include import'));
+    await rejected; assert.ok(failed); assert.equal(failed.run.phase, 'retained');
+    const diagnostic = join(value.directory, 'delayed-include-cancellation.json');
+    await writeFile(diagnostic, JSON.stringify({ error: failed.message }));
+    const completion = await failed.run.retryExport(async () => [await referenceFile(diagnostic)]);
+    assert.notEqual(completion.status, 'passed');
+    await pause(250);
+    await assert.rejects(access(value.resourcePath));
+    await assert.rejects(access(value.readyPath));
+    await access(diagnostic);
+  } finally { await ctx.fiber.dispose(); await rm(value.directory, { recursive: true, force: true }); }
+});
