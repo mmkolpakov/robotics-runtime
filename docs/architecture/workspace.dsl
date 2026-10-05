@@ -49,10 +49,10 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         platform.native -> platform.evidence "Retains observations before reset/disposal" "Exact payloads"
         platform.documents -> platform.evidence "Validates and writes linked documents" "Files"
         platform.evaluation -> platform.evidence "Reads observations and writes results" "Files/JSON/JUnit"
-        platform.host -> platform.evidence "Verifies export and cleanup outcomes" "File references"
+        platform.host -> platform.evidence "Requires nonempty export descriptors and observes cleanup" "Callback descriptors"
         deploymentEnvironment "Home" {
-            deploymentNode "Home workstation" "Existing workstation; source qualification is environment-scoped." "Windows / NVIDIA" {
-                deploymentNode "dev WSL" "Existing development environment." "Ubuntu 24.04 / WSL2" {
+            deploymentNode "Home workstation" "Existing workstation hosting the WSL CPU route." "Windows / WSL2" {
+                deploymentNode "dev WSL" "Implemented CPU route; provider qualification is profile-scoped." "Ubuntu 24.04 / WSL2" {
                     infrastructureNode "Rootless container engine" "Owned project socket and namespace mapping." "Podman 4.9.3 / Compose 5.3.1"
                     containerInstance platform.host
                     containerInstance platform.documents
@@ -60,12 +60,6 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
                     containerInstance platform.native
                     containerInstance platform.media
                     containerInstance platform.evidence
-                }
-                deploymentNode "Native Windows target" "Isaac standalone target; Windows access confirmed, runtime qualification pending." "Windows / RTX 5070 Ti" {
-                    tags "Candidate"
-                    containerInstance platform.native {
-                        tags "Candidate"
-                    }
                 }
             }
         }
@@ -79,7 +73,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             include *
             autoLayout lr
         }
-        deployment platform "Home" "HomeDeployment" "Existing WSL plus candidate Windows GPU target." {
+        deployment platform "Home" "HomeDeployment" "Implemented WSL CPU route with provider-specific qualification." {
             include *
             autoLayout lr
         }

@@ -26,25 +26,16 @@ graph LR
         style 47 fill:#e6edf3,stroke:#a1a5aa,color:#172431
       end
 
-      subgraph 53 ["Native Windows target"]
-        style 53 fill:#ffffff,stroke:#444444,color:#444444
-
-        54["<div style='font-weight: bold'>Native provider worker</div><div style='font-size: 70%; margin-top: 0px'>[Container: Native simulator / Python or C++]</div><div style='font-size: 80%; margin-top:10px'>Candidate integrations:<br />selected backend native API<br />and observed facts; each has<br />its own qualification.</div>"]
-        style 54 fill:#e6edf3,stroke:#a1a5aa,color:#172431
-      end
-
     end
 
     38-. "<div>Invokes bounded<br />validation/writer jobs</div><div style='font-size: 70%'>[argv/files/exit]</div>" .->39
     38-. "<div>Invokes bounded evaluation<br />jobs</div><div style='font-size: 70%'>[argv/files/exit]</div>" .->41
     38-. "<div>Owns startup, readiness and<br />teardown</div><div style='font-size: 70%'>[Compose/finite jobs]</div>" .->43
     38-. "<div>Invokes bounded native<br />pipeline work</div><div style='font-size: 70%'>[argv/files/exit]</div>" .->45
-    38-. "<div>Verifies export and cleanup<br />outcomes</div><div style='font-size: 70%'>[File references]</div>" .->47
+    38-. "<div>Requires nonempty export<br />descriptors and observes<br />cleanup</div><div style='font-size: 70%'>[Callback descriptors]</div>" .->47
     39-. "<div>Validates and writes linked<br />documents</div><div style='font-size: 70%'>[Files]</div>" .->47
     41-. "<div>Reads observations and writes<br />results</div><div style='font-size: 70%'>[Files/JSON/JUnit]</div>" .->47
     43-. "<div>Retains observations before<br />reset/disposal</div><div style='font-size: 70%'>[Exact payloads]</div>" .->47
     45-. "<div>Retains native reports and<br />configured file outputs</div><div style='font-size: 70%'>[Exact files]</div>" .->47
-    38-. "<div>Owns startup, readiness and<br />teardown</div><div style='font-size: 70%'>[Compose/finite jobs]</div>" .->54
-    54-. "<div>Retains observations before<br />reset/disposal</div><div style='font-size: 70%'>[Exact payloads]</div>" .->47
 
   end

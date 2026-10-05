@@ -7,8 +7,11 @@ and CLI applications, not additional software systems.
 [workspace.dsl](workspace.dsl) is the C4 source. Context shows users and external
 systems. Container shows executable applications and the retained data store;
 a C4 container is not a package or a Docker image. Deployment maps these
-applications onto the existing home environment. Dashed candidate elements
-have not passed the full released consumer gates.
+applications onto the implemented WSL CPU route. Dashed candidate elements
+have not passed the full released consumer gates. Native Windows standalone
+diagnostics are separate from this route: they do not establish Compose control
+or evidence transport between WSL and a Windows worker. An AWS/EKS target requires
+its own deployment implementation and qualification.
 
 [run-sequence.mmd](run-sequence.mmd) describes the source `RunOwner` API and
 consumer-supplied completion callbacks. The consumer starts its workload and
@@ -20,7 +23,9 @@ are distinct.
 A callback must persist and verify its payloads before returning references.
 The host checks that export returns references; it does not validate every
 referenced file itself. Contracts and qualification checks validate the
-retained documents and bytes.
+retained documents and bytes. Failed or empty export, including an explicit
+startup recovery attempt, keeps the run retained; destructive cleanup follows
+only a callback that returns nonempty descriptors.
 
 Use Context and Container in repository READMEs. Add Sequence when ordering
 changes behavior, State when recovery matters, and Deployment when a supported

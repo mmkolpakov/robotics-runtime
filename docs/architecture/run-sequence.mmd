@@ -19,11 +19,19 @@ sequenceDiagram
             Note over Owner,Provider: Resources and ID stay reserved until explicit export recovery
             opt Consumer recovers available startup evidence
                 Consumer->>Owner: retryExport(exportEvidence)
-                Owner->>Consumer: Persist evidence through callback
-                Owner->>Provider: Dispose acquired resources
-                Owner->>Provider: verifyCleanup(signal)
-                Provider-->>Owner: Observed release and references / failure
-                Owner-->>Consumer: Error completion, previous diagnostics remain
+                Owner->>Consumer: exportEvidence(signal)
+                Consumer->>Store: Persist available startup evidence and verify export
+                alt Recovery export fails or returns no references
+                    Consumer-->>Owner: Callback error or empty descriptors
+                    Owner-->>Consumer: incomplete, resources and ID retained
+                    Note over Consumer,Owner: Further explicit export recovery is still possible
+                else Recovery returns nonempty retained descriptors
+                    Consumer-->>Owner: Nonempty retained descriptors
+                    Owner->>Provider: Dispose acquired resources
+                    Owner->>Provider: verifyCleanup(signal)
+                    Provider-->>Owner: Observed release and references / failure
+                    Owner-->>Consumer: Error completion, previous diagnostics remain
+                end
                 Note over Consumer,Owner: The original RunStartupError.completion stays an incomplete snapshot
             end
         else Native readiness observed
@@ -38,7 +46,7 @@ sequenceDiagram
             Provider-->>Consumer: Exact payload references / stage diagnostics
             Consumer-->>Owner: Callback results
             Owner->>Consumer: exportEvidence(signal)
-            Consumer->>Store: Persist payloads and verified references
+            Consumer->>Store: Persist payloads and verify export in the producer
             alt Export fails or returns no references
                 Consumer-->>Owner: Export error
                 Owner-->>Consumer: incomplete, resources and ID retained
@@ -46,13 +54,18 @@ sequenceDiagram
                     Consumer->>Owner: retryExport(exportEvidence)
                     Owner->>Consumer: exportEvidence(signal)
                     Consumer->>Store: Retry persistence
-                    Consumer-->>Owner: References or export error
-                    Note over Consumer,Owner: Successful retry still reports error, prior export error is retained
+                    alt Retry export fails or returns no references
+                        Consumer-->>Owner: Callback error or empty descriptors
+                        Owner-->>Consumer: incomplete, resources and ID retained
+                    else Retry returns nonempty retained descriptors
+                        Consumer-->>Owner: Nonempty retained descriptors
+                        Note over Consumer,Owner: Prior export error remains in the completion report
+                    end
                 end
             else Export returns retained references
-                Consumer-->>Owner: Nonempty retained references
+                Consumer-->>Owner: Nonempty retained descriptors
             end
-            opt Export succeeded
+            opt Nonempty export returned, initially or on retry
                 Owner->>Provider: Dispose acquired resources through Fiber effects
                 Owner->>Provider: verifyCleanup(signal)
                 Provider-->>Owner: Observed release and evidence / cleanup failure
