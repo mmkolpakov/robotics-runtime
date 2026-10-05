@@ -25,6 +25,7 @@ import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 async function ref(path){const raw=await readFile(path); return {uri:pathToFileURL(path).href,sha256:createHash('sha256').update(raw).digest('hex'),size_bytes:raw.length};}
 async function exists(path){try{await access(path);return true;}catch{return false;}}
+export const probe={entered:Promise.withResolvers(),release:Promise.withResolvers(),written:Promise.withResolvers()};
 async function provider(ctx,config) {
  await writeFile(config.resourcePath,'owned finite resource');
  ctx.runResources.track({id:'file',ownerId:config.ownerId,
@@ -32,7 +33,7 @@ async function provider(ctx,config) {
   verifyCleanup:async(signal)=>{signal.throwIfAborted(); const released=!(await exists(config.resourcePath)); await writeFile(config.cleanupPath,JSON.stringify({released,ownerId:config.ownerId})); return {released,evidenceRefs:[await ref(config.cleanupPath)]};}
  });
  if(config.mode==='logged-cleanup')ctx.effect(()=>async()=>{throw new Error('native caught cleanup failure');});
- ctx.provide('backend',{ready:async(signal)=>{signal.throwIfAborted(); if(config.mode==='probe-error')throw new Error('native readiness probe failed'); if(config.mode==='probe-timeout')return await new Promise(()=>{}); if(config.mode==='probe-cancel'){await writeFile(config.readyPath,'entered readiness probe'); return await new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));} const present=await exists(config.resourcePath); await writeFile(config.readyPath,JSON.stringify({present,native_seconds:0.001,representation:'float64'})); return {ready:present&&config.mode!=='not-ready',evidenceRefs:[await ref(config.readyPath)]};}});
+ ctx.provide('backend',{ready:async(signal)=>{signal.throwIfAborted(); if(config.mode==='probe-error')throw new Error('native readiness probe failed'); if(config.mode==='probe-timeout'){probe.entered.resolve(signal);await probe.release.promise;await writeFile(config.resourcePath,'late readiness state');await writeFile(config.readyPath,'late readiness settled');probe.written.resolve();return {ready:true,evidenceRefs:[await ref(config.readyPath)]};} if(config.mode==='probe-cancel'){await writeFile(config.readyPath,'entered readiness probe'); return await new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));} const present=await exists(config.resourcePath); await writeFile(config.readyPath,JSON.stringify({present,native_seconds:0.001,representation:'float64'})); return {ready:present&&config.mode!=='not-ready',evidenceRefs:[await ref(config.readyPath)]};}});
 }
 provider.inject=${JSON.stringify(mode==='pending'?['runResources','absentBackend']:['runResources'])};
 export default provider;
