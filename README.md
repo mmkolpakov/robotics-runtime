@@ -180,6 +180,25 @@ See [host configuration and worker integration](host/README.md).
 The host is a source component; a new published host/provider composition
 requires its own consumer qualification.
 
+The separate `host-release.yml` workflow builds the compiled core host as a
+GitHub Release TGZ, retaining `private: true` and ordinary npm `file:` installation.
+PR and manual runs check the archive, a clean rebuild and installation outside
+the source workspace; they do not publish or establish native acceptance.
+
+A tag must exactly match `host-v<host/package.json version>` and belong to main.
+Publication stays disabled until the owner completes the current host/provider
+source cohort, including cancellation and retained verification after source
+deletion, and sets `HOST_RELEASE_PUBLISH_ENABLED=true`,
+`HOST_QUALIFIED_SOURCE_SHA` and `HOST_QUALIFIED_ASSET_SHA256`. The built archive
+and source tree must match that explicit reference. Its original source identity
+is retained separately from the actual release tag/build commit.
+
+The current host version is an RC; this package path grants no general simulator,
+hardware or cloud qualification. Published artifacts require a fresh independent
+consumer of the admitted profiles. Existing PyPI environments and their required
+reviews remain separate. Release jobs attest and verify the exact uploaded bytes
+and never replace an existing tag or release asset.
+
 ## Development
 
 Use Python 3.12–3.14 and uv. One workspace lock installs both packages:
