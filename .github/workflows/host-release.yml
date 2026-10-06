@@ -71,7 +71,8 @@ jobs:
             reference_tree="$(git rev-parse "$REFERENCE_SOURCE:host/src")"
           fi
           mkdir -p artifacts/host-release/dist
-          export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          export SOURCE_DATE_EPOCH
           printf 'SOURCE_DATE_EPOCH=%s\n' "$SOURCE_DATE_EPOCH" >> "$GITHUB_ENV"
           docker run --rm --user "$(id -u):$(id -g)" \
             --env GITHUB_REPOSITORY --env GITHUB_REF --env SOURCE_DATE_EPOCH \
