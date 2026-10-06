@@ -5,25 +5,25 @@ graph LR
     style diagram fill:#ffffff,stroke:#ffffff
 
     1["<div style='font-weight: bold'>Integrator</div><div style='font-size: 80%; margin-top:10px'>Selects profiles and verifies<br />evidence.</div>"]
-    style 1 fill:#ffffff,stroke:#444444,color:#444444
-    2["<div style='font-weight: bold'>Product application</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Robot, NSU, control and<br />vision behavior.</div>"]
-    style 2 fill:#eeeeee,stroke:#a6a6a6,color:#333333
-    3["<div style='font-weight: bold'>Simulation engines</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Gazebo / Webots / Isaac;<br />profile-scoped.</div>"]
-    style 3 fill:#eeeeee,stroke:#a6a6a6,color:#333333
-    4["<div style='font-weight: bold'>MAVSDK endpoint</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>MAVSDK: separate transport,<br />peer and effect facts.</div>"]
-    style 4 fill:#eeeeee,stroke:#a6a6a6,color:#333333
-    5["<div style='font-weight: bold'>Media source</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Camera, RTSP or fixture;<br />native frame semantics.</div>"]
-    style 5 fill:#eeeeee,stroke:#a6a6a6,color:#333333
-    6["<div style='font-weight: bold'>Artifact registries</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Immutable packages, images<br />and attestations.</div>"]
-    style 6 fill:#eeeeee,stroke:#a6a6a6,color:#333333
-    7["<div style='font-weight: bold'>Robotics runtime platform</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Source host, published Python<br />tools; providers per profile.</div>"]
-    style 7 fill:#35546f,stroke:#253a4d,color:#ffffff
+    style 1 fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
+    2("<div style='font-weight: bold'>Product application</div><div style='font-size: 80%; margin-top:10px'>Robot, NSU, control and<br />vision behavior.</div>")
+    style 2 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    3("<div style='font-weight: bold'>Simulation engines</div><div style='font-size: 80%; margin-top:10px'>Gazebo / Webots / Isaac;<br />profile-scoped.</div>")
+    style 3 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    4("<div style='font-weight: bold'>MAVSDK endpoint</div><div style='font-size: 80%; margin-top:10px'>MAVSDK: separate transport,<br />peer and effect facts.</div>")
+    style 4 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    5("<div style='font-weight: bold'>Media source</div><div style='font-size: 80%; margin-top:10px'>Camera, RTSP or fixture;<br />native frame semantics.</div>")
+    style 5 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    6("<div style='font-weight: bold'>Artifact registries</div><div style='font-size: 80%; margin-top:10px'>Immutable packages, images<br />and attestations.</div>")
+    style 6 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    7("<div style='font-weight: bold'>Robotics runtime platform</div><div style='font-size: 80%; margin-top:10px'>Source host, published Python<br />tools; providers per profile.</div>")
+    style 7 fill:#dbeafe,stroke:#60a5fa,color:#0f172a
 
-    1-. "<div>Run and verify workloads</div><div style='font-size: 70%'></div>" .->7
-    2-. "<div>Supply config; read verdicts</div><div style='font-size: 70%'></div>" .->7
-    7-. "<div>Selected native runtimes</div><div style='font-size: 70%'></div>" .->3
-    7-. "<div>Selected SDK</div><div style='font-size: 70%'></div>" .->4
-    7-. "<div>Selected media</div><div style='font-size: 70%'></div>" .->5
-    7-. "<div>Install / verify</div><div style='font-size: 70%'></div>" .->6
+    1-- "<div>Run and verify workloads</div><div style='font-size: 70%'></div>" -->7
+    2-- "<div>Supply config; read verdicts</div><div style='font-size: 70%'></div>" -->7
+    7-- "<div>Selected native runtimes</div><div style='font-size: 70%'></div>" -->3
+    7-- "<div>Selected SDK</div><div style='font-size: 70%'></div>" -->4
+    7-- "<div>Selected media</div><div style='font-size: 70%'></div>" -->5
+    7-- "<div>Install / verify</div><div style='font-size: 70%'></div>" -->6
 
   end

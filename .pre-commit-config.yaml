@@ -56,6 +56,12 @@ repos:
         pass_filenames: false
   - repo: local
     hooks:
+      - id: architecture-readme
+        name: Check generated README diagrams
+        entry: uv run --no-sync python docs/architecture/publish_readme.py --check
+        language: system
+        pass_filenames: false
+        files: ^(README\.md|docs/architecture/)
       - id: schema-compatibility
         name: Check compatibility with published contracts
         entry: uv run --no-sync python scripts/check_schema_compatibility.py

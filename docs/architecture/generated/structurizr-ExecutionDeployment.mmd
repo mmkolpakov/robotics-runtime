@@ -1,0 +1,29 @@
+graph LR
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Local execution / source topology"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    subgraph 53 ["Local execution profile"]
+      style 53 fill:#ffffff,stroke:#94a3b8,color:#0f172a
+
+      54["<div style='font-weight: bold'>Read-only inputs</div><div style='font-size: 80%; margin-top:10px'>Admitted profile and native<br />assets.</div>"]
+      style 54 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+      55("<div style='font-weight: bold'>Engine and Compose</div><div style='font-size: 80%; margin-top:10px'>One owned project per<br />attempt.</div>")
+      style 55 fill:#dbeafe,stroke:#2563eb,color:#0f172a
+      56("<div style='font-weight: bold'>Composition host</div><div style='font-size: 80%; margin-top:10px'>Source: lifecycle and<br />ownership.</div>")
+      style 56 fill:#dbeafe,stroke:#2563eb,color:#0f172a
+      57("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Candidate native SDK.</div>")
+      style 57 fill:#fffbeb,stroke:#b45309,color:#0f172a
+      59[("<div style='font-weight: bold'>Retained evidence</div><div style='font-size: 80%; margin-top:10px'>Retained files; separate<br />trust.</div>")]
+      style 59 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
+    end
+
+    56-- "<div>Lifecycle jobs</div><div style='font-size: 70%'>[Compose / argv]</div>" -->57
+    56-- "<div>Export / cleanup proof</div><div style='font-size: 70%'>[Callback refs]</div>" -->59
+    57-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->59
+    54-- "<div>Admit closure</div><div style='font-size: 70%'>[Files / hashes]</div>" -->56
+    54-- "<div>Native scene / config</div><div style='font-size: 70%'>[Read-only]</div>" -->57
+    56-- "<div>Owned execution</div><div style='font-size: 70%'>[Local API]</div>" -->55
+
+  end
