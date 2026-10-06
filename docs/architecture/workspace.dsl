@@ -18,22 +18,22 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             tags "External"
         }
         platform = softwareSystem "Robotics runtime platform" "Source host, published Python tools; providers per profile." {
-            host = container "Run host" "Source: lifecycle and ownership." "Node 24 / Cordis / Execa" {
+            host = container "Run host" "Source lifecycle." "Node 24 / Cordis / Execa" {
                 tags "Host"
             }
-            documents = container "Document CLI" "Published contracts / writers." "Python CLI" {
+            documents = container "Document CLI" "Published contracts." "Python CLI" {
                 tags "Published"
             }
-            evaluation = container "Evaluation CLI" "Published evidence evaluator." "Python CLI" {
+            evaluation = container "Evaluation CLI" "Published evaluator." "Python CLI" {
                 tags "Published"
             }
-            native = container "Provider worker" "Candidate native SDK." "Native SDK / Python or C++" {
+            native = container "Provider worker" "Native SDK candidate." "Native SDK / Python or C++" {
                 tags "Candidate"
             }
-            media = container "Media worker" "Source: GStreamer frames." "Python GI / GStreamer" {
+            media = container "Media worker" "Source GStreamer." "Python GI / GStreamer" {
                 tags "Media"
             }
-            evidence = container "Evidence store" "Retained files; separate trust." "Files / object storage" {
+            evidence = container "Evidence store" "Retained bytes." "Files / object storage" {
                 tags "Database"
             }
         }

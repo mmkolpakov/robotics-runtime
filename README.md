@@ -61,17 +61,17 @@ graph LR
     subgraph 7 ["Robotics runtime platform"]
       style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
 
-      10("<div style='font-weight: bold'>Evaluation CLI</div><div style='font-size: 80%; margin-top:10px'>Published evidence evaluator.</div>")
+      10("<div style='font-weight: bold'>Evaluation CLI</div><div style='font-size: 80%; margin-top:10px'>Published evaluator.</div>")
       style 10 fill:#ecfdf5,stroke:#047857,color:#0f172a
-      11("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Candidate native SDK.</div>")
+      11("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Native SDK candidate.</div>")
       style 11 fill:#fffbeb,stroke:#b45309,color:#0f172a
-      12("<div style='font-weight: bold'>Media worker</div><div style='font-size: 80%; margin-top:10px'>Source: GStreamer frames.</div>")
+      12("<div style='font-weight: bold'>Media worker</div><div style='font-size: 80%; margin-top:10px'>Source GStreamer.</div>")
       style 12 fill:#ecfeff,stroke:#0e7490,color:#0f172a
-      13[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Retained files; separate<br />trust.</div>")]
+      13[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Retained bytes.</div>")]
       style 13 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
-      8("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Source: lifecycle and<br />ownership.</div>")
+      8("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Source lifecycle.</div>")
       style 8 fill:#dbeafe,stroke:#2563eb,color:#0f172a
-      9("<div style='font-weight: bold'>Document CLI</div><div style='font-size: 80%; margin-top:10px'>Published contracts /<br />writers.</div>")
+      9("<div style='font-weight: bold'>Document CLI</div><div style='font-size: 80%; margin-top:10px'>Published contracts.</div>")
       style 9 fill:#ecfdf5,stroke:#047857,color:#0f172a
     end
 
