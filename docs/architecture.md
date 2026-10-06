@@ -13,7 +13,21 @@ test and published consumer run establish different claims.
 
 ## Composition and native data
 
-The host uses upstream Cordis `Context`, `Service`, plugins and `Fiber` lifecycle.
+### Composition framework
+
+The host uses upstream [Cordis](https://github.com/cordiverse/cordis) `Context`,
+`Service`, plugins and `Fiber` lifecycle. Providers register services within
+run-owned contexts; the host reuses upstream plugin loading and managed effects.
+Pinned versions and the lifecycle API are documented in the [host reference](../host/README.md).
+Cluster scheduling belongs to the deployment backend.
+
+Local context and effect management does not qualify simulator behavior,
+stable retained payloads or physical cleanup. Those require provider-specific
+observation and qualification. Run reservations are process-local; this lifecycle
+does not provide crash or distributed recovery.
+
+### Native data
+
 Application services connect bounded jobs to the existing contracts/harness APIs.
 They do not implement another document validator, wire protocol or simulator SDK.
 
