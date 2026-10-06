@@ -26,6 +26,11 @@ export function makePlan(pkg, input) {
     source_tree: input.source_tree, toolchain: {node: pkg.engines.node, npm: pkg.engines.npm},
     reference, scope: 'package integrity; native acceptance is established separately'};
 }
+export function requirePublicationCommit(source, trigger, live) {
+  assert.ok([source, trigger, live].every(value => hex(value, 40)), 'exact publication commit required');
+  assert.equal(source, trigger, 'manifest source differs from the tag-trigger commit');
+  assert.equal(live, source, 'live remote tag moved from the built commit');
+}
 export async function verifyArtifact(pkg, plan, rows, directory) {
   makePlan(pkg, {...plan, event: 'local', reference_revision: plan.reference?.source_revision,
     reference_tree: plan.reference?.source_tree, reference_asset_sha256: plan.reference?.asset_sha256});
@@ -60,6 +65,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (command === 'plan') {
     const [candidate, event, source_revision, source_tree, reference_revision = '', reference_tree = '', reference_asset_sha256 = ''] = args;
     result = makePlan(pkg, {candidate, event, source_revision, source_tree, reference_revision, reference_tree, reference_asset_sha256});
+  } else if (command === 'tag') {
+    assert.equal(args.length, 2);
+    const manifest = await json(args[0]);
+    requirePublicationCommit(manifest.source_revision, process.env.GITHUB_SHA, args[1]);
+    result = {source_revision: manifest.source_revision, live_commit: args[1]};
   } else {
     assert.equal(command, 'verify'); assert.equal(args.length, 3);
     result = await verifyArtifact(pkg, await json(args[0]), await json(args[1]), args[2]);

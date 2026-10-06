@@ -194,6 +194,11 @@ jobs:
       ASSET: ${{ needs.build.outputs.filename }}
       VERSION: ${{ needs.build.outputs.version }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: source
+          persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           name: host-package-${{ github.run_id }}
@@ -209,17 +214,43 @@ jobs:
             release/consumer-package-lock.json
             release/consumer.json
           create-storage-record: false
-      - name: Create the immutable host release without replacing assets
+      - name: Stage a draft or verify the exact immutable host release
         run: |
           set -euo pipefail
+          check_live_tag() {
+            local reference snapshot commit
+            reference="refs/tags/$CANDIDATE"
+            snapshot="$(git ls-remote --exit-code "$GITHUB_SERVER_URL/$GH_REPO.git" \
+              "$reference" "$reference^{}")"
+            commit="$(awk -v ref="$reference" '
+              $2 == ref { direct = $1 }
+              $2 == ref "^{}" { peeled = $1 }
+              END { print peeled == "" ? direct : peeled }
+            ' <<< "$snapshot")"
+            docker run --rm --network=none --user "$(id -u):$(id -g)" --env GITHUB_SHA \
+              --volume "$GITHUB_WORKSPACE:/workspace:ro" --workdir /workspace/source/host "$NODE_IMAGE" \
+              node tools/release-asset.mjs tag /workspace/release/manifest.json "$commit"
+          }
           if ! gh release view "$CANDIDATE" --json tagName >/dev/null 2>&1; then
-            flags=(--latest=false)
+            flags=(--latest=false --draft)
             if [[ "$VERSION" == *-* ]]; then flags+=(--prerelease); fi
+            check_live_tag > release/tag-before-staging.json
             gh release create "$CANDIDATE" "release/dist/$ASSET" release/manifest.json \
               release/SHA256SUMS release/consumer-package-lock.json release/consumer.json \
               --verify-tag --generate-notes "${flags[@]}"
           fi
-          gh release verify "$CANDIDATE"
+          gh release view "$CANDIDATE" --json tagName,isDraft,isImmutable > release/release-state.json
+          jq -e --arg tag "$CANDIDATE" '.tagName == $tag' release/release-state.json
+          if jq -e '.isDraft == true' release/release-state.json >/dev/null; then
+            check_live_tag > release/tag-after-staging.json
+            printf '%s\n' 'Draft remains unpublished; no public host release has been completed.' \
+              'An authenticated owner must verify current immutable-release settings and the exact live tag before publishing.' \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          jq -e '.isDraft == false and .isImmutable == true' release/release-state.json
+          gh release verify "$CANDIDATE" --format json > release/release-attestation.json
+          check_live_tag > release/tag-after-verification.json
           for artifact in "release/dist/$ASSET" release/manifest.json release/SHA256SUMS \
             release/consumer-package-lock.json release/consumer.json; do
             gh release verify-asset "$CANDIDATE" "$artifact"

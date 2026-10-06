@@ -4,7 +4,7 @@ import {mkdtemp, writeFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
-import {makePlan, verifyArtifact} from './release-asset.mjs';
+import {makePlan, verifyArtifact, requirePublicationCommit} from './release-asset.mjs';
 
 const pkg = {name: '@robotics-runtime/host', private: true, version: '0.1.0-rc.0',
   engines: {node: '24.21.0', npm: '11.19.0'},
@@ -58,3 +58,11 @@ test('corrupted reference metadata cannot manufacture a publish match', async ()
   await assert.rejects(verifyArtifact(pkg, {...plan, reference: {asset_sha256: 'c'.repeat(64)}}, [row], directory));
   await assert.rejects(verifyArtifact(pkg, {...plan, source_revision: 'main'}, [row], directory), /Git identity/);
 }));
+
+test('a moved public tag cannot reuse compiled tree or artifact equality', () => {
+  const built = 'a'.repeat(40), moved = 'b'.repeat(40);
+  requirePublicationCommit(built, built, built);
+  assert.throws(() => requirePublicationCommit(built, built, moved), /remote tag moved/);
+  assert.throws(() => requirePublicationCommit(built, moved, built), /tag-trigger commit/);
+  assert.throws(() => requirePublicationCommit(built, built, ''), /exact publication commit/);
+});
