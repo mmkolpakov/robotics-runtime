@@ -18,14 +18,22 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             tags "External"
         }
         platform = softwareSystem "Robotics runtime platform" "Source host, published Python tools; providers per profile." {
-            host = container "Composition host" "Source plugins / finite jobs / ownership." "Node 24 / Cordis / Execa"
-            documents = container "Document worker" "Published contracts / writers." "Python CLI"
-            evaluation = container "Evaluation worker" "Published; ROS attach-only." "Python CLI"
-            native = container "Provider worker" "Candidate native APIs; qualify each profile." "Native SDK / Python or C++" {
+            host = container "Run host" "Source lifecycle." "Node 24 / Cordis / Execa" {
+                tags "Host"
+            }
+            documents = container "Document CLI" "Published contracts." "Python CLI" {
+                tags "Published"
+            }
+            evaluation = container "Evaluation CLI" "Published evaluator." "Python CLI" {
+                tags "Published"
+            }
+            native = container "Provider worker" "Native SDK candidate." "Native SDK / Python or C++" {
                 tags "Candidate"
             }
-            media = container "Media worker" "Source GStreamer; native decode / frames." "Python GI / GStreamer"
-            evidence = container "Retained evidence" "Exact files; publisher identity verified separately." "Files / object storage" {
+            media = container "Media worker" "Source GStreamer." "Python GI / GStreamer" {
+                tags "Media"
+            }
+            evidence = container "Evidence store" "Retained bytes." "Files / object storage" {
                 tags "Database"
             }
         }
@@ -38,18 +46,18 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         platform -> registries "Install / verify"
         integrator -> platform.host "Trusted profile" "Consumer CLI/API"
         product -> platform.host "Trusted coordinator" "Host API / files"
-        platform.host -> platform.documents "Validate / write" "argv / files / exit"
-        platform.host -> platform.evaluation "Evaluate" "argv / files / exit"
-        platform.host -> platform.native "Startup / ready / teardown" "Compose / finite jobs"
+        platform.host -> platform.documents "Validate documents" "argv / files"
+        platform.host -> platform.evaluation "Evaluate evidence" "argv / files"
+        platform.host -> platform.native "Lifecycle jobs" "Compose / argv"
         platform.host -> autopilot "SDK clients / consumer policy" "MAVSDK / gRPC"
-        platform.host -> platform.media "Bounded media jobs" "argv / files / exit"
+        platform.host -> platform.media "Media jobs" "argv / files"
         platform.media -> mediaSource "Declared input" "GStreamer / RTSP / fixture"
-        platform.media -> platform.evidence "Native reports / outputs" "Exact files"
+        platform.media -> platform.evidence "Frames / reports" "Exact files"
         platform.native -> simulators "Native SDK/controller" "Backend API"
-        platform.native -> platform.evidence "Retain before reset / dispose" "Exact payloads"
-        platform.documents -> platform.evidence "Validate / write docs" "Files"
-        platform.evaluation -> platform.evidence "Read evidence / write results" "Files / JSON / JUnit"
-        platform.host -> platform.evidence "Nonempty refs; observe cleanup" "Callback refs"
+        platform.native -> platform.evidence "Before reset / dispose" "Exact payloads"
+        platform.documents -> platform.evidence "Write documents" "Files"
+        platform.evaluation -> platform.evidence "Read bytes / write verdicts" "JSON / JUnit"
+        platform.host -> platform.evidence "Export / cleanup proof" "Callback refs"
         deploymentEnvironment "Home" {
             deploymentNode "Home workstation" "Source WSL CPU topology; qualification is profile-scoped." "Windows / WSL2" {
                 deploymentNode "dev WSL" "Source components; native and media coverage is profile-scoped." "Ubuntu 24.04 / WSL2" {
@@ -63,27 +71,48 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
                 }
             }
         }
+        deploymentEnvironment "Local" {
+            deploymentNode "Local execution profile" "Source topology, not a universal qualification." "Linux / Docker or rootless Podman" {
+                inputs = infrastructureNode "Read-only inputs" "Admitted profile and native assets." "Mounted files" {
+                    tags "Inputs"
+                }
+                engine = infrastructureNode "Engine and Compose" "One owned project per attempt." "Native container API" {
+                    tags "Host"
+                }
+                coordinator = containerInstance platform.host
+                worker = containerInstance platform.native
+                retained = containerInstance platform.evidence
+                inputs -> coordinator "Admit closure" "Files / hashes"
+                inputs -> worker "Native scene / config" "Read-only"
+                coordinator -> engine "Owned execution" "Local API"
+            }
+        }
     }
     views {
         systemContext platform "Context" "Actors and system boundary." {
             title "Platform context"
             include *?
-            autoLayout lr 10 50
+            autoLayout lr 60 60
         }
         container platform "Container" "Owned processes and retained data; native interfaces are in ContainerDetail." {
             title "Process composition"
             include platform.host platform.documents platform.evaluation platform.native platform.media platform.evidence
-            autoLayout lr 10 50
+            autoLayout lr 60 60
         }
         container platform "ContainerDetail" "Complete consumer, controller, simulator and media interface graph." {
             title "Native and consumer interfaces"
             include *
-            autoLayout lr 50 30
+            autoLayout tb 60 70
         }
         deployment platform "Home" "HomeDeployment" "Source WSL CPU topology; this view is not a complete consumer qualification." {
             title "Source WSL CPU topology"
             include *
             autoLayout tb 100 40
+        }
+        deployment platform "Local" "ExecutionDeployment" "Selected native-worker path; document and media jobs use their own profiles." {
+            title "Local execution / source topology"
+            include *
+            autoLayout lr 60 60
         }
         properties {
             "structurizr.metadata" "false"
@@ -94,39 +123,71 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         }
         styles {
             element "Element" {
-                width 380
-                height 380
-                fontSize 36
+                shape RoundedBox
+                width 320
+                height 150
+                fontSize 26
+                strokeWidth 2
+                background "#f8fafc"
+                color "#0f172a"
+                stroke "#cbd5e1"
+                metadata false
             }
             relationship "Relationship" {
-                fontSize 36
-                width 240
+                fontSize 22
+                width 190
+                color "#475569"
+                style solid
+                routing Orthogonal
+                thickness 2
             }
             element "Person" {
                 shape Person
-                width 420
-                fontSize 36
-                metadata false
+                width 280
+                height 230
             }
             element "Software System" {
-                fontSize 36
-                background "#35546f"
-                color "#ffffff"
+                background "#dbeafe"
+                stroke "#2563eb"
             }
             element "Container" {
-                background "#e6edf3"
-                color "#172431"
+                background "#f1f5f9"
+            }
+            element "Host" {
+                background "#dbeafe"
+                stroke "#2563eb"
+            }
+            element "Published" {
+                background "#ecfdf5"
+                stroke "#047857"
+            }
+            element "Media" {
+                background "#ecfeff"
+                stroke "#0e7490"
             }
             element "Database" {
                 shape Cylinder
-                height 440
+                height 175
+                background "#eef2ff"
+                stroke "#6d28d9"
             }
             element "External" {
-                background "#eeeeee"
-                color "#333333"
+                background "#f8fafc"
+                stroke "#94a3b8"
             }
             element "Candidate" {
+                background "#fffbeb"
+                stroke "#b45309"
                 border Dashed
+            }
+            element "Inputs" {
+                shape Folder
+                background "#f8fafc"
+                stroke "#94a3b8"
+            }
+            element "Deployment Node" {
+                stroke "#94a3b8"
+                background "#f8fafc"
             }
         }
     }

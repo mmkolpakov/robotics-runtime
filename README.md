@@ -22,11 +22,11 @@ harness to evaluate evidence for a supported qualification profile. Use infra
 to launch a composition and record what actually ran.
 
 The published pair is
-[contracts 0.18.2](https://pypi.org/project/robotics-runtime-contracts/0.18.2/) and
-[harness 0.19.1](https://pypi.org/project/robotics-acceptance-harness/0.19.1/):
+[contracts 0.18.3](https://pypi.org/project/robotics-runtime-contracts/0.18.3/) and
+[harness 0.19.2](https://pypi.org/project/robotics-acceptance-harness/0.19.2/):
 
 ```bash
-python -m pip install robotics-runtime-contracts==0.18.2 robotics-acceptance-harness==0.19.1
+python -m pip install robotics-runtime-contracts==0.18.3 robotics-acceptance-harness==0.19.2
 robotics-contracts --help
 robotics-acceptance --help
 ```
@@ -46,9 +46,96 @@ These C4 views cover the joint platform in both repositories. The Python pair
 is published separately; the composition host and candidate providers require
 their own release qualification.
 
-![C4 Context: users and external systems](docs/architecture/generated/Context.svg)
+### Process composition
 
-![C4 Container: executable applications and retained data](docs/architecture/generated/Container.svg)
+<!-- architecture:Container:start -->
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, Segoe UI, sans-serif","fontSize":"18px","primaryTextColor":"#0f172a","lineColor":"#475569","edgeLabelBackground":"#ffffff","clusterBkg":"#f8fafc","clusterBorder":"#94a3b8","primaryColor":"#eff6ff","primaryBorderColor":"#64748b","secondaryColor":"#f1f5f9","tertiaryColor":"#f8fafc","noteBkgColor":"#fff7ed","noteBorderColor":"#b45309","noteTextColor":"#0f172a"},"flowchart":{"curve":"basis","htmlLabels":true,"nodeSpacing":28,"rankSpacing":35,"useMaxWidth":false},"sequence":{"useMaxWidth":false,"actorMargin":35,"width":165,"wrap":true,"noteMargin":10},"state":{"useMaxWidth":false}}}%%
+graph LR
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Process composition"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    subgraph 7 ["Robotics runtime platform"]
+      style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
+
+      10("<div style='font-weight: bold'>Evaluation CLI</div><div style='font-size: 80%; margin-top:10px'>Published evaluator.</div>")
+      style 10 fill:#ecfdf5,stroke:#047857,color:#0f172a
+      11("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Native SDK candidate.</div>")
+      style 11 fill:#fffbeb,stroke:#b45309,color:#0f172a
+      12("<div style='font-weight: bold'>Media worker</div><div style='font-size: 80%; margin-top:10px'>Source GStreamer.</div>")
+      style 12 fill:#ecfeff,stroke:#0e7490,color:#0f172a
+      13[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Retained bytes.</div>")]
+      style 13 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
+      8("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Source lifecycle.</div>")
+      style 8 fill:#dbeafe,stroke:#2563eb,color:#0f172a
+      9("<div style='font-weight: bold'>Document CLI</div><div style='font-size: 80%; margin-top:10px'>Published contracts.</div>")
+      style 9 fill:#ecfdf5,stroke:#047857,color:#0f172a
+    end
+
+    8-- "<div>Validate documents</div><div style='font-size: 70%'>[argv / files]</div>" -->9
+    8-- "<div>Evaluate evidence</div><div style='font-size: 70%'>[argv / files]</div>" -->10
+    8-- "<div>Lifecycle jobs</div><div style='font-size: 70%'>[Compose / argv]</div>" -->11
+    8-- "<div>Media jobs</div><div style='font-size: 70%'>[argv / files]</div>" -->12
+    12-- "<div>Frames / reports</div><div style='font-size: 70%'>[Exact files]</div>" -->13
+    11-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->13
+    9-- "<div>Write documents</div><div style='font-size: 70%'>[Files]</div>" -->13
+    10-- "<div>Read bytes / write verdicts</div><div style='font-size: 70%'>[JSON / JUnit]</div>" -->13
+    8-- "<div>Export / cleanup proof</div><div style='font-size: 70%'>[Callback refs]</div>" -->13
+
+  end
+```
+
+<!-- architecture:Container:end -->
+
+Colors distinguish roles: composition, published Python tools, native candidates,
+media and retained files. They are not qualification verdicts. Control and video
+use their native connections; lifecycle completion and evidence evaluation are
+separate outcomes.
+
+<details>
+<summary>C4 context — product boundaries and external systems</summary>
+
+<!-- architecture:Context:start -->
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, Segoe UI, sans-serif","fontSize":"18px","primaryTextColor":"#0f172a","lineColor":"#475569","edgeLabelBackground":"#ffffff","clusterBkg":"#f8fafc","clusterBorder":"#94a3b8","primaryColor":"#eff6ff","primaryBorderColor":"#64748b","secondaryColor":"#f1f5f9","tertiaryColor":"#f8fafc","noteBkgColor":"#fff7ed","noteBorderColor":"#b45309","noteTextColor":"#0f172a"},"flowchart":{"curve":"basis","htmlLabels":true,"nodeSpacing":28,"rankSpacing":35,"useMaxWidth":false},"sequence":{"useMaxWidth":false,"actorMargin":35,"width":165,"wrap":true,"noteMargin":10},"state":{"useMaxWidth":false}}}%%
+graph LR
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Platform context"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    1["<div style='font-weight: bold'>Integrator</div><div style='font-size: 80%; margin-top:10px'>Selects profiles and verifies<br />evidence.</div>"]
+    style 1 fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
+    2("<div style='font-weight: bold'>Product application</div><div style='font-size: 80%; margin-top:10px'>Robot, NSU, control and<br />vision behavior.</div>")
+    style 2 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    3("<div style='font-weight: bold'>Simulation engines</div><div style='font-size: 80%; margin-top:10px'>Gazebo / Webots / Isaac;<br />profile-scoped.</div>")
+    style 3 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    4("<div style='font-weight: bold'>MAVSDK endpoint</div><div style='font-size: 80%; margin-top:10px'>MAVSDK: separate transport,<br />peer and effect facts.</div>")
+    style 4 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    5("<div style='font-weight: bold'>Media source</div><div style='font-size: 80%; margin-top:10px'>Camera, RTSP or fixture;<br />native frame semantics.</div>")
+    style 5 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    6("<div style='font-weight: bold'>Artifact registries</div><div style='font-size: 80%; margin-top:10px'>Immutable packages, images<br />and attestations.</div>")
+    style 6 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    7("<div style='font-weight: bold'>Robotics runtime platform</div><div style='font-size: 80%; margin-top:10px'>Source host, published Python<br />tools; providers per profile.</div>")
+    style 7 fill:#dbeafe,stroke:#2563eb,color:#0f172a
+
+    1-- "<div>Run and verify workloads</div><div style='font-size: 70%'></div>" -->7
+    2-- "<div>Supply config; read verdicts</div><div style='font-size: 70%'></div>" -->7
+    7-- "<div>Selected native runtimes</div><div style='font-size: 70%'></div>" -->3
+    7-- "<div>Selected SDK</div><div style='font-size: 70%'></div>" -->4
+    7-- "<div>Selected media</div><div style='font-size: 70%'></div>" -->5
+    7-- "<div>Install / verify</div><div style='font-size: 70%'></div>" -->6
+
+  end
+```
+
+<!-- architecture:Context:end -->
+
+</details>
 
 [Complete native and consumer interfaces](docs/architecture/generated/ContainerDetail.svg)
 shows controller, simulator and media relationships.
