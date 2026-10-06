@@ -1,0 +1,278 @@
+---
+name: host-release
+
+on:
+  pull_request:
+    paths: [host/**, .github/workflows/host-release.yml]
+  push:
+    tags: ["host-v*"]
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: "Exact host-version tag; dispatch builds only"
+        required: true
+        type: string
+      reference_source:
+        description: "Optional exact source of the accepted asset"
+        required: false
+        type: string
+      reference_sha256:
+        description: "Optional accepted TGZ SHA256 paired with that source"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: host-release-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # yamllint disable-line rule:line-length
+  NODE_IMAGE: node:24.21.0-trixie-slim@sha256:b64fccfbcd1ae10d11b969a868b50e1c2530a7054813d5cdea04ac3bce551697
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      candidate: ${{ steps.artifact.outputs.candidate }}
+      filename: ${{ steps.artifact.outputs.filename }}
+      version: ${{ steps.artifact.outputs.version }}
+      reference_matches: ${{ steps.artifact.outputs.reference_matches }}
+    env:
+      CANDIDATE: ${{ github.event_name == 'push' && github.ref_name || inputs.candidate }}
+      REFERENCE_SOURCE: ${{ inputs.reference_source || vars.HOST_QUALIFIED_SOURCE_SHA }}
+      REFERENCE_SHA256: ${{ inputs.reference_sha256 || vars.HOST_QUALIFIED_ASSET_SHA256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Bind the actual source and optional accepted reference
+        run: |
+          set -euo pipefail
+          source_revision="$(git rev-parse HEAD)"
+          source_tree="$(git rev-parse HEAD:host/src)"
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+            test "$(git rev-parse "refs/tags/$CANDIDATE^{commit}")" = "$source_revision"
+            test "$source_revision" = "$GITHUB_SHA"
+            git merge-base --is-ancestor "$source_revision" refs/remotes/origin/main
+          fi
+          reference_tree=""
+          if [[ -n "$REFERENCE_SOURCE" ]]; then
+            [[ "$REFERENCE_SOURCE" =~ ^[a-f0-9]{40}$ ]]
+            reference_tree="$(git rev-parse "$REFERENCE_SOURCE:host/src")"
+          fi
+          mkdir -p artifacts/host-release/dist
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          export SOURCE_DATE_EPOCH
+          printf 'SOURCE_DATE_EPOCH=%s\n' "$SOURCE_DATE_EPOCH" >> "$GITHUB_ENV"
+          docker run --rm --user "$(id -u):$(id -g)" \
+            --env GITHUB_REPOSITORY --env GITHUB_REF --env SOURCE_DATE_EPOCH \
+            --volume "$PWD:/workspace:ro" --workdir /workspace/host "$NODE_IMAGE" \
+            node tools/release-asset.mjs plan "$CANDIDATE" "$GITHUB_EVENT_NAME" \
+            "$source_revision" "$source_tree" "$REFERENCE_SOURCE" "$reference_tree" \
+            "$REFERENCE_SHA256" > artifacts/host-release/plan.json
+      - name: Build and check the packed core host
+        run: |
+          set -euo pipefail
+          docker run --rm --init --user "$(id -u):$(id -g)" \
+            --env NPM_CONFIG_CACHE=/tmp/npm-cache --env SOURCE_DATE_EPOCH \
+            --env GITHUB_REPOSITORY --env GITHUB_REF \
+            --volume "$PWD:/workspace" --workdir /workspace/host "$NODE_IMAGE" \
+            bash -Eeuo pipefail -c '
+              test "$(node --version)" = v24.21.0
+              test "$(npm --version)" = 11.19.0
+              npm ci --ignore-scripts --no-fund
+              npm test
+              npm run check:boundary
+              npm audit --audit-level=high
+              node --test tools/release-asset.test.mjs
+              npm pack --ignore-scripts --pack-destination /workspace/artifacts/host-release/dist \
+                --json > /workspace/artifacts/host-release/npm-pack.json
+              node tools/release-asset.mjs verify /workspace/artifacts/host-release/plan.json \
+                /workspace/artifacts/host-release/npm-pack.json /workspace/artifacts/host-release/dist \
+                > /workspace/artifacts/host-release/manifest.json
+            '
+          git diff --exit-code -- host
+      - name: Require identical clean rebuild and ordinary external installation
+        run: |
+          set -euo pipefail
+          rebuild="$(mktemp -d "$RUNNER_TEMP/host-rebuild.XXXXXX")"
+          consumer="$(mktemp -d "$RUNNER_TEMP/host-consumer.XXXXXX")"
+          trap 'rm -rf "$rebuild" "$consumer"' EXIT
+          git archive HEAD host | tar -x --same-permissions -C "$rebuild"
+          docker run --rm --user "$(id -u):$(id -g)" --env SOURCE_DATE_EPOCH \
+            --env NPM_CONFIG_CACHE=/tmp/npm-cache --volume "$rebuild:/rebuild" \
+            --workdir /rebuild/host "$NODE_IMAGE" bash -Eeuo pipefail -c '
+              npm ci --ignore-scripts --no-fund
+              npm run build
+              mkdir /rebuild/dist
+              npm pack --ignore-scripts --pack-destination /rebuild/dist --json > /rebuild/npm-pack.json
+            '
+          archive="$(python3 -c 'import json; print(json.load(open("artifacts/host-release/manifest.json"))["filename"])')"
+          cmp "artifacts/host-release/dist/$archive" "$rebuild/dist/$archive"
+          mkdir "$consumer/assets"
+          cp "artifacts/host-release/dist/$archive" "$consumer/assets/core.tgz"
+          cp host/package.json "$consumer/expected-package.json"
+          cp artifacts/host-release/manifest.json "$consumer/expected-artifact.json"
+          cat > "$consumer/package.json" <<'JSON'
+          {"name":"host-release-consumer","private":true,"type":"module",
+           "dependencies":{"@robotics-runtime/host":"file:assets/core.tgz"}}
+          JSON
+          docker run --rm --user "$(id -u):$(id -g)" --env NPM_CONFIG_CACHE=/tmp/npm-cache \
+            --volume "$consumer:/consumer" --workdir /consumer "$NODE_IMAGE" \
+            bash -Eeuo pipefail -c 'npm install --package-lock-only --ignore-scripts --no-fund; npm ci --ignore-scripts --no-fund'
+          cat > "$consumer/verify.mjs" <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFile, stat, realpath} from 'node:fs/promises';
+          import {fileURLToPath} from 'node:url';
+          const expected=JSON.parse(await readFile('expected-package.json'));
+          const artifact=JSON.parse(await readFile('expected-artifact.json'));
+          const lock=JSON.parse(await readFile('package-lock.json'));
+          assert.equal(lock.packages['node_modules/@robotics-runtime/host'].integrity,artifact.npm_pack.integrity);
+          const root=await realpath('node_modules/@robotics-runtime/host');
+          assert.ok(root.startsWith('/consumer/node_modules/'));
+          const installed=JSON.parse(await readFile(root+'/package.json'));
+          assert.equal(installed.name,expected.name); assert.equal(installed.version,expected.version);
+          const origins={};
+          for(const [key,target] of Object.entries(expected.exports)){
+            const specifier=expected.name+(key==='.'?'':key.slice(1));
+            const resolved=fileURLToPath(import.meta.resolve(specifier));
+            assert.ok(resolved.startsWith(root+'/') && resolved.endsWith('.js'));
+            assert.ok((await stat(root+'/'+target.types)).isFile());
+            await import(specifier); origins[specifier]=resolved;
+          }
+          console.log(JSON.stringify({installed:installed.name,version:installed.version,origins,workspace_fallback:false}));
+          JS
+          docker run --rm --network=none --user "$(id -u):$(id -g)" \
+            --volume "$consumer:/consumer:ro" --workdir /consumer "$NODE_IMAGE" \
+            node verify.mjs > artifacts/host-release/consumer.json
+          cp "$consumer/package-lock.json" artifacts/host-release/consumer-package-lock.json
+      - name: Record the closed asset set
+        id: artifact
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path("artifacts/host-release")
+          manifest = json.loads((root / "manifest.json").read_text())
+          with open(os.environ["GITHUB_OUTPUT"], "a") as stream:
+              for key in ("candidate", "filename", "version", "reference_matches"):
+                  value = manifest[key]
+                  stream.write(f"{key}={str(value).lower() if isinstance(value, bool) else value}\n")
+          (root / "SHA256SUMS").write_text(f"{manifest['sha256']}  {manifest['filename']}\n")
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: host-package-${{ github.run_id }}
+          path: artifacts/host-release/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    if: >-
+      github.event_name == 'push' && vars.HOST_RELEASE_PUBLISH_ENABLED == 'true' &&
+      needs.build.outputs.reference_matches == 'true'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      CANDIDATE: ${{ needs.build.outputs.candidate }}
+      ASSET: ${{ needs.build.outputs.filename }}
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: source
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: host-package-${{ github.run_id }}
+          path: release/
+      - name: Verify the downloaded archive
+        run: cd release/dist && sha256sum --check ../SHA256SUMS
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6  # v4.2.2
+        with:
+          subject-path: |
+            release/dist/*.tgz
+            release/manifest.json
+            release/SHA256SUMS
+            release/consumer-package-lock.json
+            release/consumer.json
+          create-storage-record: false
+      - name: Stage a draft or verify the exact immutable host release
+        run: |
+          set -euo pipefail
+          check_live_tag() {
+            local reference snapshot commit
+            reference="refs/tags/$CANDIDATE"
+            snapshot="$(git ls-remote --exit-code "$GITHUB_SERVER_URL/$GH_REPO.git" \
+              "$reference" "$reference^{}")"
+            commit="$(awk -v ref="$reference" '
+              $2 == ref { direct = $1 }
+              $2 == ref "^{}" { peeled = $1 }
+              END { print peeled == "" ? direct : peeled }
+            ' <<< "$snapshot")"
+            docker run --rm --network=none --user "$(id -u):$(id -g)" --env GITHUB_SHA \
+              --volume "$GITHUB_WORKSPACE:/workspace:ro" --workdir /workspace/source/host "$NODE_IMAGE" \
+              node tools/release-asset.mjs tag /workspace/release/manifest.json "$commit"
+          }
+          check_draft_assets() (
+            set -euo pipefail
+            local directory artifact
+            directory="$(mktemp -d "$RUNNER_TEMP/host-release-draft.XXXXXX")"
+            trap 'rm -rf "$directory"' EXIT
+            mkdir "$directory/assets"
+            gh release download "$CANDIDATE" --dir "$directory/assets" \
+              --pattern "$ASSET" --pattern manifest.json --pattern SHA256SUMS \
+              --pattern consumer-package-lock.json --pattern consumer.json
+            for artifact in "release/dist/$ASSET" release/manifest.json release/SHA256SUMS \
+              release/consumer-package-lock.json release/consumer.json; do
+              cmp "$artifact" "$directory/assets/$(basename "$artifact")"
+            done
+            printf '%s\n' "$ASSET" manifest.json SHA256SUMS consumer-package-lock.json consumer.json \
+              | LC_ALL=C sort > "$directory/expected-assets"
+            gh release view "$CANDIDATE" --json assets --jq '.assets[].name' \
+              | LC_ALL=C sort > "$directory/actual-assets"
+            cmp "$directory/expected-assets" "$directory/actual-assets"
+          )
+          if ! gh release view "$CANDIDATE" --json tagName >/dev/null 2>&1; then
+            flags=(--latest=false --draft)
+            if [[ "$VERSION" == *-* ]]; then flags+=(--prerelease); fi
+            check_live_tag > release/tag-before-staging.json
+            gh release create "$CANDIDATE" "release/dist/$ASSET" release/manifest.json \
+              release/SHA256SUMS release/consumer-package-lock.json release/consumer.json \
+              --verify-tag --generate-notes "${flags[@]}"
+          fi
+          gh release view "$CANDIDATE" --json tagName,isDraft,isImmutable > release/release-state.json
+          jq -e --arg tag "$CANDIDATE" '.tagName == $tag' release/release-state.json
+          if jq -e '.isDraft == true' release/release-state.json >/dev/null; then
+            check_draft_assets
+            check_live_tag > release/tag-after-staging.json
+            printf '%s\n' 'Draft assets match this run; no public host release has been completed.' \
+              'An authenticated owner must verify current immutable-release settings and the exact live tag before publishing.' \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          jq -e '.isDraft == false and .isImmutable == true' release/release-state.json
+          gh release verify "$CANDIDATE" --format json > release/release-attestation.json
+          check_live_tag > release/tag-after-verification.json
+          for artifact in "release/dist/$ASSET" release/manifest.json release/SHA256SUMS \
+            release/consumer-package-lock.json release/consumer.json; do
+            gh release verify-asset "$CANDIDATE" "$artifact"
+          done

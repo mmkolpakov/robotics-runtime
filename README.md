@@ -180,6 +180,50 @@ See [host configuration and worker integration](host/README.md).
 The host is a source component; a new published host/provider composition
 requires its own consumer qualification.
 
+The separate `host-release.yml` workflow builds the compiled core host as a
+GitHub Release TGZ, retaining `private: true` and ordinary npm `file:` installation.
+PR and manual runs check the archive, a clean rebuild and installation outside
+the source workspace; they do not publish or establish native acceptance.
+
+Publication stays disabled. Before enabling it, the authenticated owner enables
+and verifies the repository's current immutable-release setting. Historical
+immutable releases do not prove the current setting. Its authenticated settings
+API requires Administration read, which the workflow's ordinary GitHub token
+cannot acquire; missing authorization does not mean the setting is disabled.
+
+The owner then completes the current host/provider source cohort, including
+cancellation and retained verification after source deletion, and sets
+`HOST_QUALIFIED_SOURCE_SHA` and `HOST_QUALIFIED_ASSET_SHA256`. The built archive
+and source tree must match that explicit reference. Its original source identity
+is retained separately from the actual release tag/build commit. Only then enable
+`HOST_RELEASE_PUBLISH_ENABLED=true` and create a unique tag that exactly matches
+`host-v<host/package.json version>` and belongs to main.
+
+The current host version is an RC; this package path grants no general simulator,
+hardware or cloud qualification. Published artifacts require a fresh independent
+consumer of the admitted profiles. Existing PyPI environments and their required
+reviews remain separate.
+
+The workflow stages new assets as a draft, not a completed host release. Before
+accepting a new or existing draft, it downloads the five expected assets to a
+fresh directory, compares every byte with this run and requires the exact remote
+asset set. Partial, stale or surplus drafts fail without replacing remote assets.
+After the accepted source cohort and current setting are verified, the owner uses
+stock
+`gh release edit <tag> --draft=false` to publish, rechecking the live peeled tag
+against the built manifest and tag-trigger SHA immediately before that transition.
+Repeat the workflow's `check_draft_assets` and `check_live_tag` functions with
+the same archived run inputs immediately before that transition. An earlier draft
+check does not freeze mutable assets.
+A refused draft requires explicit owner repair before retrying.
+No new approval environment or credential service is introduced.
+
+For an existing published release, the job requires `isImmutable`, verifies the
+signed release with `gh release verify --format json`, rechecks the locked live
+commit and verifies each immutable asset. Release jobs recheck the live
+peeled tag against the actual build and tag-trigger commit, independently of the
+earlier byte-equivalent reference, and never replace existing tags or release assets.
+
 ## Development
 
 Use Python 3.12–3.14 and uv. One workspace lock installs both packages:
