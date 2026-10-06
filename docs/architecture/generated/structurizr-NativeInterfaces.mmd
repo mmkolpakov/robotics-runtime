@@ -18,8 +18,6 @@ graph LR
       style 11 fill:#fffbeb,stroke:#b45309,color:#0f172a
       12("<div style='font-weight: bold'>Media worker</div><div style='font-size: 80%; margin-top:10px'>Source GStreamer.</div>")
       style 12 fill:#ecfeff,stroke:#0e7490,color:#0f172a
-      13[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Retained bytes.</div>")]
-      style 13 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
       8("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Source lifecycle.</div>")
       style 8 fill:#dbeafe,stroke:#2563eb,color:#0f172a
     end
@@ -28,9 +26,6 @@ graph LR
     8-- "<div>SDK clients / consumer policy</div><div style='font-size: 70%'>[MAVSDK / gRPC]</div>" -->4
     8-- "<div>Media jobs</div><div style='font-size: 70%'>[argv / files]</div>" -->12
     12-- "<div>Declared input</div><div style='font-size: 70%'>[GStreamer / RTSP / fixture]</div>" -->5
-    12-- "<div>Frames / reports</div><div style='font-size: 70%'>[Exact files]</div>" -->13
     11-- "<div>Native SDK/controller</div><div style='font-size: 70%'>[Backend API]</div>" -->3
-    11-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->13
-    8-- "<div>Export / cleanup proof</div><div style='font-size: 70%'>[Callback refs]</div>" -->13
 
   end

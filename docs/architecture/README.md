@@ -7,7 +7,7 @@ and CLI applications, not additional software systems.
 [workspace.dsl](workspace.dsl) is the C4 source. Context shows users and external
 systems. [Container](generated/Container.svg) shows the owned process composition
 and retained data. [NativeInterfaces](generated/NativeInterfaces.svg) isolates
-SDK, simulator and media dependencies;
+SDK, simulator and media dependencies; retention paths remain in Container.
 [ConsumerInterfaces](generated/ConsumerInterfaces.svg) shows product and
 document/evaluation ownership. [ContainerDetail](generated/ContainerDetail.svg)
 keeps the complete graph for reference. A C4 container

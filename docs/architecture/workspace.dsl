@@ -106,7 +106,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         }
         container platform "NativeInterfaces" "Selected simulator, media and SDK dependencies; no common frame or control bus." {
             title "Native interfaces"
-            include platform.host platform.native platform.media platform.evidence simulators mediaSource autopilot
+            include platform.host platform.native platform.media simulators mediaSource autopilot
             autoLayout lr 60 70
         }
         container platform "ConsumerInterfaces" "Product ownership, published document/evaluation tools and retained evidence." {
