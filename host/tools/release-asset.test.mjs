@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {mkdtemp, writeFile, rm} from 'node:fs/promises';
+import {mkdtemp, mkdir, readFile, readdir, writeFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
 import {makePlan, verifyArtifact, requirePublicationCommit} from './release-asset.mjs';
 
 const pkg = {name: '@robotics-runtime/host', private: true, version: '0.1.0-rc.0',
@@ -66,3 +67,51 @@ test('a moved public tag cannot reuse compiled tree or artifact equality', () =>
   assert.throws(() => requirePublicationCommit(built, moved, built), /tag-trigger commit/);
   assert.throws(() => requirePublicationCommit(built, built, ''), /exact publication commit/);
 });
+
+const draftAssets = ['robotics-runtime-host-0.1.0-rc.0.tgz', 'manifest.json',
+  'SHA256SUMS', 'consumer-package-lock.json', 'consumer.json'];
+async function draftFixture(change, accepted) {
+  const root = await mkdtemp(join(tmpdir(), 'host-draft-retry-'));
+  try {
+    const remote = join(root, 'remote'), temporary = join(root, 'temporary'), bin = join(root, 'bin');
+    for (const directory of [remote, temporary, bin, join(root, 'release/dist')]) await mkdir(directory, {recursive: true});
+    for (const name of draftAssets) {
+      const local = join(root, name.endsWith('.tgz') ? 'release/dist' : 'release', name);
+      await writeFile(local, 'this run: ' + name);
+      await writeFile(join(remote, name), await readFile(local));
+    }
+    await change(remote);
+    const snapshot = async () => Promise.all((await readdir(remote)).sort().map(async name =>
+      [name, (await readFile(join(remote, name))).toString('base64')]));
+    const before = await snapshot();
+    await writeFile(join(bin, 'gh'), "#!/usr/bin/env bash\nset -euo pipefail\ntest \"$1\" = release\ncommand=\"$2\"\ntest \"$3\" = \"$CANDIDATE\"\nshift 3\ncase \"$command\" in\n  download)\n    test \"$1\" = --dir\n    directory=\"$2\"\n    shift 2\n    for name in \"$ASSET\" manifest.json SHA256SUMS consumer-package-lock.json consumer.json; do\n      test \"$1\" = --pattern\n      test \"$2\" = \"$name\"\n      shift 2\n      if [[ -f \"$REMOTE/$name\" ]]; then cp \"$REMOTE/$name\" \"$directory/$name\"; fi\n    done\n    test \"$#\" = 0\n    ;;\n  view)\n    test \"$*\" = \"--json assets --jq .assets[].name\"\n    for file in \"$REMOTE\"/*; do\n      if [[ -f \"$file\" ]]; then basename \"$file\"; fi\n    done\n    ;;\n  *) exit 99 ;;\nesac\n", {mode: 0o700});
+    const workflow = await readFile(new URL('../../.github/workflows/host-release.yml', import.meta.url), 'utf8');
+    const start = workflow.indexOf('          check_draft_assets() (');
+    const end = workflow.indexOf('\n          )\n', start);
+    assert.ok(start >= 0 && end > start, 'actual workflow draft function is required');
+    const actualFunction = workflow.slice(start, end + '\n          )'.length).replace(/^          /gm, '');
+    const result = spawnSync('bash', ['-Eeuo', 'pipefail', '-c',
+      actualFunction + '\ncheck_draft_assets\nprintf accepted > accepted\n'], {
+      cwd: root, encoding: 'utf8', env: {...process.env, PATH: bin + ':' + process.env.PATH,
+        RUNNER_TEMP: temporary, REMOTE: remote, ASSET: draftAssets[0], CANDIDATE: input.candidate},
+    });
+    assert.equal(result.error, undefined);
+    assert.equal(result.status === 0, accepted, result.stderr);
+    assert.equal((await readdir(root)).includes('accepted'), accepted);
+    assert.deepEqual(await snapshot(), before, 'remote draft assets must never be repaired or replaced');
+    assert.deepEqual(await readdir(temporary), [], 'fresh downloads are cleaned on success and refusal');
+  } finally {await rm(root, {recursive: true, force: true});}
+}
+test('complete identical draft is accepted without remote mutation', () => draftFixture(async () => {}, true));
+test('partial upload draft is refused before staged success', () => draftFixture(async remote => {
+  for (const name of draftAssets.slice(1)) await rm(join(remote, name));
+}, false));
+test('stale draft manifest is refused despite matching asset names', () => draftFixture(async remote => {
+  await writeFile(join(remote, 'manifest.json'), 'earlier source');
+}, false));
+test('one missing draft asset cannot be accepted', () => draftFixture(async remote => {
+  await rm(join(remote, 'consumer.json'));
+}, false));
+test('surplus remote draft asset cannot be silently ignored', () => draftFixture(async remote => {
+  await writeFile(join(remote, 'extra.json'), 'surplus');
+}, false));

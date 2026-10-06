@@ -231,6 +231,25 @@ jobs:
               --volume "$GITHUB_WORKSPACE:/workspace:ro" --workdir /workspace/source/host "$NODE_IMAGE" \
               node tools/release-asset.mjs tag /workspace/release/manifest.json "$commit"
           }
+          check_draft_assets() (
+            set -euo pipefail
+            local directory artifact
+            directory="$(mktemp -d "$RUNNER_TEMP/host-release-draft.XXXXXX")"
+            trap 'rm -rf "$directory"' EXIT
+            mkdir "$directory/assets"
+            gh release download "$CANDIDATE" --dir "$directory/assets" \
+              --pattern "$ASSET" --pattern manifest.json --pattern SHA256SUMS \
+              --pattern consumer-package-lock.json --pattern consumer.json
+            for artifact in "release/dist/$ASSET" release/manifest.json release/SHA256SUMS \
+              release/consumer-package-lock.json release/consumer.json; do
+              cmp "$artifact" "$directory/assets/$(basename "$artifact")"
+            done
+            printf '%s\n' "$ASSET" manifest.json SHA256SUMS consumer-package-lock.json consumer.json \
+              | LC_ALL=C sort > "$directory/expected-assets"
+            gh release view "$CANDIDATE" --json assets --jq '.assets[].name' \
+              | LC_ALL=C sort > "$directory/actual-assets"
+            cmp "$directory/expected-assets" "$directory/actual-assets"
+          )
           if ! gh release view "$CANDIDATE" --json tagName >/dev/null 2>&1; then
             flags=(--latest=false --draft)
             if [[ "$VERSION" == *-* ]]; then flags+=(--prerelease); fi
@@ -242,8 +261,9 @@ jobs:
           gh release view "$CANDIDATE" --json tagName,isDraft,isImmutable > release/release-state.json
           jq -e --arg tag "$CANDIDATE" '.tagName == $tag' release/release-state.json
           if jq -e '.isDraft == true' release/release-state.json >/dev/null; then
+            check_draft_assets
             check_live_tag > release/tag-after-staging.json
-            printf '%s\n' 'Draft remains unpublished; no public host release has been completed.' \
+            printf '%s\n' 'Draft assets match this run; no public host release has been completed.' \
               'An authenticated owner must verify current immutable-release settings and the exact live tag before publishing.' \
               >> "$GITHUB_STEP_SUMMARY"
             exit 0

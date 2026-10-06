@@ -204,10 +204,18 @@ hardware or cloud qualification. Published artifacts require a fresh independent
 consumer of the admitted profiles. Existing PyPI environments and their required
 reviews remain separate.
 
-The workflow stages new assets as a draft, not a completed host release. After
-the accepted source cohort and current setting are verified, the owner uses stock
+The workflow stages new assets as a draft, not a completed host release. Before
+accepting a new or existing draft, it downloads the five expected assets to a
+fresh directory, compares every byte with this run and requires the exact remote
+asset set. Partial, stale or surplus drafts fail without replacing remote assets.
+After the accepted source cohort and current setting are verified, the owner uses
+stock
 `gh release edit <tag> --draft=false` to publish, rechecking the live peeled tag
 against the built manifest and tag-trigger SHA immediately before that transition.
+Repeat the workflow's `check_draft_assets` and `check_live_tag` functions with
+the same archived run inputs immediately before that transition. An earlier draft
+check does not freeze mutable assets.
+A refused draft requires explicit owner repair before retrying.
 No new approval environment or credential service is introduced.
 
 For an existing published release, the job requires `isImmutable`, verifies the
