@@ -59,19 +59,19 @@ graph LR
     style diagram fill:#ffffff,stroke:#ffffff
 
     subgraph 7 ["Robotics runtime platform"]
-      style 7 fill:#ffffff,stroke:#60a5fa,color:#60a5fa
+      style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
 
-      10("<div style='font-weight: bold'>Evaluation worker</div><div style='font-size: 80%; margin-top:10px'>Published evidence evaluator.</div>")
+      10("<div style='font-weight: bold'>Evaluation CLI</div><div style='font-size: 80%; margin-top:10px'>Published evidence evaluator.</div>")
       style 10 fill:#ecfdf5,stroke:#047857,color:#0f172a
       11("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Candidate native SDK.</div>")
       style 11 fill:#fffbeb,stroke:#b45309,color:#0f172a
       12("<div style='font-weight: bold'>Media worker</div><div style='font-size: 80%; margin-top:10px'>Source: GStreamer frames.</div>")
       style 12 fill:#ecfeff,stroke:#0e7490,color:#0f172a
-      13[("<div style='font-weight: bold'>Retained evidence</div><div style='font-size: 80%; margin-top:10px'>Retained files; separate<br />trust.</div>")]
+      13[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Retained files; separate<br />trust.</div>")]
       style 13 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
-      8("<div style='font-weight: bold'>Composition host</div><div style='font-size: 80%; margin-top:10px'>Source: lifecycle and<br />ownership.</div>")
+      8("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Source: lifecycle and<br />ownership.</div>")
       style 8 fill:#dbeafe,stroke:#2563eb,color:#0f172a
-      9("<div style='font-weight: bold'>Document worker</div><div style='font-size: 80%; margin-top:10px'>Published contracts /<br />writers.</div>")
+      9("<div style='font-weight: bold'>Document CLI</div><div style='font-size: 80%; margin-top:10px'>Published contracts /<br />writers.</div>")
       style 9 fill:#ecfdf5,stroke:#047857,color:#0f172a
     end
 
@@ -121,7 +121,7 @@ graph LR
     6("<div style='font-weight: bold'>Artifact registries</div><div style='font-size: 80%; margin-top:10px'>Immutable packages, images<br />and attestations.</div>")
     style 6 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
     7("<div style='font-weight: bold'>Robotics runtime platform</div><div style='font-size: 80%; margin-top:10px'>Source host, published Python<br />tools; providers per profile.</div>")
-    style 7 fill:#dbeafe,stroke:#60a5fa,color:#0f172a
+    style 7 fill:#dbeafe,stroke:#2563eb,color:#0f172a
 
     1-- "<div>Run and verify workloads</div><div style='font-size: 70%'></div>" -->7
     2-- "<div>Supply config; read verdicts</div><div style='font-size: 70%'></div>" -->7

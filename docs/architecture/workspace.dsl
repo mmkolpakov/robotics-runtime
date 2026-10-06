@@ -18,13 +18,13 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             tags "External"
         }
         platform = softwareSystem "Robotics runtime platform" "Source host, published Python tools; providers per profile." {
-            host = container "Composition host" "Source: lifecycle and ownership." "Node 24 / Cordis / Execa" {
+            host = container "Run host" "Source: lifecycle and ownership." "Node 24 / Cordis / Execa" {
                 tags "Host"
             }
-            documents = container "Document worker" "Published contracts / writers." "Python CLI" {
+            documents = container "Document CLI" "Published contracts / writers." "Python CLI" {
                 tags "Published"
             }
-            evaluation = container "Evaluation worker" "Published evidence evaluator." "Python CLI" {
+            evaluation = container "Evaluation CLI" "Published evidence evaluator." "Python CLI" {
                 tags "Published"
             }
             native = container "Provider worker" "Candidate native SDK." "Native SDK / Python or C++" {
@@ -33,7 +33,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             media = container "Media worker" "Source: GStreamer frames." "Python GI / GStreamer" {
                 tags "Media"
             }
-            evidence = container "Retained evidence" "Retained files; separate trust." "Files / object storage" {
+            evidence = container "Evidence store" "Retained files; separate trust." "Files / object storage" {
                 tags "Database"
             }
         }
@@ -148,7 +148,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             }
             element "Software System" {
                 background "#dbeafe"
-                stroke "#60a5fa"
+                stroke "#2563eb"
             }
             element "Container" {
                 background "#f1f5f9"
