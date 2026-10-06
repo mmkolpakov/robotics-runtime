@@ -102,7 +102,17 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         container platform "ContainerDetail" "Complete consumer, controller, simulator and media interface graph." {
             title "Native and consumer interfaces"
             include *
-            autoLayout tb 60 70
+            autoLayout lr 80 100
+        }
+        container platform "NativeInterfaces" "Selected simulator, media and SDK dependencies; no common frame or control bus." {
+            title "Native interfaces"
+            include platform.host platform.native platform.media simulators mediaSource autopilot
+            autoLayout lr 60 70
+        }
+        container platform "ConsumerInterfaces" "Product ownership, published document/evaluation tools and retained evidence." {
+            title "Consumer interfaces"
+            include integrator product platform.host platform.documents platform.evaluation platform.evidence autopilot
+            autoLayout lr 60 70
         }
         deployment platform "Home" "HomeDeployment" "Source WSL CPU topology; this view is not a complete consumer qualification." {
             title "Source WSL CPU topology"

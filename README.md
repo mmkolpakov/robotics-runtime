@@ -137,8 +137,11 @@ graph LR
 
 </details>
 
-[Complete native and consumer interfaces](docs/architecture/generated/ContainerDetail.svg)
-shows controller, simulator and media relationships.
+[Native interfaces](docs/architecture/generated/NativeInterfaces.svg) and
+[consumer interfaces](docs/architecture/generated/ConsumerInterfaces.svg)
+separate SDK/media paths from document and evaluation dependencies.
+The [complete graph](docs/architecture/generated/ContainerDetail.svg) remains
+available as a reference.
 
 [Diagram sources, sequence and deployment](docs/architecture/README.md).
 
