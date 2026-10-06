@@ -145,17 +145,14 @@ available as a reference.
 
 [Diagram sources, sequence and deployment](docs/architecture/README.md).
 
-The selected host uses upstream Cordis for local plugin loading, service bindings
-and managed effects. Cluster scheduling belongs to the deployment backend.
+The selected host uses upstream [Cordis](https://github.com/cordiverse/cordis)
+for local plugin loading, service bindings and managed effects. Cluster scheduling
+belongs to the deployment backend.
 The host coordinates resources; commands and frames use native SDK and media
 connections. Its implementation and simulator providers are separate from the
 published Python pair.
 
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) is a separate
-application built on [Cordis](https://github.com/cordiverse/cordis). The
-[composability paper](https://arxiv.org/abs/2608.25512) describes guarantees for
-context-mediated components. External simulator behavior, retained payloads and
-physical cleanup still require provider-specific observation and qualification.
+[Composition framework and its limits](docs/architecture.md#composition-framework).
 
 Common document/evaluation code does not require Gazebo, Isaac Sim, Webots or
 ROS. Engine-specific APIs and assets belong to selected infra providers.
