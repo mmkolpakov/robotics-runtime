@@ -9,6 +9,7 @@ import gzip
 import json
 from collections.abc import Iterator
 from copy import deepcopy
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -19,6 +20,8 @@ from referencing import Registry
 from robotics_runtime_contracts import load_mapping
 
 from scripts.bundle_schemas import RESOURCES, ROOT, Schema, read_schemas, registry_for, subschemas
+from scripts.schema_compatibility import history
+from scripts.schema_compatibility.dataset_migration import dataset_migration
 from scripts.schema_compatibility.structure import check_structure
 
 SNAPSHOT = json.loads(
@@ -90,13 +93,36 @@ def comparison_key(schema: Schema, schemas: dict[str, Schema]) -> str:
     return json.dumps(assertions(schema, schemas), sort_keys=True, allow_nan=False)
 
 
-def test_published_resources_and_catalog_remain_compatible() -> None:
-    assert check_structure(
-        BEFORE,
-        AFTER,
-        json.loads(SNAPSHOT["resources"]["catalog.v1.json"]),
-        json.loads((RESOURCES / "catalog.v1.json").read_bytes()),
-    ) == len(BEFORE)
+def test_other_published_resources_remain_compatible_with_exact_dataset_witness(
+    tmp_path: Path,
+) -> None:
+    # The immutable bundler snapshot is an older schema fact, not the current
+    # published baseline. Its dataset break is explicit, never called equivalent.
+    old_raw = SNAPSHOT["resources"]["dataset-manifest.v1.schema.json"].encode()
+    assert sha256(old_raw).hexdigest() == (
+        "64072ea4b9438c8faaf078d1d6efe81c550fb071e371186a2e9c3b683fe43726"
+    )
+    release = history.baseline(ROOT)
+    published = history.extract(ROOT, release, tmp_path / "published")
+    witness = dataset_migration(ROOT, release, published, ROOT / "packages/contracts")
+    assert witness is not None
+    witness.verify()
+    assert (
+        sha256((RESOURCES / "dataset-manifest.v2.schema.json").read_bytes()).hexdigest()
+        == (witness.row["after"]["sha256"])
+    )
+    old_catalog = json.loads(SNAPSHOT["resources"]["catalog.v1.json"])
+    new_catalog = json.loads((RESOURCES / "catalog.v1.json").read_bytes())
+    assert old_catalog["roles"].pop("dataset_manifest") == "dataset-manifest.v1"
+    assert new_catalog["roles"].pop("dataset_manifest") == "dataset-manifest.v2"
+    assert "dataset-manifest.v1.schema.json" not in AFTER
+    before = {
+        name: value for name, value in BEFORE.items() if name != "dataset-manifest.v1.schema.json"
+    }
+    after = {
+        name: value for name, value in AFTER.items() if name != "dataset-manifest.v2.schema.json"
+    }
+    assert check_structure(before, after, old_catalog, new_catalog) == len(BEFORE) - 1
 
 
 def test_cores_use_named_conditionals_and_common_owns_named_primitives() -> None:
@@ -156,6 +182,13 @@ def test_fixture_comparison_is_not_empty_or_single_package() -> None:
 def test_previously_schema_valid_fixture_remains_valid(path: str, value: Schema) -> None:
     name = f"{value['schema_version']}.schema.json"
     old_errors = validation_errors(value, BEFORE[name], registry_for(BEFORE))
+    if name == "dataset-manifest.v1.schema.json":
+        from robotics_runtime_contracts import UnknownSchemaError, validate_document
+
+        assert name not in AFTER
+        with pytest.raises(UnknownSchemaError, match="dataset-manifest.v1"):
+            validate_document(value)
+        return
     new_errors = validation_errors(value, AFTER[name], registry_for(AFTER))
     if not old_errors:
         assert not new_errors, path

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
+from hashlib import sha256
 from typing import Any, NoReturn
 
 from robotics_runtime_contracts import (
@@ -16,11 +17,13 @@ from robotics_runtime_contracts import (
 from robotics_runtime_contracts._qualification_types import QualificationArtifact as _Artifact
 from robotics_runtime_contracts._qualification_types import QualificationError
 from robotics_runtime_contracts._timestamps import parse_timestamp as _timestamp
+from robotics_runtime_contracts.datasets import DatasetValidationError, validate_bag_metadata
 from robotics_runtime_contracts.qualification_policy import (
     channel_observation_status,
     derive_channel_violations,
     hardware_clock_within_policy,
 )
+from robotics_runtime_contracts.serialization import loads_mapping
 
 _ARTIFACT_ROLES = {
     "scenario": "acceptance_scenario",
@@ -402,18 +405,135 @@ def _validate_model_and_dataset(
             )
 
     if dataset is not None:
-        dataset_document = _document(dataset)
-        source = dataset_document["artifact"]
+        _validate_dataset_identity(grouped, scenario, runtimes, _document(dataset))
+
+
+def _validate_dataset_identity(
+    grouped: Mapping[str, Sequence[_Artifact]],
+    scenario: Mapping[str, Any],
+    runtimes: Mapping[str, _Artifact],
+    dataset: Mapping[str, Any],
+) -> None:
+    references = _validate_bag_dataset_identity(grouped, scenario, dataset)
+    if scenario["execution"]["data_source"] == "recording_playback":
+        _validate_played_bag(grouped, runtimes, dataset, references)
+    qos_digest = dataset["time"].get("qos_overrides_sha256")
+    if qos_digest is not None:
+        _require_raw(grouped, qos_digest, "dataset QoS overrides")
+
+
+def _validate_bag_dataset_identity(
+    grouped: Mapping[str, Sequence[_Artifact]],
+    scenario: Mapping[str, Any],
+    dataset: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    metadata = dataset["bag"]["metadata"]
+    metadata_artifact = _require_raw(
+        grouped,
+        metadata["sha256"],
+        "dataset native metadata",
+        kinds=("other_evidence",),
+        size_bytes=metadata["size_bytes"],
+    )
+    if metadata_artifact.native_metadata_bytes is None:
+        _fail("dataset native metadata has no captured byte snapshot")
+    metadata_bytes = metadata_artifact.native_metadata_bytes
+    _require_equal("dataset metadata snapshot size", metadata["size_bytes"], len(metadata_bytes))
+    _require_equal(
+        "dataset metadata snapshot digest", metadata["sha256"], sha256(metadata_bytes).hexdigest()
+    )
+    native_metadata = loads_mapping(metadata_bytes, source_name="dataset native metadata")
+    summaries = []
+    references = [metadata]
+    policy = scenario["evidence_policy"]
+    for member in dataset["bag"]["members"]:
+        recording = member["recording"]
         _require_raw(
             grouped,
-            source["sha256"],
-            "dataset recording",
+            recording["sha256"],
+            "dataset bag member",
             kinds=("recording",),
-            size_bytes=source["size_bytes"],
+            size_bytes=recording["size_bytes"],
         )
-        qos_digest = dataset_document["time"].get("qos_overrides_sha256")
-        if qos_digest is not None:
-            _require_raw(grouped, qos_digest, "dataset QoS overrides")
+        reference = member["recording_summary"]
+        summary = _artifact_by_digest(
+            grouped,
+            "recording_summary",
+            reference["sha256"],
+            "dataset member summary",
+        )
+        _require_equal("dataset summary size", reference["size_bytes"], summary.size_bytes)
+        document = _document(summary)
+        stats = document["statistics"]
+        if recording["size_bytes"] > policy["max_segment_size_bytes"]:
+            _fail("dataset member exceeds the declared segment size policy")
+        if stats["message_end_time_ns"] - stats["message_start_time_ns"] > (
+            policy["max_segment_duration_sec"] * 1_000_000_000
+        ):
+            _fail("dataset member exceeds the declared segment duration policy")
+        summaries.append(document)
+        references.extend((recording, reference))
+    try:
+        validate_bag_metadata(
+            dataset,
+            native_metadata,
+            summaries,
+            expected_run_id=dataset["provenance"]["capture_run_id"],
+        )
+    except DatasetValidationError as error:
+        _fail(str(error), error_id=error.error_id)
+    for field in ("scenario_sha256", "runtime_manifest_sha256"):
+        _require_raw(
+            grouped,
+            dataset["provenance"][field],
+            f"dataset capture {field}",
+            kinds=("other_evidence",),
+        )
+    return references
+
+
+def _played_bag_matches(
+    grouped: Mapping[str, Sequence[_Artifact]],
+    binding: Mapping[str, Any],
+    dataset: Mapping[str, Any],
+    references: Sequence[Mapping[str, Any]],
+) -> bool:
+    if binding["provider"]["kind"] != "recording_source":
+        return False
+    result = _document(
+        _artifact_by_digest(
+            grouped,
+            "provider_conformance",
+            binding["conformance_result_sha256"],
+            "dataset playback provider",
+        )
+    )
+    played = {(ref["sha256"], ref["size_bytes"]) for ref in result["evidence"]}
+    required = {(ref["sha256"], ref["size_bytes"]) for ref in references}
+    played_recordings = {
+        (raw.sha256, raw.size_bytes)
+        for raw in grouped.get("recording", ())
+        if (raw.sha256, raw.size_bytes) in played
+    }
+    members = {
+        (member["recording"]["sha256"], member["recording"]["size_bytes"])
+        for member in dataset["bag"]["members"]
+    }
+    return required <= played and played_recordings == members
+
+
+def _validate_played_bag(
+    grouped: Mapping[str, Sequence[_Artifact]],
+    runtimes: Mapping[str, _Artifact],
+    dataset: Mapping[str, Any],
+    references: Sequence[Mapping[str, Any]],
+) -> None:
+    for domain_id, runtime in runtimes.items():
+        if not any(
+            _played_bag_matches(grouped, binding, dataset, references)
+            for binding in _document(runtime)["provider_bindings"]
+        ):
+            _fail(f"dataset played bag bytes for {domain_id} do not match its provider")
 
 
 def _validate_provider_bindings(
@@ -1158,6 +1278,24 @@ def _validate_transport(
             _fail(f"transport trace does not match evidence index for domain {domain_id}")
 
 
+def _add_dataset_summary_references(
+    grouped: Mapping[str, Sequence[_Artifact]],
+    referenced_summaries: dict[str, tuple[str, int]],
+) -> None:
+    bag_datasets = grouped.get("dataset_manifest", ())
+    if bag_datasets:
+        scenario = _document(_one(grouped, "scenario", "scenario.json"))
+        for dataset in bag_datasets:
+            if dataset.sha256 != scenario.get("dataset_manifest_sha256"):
+                continue
+            for member in _document(dataset)["bag"]["members"]:
+                summary = member["recording_summary"]
+                reference = (member["recording"]["sha256"], summary["size_bytes"])
+                previous = referenced_summaries.setdefault(summary["sha256"], reference)
+                if previous != reference:
+                    _fail("one recording summary cannot describe multiple dataset sources")
+
+
 def _validate_evidence(
     grouped: Mapping[str, Sequence[_Artifact]],
     evidence_indexes: Mapping[str, _Artifact],
@@ -1183,6 +1321,8 @@ def _validate_evidence(
                 previous = referenced_summaries.setdefault(summary["sha256"], reference)
                 if previous != reference:
                     _fail("one recording summary cannot describe multiple evidence sources")
+
+    _add_dataset_summary_references(grouped, referenced_summaries)
 
     summaries_by_digest = {artifact.sha256: artifact for artifact in recording_summaries.values()}
     if set(referenced_summaries) != set(summaries_by_digest):

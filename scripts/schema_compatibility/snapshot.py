@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from copy import deepcopy
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from scripts.schema_compatibility import history
@@ -148,6 +150,69 @@ def historical_snapshot() -> dict[str, Any]:
     }
 
 
+def _capture_release_semantics(
+    root: Path,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any] | None]:
+    from scripts.schema_compatibility.dataset_migration import dataset_migration
+    from scripts.schema_compatibility.semantic import verify_response
+
+    original_contexts = None
+    with TemporaryDirectory(prefix="release-dataset-witness-") as temporary:
+        published = history.extract(root, history.baseline(root), Path(temporary) / "published")
+        transition = dataset_migration(
+            root, history.baseline(root), published, root / "packages/contracts"
+        )
+        if transition is None:
+            snapshot = capture(root, root / "packages/contracts/src")
+            historical = historical_snapshot()
+            response = execute(root / "packages/contracts/src", historical["request"])
+            if token(response["documents"]) != token(historical["request"]["documents"]):
+                raise ReviewRequired("Release changed historical JSON values")
+            if token(response["outcomes"]) != token(historical["expected"]):
+                raise ReviewRequired("Release changed historical outcomes")
+        else:
+            original = transition.historical_source(root, Path(temporary) / "original")
+            snapshot = capture(original.parents[1], original / "src")
+            historical = historical_snapshot()
+            original_contexts = {
+                "published": {
+                    "tag": transition.row["before"]["tag"],
+                    "commit": transition.row["before"]["commit"],
+                    "request": snapshot["request"],
+                    "expected": snapshot["expected"],
+                },
+                "historical": deepcopy(historical),
+                "dataset_migration": transition.row,
+            }
+            current = execute(root / "packages/contracts/src", snapshot["request"])
+            verify_response(
+                snapshot["request"],
+                snapshot["expected"],
+                current,
+                dataset_transition=transition,
+            )
+            snapshot["expected"] = current["outcomes"]
+            for entry in snapshot["inventory"]["entries"]:
+                if "document" in entry:
+                    entry["outcome"] = current["outcomes"][entry["document"]]
+            legacy = legacy_corpus()
+            legacy_response = execute(root / "packages/contracts/src", legacy["request"])
+            verify_response(
+                legacy["request"],
+                legacy["expected"],
+                legacy_response,
+                dataset_transition=transition,
+            )
+            historical["expected"] = {
+                "historical/" + name: value for name, value in legacy_response["outcomes"].items()
+            }
+            snapshot["inventory"]["raw_fixture_source"] = {
+                "tag": transition.row["before"]["tag"],
+                "commit": transition.row["before"]["commit"],
+            }
+    return snapshot, historical, original_contexts
+
+
 def write_release(root: Path, plan: dict[str, Any], output: Path) -> None:
     commit = history.git(root, "rev-parse", "HEAD").decode().strip()
     tree = history.git(root, "rev-parse", "HEAD^{tree}").decode().strip()
@@ -170,14 +235,8 @@ def write_release(root: Path, plan: dict[str, Any], output: Path) -> None:
         raise ReviewRequired("Release corpus source must be clean")
     if output.exists():
         raise FileExistsError(output)
-    snapshot = capture(root, root / "packages/contracts/src")
+    snapshot, historical, original_contexts = _capture_release_semantics(root)
     snapshot["inventory"].update(tag=plan["candidate"], commit=plan["commit"])
-    historical = historical_snapshot()
-    response = execute(root / "packages/contracts/src", historical["request"])
-    if token(response["documents"]) != token(historical["request"]["documents"]):
-        raise ReviewRequired("Release changed historical JSON values")
-    if token(response["outcomes"]) != token(historical["expected"]):
-        raise ReviewRequired("Release changed historical outcomes")
     snapshot["inventory"]["historical"] = historical["inventory"]
     documents = {**snapshot["request"]["documents"], **historical["request"]["documents"]}
     contexts = {
@@ -196,6 +255,8 @@ def write_release(root: Path, plan: dict[str, Any], output: Path) -> None:
         "semantic-contexts.json": contexts,
         "raw-syntax.json": raw,
     }
+    if original_contexts is not None:
+        contents["semantic-old-tool-contexts.json"] = original_contexts
     for name, value in contents.items():
         (output / name).write_text(
             json.dumps(value, indent=2, allow_nan=False) + "\n", encoding="utf-8"

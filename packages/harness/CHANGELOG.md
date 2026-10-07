@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.20.0
+
+Requires contracts 0.19 (`>=0.19,<0.20`), with release prerequisite
+[contracts-v0.19.0](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.19.0).
+
+- Load the canonical `dataset-manifest.v2` bag model for one or more finalized
+  MCAP members. Reject v1 dataset documents in the current execution bundle;
+  historical v1 inputs remain associated with the previously published package
+  pair.
+- Validate the captured dataset document against its recorded digest before
+  execution. Preserve immutable metadata and member declarations when the source
+  document changes after loading.
+
 ## 0.19.2
 
 Requires contracts 0.18 (`>=0.18,<0.19`), with release prerequisite

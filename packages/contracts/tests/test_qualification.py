@@ -30,10 +30,11 @@ from tests.support import qualification_specifications
 
 
 def artifacts(case: str) -> list[QualificationArtifact]:
-    return [
-        load_qualification_artifact(specification, {})
-        for specification in qualification_specifications(case)
-    ]
+    from robotics_runtime_contracts.qualification import inspect_qualification_artifacts
+
+    report = inspect_qualification_artifacts(qualification_specifications(case))
+    report.raise_for_errors()
+    return list(report.artifacts)
 
 
 def artifact(items: list[QualificationArtifact], subject_name: str) -> QualificationArtifact:
@@ -959,7 +960,7 @@ def test_qualification_artifact_kinds_have_one_schema_catalog() -> None:
         ("transport", "evidence/control.mcap", "indexed size"),
         ("transport", "config/bridge.json", "bridge configuration"),
         ("inference", "models/detector.onnx", "model source artifact"),
-        ("inference", "datasets/baseline.mcap", "dataset recording"),
+        ("inference", "datasets/baseline.mcap", "dataset bag member"),
         ("physical", "policy/trust.json", "scenario trust policy"),
         ("physical", "authorization/preflight.json", "interlock"),
         ("physical", "evidence/hardware-clock.json", "indexed size"),

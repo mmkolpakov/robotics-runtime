@@ -1,34 +1,75 @@
----
-schema_version: dataset-manifest.v1
-dataset_id: org.example.invalid
-version: 1.0.0
-artifact:
-  uri: s3://robotics-datasets/unversioned.mcap
-  size_bytes: 1
-  sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-  media_type: application/mcap
-  storage_id: mcap
-channels:
-  - topic: /camera/image
-    type: sensor_msgs/msg/Image
-    type_hash: RIHS01_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-    qos_profile: sensor_data
-time:
-  basis: ros_time
-  start_ns: 0
-  end_ns: 1
-  clock_jumps: []
-  qos_overrides_sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-source: simulation
-provenance:
-  producer: test
-  captured_at: '2026-07-11T10:00:00Z'
-  scenario_sha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-  runtime_manifest_sha256: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
-  source_revisions:
-    world: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-governance:
-  license: MIT
-  data_classification: public
-  retention_class: test-7d
-topic_remaps: []
+{
+  "bag": {
+    "members": [
+      {
+        "recording": {
+          "sha256": "not-a-digest",
+          "size_bytes": 991,
+          "uri": "file:///dataset/dataset.mcap"
+        },
+        "recording_summary": {
+          "sha256": "fc9793aef4488a07c4cc5af14caeb2ee11687027a0b389869132207db934b644",
+          "size_bytes": 747,
+          "uri": "file:///dataset/dataset-recording-summary.json"
+        },
+        "relative_path": "dataset.mcap",
+        "segment_index": 0
+      }
+    ],
+    "message_count": 4,
+    "metadata": {
+      "sha256": "029f9661332a2e4b4d2903c4ba3382182340b4a037e59ce9877838f241209e37",
+      "size_bytes": 1683,
+      "uri": "file:///dataset/dataset-metadata.yaml"
+    },
+    "storage_id": "mcap"
+  },
+  "channels": [
+    {
+      "message_count": 2,
+      "qos_profile": "sensor_data",
+      "topic": "/camera/image",
+      "type": "sensor_msgs/msg/Image",
+      "type_hash": "RIHS01_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "message_count": 2,
+      "qos_profile": "sensor_data",
+      "topic": "/camera/camera_info",
+      "type": "sensor_msgs/msg/CameraInfo",
+      "type_hash": "RIHS01_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "dataset_id": "org.example.camera-baseline",
+  "governance": {
+    "data_classification": "internal",
+    "license": "LicenseRef-Internal-Robotics",
+    "retention_class": "benchmark-365d"
+  },
+  "provenance": {
+    "capture_run_id": "fixture-source",
+    "captured_at": "2026-07-11T10:00:00Z",
+    "producer": "capture-pipeline",
+    "runtime_manifest_sha256": "6f796b2fd0e933825201f10b8ef3adc32410bd56bc4619590a2bea627b366e43",
+    "scenario_sha256": "9ed90d21bf272c4082211cbe42dc39fe0a7178b1a59d8b1a43bf93dc54acca3f",
+    "source_revisions": {
+      "sensor-stack": "ffffffffffffffffffffffffffffffffffffffff"
+    }
+  },
+  "schema_version": "dataset-manifest.v2",
+  "source": "real_robot",
+  "time": {
+    "basis": "ros_time",
+    "clock_jumps": [],
+    "end_ns": 11000000000,
+    "qos_overrides_sha256": "6c05dab8e032bc5227a51622078080dc8a2552c6b5e4462c9335bbd23e6b3262",
+    "start_ns": 1000000000
+  },
+  "topic_remaps": [
+    {
+      "from": "/camera/image",
+      "to": "/input/image"
+    }
+  ],
+  "version": "1.0.0"
+}

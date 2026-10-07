@@ -42,26 +42,29 @@ version.
 | Component | Baseline |
 | --- | --- |
 | Python | 3.12 through 3.14 |
-| Contracts | `robotics-runtime-contracts>=0.18,<0.19` |
+| Contracts | `robotics-runtime-contracts>=0.19,<0.20` |
 | ROS observation | ROS 2 Jazzy packages in the observer environment |
 | Metrics | OTLP JSON Lines exported by OpenTelemetry Collector |
 
-All public contract families currently use one canonical `v1`. Published
-schemas are checked for compatible changes against the release baseline.
+Each role has one canonical schema. Datasets use v2 for one complete bag with
+one or multiple MCAP members; other existing roles keep their v1 schemas.
+The dataset transition is an explicit pre-1.0 breaking release. Checks for
+unrelated published schemas and historical byte identities remain strict.
 
 ## Install
 
 The published pair is
-[harness 0.19.1](https://pypi.org/project/robotics-acceptance-harness/0.19.1/) with
-[contracts 0.18.2](https://pypi.org/project/robotics-runtime-contracts/0.18.2/):
+[harness 0.19.2](https://pypi.org/project/robotics-acceptance-harness/0.19.2/) with
+[contracts 0.18.3](https://pypi.org/project/robotics-runtime-contracts/0.18.3/):
 
 ```bash
 uv venv
-uv pip install robotics-acceptance-harness==0.19.1 robotics-runtime-contracts==0.18.2
+uv pip install robotics-acceptance-harness==0.19.2 robotics-runtime-contracts==0.18.3
 ```
 
-Development uses both packages from the shared workspace and the dependency
-graph in the root `uv.lock`:
+This source workspace targets harness 0.20.0 and contracts 0.19.0 with the
+canonical dataset format. It is separate from the older published pair.
+Development uses both packages and the dependency graph in the root `uv.lock`:
 
 ```bash
 git clone https://github.com/mmkolpakov/robotics-runtime.git
@@ -74,11 +77,10 @@ cd packages/harness
 Release consumers should install the published wheel together with the locked
 contracts wheel and verify release provenance as described in
 [`docs/supply-chain.md`](docs/supply-chain.md).
-Both published packages come from workspace source
-`dc02c62897372514537cf241f06dc71b9f960c44`; later source changes are separate
-from these immutable archives. Independent package installs and archive checks
-establish this pair. Infra R9's B2 stock profile uses 0.18.1/0.19.0; R10 uses
-the current pair, but its released B3 run failed and is not accepted. See
+Published archives and earlier infra R9/R10 profile results retain their original
+versions and source identities. The current workspace's new dataset format does
+not retroactively qualify those images. R10's released B3 run failed and is not
+accepted. See
 [compatibility](docs/compatibility.md) for the evidence boundaries. They do
 not qualify an infra image, accelerator backend, arbitrary product evaluator
 or physical target; those require their own execution evidence.
@@ -314,10 +316,16 @@ exceedance or a clock stall proved by recorded endpoints remains a failure.
 | Runtime facts | `runtime-manifest.v1` |
 | Run context | `acceptance-run.v1` |
 | Evidence and provenance | `evidence-index.v1`, `artifact-receipt.v1`, `artifact-verification.v1` |
-| Model and dataset provenance | `model-artifact-manifest.v1`, `dataset-manifest.v1` |
+| Model and dataset provenance | `model-artifact-manifest.v1`, `dataset-manifest.v2` |
 | Physical authorization | `execution-permit.v1`, `execution-verification.v1` |
 | Transport inputs | `transport-channel.v1`, `clock-relation.v1`, `causal-chain.v1` |
 | Outputs | `acceptance-result.v1`, `acceptance-aggregate.v1`, `campaign-summary.v1` |
+
+Dataset manifests use one complete rosbag2 MCAP set for one or multiple segments.
+Native metadata and every recording/summary have exact retained byte references;
+qualification checks the entire declared set. The current SDK uses v2 only.
+Historical v1 artifacts retain their original version and are checked with the
+matching archived package, rather than converted inside the current evaluator.
 
 Scenario extensions are explicit and digest-pinned. Pass the same
 `--extension-schema URI=PATH` mapping to every command that reads the scenario.

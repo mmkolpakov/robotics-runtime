@@ -54,7 +54,6 @@ FIXTURES = {
 }
 LEGACY_ROLES = (
     "acceptance_result",
-    "dataset_manifest",
     "evidence_index",
     "execution_permit",
     "execution_verification",

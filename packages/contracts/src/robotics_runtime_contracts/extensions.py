@@ -287,7 +287,6 @@ def _validate_payload(
 _LEGACY_UNPINNED_SCHEMAS = frozenset(
     {
         "acceptance-result.v1",
-        "dataset-manifest.v1",
         "evidence-index.v1",
         "execution-permit.v1",
         "execution-verification.v1",
@@ -304,7 +303,7 @@ def validate_extensions(
 ) -> None:
     """Validate schema-checked public document extensions entirely offline.
 
-    Seven v1 roles historically accepted unpinned payloads. Absence of the new
+    Older v1 roles historically accepted unpinned payloads. Absence of the new
     extension_schemas field preserves that behavior; its presence opts into
     digest verification and exact namespace matching. New roles are strict.
     The in-toto statement carries extensions inside its predicate.

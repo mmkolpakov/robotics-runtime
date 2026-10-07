@@ -24,6 +24,11 @@ from robotics_runtime_contracts.catalog import (
     role_schemas,
     schema_for_role,
 )
+from robotics_runtime_contracts.datasets import (
+    DatasetValidationError,
+    validate_bag_metadata,
+    validate_bag_summaries,
+)
 from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.extensions import (
     ExtensionValidationError,
@@ -252,6 +257,9 @@ __all__ = [
     "ClockEvidenceValidationError",
     "ContractValidationError",
     "ContractError",
+    "DatasetValidationError",
+    "validate_bag_metadata",
+    "validate_bag_summaries",
     "ArtifactReceiptValidationError",
     "DocumentParseError",
     "ExtensionValidationError",

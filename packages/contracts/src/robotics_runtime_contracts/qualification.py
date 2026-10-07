@@ -29,9 +29,15 @@ RAW_ARTIFACT_KINDS = _RAW_ARTIFACT_KINDS
 def load_qualification_artifact(
     specification: str,
     extension_schemas: Mapping[str, bytes] | None = None,
+    *,
+    native_metadata_references: Mapping[str, int] | None = None,
 ) -> QualificationArtifact:
-    """Load and validate one KIND:SUBJECT=PATH, hashing the exact bytes read once."""
-    return load_artifact(specification, extension_schemas)
+    """Load one artifact; v2 metadata capture needs its explicit SHA/size reference."""
+    return load_artifact(
+        specification,
+        extension_schemas,
+        native_metadata_references=native_metadata_references,
+    )
 
 
 def inspect_qualification_documents(
@@ -70,28 +76,50 @@ def validate_qualification_documents(
     return report.run_id, report.generated_at
 
 
+def _load_diagnostic(error: ContractError) -> QualificationDiagnostic:
+    return QualificationDiagnostic(
+        error.error_id,
+        str(error),
+        "artifact.load",
+        json_path=error.json_path,
+    )
+
+
 def inspect_qualification_artifacts(
     specifications: Sequence[str],
     extension_schemas: Mapping[str, bytes] | None = None,
 ) -> QualificationReport:
     """Read every supplied file once, then inspect links if all files are valid."""
-    artifacts: list[QualificationArtifact] = []
+    loaded: dict[int, QualificationArtifact] = {}
     diagnostics: list[QualificationDiagnostic] = []
-    for specification in specifications:
+    references: dict[str, int] = {}
+    # Capture dataset controls first; raw MCAP remains streamed. All returned
+    # descriptors retain caller order, and each supplied file is opened once.
+    for index, specification in enumerate(specifications):
+        if specification.partition(":")[0] != "dataset_manifest":
+            continue
         try:
-            artifacts.append(load_artifact(specification, extension_schemas))
+            dataset = load_artifact(specification, extension_schemas)
+            loaded[index] = dataset
+            assert dataset.document is not None
+            reference = dataset.document["bag"]["metadata"]
+            references[reference["sha256"]] = reference["size_bytes"]
         except ContractError as error:
-            # A malformed specification has no trustworthy subject name.
-            diagnostics.append(
-                QualificationDiagnostic(
-                    error.error_id,
-                    str(error),
-                    "artifact.load",
-                    json_path=error.json_path,
-                )
+            diagnostics.append(_load_diagnostic(error))
+    for index, specification in enumerate(specifications):
+        if specification.partition(":")[0] == "dataset_manifest":
+            continue
+        try:
+            loaded[index] = load_artifact(
+                specification,
+                extension_schemas,
+                native_metadata_references=references,
             )
+        except ContractError as error:
+            diagnostics.append(_load_diagnostic(error))
+    artifacts = tuple(loaded[index] for index in sorted(loaded))
     if diagnostics:
-        return QualificationReport(tuple(artifacts), tuple(diagnostics), blocked_checks=("links",))
+        return QualificationReport(artifacts, tuple(diagnostics), blocked_checks=("links",))
     return inspect_links(artifacts)
 
 

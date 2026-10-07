@@ -16,6 +16,7 @@ class QualificationArtifact:
     sha256: str
     size_bytes: int
     document: Mapping[str, Any] | None
+    native_metadata_bytes: bytes | None = None
 
 
 @dataclass(frozen=True, slots=True)

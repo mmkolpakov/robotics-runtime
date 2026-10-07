@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.19.0
+
+The current dataset contract moves to `dataset-manifest.v2`. This is a breaking
+pre-1.0 change: current readers and writers use one bag model for one or more
+finalized MCAP members and reject v1 dataset documents. Previously published
+packages and their v1 schema identities remain unchanged.
+
+- Bind the retained native `metadata.yaml`, ordered MCAP members and each typed
+  recording summary through exact artifact digests and byte sizes. Reject missing,
+  extra, duplicate or unsafe member references.
+- Validate aggregate message and channel counts and the full bag interval against
+  per-member summaries and native metadata. Preserve recording size and duration
+  limits for each segment.
+- Bind capture run, timestamp basis, governance, native type hashes and declared
+  custom QoS metadata to the retained source evidence. Require registered,
+  digest-pinned extensions for the v2 dataset role.
+- Retain native metadata bytes during qualification loading and recheck their
+  digest before validation. File-backed qualification verifies the complete set
+  of recordings selected for playback.
+- Record the dataset-only schema transition explicitly in the published-schema
+  compatibility gate; keep all other document roles under the existing checks.
+
 ## 0.18.3
 
 - Document the frozen semantic compatibility corpus and its source-bound release

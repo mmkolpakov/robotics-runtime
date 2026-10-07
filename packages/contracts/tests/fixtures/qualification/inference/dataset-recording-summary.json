@@ -1,0 +1,31 @@
+{
+  "channels": [
+    {
+      "message_count": 2,
+      "message_encoding": "cdr",
+      "schema_name": "sensor_msgs/msg/CameraInfo",
+      "topic": "/camera/camera_info"
+    },
+    {
+      "message_count": 2,
+      "message_encoding": "cdr",
+      "schema_name": "sensor_msgs/msg/Image",
+      "topic": "/camera/image"
+    }
+  ],
+  "compressions": [
+    "zstd"
+  ],
+  "schema_version": "recording-summary.v1",
+  "source_sha256": "52672e7ec8654e0f5868052050ffc32d39b11cfcf8ccdce6eb6a4ff41f6fb227",
+  "statistics": {
+    "attachment_count": 0,
+    "channel_count": 2,
+    "chunk_count": 1,
+    "message_count": 4,
+    "message_end_time_ns": 11000000000,
+    "message_start_time_ns": 1000000000,
+    "metadata_count": 0,
+    "schema_count": 2
+  }
+}
