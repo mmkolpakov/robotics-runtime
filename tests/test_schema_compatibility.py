@@ -703,15 +703,21 @@ def test_retained_raw_fixture_change_fails_before_semantic_probe(
         snapshot.capture(root, published / "src")
 
 
-def test_historical_corpus_keeps_all_inventory_bytes_and_json_values(tmp_path: Path) -> None:
+def test_historical_corpus_keeps_all_inventory_bytes_and_json_values(
+    tmp_path: Path, dataset_transition_candidate
+) -> None:
     release = history.Baseline(history.LEGACY_TAG, history.LEGACY_COMMIT, "")
     published = history.extract(ROOT, release, tmp_path / "historical")
     captured = snapshot.capture_legacy(published, published / "src")
     corpus = snapshot.legacy_corpus()
     assert len(corpus["entries"]) == 105
     assert len(captured["request"]["cases"]) == 67
+    _, candidate, witness = dataset_transition_candidate
     semantic.compare_request(
-        ROOT / "packages/contracts/src", captured["request"], captured["expected"]
+        candidate / "src",
+        captured["request"],
+        captured["expected"],
+        dataset_transition=witness,
     )
 
 
@@ -783,16 +789,254 @@ def test_release_corpus_retains_raw_identity_and_source_plan(tmp_path: Path) -> 
 
 @pytest.mark.parametrize("changed", ["commit", "repository_tree", "other_package_tree"])
 def test_release_corpus_rejects_a_mismatched_source_plan(tmp_path: Path, changed: str) -> None:
+    root = tmp_path / "source"
+    history.git(ROOT, "clone", "--quiet", "--no-hardlinks", str(ROOT), str(root))
     plan = asdict(
         create_plan(
-            ROOT, f"contracts-v{project(ROOT, 'contracts')['version']}", event="workflow_dispatch"
+            root, f"contracts-v{project(root, 'contracts')['version']}", event="workflow_dispatch"
         )
     )
     if changed == "commit":
         plan["commit"] = "0" * 40
     else:
         ref = "HEAD^{tree}" if changed == "repository_tree" else "HEAD:packages/harness"
-        plan["tree"] = history.git(ROOT, "rev-parse", ref).decode().strip()
+        plan["tree"] = history.git(root, "rev-parse", ref).decode().strip()
     with pytest.raises(ReviewRequired, match="source differs from the validated plan"):
-        snapshot.write_release(ROOT, plan, tmp_path / "mismatched")
+        snapshot.write_release(root, plan, tmp_path / "mismatched")
     assert not (tmp_path / "mismatched").exists()
+
+
+@pytest.fixture
+def dataset_transition_candidate(published: Path, tmp_path: Path):
+    import tomllib
+
+    from scripts.schema_compatibility.dataset_migration import dataset_migration
+
+    root = tmp_path / "dataset-train"
+    history.git(ROOT, "clone", "--quiet", "--no-hardlinks", str(ROOT), str(root))
+    candidate = root / "packages/contracts"
+    shutil.rmtree(candidate / "src")
+    shutil.copytree(ROOT / "packages/contracts/src", candidate / "src")
+    raw = (ROOT / "packages/contracts/pyproject.toml").read_text()
+    current = tomllib.loads(raw)["project"]["version"]
+    (candidate / "pyproject.toml").write_text(
+        raw.replace(f'version = "{current}"', 'version = "0.19.0"', 1)
+    )
+    harness = root / "packages/harness"
+    harness.mkdir(parents=True, exist_ok=True)
+    (harness / "pyproject.toml").write_text('[project]\nversion = "0.20.0"\n')
+    witness = dataset_migration(root, history.baseline(ROOT), published, candidate)
+    assert witness is not None
+    return root, candidate, witness
+
+
+def dataset_structure(published: Path, candidate: Path, witness=None) -> int:
+    old = published / "src/robotics_runtime_contracts/schemas"
+    new = candidate / "src/robotics_runtime_contracts/schemas"
+    return check_structure(
+        read_schemas(old),
+        read_schemas(new),
+        json.loads((old / "catalog.v1.json").read_bytes()),
+        json.loads((new / "catalog.v1.json").read_bytes()),
+        dataset_transition=witness,
+    )
+
+
+def test_exact_dataset_migration_requires_the_explicit_raw_witness(
+    published: Path, dataset_transition_candidate
+) -> None:
+    from dataclasses import replace
+
+    _, candidate, witness = dataset_transition_candidate
+    with pytest.raises(ReviewRequired, match="role"):
+        dataset_structure(published, candidate)
+    count = dataset_structure(published, candidate, witness)
+    assert count == len(read_schemas(published / "src/robotics_runtime_contracts/schemas")) - 1
+    with pytest.raises(ReviewRequired, match="SHA256"):
+        dataset_structure(published, candidate, replace(witness, after_raw=b"changed"))
+
+
+@pytest.mark.parametrize("mutation", ["another-role", "another-id", "dataset-body"])
+def test_dataset_witness_cannot_bypass_other_role_or_resource_changes(
+    published: Path, dataset_transition_candidate, mutation: str
+) -> None:
+    _, candidate, witness = dataset_transition_candidate
+    resources = candidate / "src/robotics_runtime_contracts/schemas"
+    if mutation == "another-role":
+        path = resources / "catalog.v1.json"
+        body = json.loads(path.read_bytes())
+        body["roles"]["acceptance_result"] = body["roles"]["acceptance_run"]
+    elif mutation == "another-id":
+        path = resources / "acceptance-result.v1.schema.json"
+        body = json.loads(path.read_bytes())
+        body["$id"] = "urn:changed"
+    else:
+        path = resources / "dataset-manifest.v2.schema.json"
+        body = json.loads(path.read_bytes())
+        body["description"] = "unreviewed dataset schema bytes"
+    path.write_text(json.dumps(body))
+    with pytest.raises(ReviewRequired):
+        dataset_structure(published, candidate, witness)
+
+
+def test_dataset_migration_refuses_wrong_package_train(
+    published: Path, dataset_transition_candidate
+):
+    from scripts.schema_compatibility.dataset_migration import dataset_migration
+
+    root, candidate, _ = dataset_transition_candidate
+    (root / "packages/harness/pyproject.toml").write_text('[project]\nversion = "0.19.2"\n')
+    with pytest.raises(ReviewRequired, match="train"):
+        dataset_migration(root, history.baseline(ROOT), published, candidate)
+
+
+def test_dataset_migration_replays_all_native_cases_without_changing_historical_facts(
+    published: Path, dataset_transition_candidate
+) -> None:
+    _, candidate, witness = dataset_transition_candidate
+    before = {path: path.read_bytes() for path in semantic.FIXTURES.rglob("*") if path.is_file()}
+    assert semantic.check_semantics(published, candidate, dataset_transition=witness) == 375
+    assert all(path.read_bytes() == raw for path, raw in before.items())
+
+
+def test_dataset_migration_still_catches_unrelated_semantic_mutation(
+    published: Path, dataset_transition_candidate
+) -> None:
+    _, candidate, witness = dataset_transition_candidate
+    path = candidate / "src/robotics_runtime_contracts/semantics.py"
+    source = path.read_text()
+    declaration = "def validate_semantics(schema_name: str, document: Mapping[str, Any]) -> None:\n"
+    assert source.count(declaration) == 1
+    mutation = (
+        '    if schema_name == "campaign-summary.v1":\n'
+        '        raise ValueError("unrelated-mutation")\n'
+    )
+    path.write_text(source.replace(declaration, declaration + mutation))
+    with pytest.raises(ReviewRequired, match="unrelated-mutation"):
+        semantic.check_semantics(published, candidate, dataset_transition=witness)
+
+
+def test_dataset_refusal_hashes_do_not_bless_another_rejection(
+    published: Path, dataset_transition_candidate, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, candidate, witness = dataset_transition_candidate
+    captured = snapshot.capture(published.parents[1], published / "src")
+    response = execute(candidate / "src", captured["request"])
+    name = next(iter(witness.row["semantic"]["published"]["refusals"]))
+    response["outcomes"][name]["message"] = "unrelated failure"
+    monkeypatch.setattr(semantic, "probe", lambda *_args: response)
+    with pytest.raises(ReviewRequired, match="clean refusal changed"):
+        semantic.compare_request(
+            candidate / "src", captured["request"], captured["expected"], dataset_transition=witness
+        )
+
+
+def test_dataset_migration_missing_or_bad_row_fails_closed(
+    published: Path, dataset_transition_candidate, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from scripts.schema_compatibility import dataset_migration as migration
+
+    root, candidate, _ = dataset_transition_candidate
+    missing = tmp_path / "missing/dataset_migration.py"
+    monkeypatch.setattr(migration, "__file__", str(missing))
+    with pytest.raises(FileNotFoundError):
+        migration.dataset_migration(root, history.baseline(ROOT), published, candidate)
+    missing.parent.mkdir()
+    row = json.loads((ROOT / "scripts/schema_compatibility/dataset-v2-migration.json").read_bytes())
+    row["role"] = "acceptance_result"
+    missing.with_name("dataset-v2-migration.json").write_text(json.dumps(row))
+    with pytest.raises(ReviewRequired, match="Unsupported dataset migration"):
+        migration.dataset_migration(root, history.baseline(ROOT), published, candidate)
+
+
+def test_dataset_refusal_labels_cannot_disagree_with_the_pinned_native_outcome(
+    published: Path, dataset_transition_candidate
+) -> None:
+    from dataclasses import replace
+
+    _, candidate, witness = dataset_transition_candidate
+    captured = snapshot.capture(published.parents[1], published / "src")
+    row = deepcopy(witness.row)
+    name = next(iter(row["semantic"]["published"]["refusals"]))
+    row["semantic"]["published"]["refusals"][name]["refusal"]["message"] = "misleading label"
+    changed = replace(witness, row=row)
+    with pytest.raises(ReviewRequired, match="clean refusal changed"):
+        semantic.compare_request(
+            candidate / "src", captured["request"], captured["expected"], dataset_transition=changed
+        )
+
+
+def test_dataset_release_snapshot_keeps_old_facts_and_new_refusals_separate(tmp_path: Path) -> None:
+    root = tmp_path / "dataset-source"
+    history.git(ROOT, "clone", "--quiet", "--no-hardlinks", str(ROOT), str(root))
+    for key in ("contracts", "harness"):
+        source = ROOT / f"packages/{key}/src"
+        target = root / f"packages/{key}/src"
+        shutil.rmtree(target)
+        shutil.copytree(source, target)
+        shutil.copyfile(
+            ROOT / f"packages/{key}/pyproject.toml", root / f"packages/{key}/pyproject.toml"
+        )
+    fixtures = root / "packages/contracts/tests/fixtures"
+    shutil.rmtree(fixtures)
+    shutil.copytree(ROOT / "packages/contracts/tests/fixtures", fixtures)
+    history.git(root, "add", "packages")
+    history.git(
+        root,
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.test",
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        "Record canonical dataset fixtures",
+    )
+    plan = asdict(create_plan(root, "contracts-v0.19.0", event="workflow_dispatch"))
+    output = tmp_path / "dataset-release"
+    snapshot.write_release(root, plan, output)
+    inventory = json.loads((output / "semantic-inventory.json").read_bytes())
+    assert inventory["raw_fixture_source"] == {
+        "tag": "contracts-v0.18.3",
+        "commit": "ecfb0446fddad70e8ab1094694dddacfeb496d53",
+    }
+    original = json.loads((output / "semantic-old-tool-contexts.json").read_bytes())
+    frozen = snapshot.legacy_corpus()
+    assert original["historical"]["expected"] == snapshot.historical_snapshot()["expected"]
+    assert original["published"]["expected"]["role/dataset_manifest"]["status"] == "accepted"
+    current = json.loads((output / "semantic-contexts.json").read_bytes())
+    assert current["expected"]["role/dataset_manifest"]["status"] == "rejected"
+    for entry in inventory["entries"]:
+        if "document" in entry:
+            assert entry["outcome"] == current["expected"][entry["document"]]
+    dataset = "legacy/tests/fixtures/dataset/valid/camera-mcap.yaml"
+    assert frozen["expected"][dataset]["status"] == "accepted"
+    assert current["expected"]["historical/" + dataset]["error_id"] == "schema.unknown"
+    assert original["historical"]["expected"]["historical/" + dataset]["status"] == "accepted"
+
+    # Creating the contracts tag must not make the subsequent train snapshot
+    # reinterpret old witnesses or bypass v2-to-v2 structural checks.
+    history.git(root, "tag", "contracts-v0.19.0")
+    later = tmp_path / "after-contracts-tag"
+    snapshot.write_release(root, plan, later)
+    assert (later / "semantic-old-tool-contexts.json").read_bytes() == (
+        output / "semantic-old-tool-contexts.json"
+    ).read_bytes()
+    later_inventory = json.loads((later / "semantic-inventory.json").read_bytes())
+    later_contexts = json.loads((later / "semantic-contexts.json").read_bytes())
+    for entry in later_inventory["entries"]:
+        if "document" in entry:
+            assert entry["outcome"] == later_contexts["expected"][entry["document"]]
+    from scripts.schema_compatibility.dataset_migration import dataset_migration
+
+    release = history.baseline(root)
+    published = history.extract(root, release, tmp_path / "v2-published")
+    witness = dataset_migration(root, release, published, root / "packages/contracts")
+    assert witness is not None
+    assert dataset_structure(published, root / "packages/contracts", witness) == len(
+        read_schemas(published / "src/robotics_runtime_contracts/schemas")
+    )
+    assert (
+        semantic.check_semantics(published, root / "packages/contracts", dataset_transition=witness)
+        == 375
+    )

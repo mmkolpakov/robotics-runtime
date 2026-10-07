@@ -40,14 +40,15 @@ FIXTURES = Path(__file__).parent / "fixtures" / "scenario"
 def test_schemas_satisfy_draft_2020_12_metaschema(schema_name: str) -> None:
     schema = load_schema(schema_name)
     Draft202012Validator.check_schema(schema)
-    assert schema["$id"].startswith("urn:robotics-runtime-contracts:v1:")
+    version = schema_name.rsplit(".", 1)[1]
+    assert schema["$id"].startswith(f"urn:robotics-runtime-contracts:{version}:")
 
 
-def test_catalog_defines_one_public_v1_schema_per_role() -> None:
+def test_catalog_defines_one_canonical_public_schema_per_role() -> None:
     assert contract_set() == "v1"
     assert contract_roles() == tuple(role_schemas())
     assert set(role_schemas().values()) == set(schema_names())
-    assert all(schema_name.endswith(".v1") for schema_name in schema_names())
+    assert schema_for_role("dataset_manifest") == "dataset-manifest.v2"
     for role, schema_name in role_schemas().items():
         assert schema_for_role(role) == schema_name
 

@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.bundle_schemas import read_schemas  # noqa: E402
+from scripts.schema_compatibility.dataset_migration import dataset_migration  # noqa: E402
 from scripts.schema_compatibility.history import baseline, extract  # noqa: E402
 from scripts.schema_compatibility.semantic import check_semantics  # noqa: E402
 from scripts.schema_compatibility.structure import check_structure  # noqa: E402
@@ -25,14 +26,26 @@ def check(root: Path) -> str:
         candidate = root / "packages/contracts"
         old_path = published / "src/robotics_runtime_contracts/schemas"
         new_path = candidate / "src/robotics_runtime_contracts/schemas"
+        transition = dataset_migration(root, release, published, candidate)
         count = check_structure(
             read_schemas(old_path),
             read_schemas(new_path),
             json.loads((old_path / "catalog.v1.json").read_bytes()),
             json.loads((new_path / "catalog.v1.json").read_bytes()),
+            dataset_transition=transition,
         )
-        cases = check_semantics(published, candidate, legacy=not release.prefix)
-    return f"{release.tag} ({release.commit}): {count} retained schemas; {cases} semantic cases"
+        cases = check_semantics(
+            published, candidate, legacy=not release.prefix, dataset_transition=transition
+        )
+    migration = (
+        "; reviewed dataset-manifest.v1 -> dataset-manifest.v2 break"
+        if transition is not None
+        else ""
+    )
+    return (
+        f"{release.tag} ({release.commit}): {count} retained schemas; "
+        f"{cases} semantic cases{migration}"
+    )
 
 
 def main() -> int:

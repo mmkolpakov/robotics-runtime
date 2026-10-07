@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import json
+from hashlib import sha256
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
 from robotics_runtime_contracts import RobotDescriptionBindingError
 
-from robotics_acceptance_harness.documents import BundleValidationError, load_bundle
+from robotics_acceptance_harness.documents import (
+    BundleValidationError,
+    load_bundle,
+    load_document,
+    load_document_bytes,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "simulation"
 
@@ -139,3 +147,75 @@ def test_load_bundle_rejects_missing_or_mismatched_robot_description(
         load_bundle(scenario_path, runtime_path=runtime_path)
     assert caught.value.json_path == "$.runtime.workload.robot_description.sha256"
     assert isinstance(caught.value.__cause__, RobotDescriptionBindingError)
+
+
+def _dataset_document(member_count: int = 2) -> dict[str, Any]:
+    fixture = (
+        Path(__file__).resolve().parents[2]
+        / "contracts/tests/fixtures/dataset/valid/camera-mcap.yaml"
+    )
+    document = yaml.safe_load(fixture.read_text())
+    assert isinstance(document, dict)
+    assert document["schema_version"] == "dataset-manifest.v2"
+    for channel, count in zip(document["channels"], (2, 1), strict=True):
+        channel["message_count"] = count
+
+    def reference(name: str, digest: str) -> dict[str, Any]:
+        return {"uri": "s3://fixture-bags/" + name, "sha256": digest * 64, "size_bytes": 128}
+
+    document["bag"] = {
+        "storage_id": "mcap",
+        "metadata": reference("metadata.yaml", "c"),
+        "message_count": 3,
+        "members": [
+            {
+                "segment_index": index,
+                "relative_path": f"recording_{index}.mcap",
+                "recording": reference(f"recording_{index}.mcap", digest),
+                "recording_summary": reference(f"recording_{index}.summary.json", summary),
+            }
+            for index, digest, summary in ((0, "a", "d"), (1, "b", "e"))[:member_count]
+        ],
+    }
+    return document
+
+
+@pytest.mark.parametrize("member_count", [1, 2])
+def test_load_dataset_role_accepts_one_canonical_bag_shape(member_count: int) -> None:
+    raw = json.dumps(_dataset_document(member_count)).encode()
+    document = load_document_bytes(
+        raw, source=Path("dataset.json"), expected_role="dataset_manifest"
+    )
+    assert document.schema_version == "dataset-manifest.v2"
+    assert len(document.data["bag"]["members"]) == member_count
+    assert document.sha256 == sha256(raw).hexdigest()
+
+
+@pytest.mark.parametrize("schema_version", ["dataset-manifest.v1", "dataset-manifest.v3"])
+def test_load_dataset_role_refuses_unsupported_versions(schema_version: str) -> None:
+    raw = json.dumps({"schema_version": schema_version}).encode()
+    with pytest.raises(BundleValidationError) as caught:
+        load_document_bytes(raw, source=Path("dataset.json"), expected_role="dataset_manifest")
+    assert caught.value.json_path == "$.schema_version"
+
+
+def test_v2_dataset_cannot_fall_back_to_single_artifact_validation() -> None:
+    document = _dataset_document(1)
+    document["artifact"] = document.pop("bag")["members"][0]["recording"]
+    raw = json.dumps(document).encode()
+    with pytest.raises(BundleValidationError, match="invalid"):
+        load_document_bytes(raw, source=Path("dataset.json"), expected_role="dataset_manifest")
+
+
+def test_loaded_bag_dataset_freezes_members_and_captured_digest(tmp_path: Path) -> None:
+    path = tmp_path / "dataset.json"
+    raw = json.dumps(_dataset_document(), indent=2).encode()
+    path.write_bytes(raw)
+    document = load_document(path, expected_role="dataset_manifest")
+    path.write_bytes(b"replaced after load")
+    assert document.sha256 == sha256(raw).hexdigest()
+    assert isinstance(document.data["bag"]["members"], tuple)
+    assert len(document.data["bag"]["members"]) == 2
+    assert document.data["bag"]["members"][1]["relative_path"] == "recording_1.mcap"
+    with pytest.raises(TypeError):
+        document.data["bag"]["members"][0]["recording"]["sha256"] = "f" * 64

@@ -1,0 +1,64 @@
+{
+  "rosbag2_bagfile_information": {
+    "custom_data": {
+      "captured_at": "2026-07-11T10:00:00Z",
+      "data_classification": "internal",
+      "dataset_license": "LicenseRef-Internal-Robotics",
+      "record_timestamp_basis": "ros_time",
+      "retention_class": "benchmark-365d",
+      "run_id": "fixture-source"
+    },
+    "duration": {
+      "nanoseconds": 10000000000
+    },
+    "files": [
+      {
+        "duration": {
+          "nanoseconds": 10000000000
+        },
+        "message_count": 4,
+        "path": "dataset.mcap",
+        "starting_time": {
+          "nanoseconds_since_epoch": 1000000000
+        }
+      }
+    ],
+    "message_count": 4,
+    "relative_file_paths": [
+      "dataset.mcap"
+    ],
+    "starting_time": {
+      "nanoseconds_since_epoch": 1000000000
+    },
+    "storage_identifier": "mcap",
+    "topics_with_message_count": [
+      {
+        "message_count": 2,
+        "topic_metadata": {
+          "name": "/camera/image",
+          "offered_qos_profiles": [
+            {
+              "reliability": "best_effort"
+            }
+          ],
+          "type": "sensor_msgs/msg/Image",
+          "type_description_hash": "RIHS01_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      {
+        "message_count": 2,
+        "topic_metadata": {
+          "name": "/camera/camera_info",
+          "offered_qos_profiles": [
+            {
+              "reliability": "best_effort"
+            }
+          ],
+          "type": "sensor_msgs/msg/CameraInfo",
+          "type_description_hash": "RIHS01_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      }
+    ],
+    "version": 9
+  }
+}

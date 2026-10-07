@@ -225,7 +225,10 @@ def _validate_model_artifact(document: Mapping[str, Any]) -> None:
 
 
 def _validate_dataset(document: Mapping[str, Any]) -> None:
-    schema_name = "dataset-manifest.v1"
+    from robotics_runtime_contracts.datasets import validate_bag_structure
+
+    schema_name = "dataset-manifest.v2"
+    validate_bag_structure(document)
     channels = document["channels"]
     time = document["time"]
 
@@ -1249,7 +1252,7 @@ _VALIDATORS: dict[str, Callable[[Mapping[str, Any]], None]] = {
     "acceptance-observation.v1": _validate_acceptance_observation,
     "acceptance-scenario.v1": _validate_acceptance_scenario,
     "model-artifact-manifest.v1": _validate_model_artifact,
-    "dataset-manifest.v1": _validate_dataset,
+    "dataset-manifest.v2": _validate_dataset,
     "runtime-manifest.v1": _validate_runtime,
     "execution-permit.v1": _validate_permit,
     "execution-trust-policy.v1": _validate_execution_trust_policy,

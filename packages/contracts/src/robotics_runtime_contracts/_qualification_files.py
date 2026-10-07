@@ -18,7 +18,7 @@ from robotics_runtime_contracts._qualification_types import (
     QualificationError,
 )
 from robotics_runtime_contracts.errors import CLIArgumentError, ContractError
-from robotics_runtime_contracts.serialization import read_document_bytes
+from robotics_runtime_contracts.serialization import MAX_DOCUMENT_BYTES, read_document_bytes
 
 
 def _identity_problem(kind: str, subject_name: str) -> str | None:
@@ -58,6 +58,7 @@ def validate_descriptor(
     if artifact.kind in _RAW_ARTIFACT_KINDS:
         if artifact.document is not None:
             raise QualificationError(f"raw artifact {artifact.kind} must not carry a document")
+        _validate_metadata_capture(artifact)
         return
     document = artifact.document
     if document is None:
@@ -76,6 +77,20 @@ def validate_descriptor(
     )
 
 
+def _validate_metadata_capture(artifact: QualificationArtifact) -> None:
+    if artifact.native_metadata_bytes is not None:
+        raw = artifact.native_metadata_bytes
+        if artifact.kind != "other_evidence" or not isinstance(raw, bytes):
+            raise QualificationError(
+                "native bag metadata requires bounded raw other_evidence bytes"
+            )
+        if len(raw) > MAX_DOCUMENT_BYTES or (len(raw), hashlib.sha256(raw).hexdigest()) != (
+            artifact.size_bytes,
+            artifact.sha256,
+        ):
+            raise QualificationError("native metadata bytes do not match the supplied identity")
+
+
 def _raw_identity(path: Path) -> tuple[str, int]:
     digest, size = hashlib.sha256(), 0
     with path.open("rb") as stream:
@@ -85,13 +100,40 @@ def _raw_identity(path: Path) -> tuple[str, int]:
     return digest.hexdigest(), size
 
 
+def _capture_native_metadata(
+    path: Path,
+    kind: str,
+    references: Mapping[str, int] | None,
+) -> tuple[str, int, bytes | None] | None:
+    if kind != "other_evidence" or not references:
+        return None
+    sizes = set(references.values())
+    advertised_size = path.stat().st_size
+    if advertised_size not in sizes or advertised_size > MAX_DOCUMENT_BYTES:
+        return None
+    # A candidate is read once within the existing control-document bound.
+    # Retain immutable bytes only for a referenced metadata identity.
+    raw = read_document_bytes(path)
+    digest, size = hashlib.sha256(raw).hexdigest(), len(raw)
+    metadata = None
+    if references.get(digest) == size:
+        metadata = raw
+    return digest, size, metadata
+
+
 def load_artifact(
     specification: str,
     extension_schemas: Mapping[str, bytes] | None = None,
+    *,
+    native_metadata_references: Mapping[str, int] | None = None,
 ) -> QualificationArtifact:
     kind, name, path = _specification(specification)
     try:
         if kind in _RAW_ARTIFACT_KINDS:
+            captured = _capture_native_metadata(path, kind, native_metadata_references)
+            if captured is not None:
+                digest, size, metadata = captured
+                return QualificationArtifact(kind, name, digest, size, None, metadata)
             digest, size = _raw_identity(path)
             return QualificationArtifact(kind, name, digest, size, None)
         raw = read_document_bytes(path)

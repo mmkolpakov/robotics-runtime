@@ -1,0 +1,158 @@
+{
+  "role": "dataset_manifest",
+  "before": {
+    "tag": "contracts-v0.18.3",
+    "commit": "ecfb0446fddad70e8ab1094694dddacfeb496d53",
+    "schema_name": "dataset-manifest.v1",
+    "schema_id": "urn:robotics-runtime-contracts:v1:dataset-manifest",
+    "sha256": "b9d54d47fb94af6d948832b62302a967d381d5132a24ff6838e4734c743f0b76"
+  },
+  "after": {
+    "schema_name": "dataset-manifest.v2",
+    "schema_id": "urn:robotics-runtime-contracts:v2:dataset-manifest",
+    "sha256": "b85fdb8541a128001f57bf5ecc8b9cd807ff3b8c1c40cef07325d916ce30d2b0",
+    "contracts_version": "0.19.0",
+    "harness_version": "0.20.0"
+  },
+  "reason": "Intentional pre-1.0 dataset break: one canonical ordered bag-set manifest represents one or many recording members and binds the capture metadata, summaries and provenance. The new package removes the v1 resource and cleanly refuses old dataset forms. Immutable published v1 schemas, signed bytes and historical tool outcomes remain historical facts.",
+  "semantic": {
+    "published": {
+      "request_sha256": "ae82fe25c15b8a9982c2975b7ace895f1d703ac2fbb62c458c0b20b402d44562",
+      "case_count": 288,
+      "refusals": {
+        "fixture/packages/contracts/tests/fixtures/dataset/invalid/s3-without-version.yaml": {
+          "old_outcome_sha256": "4e5adb4adba8f38a9dca1967e71f2d64b8508916846c220cd9c841a3f91e9b9e",
+          "new_outcome_sha256": "b5f755c5db289f51425a42caae28bb59972c797e370959de564c013beed74735",
+          "refusal": {
+            "exception": "UnknownSchemaError",
+            "error_id": "schema.unknown",
+            "message": "Unknown schema: dataset-manifest.v1"
+          }
+        },
+        "fixture/packages/contracts/tests/fixtures/dataset/valid/camera-mcap.yaml": {
+          "old_outcome_sha256": "daed51e2126e08ac742f3c88f07768135dfb0609ce1b7e7b3fcff483dbeaf79b",
+          "new_outcome_sha256": "b5f755c5db289f51425a42caae28bb59972c797e370959de564c013beed74735",
+          "refusal": {
+            "exception": "UnknownSchemaError",
+            "error_id": "schema.unknown",
+            "message": "Unknown schema: dataset-manifest.v1"
+          }
+        },
+        "fixture/packages/contracts/tests/fixtures/qualification/inference/dataset.json": {
+          "old_outcome_sha256": "daed51e2126e08ac742f3c88f07768135dfb0609ce1b7e7b3fcff483dbeaf79b",
+          "new_outcome_sha256": "b5f755c5db289f51425a42caae28bb59972c797e370959de564c013beed74735",
+          "refusal": {
+            "exception": "UnknownSchemaError",
+            "error_id": "schema.unknown",
+            "message": "Unknown schema: dataset-manifest.v1"
+          }
+        },
+        "role/dataset_manifest": {
+          "old_outcome_sha256": "daed51e2126e08ac742f3c88f07768135dfb0609ce1b7e7b3fcff483dbeaf79b",
+          "new_outcome_sha256": "934419eec454ac29362d475738bf86569f7334e6be255432d6e4b810f6b8d007",
+          "refusal": {
+            "exception": "ContractValidationError",
+            "error_id": "schema.validation_failed",
+            "message": "$: Additional properties are not allowed ('artifact' was unexpected)"
+          }
+        },
+        "extension/dataset_manifest/pinned": {
+          "old_outcome_sha256": "daed51e2126e08ac742f3c88f07768135dfb0609ce1b7e7b3fcff483dbeaf79b",
+          "new_outcome_sha256": "934419eec454ac29362d475738bf86569f7334e6be255432d6e4b810f6b8d007",
+          "refusal": {
+            "exception": "ContractValidationError",
+            "error_id": "schema.validation_failed",
+            "message": "$: Additional properties are not allowed ('artifact' was unexpected)"
+          }
+        },
+        "extension/dataset_manifest/payload": {
+          "old_outcome_sha256": "0a3e7bc16c8fc2e9bff811181193d6525286a0de44910f086a9bd30307899a0e",
+          "new_outcome_sha256": "934419eec454ac29362d475738bf86569f7334e6be255432d6e4b810f6b8d007",
+          "refusal": {
+            "exception": "ContractValidationError",
+            "error_id": "schema.validation_failed",
+            "message": "$: Additional properties are not allowed ('artifact' was unexpected)"
+          }
+        },
+        "extension/dataset_manifest/missing-schema": {
+          "old_outcome_sha256": "37abeb9eee67f4864c78158d14a5d17bbdf257e000e79f669be224fc0bc4922d",
+          "new_outcome_sha256": "934419eec454ac29362d475738bf86569f7334e6be255432d6e4b810f6b8d007",
+          "refusal": {
+            "exception": "ContractValidationError",
+            "error_id": "schema.validation_failed",
+            "message": "$: Additional properties are not allowed ('artifact' was unexpected)"
+          }
+        },
+        "extension/dataset_manifest/changed-schema": {
+          "old_outcome_sha256": "65bb11dc5b1b8f7ba01e4b063a9893d31baa945bf2d28d8881758050deb0d658",
+          "new_outcome_sha256": "934419eec454ac29362d475738bf86569f7334e6be255432d6e4b810f6b8d007",
+          "refusal": {
+            "exception": "ContractValidationError",
+            "error_id": "schema.validation_failed",
+            "message": "$: Additional properties are not allowed ('artifact' was unexpected)"
+          }
+        },
+        "extension/dataset_manifest/legacy-unpinned": {
+          "old_outcome_sha256": "daed51e2126e08ac742f3c88f07768135dfb0609ce1b7e7b3fcff483dbeaf79b",
+          "new_outcome_sha256": "934419eec454ac29362d475738bf86569f7334e6be255432d6e4b810f6b8d007",
+          "refusal": {
+            "exception": "ContractValidationError",
+            "error_id": "schema.validation_failed",
+            "message": "$: Additional properties are not allowed ('artifact' was unexpected)"
+          }
+        },
+        "extension/dataset_manifest/legacy-opt-in": {
+          "old_outcome_sha256": "77d1cbb9ea2c364aa896ed97365d7359ff11961f8169752fea36479243823789",
+          "new_outcome_sha256": "934419eec454ac29362d475738bf86569f7334e6be255432d6e4b810f6b8d007",
+          "refusal": {
+            "exception": "ContractValidationError",
+            "error_id": "schema.validation_failed",
+            "message": "$: Additional properties are not allowed ('artifact' was unexpected)"
+          }
+        },
+        "qualification/inference": {
+          "old_outcome_sha256": "0a7bfc2aea368093e7d7b91a7131a07624db0730c7c1652450d40a501e5dec54",
+          "new_outcome_sha256": "194675cd9faab610f0c965f02d3543f1a1be22064aa4eb1f8d445663698033f0",
+          "refusal": {
+            "exception": "QualificationError",
+            "error_id": "qualification.invalid",
+            "message": "provenance/dataset.json: unsupported dataset_manifest schema_version 'dataset-manifest.v1'; expected one of ['dataset-manifest.v2']"
+          }
+        },
+        "qualification/contradiction/model-link": {
+          "old_outcome_sha256": "cf4cdd20d988a1ebe8e5f8fd78b35a59fbaa3bc732b8d2464d44bf976da8289e",
+          "new_outcome_sha256": "194675cd9faab610f0c965f02d3543f1a1be22064aa4eb1f8d445663698033f0",
+          "refusal": {
+            "exception": "QualificationError",
+            "error_id": "qualification.invalid",
+            "message": "provenance/dataset.json: unsupported dataset_manifest schema_version 'dataset-manifest.v1'; expected one of ['dataset-manifest.v2']"
+          }
+        }
+      }
+    },
+    "historical": {
+      "request_sha256": "6d80c295285ade197f3e1e01c7bafd6e978e4acc858a61577ffc7866821cc41b",
+      "case_count": 67,
+      "refusals": {
+        "legacy/tests/fixtures/dataset/valid/camera-mcap.yaml": {
+          "old_outcome_sha256": "daed51e2126e08ac742f3c88f07768135dfb0609ce1b7e7b3fcff483dbeaf79b",
+          "new_outcome_sha256": "b5f755c5db289f51425a42caae28bb59972c797e370959de564c013beed74735",
+          "refusal": {
+            "exception": "UnknownSchemaError",
+            "error_id": "schema.unknown",
+            "message": "Unknown schema: dataset-manifest.v1"
+          }
+        },
+        "legacy/tests/fixtures/qualification/inference/dataset.json": {
+          "old_outcome_sha256": "daed51e2126e08ac742f3c88f07768135dfb0609ce1b7e7b3fcff483dbeaf79b",
+          "new_outcome_sha256": "b5f755c5db289f51425a42caae28bb59972c797e370959de564c013beed74735",
+          "refusal": {
+            "exception": "UnknownSchemaError",
+            "error_id": "schema.unknown",
+            "message": "Unknown schema: dataset-manifest.v1"
+          }
+        }
+      }
+    }
+  }
+}
