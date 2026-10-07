@@ -6,7 +6,7 @@ FROM ${CONTRACTS_BASE}
 USER root
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=evidence-tools /usr/local/aws-cli /usr/local/aws-cli
-RUN ln -s /usr/local/aws-cli/v2/current/bin/aws /usr/local/bin/aws \
+RUN ln -sf /usr/local/aws-cli/v2/current/bin/aws /usr/local/bin/aws \
     && test -x /opt/contracts/bin/robotics-contracts \
     && mkdir -p /opt/api /work/api-custody \
     && chown -R 1000:1000 /work/api-custody
