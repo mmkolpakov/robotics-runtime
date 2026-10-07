@@ -42,6 +42,40 @@ ROS is a selected integration profile, not a requirement of the common host or
 document model. The observer remains attach-only; changing a simulation is a
 provider/controller responsibility.
 
+## External API compatibility
+
+External SDK compatibility is a planned adoption path, separate from the native
+runtime model. An optional facade can translate a versioned public API into
+native run, attempt and evidence operations. Vendor identifiers, status models,
+authentication details and metric formats end at that boundary. Execution status
+does not substitute for an independent qualification verdict.
+
+The first research target is the MIT SignalFlag SDK
+[`sdk-v1.8.0`](https://github.com/resim-ai/open-core/tree/sdk-v1.8.0/signalflag/sdk).
+Its client supports a configurable backend. The candidate subset covers external
+batches, jobs, emissions, artifact uploads and closure with a preconfigured
+project/branch and `metrics_config_path=None`. Default metrics configuration uses
+a separate GraphQL path and is outside this initial subset.
+
+This facade is not implemented or qualified. Support requires an unmodified
+installed SDK to pass against our endpoint, including required response fields,
+authorization, upload verification, errors and duplicate submissions. Unsupported
+operations and options must fail explicitly. Compatibility claims name the SDK
+version, schema and supported operations; they do not cover the vendor's closed
+backend or worker protocol.
+
+Native MCAP, OTLP and signed evidence remain authoritative. Core installation and
+offline evaluation do not require the external SDK or a vendor account.
+Product-specific extensions use a separate namespace and capability declaration,
+so the platform can improve its internals without silently changing supported
+external behavior.
+
+Self-hosting, identity integration, tenant isolation, configurable retention,
+comparison and cost controls are platform requirements with separate acceptance.
+They use maintained identity, storage, query and deployment services. Adding an
+API facade does not qualify those services, establish an SLA or confer a security
+certification.
+
 ## Simulator providers
 
 Each provider declares its source/runtime/assets, supported environment, native
