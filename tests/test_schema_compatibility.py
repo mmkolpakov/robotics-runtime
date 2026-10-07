@@ -32,6 +32,9 @@ from scripts.schema_compatibility.structure import (
 )
 
 type DatasetCandidate = tuple[Path, Path, DatasetMigration]
+FROZEN_DATASET_RELEASE = history.Baseline(
+    "contracts-v0.18.3", "ecfb0446fddad70e8ab1094694dddacfeb496d53", "packages/contracts/"
+)
 
 
 def schema(body: Schema) -> Schema:
@@ -50,12 +53,12 @@ def catalog(role: str = "acceptance_result") -> Schema:
 
 @pytest.fixture(scope="module")
 def published(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    release = history.baseline(ROOT)
-    return history.extract(ROOT, release, tmp_path_factory.mktemp("published25"))
+    return history.extract(ROOT, FROZEN_DATASET_RELEASE, tmp_path_factory.mktemp("published25"))
 
 
-def test_actual_published_git_baseline_and_semantics(published: Path) -> None:
+def test_actual_published_git_baseline_and_semantics(tmp_path: Path) -> None:
     release = history.baseline(ROOT)
+    published = history.extract(ROOT, release, tmp_path / "latest-published")
     assert (
         release.commit
         == history.git(ROOT, "rev-parse", f"refs/tags/{release.tag}^{{commit}}").decode().strip()
@@ -834,7 +837,7 @@ def dataset_transition_candidate(published: Path, tmp_path: Path) -> DatasetCand
     harness = root / "packages/harness"
     harness.mkdir(parents=True, exist_ok=True)
     (harness / "pyproject.toml").write_text('[project]\nversion = "0.20.0"\n')
-    witness = dataset_migration(root, history.baseline(ROOT), published, candidate)
+    witness = dataset_migration(root, FROZEN_DATASET_RELEASE, published, candidate)
     assert witness is not None
     return root, candidate, witness
 
@@ -898,7 +901,7 @@ def test_dataset_migration_refuses_wrong_package_train(
     root, candidate, _ = dataset_transition_candidate
     (root / "packages/harness/pyproject.toml").write_text('[project]\nversion = "0.19.2"\n')
     with pytest.raises(ReviewRequired, match="train"):
-        dataset_migration(root, history.baseline(ROOT), published, candidate)
+        dataset_migration(root, FROZEN_DATASET_RELEASE, published, candidate)
 
 
 def test_dataset_migration_replays_all_native_cases_without_changing_historical_facts(
@@ -954,13 +957,13 @@ def test_dataset_migration_missing_or_bad_row_fails_closed(
     missing = tmp_path / "missing/dataset_migration.py"
     monkeypatch.setattr(migration, "__file__", str(missing))
     with pytest.raises(FileNotFoundError):
-        migration.dataset_migration(root, history.baseline(ROOT), published, candidate)
+        migration.dataset_migration(root, FROZEN_DATASET_RELEASE, published, candidate)
     missing.parent.mkdir()
     row = json.loads((ROOT / "scripts/schema_compatibility/dataset-v2-migration.json").read_bytes())
     row["role"] = "acceptance_result"
     missing.with_name("dataset-v2-migration.json").write_text(json.dumps(row))
     with pytest.raises(ReviewRequired, match="Unsupported dataset migration"):
-        migration.dataset_migration(root, history.baseline(ROOT), published, candidate)
+        migration.dataset_migration(root, FROZEN_DATASET_RELEASE, published, candidate)
 
 
 def test_dataset_refusal_labels_cannot_disagree_with_the_pinned_native_outcome(
@@ -982,7 +985,15 @@ def test_dataset_refusal_labels_cannot_disagree_with_the_pinned_native_outcome(
 
 def test_dataset_release_snapshot_keeps_old_facts_and_new_refusals_separate(tmp_path: Path) -> None:
     root = tmp_path / "dataset-source"
-    history.git(ROOT, "clone", "--quiet", "--no-hardlinks", str(ROOT), str(root))
+    history.git(ROOT, "clone", "--quiet", "--no-hardlinks", "--no-tags", str(ROOT), str(root))
+    history.git(
+        root,
+        "fetch",
+        "--quiet",
+        "--no-tags",
+        str(ROOT),
+        "refs/tags/contracts-v0.18.3:refs/tags/contracts-v0.18.3",
+    )
     for key in ("contracts", "harness"):
         source = ROOT / f"packages/{key}/src"
         target = root / f"packages/{key}/src"
