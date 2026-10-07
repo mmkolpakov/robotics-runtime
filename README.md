@@ -165,6 +165,10 @@ Current public compatibility is recorded in
 [harness compatibility](packages/harness/docs/compatibility.md) and the package
 [compatibility policy](packages/contracts/COMPATIBILITY.md).
 
+[External SDK compatibility](docs/architecture.md#external-api-compatibility)
+is a planned optional adapter boundary. It keeps native evidence and qualification
+independent of vendor APIs; no external facade is implemented or qualified yet.
+
 ## Host development
 
 The source host uses the pinned Node version in `host/.node-version`.
