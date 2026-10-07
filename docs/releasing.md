@@ -10,10 +10,10 @@ Tag pushes must resolve to the checked-out commit and be reachable from `origin/
 ## Published pair and dry runs
 
 [Contracts 0.19.0](https://pypi.org/project/robotics-runtime-contracts/0.19.0/) and
-[harness 0.20.0](https://pypi.org/project/robotics-acceptance-harness/0.20.0/) are
+[harness 0.20.1](https://pypi.org/project/robotics-acceptance-harness/0.20.1/) are
 published. Their root GitHub release tags are
 [`contracts-v0.19.0`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.19.0)
-and [`harness-v0.20.0`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/harness-v0.20.0).
+and [`harness-v0.20.1`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/harness-v0.20.1).
 Harness declares `robotics-runtime-contracts>=0.19,<0.20`; its release checks use
 the exact contracts 0.19.0 archive. Independent installs of both published packages,
 their public writer and CLI, installed file inventories and archive attestations
