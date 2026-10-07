@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.20.1
+
+Requires contracts 0.19 (`>=0.19,<0.20`), with release prerequisite
+[contracts-v0.19.0](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.19.0).
+
+- Add an optional, explicit import of SignalFlag SDK 1.8.0 JSONL emissions into
+  native scalar gauge samples. Require selected numeric fields, declared units,
+  and exact Unix-nanosecond timestamps; preserve scoped source-byte provenance.
+- Reuse strict JSON parsing and document budgets, checking LF record counts
+  before allocation. Keep opaque retention and qualification independent, with
+  no SDK runtime dependency or endpoint compatibility claim.
+
 ## 0.20.0
 
 Requires contracts 0.19 (`>=0.19,<0.20`), with release prerequisite
