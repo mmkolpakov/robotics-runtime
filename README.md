@@ -40,11 +40,23 @@ Harness requires contracts `>=0.18,<0.19`; release checks install the exact
 published pair outside the workspace. Package installation does not qualify
 a simulator, image, accelerator or physical target.
 
+The compiled host is available as the immutable
+[host 0.1.0-rc.0 prerelease](https://github.com/mmkolpakov/robotics-runtime/releases/tag/host-v0.1.0-rc.0).
+Its TGZ installs as an ordinary npm dependency using Node 24.21.0 and npm 11.19.0:
+
+```bash
+npm install --ignore-scripts --save-exact https://github.com/mmkolpakov/robotics-runtime/releases/download/host-v0.1.0-rc.0/robotics-runtime-host-0.1.0-rc.0.tgz
+```
+
+The release includes a source manifest, checksums and the external installation
+report. Host package integrity and provider execution qualification have separate
+scopes; see the [host reference](host/README.md).
+
 ## Architecture
 
-These C4 views cover the joint platform in both repositories. The Python pair
-is published separately; the composition host and candidate providers require
-their own release qualification.
+These C4 views cover the joint platform in both repositories. The Python pair and
+compiled host have separate releases; candidate providers require their own
+execution qualification.
 
 ### Process composition
 
@@ -69,7 +81,7 @@ graph LR
       style 12 fill:#ecfeff,stroke:#0e7490,color:#0f172a
       13[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Retained bytes.</div>")]
       style 13 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
-      8("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Source lifecycle.</div>")
+      8("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Prerelease ESM host.</div>")
       style 8 fill:#dbeafe,stroke:#2563eb,color:#0f172a
       9("<div style='font-weight: bold'>Document CLI</div><div style='font-size: 80%; margin-top:10px'>Published contracts.</div>")
       style 9 fill:#ecfdf5,stroke:#047857,color:#0f172a
@@ -120,7 +132,7 @@ graph LR
     style 5 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
     6("<div style='font-weight: bold'>Artifact registries</div><div style='font-size: 80%; margin-top:10px'>Immutable packages, images<br />and attestations.</div>")
     style 6 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    7("<div style='font-weight: bold'>Robotics runtime platform</div><div style='font-size: 80%; margin-top:10px'>Source host, published Python<br />tools; providers per profile.</div>")
+    7("<div style='font-weight: bold'>Robotics runtime platform</div><div style='font-size: 80%; margin-top:10px'>Published host and Python<br />tools; providers per profile.</div>")
     style 7 fill:#dbeafe,stroke:#2563eb,color:#0f172a
 
     1-- "<div>Run and verify workloads</div><div style='font-size: 70%'></div>" -->7
@@ -181,17 +193,18 @@ npm --prefix host run check:boundary
 ```
 
 See [host configuration and worker integration](host/README.md).
-The host is a source component; a new published host/provider composition
-requires its own consumer qualification.
+The compiled host prerelease has passed package and external installation checks.
+A new host/provider composition still requires its own consumer qualification.
 
 The separate `host-release.yml` workflow builds the compiled core host as a
 GitHub Release TGZ, retaining `private: true` and ordinary npm `file:` installation.
 PR and manual runs check the archive, a clean rebuild and installation outside
 the source workspace; they do not publish or establish native acceptance.
 
-Publication stays disabled. Before enabling it, the authenticated owner enables
-and verifies the repository's current immutable-release setting. Historical
-immutable releases do not prove the current setting. Its authenticated settings
+The first host prerelease is published with release immutability enabled.
+Further publication requires the current setting, the exact live tag and the
+accepted archive to be verified. Historical immutable releases do not prove the
+current setting. Its authenticated settings
 API requires Administration read, which the workflow's ordinary GitHub token
 cannot acquire; missing authorization does not mean the setting is disabled.
 

@@ -15,8 +15,8 @@ is not a package or a Docker image. The
 [local execution view](generated/ExecutionDeployment.svg) shows the selected
 native-worker path, admitted read-only inputs and owned Engine/Compose jobs.
 The [home deployment view](generated/HomeDeployment.svg) maps the broader source
-composition onto WSL. Candidate wording and role colors distinguish source
-components from the published Python packages; neither is a passed verdict.
+composition onto WSL. Candidate wording distinguishes unpublished provider/media components from the
+separately released host and Python packages. Role colors do not encode a passed verdict.
 Box and arrow labels are kept
 short for README display; [the architecture reference](../architecture.md) and
 [host reference](../../host/README.md) describe native endpoints, producer
