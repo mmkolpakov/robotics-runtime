@@ -183,8 +183,7 @@ def test_previously_schema_valid_fixture_remains_valid(path: str, value: Schema)
     name = f"{value['schema_version']}.schema.json"
     old_errors = validation_errors(value, BEFORE[name], registry_for(BEFORE))
     if name == "dataset-manifest.v1.schema.json":
-        from robotics_runtime_contracts import validate_document
-        from robotics_runtime_contracts.errors import UnknownSchemaError
+        from robotics_runtime_contracts import UnknownSchemaError, validate_document
 
         assert name not in AFTER
         with pytest.raises(UnknownSchemaError, match="dataset-manifest.v1"):

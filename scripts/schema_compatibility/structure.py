@@ -260,6 +260,30 @@ def check_catalog(catalog: Schema, schemas: dict[str, Schema]) -> None:
         raise ReviewRequired("Catalog must enumerate each resource exactly once")
 
 
+def _check_retained_catalog(
+    old_catalog: Schema, new_catalog: Schema, migrated: tuple[str, str] | None
+) -> None:
+    if old_catalog["contract_set"] != new_catalog["contract_set"]:
+        raise ReviewRequired("Changed contract_set")
+    for role, name in old_catalog["roles"].items():
+        if migrated is not None and role == "dataset_manifest":
+            continue
+        if new_catalog["roles"].get(role) != name:
+            raise ReviewRequired(f"Removed or renamed published role: {role}")
+    if set(old_catalog["internal_resources"]) - set(new_catalog["internal_resources"]):
+        raise ReviewRequired("Removed published internal resources")
+
+
+def _check_resource_identities(
+    before: dict[str, Schema], after: dict[str, Schema], migrated: tuple[str, str] | None
+) -> None:
+    for name, schema in before.items():
+        if migrated is not None and name == migrated[0]:
+            continue
+        if name not in after or schema["$id"] != after[name]["$id"]:
+            raise ReviewRequired(f"Removed resource or changed $id: {name}")
+
+
 def check_structure(
     before: dict[str, Schema],
     after: dict[str, Schema],
@@ -276,20 +300,8 @@ def check_structure(
         if dataset_transition is not None
         else None
     )
-    if old_catalog["contract_set"] != new_catalog["contract_set"]:
-        raise ReviewRequired("Changed contract_set")
-    for role, name in old_catalog["roles"].items():
-        if migrated is not None and role == "dataset_manifest":
-            continue
-        if new_catalog["roles"].get(role) != name:
-            raise ReviewRequired(f"Removed or renamed published role: {role}")
-    if set(old_catalog["internal_resources"]) - set(new_catalog["internal_resources"]):
-        raise ReviewRequired("Removed published internal resources")
-    for name, schema in before.items():
-        if migrated is not None and name == migrated[0]:
-            continue
-        if name not in after or schema["$id"] != after[name]["$id"]:
-            raise ReviewRequired(f"Removed resource or changed $id: {name}")
+    _check_retained_catalog(old_catalog, new_catalog, migrated)
+    _check_resource_identities(before, after, migrated)
     left, right = Expansion(before), Expansion(after)
     inputs = INPUT_CORES | {
         name for role, name in old_catalog["roles"].items() if role in INPUT_ROLES

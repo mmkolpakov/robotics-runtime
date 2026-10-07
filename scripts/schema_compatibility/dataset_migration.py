@@ -95,7 +95,7 @@ class DatasetMigration:
         ]
         if len(matches) != 1 or matches[0]["case_count"] != len(request["cases"]):
             raise ReviewRequired("Dataset migration frozen request differs")
-        records = matches[0]["refusals"]
+        records: dict[str, Any] = matches[0]["refusals"]
         cases = {case["id"]: case for case in request["cases"]}
         if not records or not records.keys() <= cases.keys():
             raise ReviewRequired("Dataset migration refusal inventory differs")

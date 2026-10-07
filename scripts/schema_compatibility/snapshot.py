@@ -150,28 +150,9 @@ def historical_snapshot() -> dict[str, Any]:
     }
 
 
-def write_release(root: Path, plan: dict[str, Any], output: Path) -> None:
-    commit = history.git(root, "rev-parse", "HEAD").decode().strip()
-    tree = history.git(root, "rev-parse", "HEAD^{tree}").decode().strip()
-    key = plan.get("key")
-    if key not in {"contracts", "harness"}:
-        raise ReviewRequired("Release corpus plan must select a workspace package")
-    package_tree = history.git(root, "rev-parse", f"HEAD:packages/{key}").decode().strip()
-    if (plan["commit"], plan["tree"]) != (commit, package_tree):
-        raise ReviewRequired("Release corpus source differs from the validated plan")
-    dirty = history.git(
-        root,
-        "status",
-        "--porcelain",
-        "--untracked-files=all",
-        "--",
-        ".",
-        ":(exclude,literal).codegraph",
-    )
-    if dirty.strip():
-        raise ReviewRequired("Release corpus source must be clean")
-    if output.exists():
-        raise FileExistsError(output)
+def _capture_release_semantics(
+    root: Path,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any] | None]:
     from scripts.schema_compatibility.dataset_migration import dataset_migration
     from scripts.schema_compatibility.semantic import verify_response
 
@@ -229,6 +210,32 @@ def write_release(root: Path, plan: dict[str, Any], output: Path) -> None:
                 "tag": transition.row["before"]["tag"],
                 "commit": transition.row["before"]["commit"],
             }
+    return snapshot, historical, original_contexts
+
+
+def write_release(root: Path, plan: dict[str, Any], output: Path) -> None:
+    commit = history.git(root, "rev-parse", "HEAD").decode().strip()
+    tree = history.git(root, "rev-parse", "HEAD^{tree}").decode().strip()
+    key = plan.get("key")
+    if key not in {"contracts", "harness"}:
+        raise ReviewRequired("Release corpus plan must select a workspace package")
+    package_tree = history.git(root, "rev-parse", f"HEAD:packages/{key}").decode().strip()
+    if (plan["commit"], plan["tree"]) != (commit, package_tree):
+        raise ReviewRequired("Release corpus source differs from the validated plan")
+    dirty = history.git(
+        root,
+        "status",
+        "--porcelain",
+        "--untracked-files=all",
+        "--",
+        ".",
+        ":(exclude,literal).codegraph",
+    )
+    if dirty.strip():
+        raise ReviewRequired("Release corpus source must be clean")
+    if output.exists():
+        raise FileExistsError(output)
+    snapshot, historical, original_contexts = _capture_release_semantics(root)
     snapshot["inventory"].update(tag=plan["candidate"], commit=plan["commit"])
     snapshot["inventory"]["historical"] = historical["inventory"]
     documents = {**snapshot["request"]["documents"], **historical["request"]["documents"]}

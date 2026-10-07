@@ -20,6 +20,7 @@ from scripts import check_schema_compatibility as gate
 from scripts.bundle_schemas import DIALECT, ROOT, Schema, read_schemas
 from scripts.release.plan import create_plan, project
 from scripts.schema_compatibility import history, semantic, snapshot
+from scripts.schema_compatibility.dataset_migration import DatasetMigration
 from scripts.schema_compatibility.probe import execute
 from scripts.schema_compatibility.structure import (
     Context,
@@ -29,6 +30,8 @@ from scripts.schema_compatibility.structure import (
     compare,
     token,
 )
+
+type DatasetCandidate = tuple[Path, Path, DatasetMigration]
 
 
 def schema(body: Schema) -> Schema:
@@ -704,7 +707,7 @@ def test_retained_raw_fixture_change_fails_before_semantic_probe(
 
 
 def test_historical_corpus_keeps_all_inventory_bytes_and_json_values(
-    tmp_path: Path, dataset_transition_candidate
+    tmp_path: Path, dataset_transition_candidate: DatasetCandidate
 ) -> None:
     release = history.Baseline(history.LEGACY_TAG, history.LEGACY_COMMIT, "")
     published = history.extract(ROOT, release, tmp_path / "historical")
@@ -752,9 +755,15 @@ def test_release_corpus_retains_raw_identity_and_source_plan(tmp_path: Path) -> 
     inventory = json.loads((output / "semantic-inventory.json").read_bytes())
     assert inventory["commit"] == plan["commit"]
     assert inventory["tag"] == plan["candidate"]
+    raw_source = inventory["raw_fixture_source"]
+    assert raw_source == {
+        "tag": "contracts-v0.18.3",
+        "commit": "ecfb0446fddad70e8ab1094694dddacfeb496d53",
+    }
     for entry in inventory["entries"]:
-        path = root / entry["path"]
-        assert entry["raw_sha256"] == sha256(path.read_bytes()).hexdigest()
+        raw = history.git(root, "show", f"{raw_source['commit']}:{entry['path']}")
+        assert entry["raw_sha256"] == sha256(raw).hexdigest()
+        assert entry["size_bytes"] == len(raw)
     _, documents, _ = snapshot.read_corpus()
     historical = snapshot.historical_snapshot()
     expected_documents = {**documents, **historical["request"]["documents"]}
@@ -807,7 +816,7 @@ def test_release_corpus_rejects_a_mismatched_source_plan(tmp_path: Path, changed
 
 
 @pytest.fixture
-def dataset_transition_candidate(published: Path, tmp_path: Path):
+def dataset_transition_candidate(published: Path, tmp_path: Path) -> DatasetCandidate:
     import tomllib
 
     from scripts.schema_compatibility.dataset_migration import dataset_migration
@@ -830,7 +839,9 @@ def dataset_transition_candidate(published: Path, tmp_path: Path):
     return root, candidate, witness
 
 
-def dataset_structure(published: Path, candidate: Path, witness=None) -> int:
+def dataset_structure(
+    published: Path, candidate: Path, witness: DatasetMigration | None = None
+) -> int:
     old = published / "src/robotics_runtime_contracts/schemas"
     new = candidate / "src/robotics_runtime_contracts/schemas"
     return check_structure(
@@ -843,7 +854,7 @@ def dataset_structure(published: Path, candidate: Path, witness=None) -> int:
 
 
 def test_exact_dataset_migration_requires_the_explicit_raw_witness(
-    published: Path, dataset_transition_candidate
+    published: Path, dataset_transition_candidate: DatasetCandidate
 ) -> None:
     from dataclasses import replace
 
@@ -858,7 +869,7 @@ def test_exact_dataset_migration_requires_the_explicit_raw_witness(
 
 @pytest.mark.parametrize("mutation", ["another-role", "another-id", "dataset-body"])
 def test_dataset_witness_cannot_bypass_other_role_or_resource_changes(
-    published: Path, dataset_transition_candidate, mutation: str
+    published: Path, dataset_transition_candidate: DatasetCandidate, mutation: str
 ) -> None:
     _, candidate, witness = dataset_transition_candidate
     resources = candidate / "src/robotics_runtime_contracts/schemas"
@@ -880,8 +891,8 @@ def test_dataset_witness_cannot_bypass_other_role_or_resource_changes(
 
 
 def test_dataset_migration_refuses_wrong_package_train(
-    published: Path, dataset_transition_candidate
-):
+    published: Path, dataset_transition_candidate: DatasetCandidate
+) -> None:
     from scripts.schema_compatibility.dataset_migration import dataset_migration
 
     root, candidate, _ = dataset_transition_candidate
@@ -891,7 +902,7 @@ def test_dataset_migration_refuses_wrong_package_train(
 
 
 def test_dataset_migration_replays_all_native_cases_without_changing_historical_facts(
-    published: Path, dataset_transition_candidate
+    published: Path, dataset_transition_candidate: DatasetCandidate
 ) -> None:
     _, candidate, witness = dataset_transition_candidate
     before = {path: path.read_bytes() for path in semantic.FIXTURES.rglob("*") if path.is_file()}
@@ -900,7 +911,7 @@ def test_dataset_migration_replays_all_native_cases_without_changing_historical_
 
 
 def test_dataset_migration_still_catches_unrelated_semantic_mutation(
-    published: Path, dataset_transition_candidate
+    published: Path, dataset_transition_candidate: DatasetCandidate
 ) -> None:
     _, candidate, witness = dataset_transition_candidate
     path = candidate / "src/robotics_runtime_contracts/semantics.py"
@@ -917,7 +928,7 @@ def test_dataset_migration_still_catches_unrelated_semantic_mutation(
 
 
 def test_dataset_refusal_hashes_do_not_bless_another_rejection(
-    published: Path, dataset_transition_candidate, monkeypatch: pytest.MonkeyPatch
+    published: Path, dataset_transition_candidate: DatasetCandidate, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _, candidate, witness = dataset_transition_candidate
     captured = snapshot.capture(published.parents[1], published / "src")
@@ -932,7 +943,10 @@ def test_dataset_refusal_hashes_do_not_bless_another_rejection(
 
 
 def test_dataset_migration_missing_or_bad_row_fails_closed(
-    published: Path, dataset_transition_candidate, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    published: Path,
+    dataset_transition_candidate: DatasetCandidate,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from scripts.schema_compatibility import dataset_migration as migration
 
@@ -950,7 +964,7 @@ def test_dataset_migration_missing_or_bad_row_fails_closed(
 
 
 def test_dataset_refusal_labels_cannot_disagree_with_the_pinned_native_outcome(
-    published: Path, dataset_transition_candidate
+    published: Path, dataset_transition_candidate: DatasetCandidate
 ) -> None:
     from dataclasses import replace
 
@@ -991,6 +1005,7 @@ def test_dataset_release_snapshot_keeps_old_facts_and_new_refusals_separate(tmp_
         "--no-gpg-sign",
         "-m",
         "Record canonical dataset fixtures",
+        "--allow-empty",
     )
     plan = asdict(create_plan(root, "contracts-v0.19.0", event="workflow_dispatch"))
     output = tmp_path / "dataset-release"
