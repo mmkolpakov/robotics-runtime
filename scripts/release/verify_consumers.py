@@ -19,8 +19,8 @@ from scripts.release.verify_install import clean_environment, clean_install, dis
 INFRA_REPOSITORY = "https://github.com/mmkolpakov/robotics-runtime-infra"
 INFRA_COMMIT = "dfbf26e99d3d569f9d25bdc260510220d4dd2872"
 FIXTURE_DIRECTORY = "test/qualification/fixtures"
-PUBLISHED_COMMIT = "efeac712ea512b19523ce41be40752f703fa782b"
-PUBLISHED_VERSIONS = {"contracts": "0.19.0", "harness": "0.20.0"}
+PUBLISHED_COMMIT = "35f6d132caa4e11b55bbeb7693e4672e31b83198"
+PUBLISHED_VERSIONS = {"contracts": "0.19.0", "harness": "0.20.1"}
 
 
 def extract_infra_fixtures(infra: Path, destination: Path) -> tuple[Path, dict[str, Any]]:
