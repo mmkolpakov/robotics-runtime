@@ -9,13 +9,13 @@ Tag pushes must resolve to the checked-out commit and be reachable from `origin/
 
 ## Published pair and dry runs
 
-[Contracts 0.18.2](https://pypi.org/project/robotics-runtime-contracts/0.18.2/) and
-[harness 0.19.1](https://pypi.org/project/robotics-acceptance-harness/0.19.1/) are
+[Contracts 0.19.0](https://pypi.org/project/robotics-runtime-contracts/0.19.0/) and
+[harness 0.20.0](https://pypi.org/project/robotics-acceptance-harness/0.20.0/) are
 published. Their root GitHub release tags are
-[`contracts-v0.18.2`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.18.2)
-and [`harness-v0.19.1`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/harness-v0.19.1).
-Harness declares `robotics-runtime-contracts>=0.18,<0.19`; its release checks use
-the exact contracts 0.18.2 archive. Independent installs of both published packages,
+[`contracts-v0.19.0`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.19.0)
+and [`harness-v0.20.0`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/harness-v0.20.0).
+Harness declares `robotics-runtime-contracts>=0.19,<0.20`; its release checks use
+the exact contracts 0.19.0 archive. Independent installs of both published packages,
 their public writer and CLI, installed file inventories and archive attestations
 were verified outside the workspace.
 
@@ -40,7 +40,7 @@ uv sync --locked --only-group dev --no-install-workspace --python 3.12
 PY="$UV_PROJECT_ENVIRONMENT/bin/python"
 "$PY" -m pytest tests/release
 "$PY" -m scripts.release.plan \
-  --candidate contracts-v0.18.2 --event workflow_dispatch \
+  --candidate contracts-v0.19.0 --event workflow_dispatch \
   --repository mmkolpakov/robotics-runtime --output artifacts/release/plan.json
 uv build --package robotics-runtime-contracts --no-sources --out-dir artifacts/release/dist
 "$PY" -m scripts.release.verify_install \
@@ -60,8 +60,8 @@ version in this checkout**. It never selects a lexically sorted or arbitrary lat
 It requires all of the following, even in dry-run mode:
 
 1. Exactly one unconditional, index-based contracts dependency with the selected minor's
-   lower bound and exclusive next-minor upper bound. Harness `0.19.*` specifically requires
-   `robotics-runtime-contracts>=0.18,<0.19` and a stable contracts `0.18.*` version.
+   lower bound and exclusive next-minor upper bound. Harness `0.20.*` specifically requires
+   `robotics-runtime-contracts>=0.19,<0.20` and a stable contracts `0.19.*` version.
 2. The exact root tag `contracts-vX.Y.Z`, with a published, stable, non-draft GitHub release
    in `mmkolpakov/robotics-runtime`. Imported `contracts-legacy/*` tags do not satisfy this.
 3. An identical Git tree for `packages/contracts/src` and an identical `[project]` table in

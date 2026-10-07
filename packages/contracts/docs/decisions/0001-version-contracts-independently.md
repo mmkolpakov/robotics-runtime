@@ -10,6 +10,10 @@ experimental document generations made producer behavior and review scope
 ambiguous. That assumption no longer applies: harness and infra consume
 different released generations. The outcome below records the historical policy.
 
+Current policy keeps one schema per role with an explicit schema major.
+Dataset v2 supersedes dataset v1 in the 0.19 package line; the historical
+`v1` decision below does not require every current role to retain that version.
+
 ## Decision Drivers
 
 - One obvious writer and reader per document role

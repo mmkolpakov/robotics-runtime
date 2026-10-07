@@ -2,21 +2,17 @@
 
 ## Package Line
 
-The `0.19.x` harness line requires Python `>=3.12,<3.15` and
-`robotics-runtime-contracts>=0.18,<0.19`.
-[Harness 0.19.1](https://pypi.org/project/robotics-acceptance-harness/0.19.1/) and
-[contracts 0.18.2](https://pypi.org/project/robotics-runtime-contracts/0.18.2/)
-are published from the root workspace under `harness-v0.19.1` and
-`contracts-v0.18.2`. Independent installs outside the workspace checked the
-exact pair, its public API/CLI and installed archive contents. Both releases
-come from workspace source `dc02c62897372514537cf241f06dc71b9f960c44`. Later
-source changes, including runtime main `d9dad3d`, have not been published under
-these version numbers.
+The `0.20.x` harness line requires Python `>=3.12,<3.15` and
+`robotics-runtime-contracts>=0.19,<0.20`.
+[Harness 0.20.0](https://pypi.org/project/robotics-acceptance-harness/0.20.0/) and
+[contracts 0.19.0](https://pypi.org/project/robotics-runtime-contracts/0.19.0/)
+are published under `harness-v0.20.0` and `contracts-v0.19.0`.
+Independent installs outside the workspace checked the exact pair, public API,
+CLI and archive contents against their tagged sources.
 
-The packages are pre-1.0. Each public document family has one canonical `v1`;
-superseded experimental v2-v5 schemas and compatibility branches are intentionally
-absent. The first stable release
-will establish the long-term compatibility baseline.
+Each role has one canonical schema. Datasets use v2 for one or multiple
+MCAP members; other current roles use v1. Historical datasets require the
+matching archived package. Current readers do not convert old dataset forms.
 
 ## Document Set
 
