@@ -136,8 +136,9 @@ verdict.
 
 ## Qualification boundaries
 
-The cross-simulator host/provider line is a source development target until its
-published consumer gates pass. Existing package and ROS-profile evidence retains
+The compiled core host has passed release integrity and external installation
+checks. Each cross-simulator host/provider composition remains a development
+target until its own published consumer gates pass. Existing package and ROS-profile evidence retains
 its original scope; new providers are not qualified by an architecture diagram.
 
 Qualification separates physics-only execution, offscreen sensor rendering and
