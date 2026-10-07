@@ -152,9 +152,12 @@ def read_emissions(
         raise HarnessInputError("emissions timestamp_basis must be explicitly unix_ns")
     if len(source) > MAX_DOCUMENT_BYTES:
         raise HarnessInputError("emissions source exceeds the document byte limit")
-    lines = source.splitlines()
-    if len(lines) > MAX_DOCUMENT_NODES:
+    line_count = source.count(b"\n") + int(bool(source) and not source.endswith(b"\n"))
+    if line_count > MAX_DOCUMENT_NODES:
         raise HarnessInputError("emissions lines exceed the document node limit")
+    lines = source.split(b"\n")
+    if not lines[-1]:
+        lines.pop()
     grouped = _bindings_by_topic(bindings)
     digest = sha256(source).hexdigest()
     output: list[MetricSample] = []

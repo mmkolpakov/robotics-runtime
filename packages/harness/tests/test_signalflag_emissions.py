@@ -165,3 +165,37 @@ def test_pinned_actual_emitter_fixture_supports_native_gauge_assertions() -> Non
         evaluate_metric_assertions(({**assertion, "unit": "km/h"},), samples)[0].status == "error"
     )
     assert path.read_bytes() == source
+
+
+@pytest.mark.parametrize("line_ending", [b"\r\n", b"\n", b""])
+def test_jsonl_lf_crlf_and_final_record_without_lf_keep_original_byte_identity(
+    line_ending: bytes,
+) -> None:
+    path = Path(__file__).parent / "fixtures/signalflag/emissions-sdk-1.8.0.jsonl"
+    original = path.read_bytes()
+    lines = original.rstrip(b"\n").split(b"\n")
+    source = (line_ending if line_ending else b"\n").join(lines) + line_ending
+    samples = read(source)
+    assert [sample.value for sample in samples] == [1, 2, 3, 4]
+    assert all(
+        sample.attributes["signalflag.source_sha256"] == sha256(source).hexdigest()
+        for sample in samples
+    )
+    assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize("separator", [b"\r", b"\v", b"\f", b"\n\n"])
+def test_bare_non_lf_separators_and_blank_records_are_not_jsonl(separator: bytes) -> None:
+    path = Path(__file__).parent / "fixtures/signalflag/emissions-sdk-1.8.0.jsonl"
+    original = path.read_bytes()
+    first = original.split(b"\n", 1)[0]
+    with pytest.raises(ContractError):
+        read(first + separator + first)
+    assert path.read_bytes() == original
+
+
+def test_line_count_is_bounded_before_interpreting_many_empty_records() -> None:
+    from robotics_runtime_contracts.serialization import MAX_DOCUMENT_NODES
+
+    with pytest.raises(HarnessInputError, match="lines"):
+        read(b"\n" * (MAX_DOCUMENT_NODES + 1))
