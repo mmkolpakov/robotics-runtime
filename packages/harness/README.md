@@ -398,3 +398,49 @@ See [compatibility](docs/compatibility.md), [architecture decisions](docs/decisi
 [supply-chain assurance](docs/supply-chain.md), and the
 [REP-2004 quality declaration](QUALITY_DECLARATION.md). Security reports follow
 [SECURITY.md](SECURITY.md).
+
+### Optional SignalFlag emissions import
+
+The explicit `robotics_acceptance_harness.signalflag_emissions` module reads the
+JSONL format emitted by SignalFlag SDK 1.8.0. It does not require that SDK at
+runtime. The caller retains the original file through its existing evidence
+path and supplies the original bytes:
+
+```python
+from robotics_acceptance_harness.signalflag_emissions import MetricBinding, read_emissions
+
+samples = read_emissions(
+    raw_emissions,
+    bindings={("motion", "speed"): MetricBinding("org.example.speed", "m/s")},
+    timestamp_basis="unix_ns",
+)
+```
+
+Only explicitly bound numeric fields become native scalar gauge samples.
+Selected records require an exact nonnegative integer timestamp, and the caller
+must establish that it represents Unix nanoseconds. Simulation timestamps and
+records without a known clock cannot be guessed or converted. Missing timestamps
+are allowed on unselected records, which can still be retained as opaque bytes.
+
+The reader reuses the contracts parser for bounded, duplicate-free, finite JSON.
+Total input bytes and line, binding, and sample counts use its existing document
+limits. Booleans and nonnumeric selected values are rejected. Integer values
+must be exactly representable as float gauges; this allows larger representable
+powers while refusing silent rounding. Units come from the binding without
+conversion, and existing metric assertion evaluation remains responsible for
+matching the declared metric unit and threshold.
+
+Samples carry only scoped SignalFlag topic, field, line, source SHA-256, and
+optional event provenance. That digest records byte identity, not filesystem
+integrity or an attestation. Import does not create ROS graph facts, run or domain
+identity, execution status, or a qualification verdict. The SDK endpoint facade
+and server compatibility remain separate planned work.
+
+The default tests also read a frozen fixture produced by the actual SDK 1.8.0
+Emitter. Its SHA-256 is
+`b3d92727949e534172f45a0a79abb654952bf35a93c0c046017d3275043b7ee4`.
+Optional producer tests use an installed, pinned `signalflag==1.8.0` package and
+verify that real scalar, series, event, and untimed output matches those bytes.
+They skip when that optional test dependency is absent; the normal harness has
+no SDK dependency. The official wheel used for producer qualification has
+SHA-256 `5431d8dd8f6332b2f2c8a873f3e45568bffb39b87a8342069be52594918487d4`.

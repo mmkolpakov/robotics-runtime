@@ -1002,6 +1002,17 @@ def test_dataset_release_snapshot_keeps_old_facts_and_new_refusals_separate(tmp_
         shutil.copyfile(
             ROOT / f"packages/{key}/pyproject.toml", root / f"packages/{key}/pyproject.toml"
         )
+    # This fixture recreates the recorded first v1-to-v2 train, independent of
+    # subsequent harness patches using the already published v2 contracts.
+    migration = json.loads(
+        (ROOT / "scripts/schema_compatibility/dataset-v2-migration.json").read_bytes()
+    )
+    harness_metadata = root / "packages/harness/pyproject.toml"
+    declaration = f'version = "{project(root, "harness")["version"]}"'
+    historical_version = migration["after"]["harness_version"]
+    harness_metadata.write_text(
+        harness_metadata.read_text().replace(declaration, f'version = "{historical_version}"', 1)
+    )
     fixtures = root / "packages/contracts/tests/fixtures"
     shutil.rmtree(fixtures)
     shutil.copytree(ROOT / "packages/contracts/tests/fixtures", fixtures)

@@ -1,0 +1,6 @@
+{"$metadata": {"topic": "motion", "timestamp": 1791000000000000000}, "$data": {"speed": 1}}
+{"$metadata": {"topic": "motion", "timestamp": 1791000000000000001}, "$data": {"speed": 2}}
+{"$metadata": {"topic": "motion", "timestamp": 1791000000000000002}, "$data": {"speed": 3}}
+{"$metadata": {"topic": "motion", "timestamp": 1791000000000000003, "event": true}, "$data": {"speed": 4}}
+{"$metadata": {"topic": "note", "timestamp": 1791000000000000004, "event": true}, "$data": {"text": "opaque"}}
+{"$metadata": {"topic": "untimed"}, "$data": {"value": 7}}
