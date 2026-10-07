@@ -54,16 +54,14 @@ unrelated published schemas and historical byte identities remain strict.
 ## Install
 
 The published pair is
-[harness 0.19.2](https://pypi.org/project/robotics-acceptance-harness/0.19.2/) with
-[contracts 0.18.3](https://pypi.org/project/robotics-runtime-contracts/0.18.3/):
+[harness 0.20.0](https://pypi.org/project/robotics-acceptance-harness/0.20.0/) with
+[contracts 0.19.0](https://pypi.org/project/robotics-runtime-contracts/0.19.0/):
 
 ```bash
 uv venv
-uv pip install robotics-acceptance-harness==0.19.2 robotics-runtime-contracts==0.18.3
+uv pip install robotics-acceptance-harness==0.20.0 robotics-runtime-contracts==0.19.0
 ```
 
-This source workspace targets harness 0.20.0 and contracts 0.19.0 with the
-canonical dataset format. It is separate from the older published pair.
 Development uses both packages and the dependency graph in the root `uv.lock`:
 
 ```bash

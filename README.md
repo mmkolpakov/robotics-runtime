@@ -22,11 +22,11 @@ harness to evaluate evidence for a supported qualification profile. Use infra
 to launch a composition and record what actually ran.
 
 The published pair is
-[contracts 0.18.3](https://pypi.org/project/robotics-runtime-contracts/0.18.3/) and
-[harness 0.19.2](https://pypi.org/project/robotics-acceptance-harness/0.19.2/):
+[contracts 0.19.0](https://pypi.org/project/robotics-runtime-contracts/0.19.0/) and
+[harness 0.20.0](https://pypi.org/project/robotics-acceptance-harness/0.20.0/):
 
 ```bash
-python -m pip install robotics-runtime-contracts==0.18.3 robotics-acceptance-harness==0.19.2
+python -m pip install robotics-runtime-contracts==0.19.0 robotics-acceptance-harness==0.20.0
 robotics-contracts --help
 robotics-acceptance --help
 ```
@@ -36,7 +36,7 @@ Package reference:
 [harness](packages/harness/README.md),
 [consumer examples](packages/contracts/consumer-examples/README.md).
 
-Harness requires contracts `>=0.18,<0.19`; release checks install the exact
+Harness requires contracts `>=0.19,<0.20`; release checks install the exact
 published pair outside the workspace. Package installation does not qualify
 a simulator, image, accelerator or physical target.
 
