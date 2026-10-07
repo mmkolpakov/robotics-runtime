@@ -1,0 +1,10 @@
+ARG API_IMAGE
+FROM ${API_IMAGE}
+USER root
+COPY api/test/sdk-requirements.lock /tmp/sdk-requirements.lock
+RUN /usr/local/bin/uv pip install --python /opt/contracts/bin/python --require-hashes --no-deps --no-cache --requirement /tmp/sdk-requirements.lock
+COPY --chmod=0444 api/test/sdk-consumer.py /opt/sdk/sdk-consumer.py
+COPY --chmod=0444 api/test/fault-proxy.mjs /opt/sdk/fault-proxy.mjs
+USER 1000:1000
+WORKDIR /work
+ENTRYPOINT ["/opt/contracts/bin/python","/opt/sdk/sdk-consumer.py"]

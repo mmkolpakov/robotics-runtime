@@ -1,0 +1,30 @@
+{
+  "sdk": {
+    "version": "1.8.0",
+    "source": "61dc5b41c19872520cee799098b93b11f1e2692e",
+    "wheelSha256": "5431d8dd8f6332b2f2c8a873f3e45568bffb39b87a8342069be52594918487d4"
+  },
+  "node": "docker.io/library/node@sha256:b64fccfbcd1ae10d11b969a868b50e1c2530a7054813d5cdea04ac3bce551697",
+  "postgres": "docker.io/library/postgres@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336",
+  "keycloak": "quay.io/keycloak/keycloak@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc",
+  "s3": "docker.io/chrislusf/seaweedfs@sha256:d47c7ee99fcb951351d7194915f4e3a5ea604a8e8871183d713907dec4fb9bf5",
+  "retention": {
+    "source": "2da1a0fae011cf59e8acfc5ec1ec340ca990cd4f",
+    "files": {
+      "retained-artifact.py": "398bf5e45b215d50e67433071ef218f4dff58fca44ab056114fdd6f180c2098c",
+      "receipt-inputs.py": "d8a9afc880ca3fcc876e6f17116a7f4ac49c1164b0ce5d7f6230b4ef3ff6b13e"
+    }
+  },
+  "scope": "source integration fixture only; no immutable API release or AWS deployment",
+  "init": {
+    "implementation": "stock Ubuntu catatonit",
+    "sha256": "43e9b836ca7631672f12d0610cd574875b62d236dfd62e3b86751f35862e5eba"
+  },
+  "fixtureSource": {
+    "repository": "https://github.com/mmkolpakov/robotics-runtime-infra.git",
+    "revision": "2da1a0fae011cf59e8acfc5ec1ec340ca990cd4f",
+    "workspaceRevision": "efeac712ea512b19523ce41be40752f703fa782b",
+    "contracts": "0.19.0",
+    "harness": "0.20.0"
+  }
+}

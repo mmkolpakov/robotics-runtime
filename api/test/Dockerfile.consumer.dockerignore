@@ -1,0 +1,7 @@
+**
+!api/
+!api/test/
+!api/test/sdk-requirements.lock
+!api/test/sdk-consumer.py
+!api/test/fault-proxy.mjs
+!api/test/Dockerfile.consumer

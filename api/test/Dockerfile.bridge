@@ -1,0 +1,4 @@
+ARG EVIDENCE_IMAGE
+FROM ${EVIDENCE_IMAGE}
+USER 0:0
+RUN ln -s /opt/venv /opt/contracts
