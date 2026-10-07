@@ -1,4 +1,4 @@
-workspace "Robotics execution and qualification" "Joint platform from robotics-runtime and robotics-runtime-infra; source host and candidate providers are separate from the published Python pair." {
+workspace "Robotics execution and qualification" "Joint platform from robotics-runtime and robotics-runtime-infra; compiled host and Python packages have separate releases; provider qualification is profile-scoped." {
     !identifiers hierarchical
     model {
         integrator = person "Integrator" "Selects profiles and verifies evidence."
@@ -17,8 +17,8 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         registries = softwareSystem "Artifact registries" "Immutable packages, images and attestations." {
             tags "External"
         }
-        platform = softwareSystem "Robotics runtime platform" "Source host, published Python tools; providers per profile." {
-            host = container "Run host" "Source lifecycle." "Node 24 / Cordis / Execa" {
+        platform = softwareSystem "Robotics runtime platform" "Published host and Python tools; providers per profile." {
+            host = container "Run host" "Prerelease ESM host." "Node 24 / Cordis / Execa" {
                 tags "Host"
             }
             documents = container "Document CLI" "Published contracts." "Python CLI" {
