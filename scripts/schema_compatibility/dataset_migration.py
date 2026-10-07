@@ -134,17 +134,22 @@ def dataset_migration(
     if old_name == old["schema_name"]:
         if (release.tag, release.commit) != (old["tag"], old["commit"]):
             raise ReviewRequired("Dataset migration published baseline differs")
-    elif old_name != new["schema_name"] or release.tag != "contracts-v0.19.0":
+        versions = (
+            tomllib.loads((candidate / "pyproject.toml").read_text())["project"]["version"],
+            tomllib.loads((root / "packages/harness/pyproject.toml").read_text())["project"][
+                "version"
+            ],
+        )
+        if versions != (new["contracts_version"], new["harness_version"]):
+            raise ReviewRequired("Dataset migration requires contracts0.19.0/harness0.20.0 train")
+    elif old_name != new["schema_name"] or (release.tag, release.commit) != (
+        "contracts-v0.19.0",
+        "6c8bc47d1bc416e1b40cdaebf04983e172e78c21",
+    ):
         raise ReviewRequired("Dataset migration published baseline differs")
     original = git(root, "rev-parse", f"refs/tags/{old['tag']}^{{commit}}").decode().strip()
     if original != old["commit"]:
         raise ReviewRequired("Dataset migration immutable source tag moved")
-    versions = (
-        tomllib.loads((candidate / "pyproject.toml").read_text())["project"]["version"],
-        tomllib.loads((root / "packages/harness/pyproject.toml").read_text())["project"]["version"],
-    )
-    if versions != (new["contracts_version"], new["harness_version"]):
-        raise ReviewRequired("Dataset migration requires contracts0.19.0/harness0.20.0 train")
     witness = DatasetMigration(
         row,
         git(
