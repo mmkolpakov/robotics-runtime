@@ -1042,7 +1042,14 @@ def test_dataset_release_snapshot_keeps_old_facts_and_new_refusals_separate(tmp_
 
     # Creating the contracts tag must not make the subsequent train snapshot
     # reinterpret old witnesses or bypass v2-to-v2 structural checks.
-    history.git(root, "tag", "contracts-v0.19.0")
+    history.git(
+        root,
+        "fetch",
+        "--quiet",
+        "--no-tags",
+        str(ROOT),
+        "refs/tags/contracts-v0.19.0:refs/tags/contracts-v0.19.0",
+    )
     later = tmp_path / "after-contracts-tag"
     snapshot.write_release(root, plan, later)
     assert (later / "semantic-old-tool-contexts.json").read_bytes() == (
@@ -1066,3 +1073,30 @@ def test_dataset_release_snapshot_keeps_old_facts_and_new_refusals_separate(tmp_
         semantic.check_semantics(published, root / "packages/contracts", dataset_transition=witness)
         == 375
     )
+
+
+def test_published_v2_keeps_harness_patch_releases_independent(
+    tmp_path: Path, dataset_transition_candidate: DatasetCandidate
+) -> None:
+    from scripts.schema_compatibility.dataset_migration import dataset_migration
+
+    root, candidate, _ = dataset_transition_candidate
+    release = history.baseline(ROOT)
+    published_v2 = history.extract(ROOT, release, tmp_path / "published-v2")
+    (root / "packages/harness/pyproject.toml").write_text('[project]\nversion = "0.20.1"\n')
+    wrong = history.Baseline(release.tag, "0" * 40, release.prefix)
+    with pytest.raises(ReviewRequired, match="published baseline differs"):
+        dataset_migration(root, wrong, published_v2, candidate)
+    witness = dataset_migration(root, release, published_v2, candidate)
+    assert witness is not None
+    assert dataset_structure(published_v2, candidate, witness) == len(
+        read_schemas(published_v2 / "src/robotics_runtime_contracts/schemas")
+    )
+    assert semantic.check_semantics(published_v2, candidate, dataset_transition=witness) == 375
+
+    schema_path = (
+        candidate / "src/robotics_runtime_contracts/schemas/dataset-manifest.v2.schema.json"
+    )
+    schema_path.write_bytes(schema_path.read_bytes() + b" ")
+    with pytest.raises(ReviewRequired, match="SHA256"):
+        dataset_migration(root, release, published_v2, candidate)
