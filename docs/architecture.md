@@ -57,6 +57,26 @@ batches, jobs, emissions, artifact uploads and closure with a preconfigured
 project/branch and `metrics_config_path=None`. Default metrics configuration uses
 a separate GraphQL path and is outside this initial subset.
 
+The initial qualification journey is a completed external test, not a scheduled
+workload. With an existing project and branch, the installed SDK must create a
+batch and test, emit single-point/series/event data, attach a file and close both
+contexts. Six REST operations plus the actual presigned PUT transfer form this
+bounded surface. Successful metadata responses alone do not qualify uploads,
+retention or result processing.
+
+SDK compatibility is counted by completed supported journeys. Native contracts,
+evaluation and export are reusable components, not completed SDK operations.
+The full default configuration path adds GraphQL configuration synchronization;
+project-name lookup, systems and test-suite options also need their own API
+support. They remain outside the initial surface until separately qualified.
+
+The installed SDK producer uses the upstream Emitter for its JSONL format.
+The adapter retains those original bytes as artifacts. Explicit topic, unit and
+timestamp mappings can create native observations without replacing the source.
+Missing mappings, unsupported types, unknown units or an unbound clock block
+only conversion or evaluation that requires them. Opaque upload and retention
+remain available without a metrics configuration or timestamp.
+
 This facade is not implemented or qualified. Support requires an unmodified
 installed SDK to pass against our endpoint, including required response fields,
 authorization, upload verification, errors and duplicate submissions. Unsupported
@@ -75,6 +95,18 @@ comparison and cost controls are platform requirements with separate acceptance.
 They use maintained identity, storage, query and deployment services. Adding an
 API facade does not qualify those services, establish an SLA or confer a security
 certification.
+
+## Agent access
+
+Product MCP is planned as an optional adapter over the same public operations,
+using the maintained MCP SDK. Its first scope is reading run status, evaluation
+diagnostics, metrics and verified artifact references. The development
+home-compute and CodeGraph servers are not product interfaces.
+
+A Web UI is outside the current implementation sequence. This does not remove
+the metadata, identity, storage and authorization required by SDK clients.
+Execution controls can be exposed through MCP only with the existing admission
+and ownership rules; they do not create a second run manager.
 
 ## Simulator providers
 
