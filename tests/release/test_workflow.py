@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 WORKFLOW = Path(__file__).resolve().parents[2] / ".github/workflows/release.yml"
@@ -127,3 +130,63 @@ def test_release_requires_published_compatibility_before_build_and_capture() -> 
     assert compatibility < names.index(
         "Capture the source-bound compatibility corpus outside distributions"
     )
+
+
+@pytest.mark.parametrize("ready_at,attempts,successful", [(3, 3, True), (99, 6, False)])
+def test_release_verification_waits_boundedly_without_skipping_signatures(
+    tmp_path: Path, ready_at: int, attempts: int, successful: bool
+) -> None:
+    steps = workflow()["jobs"]["github-release"]["steps"]
+    script = next(
+        step["run"] for step in steps if step.get("name") == "Verify immutable release assets"
+    )
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    gh = tools / "gh"
+    gh.write_text(
+        """#!/usr/bin/env bash
+set -eu
+if [[ "$1 $2" == "release verify" ]]; then
+  count=0
+  if [[ -f "$VERIFY_COUNT" ]]; then count=$(cat "$VERIFY_COUNT"); fi
+  count=$((count + 1))
+  printf '%s\\n' "$count" > "$VERIFY_COUNT"
+  [[ "$count" -ge "$VERIFY_READY_AT" ]]
+elif [[ "$1 $2" == "release verify-asset" ]]; then
+  printf '%s\\n' "$4" >> "$VERIFY_ASSETS"
+else
+  exit 90
+fi
+"""
+    )
+    gh.chmod(0o755)
+    sleep = tools / "sleep"
+    sleep.write_text("#!/usr/bin/env bash\nexit 0\n")
+    sleep.chmod(0o755)
+    for name in ("dist/archive.whl", "corpus/semantic.json"):
+        path = tmp_path / name
+        path.parent.mkdir(exist_ok=True)
+        path.write_bytes(b"verification fixture")
+    count = tmp_path / "attempts"
+    assets = tmp_path / "assets"
+    result = subprocess.run(
+        ["bash", "-eu", "-c", script],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "PATH": str(tools) + os.pathsep + os.environ["PATH"],
+            "CANDIDATE": "contracts-v0.19.0",
+            "VERIFY_COUNT": str(count),
+            "VERIFY_ASSETS": str(assets),
+            "VERIFY_READY_AT": str(ready_at),
+        },
+        capture_output=True,
+        timeout=10,
+        check=False,
+    )
+    assert (result.returncode == 0) is successful, result.stderr
+    assert int(count.read_text()) == attempts
+    if successful:
+        assert assets.read_text().splitlines() == ["dist/archive.whl", "corpus/semantic.json"]
+    else:
+        assert not assets.exists()

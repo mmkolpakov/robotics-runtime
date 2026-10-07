@@ -31,13 +31,13 @@ they do not select a schema.
 ## Install
 
 Python 3.12 through 3.14 is supported. The current published version is
-[0.18.2 on PyPI](https://pypi.org/project/robotics-runtime-contracts/0.18.2/), with
+[0.19.0 on PyPI](https://pypi.org/project/robotics-runtime-contracts/0.19.0/), with
 archives in the root workspace's
-[tagged release](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.18.2):
+[tagged release](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.19.0):
 
 ```bash
 uv venv
-uv pip install robotics-runtime-contracts==0.18.2
+uv pip install robotics-runtime-contracts==0.19.0
 ```
 
 Release assets include build-provenance attestations. See
@@ -113,9 +113,10 @@ evidence or process memory; existing MCAP record/chunk limits still apply.
 
 ## Contract Set
 
-Release 0.18.2 publishes one catalogued `v1` contract set. These identifiers are
-not compatible with every historical `v1` document. The
-machine-readable source of truth is
+Release 0.19.0 publishes one canonical schema per role. Datasets use
+`dataset-manifest.v2` for a complete bag of one or multiple MCAP members;
+other existing roles use v1. Historical dataset-v1 documents require their
+matching archived package. The machine-readable source of truth is
 [`catalog.v1.json`](src/robotics_runtime_contracts/schemas/catalog.v1.json).
 
 | Area | Public roles |
@@ -127,9 +128,10 @@ machine-readable source of truth is
 | Physical safety | execution permit, verification, trust policy |
 | Cross-domain transport | channel, observation, clock relation, causal chain, qualification result |
 
-Every public document uses JSON Schema Draft 2020-12, declares a
-`schema_version` ending in `.v1`, rejects unknown root fields, and has an ID in
-the `urn:robotics-runtime-contracts:v1:*` namespace. Internal schema resources
+Every public document uses JSON Schema Draft 2020-12, declares
+`schema_version`, and rejects unknown root fields. Dataset IDs use the
+`urn:robotics-runtime-contracts:v2:*` namespace; other current role IDs use
+`urn:robotics-runtime-contracts:v1:*`. Internal schema resources
 exist only to remove duplication and are not document roles.
 
 The published catalog includes `execution_trust_policy` and `robot_description`. See
@@ -147,8 +149,8 @@ reverse-domain namespaces such as
 `org.example.sorting`; schema bytes are supplied by the caller and are never
 fetched from the network.
 
-For compatibility, seven existing v1 roles retain unpinned extensions when
-`extension_schemas` is absent: acceptance result, dataset manifest, evidence
+Six existing v1 roles permit unpinned extensions when
+`extension_schemas` is absent: acceptance result, evidence
 index, execution permit, execution verification, model artifact manifest, and
 runtime manifest. Adding the field opts into strict validation, including when
 the declaration list is empty. An unpinned legacy payload has no schema-integrity
@@ -322,9 +324,9 @@ adopting a context-manager API. Paths must not be persisted for another process.
 
 ## Version Policy
 
-The published harness 0.19.1 uses contracts 0.18.2. Both releases come from
-workspace source `dc02c62897372514537cf241f06dc71b9f960c44`. Later source
-changes have not been published under these versions. Infra's accepted R9
+The published harness 0.20.0 requires contracts `>=0.19,<0.20`. The current
+pair is contracts 0.19.0 and harness 0.20.0; their tagged package sources and
+installed inventories are verified separately. Infra's accepted R9
 stock profile and published R10 have separate evidence scopes; R10's released
 B3 run is not accepted. See [COMPATIBILITY.md](COMPATIBILITY.md).
 Published schema names now permit only additive changes; breaking changes
