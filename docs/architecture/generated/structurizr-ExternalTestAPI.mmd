@@ -4,12 +4,12 @@ graph TB
   subgraph diagram ["Optional external Test API"]
     style diagram fill:#ffffff,stroke:#ffffff
 
-    17("<div style='font-weight: bold'>SDK client</div><div style='font-size: 80%; margin-top:10px'>SignalFlag 1.8.0; project +<br />JWT.</div>")
-    style 17 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    18("<div style='font-weight: bold'>OIDC issuer</div><div style='font-size: 80%; margin-top:10px'>JWT and JWKS.</div>")
+    18("<div style='font-weight: bold'>SDK client</div><div style='font-size: 80%; margin-top:10px'>SignalFlag 1.8.0; project +<br />JWT.</div>")
     style 18 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    19("<div style='font-weight: bold'>Versioned S3</div><div style='font-size: 80%; margin-top:10px'>Opaque object versions.</div>")
+    19("<div style='font-weight: bold'>OIDC issuer</div><div style='font-size: 80%; margin-top:10px'>JWT and JWKS.</div>")
     style 19 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    20("<div style='font-weight: bold'>Versioned S3</div><div style='font-size: 80%; margin-top:10px'>Opaque object versions.</div>")
+    style 20 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
 
     subgraph 7 ["Runtime platform"]
       style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
@@ -22,12 +22,12 @@ graph TB
       style 16 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
     end
 
-    17-- "<div>REST ×6 + config</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->14
-    17-- "<div>Opaque upload</div><div style='font-size: 70%'>[Presigned PUT]</div>" -->19
-    14-- "<div>Verify JWT / JWKS</div><div style='font-size: 70%'>[jose / RS256]</div>" -->18
+    18-- "<div>REST ×6 + config</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->14
+    18-- "<div>Opaque upload</div><div style='font-size: 70%'>[Presigned PUT]</div>" -->20
+    14-- "<div>Verify JWT / JWKS</div><div style='font-size: 70%'>[jose / RS256]</div>" -->19
     14-- "<div>Metadata / proofs</div><div style='font-size: 70%'>[SQL / forced RLS]</div>" -->15
-    14-- "<div>Bind VersionId</div><div style='font-size: 70%'>[Presign / HEAD]</div>" -->19
+    14-- "<div>Bind VersionId</div><div style='font-size: 70%'>[Presign / HEAD]</div>" -->20
     14-- "<div>Custody commands</div><div style='font-size: 70%'>[Core Jobs / argv]</div>" -->16
-    16-- "<div>Exact-version bytes</div><div style='font-size: 70%'>[CLI / GET]</div>" -->19
+    16-- "<div>Exact-version bytes</div><div style='font-size: 70%'>[CLI / GET]</div>" -->20
 
   end

@@ -1,0 +1,25 @@
+{
+  "name": "@robotics-runtime/mcp",
+  "version": "0.1.0-rc.0",
+  "private": true,
+  "type": "module",
+  "description": "Optional offline MCP tools over published robotics CLI interfaces",
+  "engines": {
+    "node": "24.21.0",
+    "npm": "11.19.0"
+  },
+  "packageManager": "npm@11.19.0",
+  "bin": {
+    "robotics-runtime-mcp": "bin/server.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.3.1",
+    "@robotics-runtime/host": "https://github.com/mmkolpakov/robotics-runtime/releases/download/host-v0.1.0-rc.0/robotics-runtime-host-0.1.0-rc.0.tgz"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.3.1"
+  }
+}

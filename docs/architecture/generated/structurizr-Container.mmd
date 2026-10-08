@@ -4,8 +4,10 @@ graph LR
   subgraph diagram ["Execution and external Test boundaries"]
     style diagram fill:#ffffff,stroke:#ffffff
 
-    17("<div style='font-weight: bold'>SDK client</div><div style='font-size: 80%; margin-top:10px'>SignalFlag 1.8.0; project +<br />JWT.</div>")
-    style 17 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    18("<div style='font-weight: bold'>SDK client</div><div style='font-size: 80%; margin-top:10px'>SignalFlag 1.8.0; project +<br />JWT.</div>")
+    style 18 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    21("<div style='font-weight: bold'>MCP client</div><div style='font-size: 80%; margin-top:10px'>Local trusted operator.</div>")
+    style 21 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
 
     subgraph 7 ["Runtime platform"]
       style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
@@ -21,6 +23,8 @@ graph LR
       style 13 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
       14("<div style='font-weight: bold'>External Test API</div><div style='font-size: 80%; margin-top:10px'>Producer metadata and upload<br />custody.</div>")
       style 14 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
+      17("<div style='font-weight: bold'>Offline MCP</div><div style='font-size: 80%; margin-top:10px'>Six read tools; source<br />package.</div>")
+      style 17 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
       8("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Lifecycle and owned jobs.</div>")
       style 8 fill:#dbeafe,stroke:#2563eb,color:#0f172a
     end
@@ -28,6 +32,8 @@ graph LR
     8-- "<div>Lifecycle jobs</div><div style='font-size: 70%'>[Compose / argv]</div>" -->11
     11-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->13
     8-- "<div>Export / cleanup proof</div><div style='font-size: 70%'>[Callback refs]</div>" -->13
-    17-- "<div>REST ×6 + config</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->14
+    18-- "<div>REST ×6 + config</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->14
+    21-- "<div>Artifact IDs</div><div style='font-size: 70%'>[MCP / stdio]</div>" -->17
+    17-- "<div>Registered local files</div><div style='font-size: 70%'>[SHA-256 / size]</div>" -->13
 
   end

@@ -10,6 +10,8 @@ graph LR
     style 2 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
     4("<div style='font-weight: bold'>Control endpoint</div><div style='font-size: 80%; margin-top:10px'>Selected SDK; transport, peer<br />and effects differ.</div>")
     style 4 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    21("<div style='font-weight: bold'>MCP client</div><div style='font-size: 80%; margin-top:10px'>Local trusted operator.</div>")
+    style 21 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
 
     subgraph 7 ["Runtime platform"]
       style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
@@ -25,6 +27,8 @@ graph LR
 
       13[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Retained bytes.</div>")]
       style 13 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
+      17("<div style='font-weight: bold'>Offline MCP</div><div style='font-size: 80%; margin-top:10px'>Six read tools; source<br />package.</div>")
+      style 17 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
       8("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Lifecycle and owned jobs.</div>")
       style 8 fill:#dbeafe,stroke:#2563eb,color:#0f172a
     end
@@ -38,5 +42,9 @@ graph LR
     9-- "<div>Write documents</div><div style='font-size: 70%'>[Files]</div>" -->13
     10-- "<div>Read bytes / write verdicts</div><div style='font-size: 70%'>[JSON / JUnit]</div>" -->13
     8-- "<div>Export / cleanup proof</div><div style='font-size: 70%'>[Callback refs]</div>" -->13
+    21-- "<div>Artifact IDs</div><div style='font-size: 70%'>[MCP / stdio]</div>" -->17
+    17-- "<div>Read contracts</div><div style='font-size: 70%'>[Public Jobs / argv]</div>" -->9
+    17-- "<div>Read explanations</div><div style='font-size: 70%'>[Public Jobs / argv]</div>" -->10
+    17-- "<div>Registered local files</div><div style='font-size: 70%'>[SHA-256 / size]</div>" -->13
 
   end

@@ -66,10 +66,17 @@ Core installation and offline evaluation need no vendor account.
 
 ## Agent access
 
-Product MCP is not a supported interface. Its design uses the maintained MCP SDK
-as an optional adapter over public operations and existing authorization.
-Development tools are not product interfaces. A future adapter must reuse
-admission and ownership rather than introduce a second run manager.
+The optional [offline MCP source package](../mcp/README.md) exposes six read
+tools through the maintained SDK's stdio transport. Trusted local bootstrap
+registers immutable artifact IDs and installed public workers. Public host
+`Jobs`, `Documents` and `Evaluation` services delegate to the published
+contracts/harness CLIs; payload JSON stays text. The adapter has no published
+MCP artifact and does not launch observations or evaluators.
+
+Stdio uses local operator trust. HTTP/OAuth, a live run catalog and start/cancel
+tools are not implemented. Future effects must request real admitted consumer
+operations and preserve capture, drain, export and verified cleanup. Disposing
+a Fiber is not a generic cancellation API.
 A Web UI is outside the current product surface.
 
 ## Simulator providers

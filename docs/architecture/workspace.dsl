@@ -47,6 +47,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
                 tags "Database"
             }
             custody = container "Custody CLI" "Bounded verify, sign and receipt." "AWS CLI / cosign / retained-artifact / contracts CLI"
+            mcp = container "Offline MCP" "Six read tools; source package." "Standard MCP SDK / public host workers"
         }
         group "SDK interfaces" {
         externalSdk = softwareSystem "SDK client" "SignalFlag 1.8.0; project + JWT." {
@@ -58,6 +59,9 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         objectStorage = softwareSystem "Versioned S3" "Opaque object versions." {
             tags "External"
         }
+        }
+        mcpClient = softwareSystem "MCP client" "Local trusted operator." {
+            tags "External"
         }
         integrator -> platform "Run / verify"
         product -> platform "Configure / verdicts"
@@ -89,6 +93,10 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         platform.externalApi -> objectStorage "Bind VersionId" "Presign / HEAD"
         platform.externalApi -> platform.custody "Custody commands" "Core Jobs / argv"
         platform.custody -> objectStorage "Exact-version bytes" "CLI / GET"
+        mcpClient -> platform.mcp "Artifact IDs" "MCP / stdio"
+        platform.mcp -> platform.documents "Read contracts" "Public Jobs / argv"
+        platform.mcp -> platform.evaluation "Read explanations" "Public Jobs / argv"
+        platform.mcp -> platform.evidence "Registered local files" "SHA-256 / size"
 
         deploymentEnvironment "Development" {
             deploymentNode "Development host" "Example CPU topology; qualification is profile-scoped." "Windows / WSL2" {
@@ -123,12 +131,12 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
     views {
         systemContext platform "Context" "Actors and system boundary." {
             title "Platform context"
-            include *?
+            include integrator product platform simulators autopilot mediaSource registries externalSdk mcpClient
             autoLayout lr 20 25
         }
         container platform "Container" "Execution/evidence and optional external Test boundaries; complete worker/tool interfaces are in ContainerDetail." {
             title "Execution and external Test boundaries"
-            include platform.host platform.native platform.evidence platform.externalApi externalSdk
+            include platform.host platform.native platform.evidence platform.externalApi externalSdk platform.mcp mcpClient
             autoLayout lr 20 25
         }
         container platform "ContainerDetail" "Complete consumer, controller, simulator and media interface graph." {
@@ -148,7 +156,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         }
         container platform "ConsumerInterfaces" "Product ownership, published document/evaluation tools and retained evidence." {
             title "Consumer interfaces"
-            include integrator product platform.host platform.documents platform.evaluation platform.evidence autopilot
+            include integrator product platform.host platform.documents platform.evaluation platform.evidence autopilot platform.mcp mcpClient
             autoLayout lr 60 70
         }
         deployment platform "Development" "DevelopmentDeployment" "Example CPU development profile; qualification remains profile-scoped." {
