@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {retainDiagnostic,publishSafeFiles} from './safe-diagnostics.mjs';
+import {retainDiagnostic,publishSafeFiles,redactDiagnostics} from './safe-diagnostics.mjs';
 
 test('real fixture diagnostic capture strips HTTP failure authority before retained closure',async()=>{
  const work=await mkdtemp(join(tmpdir(),'api-diagnostic-'));
@@ -22,4 +22,16 @@ test('real fixture diagnostic capture strips HTTP failure authority before retai
   await assert.rejects(publishSafeFiles(work,join(work,'refused'),['payload','raw-failure.log'],[marker]),/authority/);
   await assert.rejects(readFile(join(work,'refused/payload')),/ENOENT/);
  }finally{await rm(work,{recursive:true,force:true})}
+});
+
+test('double sanitization retains structured worker JSON and escaped URL diagnostics',()=>{
+ const marker='synthetic-double-pass-authority';
+ const original=JSON.stringify({kind:'custody-operation-refused',uploadId:'fixed-upload',operation:'download',exitCode:255,
+  stderr:'Could not connect to endpoint URL: "http://s3-fixture:8333/bucket/payload?X-Amz-Signature='+marker+'"\n'});
+ const first=redactDiagnostics(original,[marker]);
+ const second=redactDiagnostics(first,[marker]);
+ const value=JSON.parse(second);
+ assert.equal(value.operation,'download');assert.equal(value.exitCode,255);
+ assert.match(value.stderr,/Could not connect/);assert.match(value.stderr,/s3-fixture:8333\/bucket\/payload/);
+ assert.ok(!second.includes(marker)&&!second.includes('X-Amz-Signature'));
 });

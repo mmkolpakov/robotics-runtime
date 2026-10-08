@@ -8,7 +8,7 @@ import {join,resolve} from 'node:path';
 import {Pool} from 'pg';
 import {S3Client,CreateBucketCommand,PutBucketVersioningCommand,HeadObjectCommand,GetObjectCommand} from '@aws-sdk/client-s3';
 const root=resolve(new URL('../../',import.meta.url).pathname),lock=JSON.parse(await readFile(join(root,'api/test/upstream-lock.json'),'utf8'));
-const owner='rr-sdk-api-'+randomUUID().slice(0,8),network=owner+'-net',names=[],volumes=[];
+const owner='rr-sdk-api-'+randomUUID().slice(0,8),network=owner+'-net',bootstrap=owner+'-bootstrap',names=[],volumes=[],networks=[];
 const engine=process.env.API_FIXTURE_ENGINE??'podman',suite=process.env.API_FIXTURE_SUITE??owner;
 assert.ok(['podman','docker'].includes(engine));assert.match(suite,/^[a-z0-9-]{1,80}$/);
 const apiImage=process.env.API_FIXTURE_IMAGE,sdkImage=process.env.API_FIXTURE_SDK_IMAGE;
@@ -24,13 +24,20 @@ const report={engine,scope:'Installed SDK1.8.0 external Test, local Keycloak/PG1
 function cmd(args){const p=spawnSync(engine,args,{env,encoding:'utf8',timeout:120000});if(p.status!==0)throw new Error(args[0]+' failed: '+p.stderr);return p.stdout.trim()}
 function logs(name){const p=spawnSync(engine,['logs',name],{env,encoding:'utf8',timeout:30000});if(p.status!==0)throw new Error('container logs unavailable');return p.stdout+p.stderr}
 function volume(suffix){const name=owner+'-'+suffix;cmd(['volume','create','--label','org.robotics.runtime.fixture-owner='+owner,'--label','org.robotics.runtime.fixture-suite='+suite,name]);volumes.push(name);return name}
-function launch(suffix,image,args,extra=[]){const name=owner+'-'+suffix;cmd(['run','--detach','--name',name,'--label','org.robotics.runtime.fixture-owner='+owner,'--label','org.robotics.runtime.fixture-suite='+suite,'--log-driver',engine==='docker'?'local':'k8s-file','--network',network,'--network-alias',suffix,...extra,image,...args]);names.push(name);return name}
+function launch(suffix,image,args,extra=[]){const name=owner+'-'+suffix;cmd(['run','--detach','--name',name,'--label','org.robotics.runtime.fixture-owner='+owner,'--label','org.robotics.runtime.fixture-suite='+suite,'--log-driver',engine==='docker'?'local':'k8s-file','--network',network,'--network-alias',suffix,...extra,image,...args]);names.push(name);if(['pg','keycloak','s3-fixture','api'].includes(suffix))cmd(['network','connect','--alias',suffix,bootstrap,name]);return name}
 function port(name,p){return Number(cmd(['port',name,p+'/tcp']).split(':').at(-1))}
 async function eventually(work){let last;for(let i=0;i<120;i++){try{return await work()}catch(e){last=e;await new Promise(r=>setTimeout(r,250))}}throw last}
 async function http(url,options={}){const response=await fetch(url,{...options,signal:options.signal??AbortSignal.timeout(10000)});if(!response.ok)throw new Error('HTTP bootstrap refused '+response.status);if(response.status===204||response.headers.get('content-length')==='0')return null;const raw=await response.text();return raw?JSON.parse(raw):null}
 let pgAdmin,apiAdmin,s3;
 try{
- cmd(['network','create','--internal','--label','org.robotics.runtime.fixture-owner='+owner,'--label','org.robotics.runtime.fixture-suite='+suite,network]);
+ for(const [name,internal]of [[network,true],[bootstrap,false]]){
+  cmd(['network','create',...(internal?['--internal']:[]),'--label','org.robotics.runtime.fixture-owner='+owner,'--label','org.robotics.runtime.fixture-suite='+suite,name]);
+  const item={name,id:null,internal};networks.push(item);
+  const d=JSON.parse(cmd(['network','inspect',name]))[0],labels=d.Labels??d.labels;
+  assert.equal(labels['org.robotics.runtime.fixture-owner'],owner);assert.equal(labels['org.robotics.runtime.fixture-suite'],suite);
+  assert.equal(d.Internal??d.internal,internal);item.id=d.Id??d.id;assert.match(item.id,/^[0-9a-f]{64}$/);
+ }
+
  const pgVolume=volume('pg'),s3Volume=volume('s3'),secretVolume=volume('secrets'),workVolume=volume('work');
  const pg=launch('pg',lock.postgres,[],['--memory','384m','-e','POSTGRES_PASSWORD','-p','127.0.0.1::5432','--mount','type=volume,source='+pgVolume+',target=/var/lib/postgresql']);
  const pgPort=port(pg,5432);
@@ -115,7 +122,30 @@ try{
  report.steps.push({name:'actual-JWT-and-admission-refusals-before-DB-effects',cases:admission,countsUnchanged:true});
 
  const proxy=launch('proxy',sdkImage,['/opt/sdk/fault-proxy.mjs'],['--entrypoint','/usr/local/bin/node','--memory','128m','--mount','type=volume,source='+workVolume+',target=/work','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges']);
- const consumer=launch('consumer',sdkImage,[],['--memory','384m','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--mount','type=volume,source='+secretVolume+',target=/run/secrets,readonly','--mount','type=volume,source='+workVolume+',target=/work','-e','HTTP_PROXY=http://proxy:8080','-e','HTTPS_PROXY=http://proxy:8080','-e','NO_PROXY=']);
+ const consumerCommand='for attempt in $(seq 1 300); do if [ -f /work/network-ready ]; then exec /opt/contracts/bin/python /opt/sdk/sdk-consumer.py; fi; sleep 0.1; done; exit 124';
+ const consumer=launch('consumer',sdkImage,['--','/bin/sh','-c',consumerCommand],['--entrypoint','/usr/local/bin/catatonit','--memory','384m','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--mount','type=volume,source='+secretVolume+',target=/run/secrets,readonly','--mount','type=volume,source='+workVolume+',target=/work','-e','HTTP_PROXY=http://proxy:8080','-e','HTTPS_PROXY=http://proxy:8080','-e','NO_PROXY=']);
+ const topology=[];
+ for(const [name,expected,portNumber]of [[pg,[network,bootstrap],5432],[kc,[network,bootstrap],8080],[seaweed,[network,bootstrap],8333],[api,[network,bootstrap],3000],[proxy,[network],null],[consumer,[network],null]]){
+  const detail=JSON.parse(cmd(['inspect',name]))[0];
+  assert.deepEqual(Object.keys(detail.NetworkSettings.Networks).sort(),[...expected].sort());
+  const bindings=portNumber?detail.NetworkSettings.Ports[portNumber+'/tcp']:null;
+  if(bindings){assert.equal(bindings.length,1);assert.equal(bindings[0].HostIp,'127.0.0.1');assert.match(bindings[0].HostPort,/^[0-9]+$/)}
+  if(portNumber)assert.ok(bindings);
+  topology.push({name,networks:expected,loopbackBindings:bindings});
+ }
+ for(const name of [proxy,consumer]){
+  const routes=cmd(['exec',name,'/usr/local/bin/node','-e',"process.stdout.write(require('node:fs').readFileSync('/proc/net/route','utf8'))"]);
+  const rows=routes.trim().split('\n').slice(1).map(line=>line.trim().split(/\s+/));
+  assert.ok(rows.every(row=>row[1]!=='00000000'),'SDK/proxy must have no default IPv4 route');
+ }
+ for(const item of networks){
+  const d=JSON.parse(cmd(['network','inspect',item.name]))[0];
+  assert.equal(d.Id??d.id,item.id);assert.equal(d.Internal??d.internal,item.internal);
+  const labels=d.Labels??d.labels;
+  assert.equal(labels['org.robotics.runtime.fixture-owner'],owner);assert.equal(labels['org.robotics.runtime.fixture-suite'],suite);
+ }
+ report.steps.push({name:'owned-two-network-bootstrap-and-isolated-SDK-proxy',topology,SDKAndProxyInternalOnly:true,noDefaultIPv4Route:true});
+ cmd(['exec',proxy,'/usr/local/bin/node','-e',"require('node:fs').writeFileSync('/work/network-ready','ready\\n')"]);
  const exit=await eventually(async()=>{const detail=JSON.parse(cmd(['inspect',consumer]))[0];if(detail.State.Running)throw new Error('consumer active');return detail.State.ExitCode});
  if(exit!==0){
   const detail=JSON.parse(cmd(['inspect',consumer]))[0];
@@ -287,7 +317,14 @@ finally{
  await apiAdmin?.end();await pgAdmin?.end();s3?.destroy();
  for(const name of names.reverse()){try{const d=JSON.parse(cmd(['inspect',name]))[0];assert.equal(d.Config.Labels['org.robotics.runtime.fixture-owner'],owner);cmd(['stop','--time','15',name]);cmd(['rm',name])}catch(e){report.cleanupError=String(e)}}
  for(const name of volumes.reverse()){try{const d=JSON.parse(cmd(['volume','inspect',name]))[0];assert.equal(d.Labels['org.robotics.runtime.fixture-owner'],owner);cmd(['volume','rm',name])}catch(e){report.cleanupError=String(e)}}
- try{cmd(['network','rm',network])}catch(e){report.cleanupError=String(e)}
+ for(const item of networks.reverse()){
+  try{
+   const d=JSON.parse(cmd(['network','inspect',item.name]))[0],labels=d.Labels??d.labels;
+   assert.equal(d.Id??d.id,item.id);assert.equal(labels['org.robotics.runtime.fixture-owner'],owner);assert.equal(labels['org.robotics.runtime.fixture-suite'],suite);
+   cmd(['network','rm',item.id]);
+  }catch(e){report.cleanupError=String(e)}
+ }
+
  await rm(secrets,{recursive:true,force:true});
  if(report.cleanupError){report.passed=false;process.exitCode=1}
  const reportBytes=Buffer.from(JSON.stringify(report,null,2)+'\n');assertSafeArtifact(reportBytes,privateValues);
