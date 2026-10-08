@@ -119,6 +119,15 @@ retains opaque uploads through existing custody tools. This source service is se
 native execution and qualification;
 it has no published API image release.
 
+## Planned integrations
+
+These designs are not released capabilities:
+
+- [Product MCP](docs/architecture.md#agent-access) over authorized status,
+  diagnostics and verified artifact-reference operations, using the maintained MCP SDK.
+- Additional native autopilot profiles through upstream ROS 2/DDS interfaces,
+  with [separate control-operation acceptance](docs/architecture.md#native-data).
+
 ## Host development
 
 The host uses the Node version in `host/.node-version` and its own npm lockfile:
