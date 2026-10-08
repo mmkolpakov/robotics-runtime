@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {retainDiagnostic,assertSafeArtifact,redactDiagnostics} from './safe-diagnostics.mjs';
+import {waitForConsumerExit} from './consumer-settlement.mjs';
 import {request as wireRequest} from 'node:http';
 import {randomUUID,randomBytes,createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
@@ -21,7 +22,7 @@ const access=randomBytes(12).toString('hex'),secret=randomBytes(24).toString('he
 const privateValues=[password,kcPassword,apiPassword,access,secret,signingPassword];
 const env={...process.env,POSTGRES_PASSWORD:password,KC_DB_PASSWORD:kcPassword,KC_BOOTSTRAP_ADMIN_PASSWORD:kcPassword,AWS_ACCESS_KEY_ID:access,AWS_SECRET_ACCESS_KEY:secret,COSIGN_PASSWORD:signingPassword};
 const report={engine,scope:'Installed SDK1.8.0 external Test, local Keycloak/PG18.6/SeaweedFS4.29 only',owner,steps:[]};
-function cmd(args){const p=spawnSync(engine,args,{env,encoding:'utf8',timeout:120000});if(p.status!==0)throw new Error(args[0]+' failed: '+p.stderr);return p.stdout.trim()}
+function cmd(args,timeoutMs=120000){const p=spawnSync(engine,args,{env,encoding:'utf8',timeout:timeoutMs});if(p.status!==0)throw new Error(args[0]+' failed: '+p.stderr);return p.stdout.trim()}
 function logs(name){const p=spawnSync(engine,['logs',name],{env,encoding:'utf8',timeout:30000});if(p.status!==0)throw new Error('container logs unavailable');return p.stdout+p.stderr}
 function volume(suffix){const name=owner+'-'+suffix;cmd(['volume','create','--label','org.robotics.runtime.fixture-owner='+owner,'--label','org.robotics.runtime.fixture-suite='+suite,name]);volumes.push(name);return name}
 function launch(suffix,image,args,extra=[]){const name=owner+'-'+suffix;cmd(['run','--detach','--name',name,'--label','org.robotics.runtime.fixture-owner='+owner,'--label','org.robotics.runtime.fixture-suite='+suite,'--log-driver',engine==='docker'?'local':'k8s-file','--network',network,'--network-alias',suffix,...extra,image,...args]);names.push(name);if(['pg','keycloak','s3-fixture','api'].includes(suffix))cmd(['network','connect','--alias',suffix,bootstrap,name]);return name}
@@ -186,7 +187,7 @@ try{
   catch(error){report.diagnosticCaptureFailure={errorName:error.name,errorCode:error.code??null}}
  }
  let exit;
- try{exit=await eventually(async()=>{const detail=JSON.parse(cmd(['inspect',consumer]))[0];if(detail.State.Running)throw new Error('consumer active');return detail.State.ExitCode})}
+ try{exit=await waitForConsumerExit(timeoutMs=>JSON.parse(cmd(['inspect',consumer],timeoutMs))[0].State)}
  catch(error){await preserveConsumerRefusal('settlement-wait-refused');throw error}
  if(exit!==0){await preserveConsumerRefusal('settled-nonzero');throw new Error('installed SDK consumer exited '+exit)}
  cmd(['cp',consumer+':/work/sdk-report.json',join(output,'sdk-report.json')]);const sdk=JSON.parse(await readFile(join(output,'sdk-report.json'),'utf8'));assert.equal(sdk.tenants.length,2);
