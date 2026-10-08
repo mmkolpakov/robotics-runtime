@@ -36,6 +36,20 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             evidence = container "Evidence store" "Retained bytes." "Files / object storage" {
                 tags "Database"
             }
+            externalApi = container "Optional external Test API" "Source service; external producer metadata and opaque byte custody." "Fastify / jose / public core Jobs"
+            apiMetadata = container "External Test metadata" "Tenant/project RLS; upload versions, proof checkpoints and producer claims." "PostgreSQL" {
+                tags "Database"
+            }
+            custody = container "Custody CLI processes" "Finite public download, verification, signature and receipt operations." "AWS CLI / cosign / retained-artifact / contracts CLI"
+        }
+        externalSdk = softwareSystem "External SDK client" "Limited SignalFlag SDK 1.8.0 recipe; project ID and explicit token." {
+            tags "External"
+        }
+        identity = softwareSystem "OIDC issuer" "Configured JWT issuer and JWKS; fixture uses Keycloak." {
+            tags "External"
+        }
+        objectStorage = softwareSystem "Versioned S3 service" "Opaque objects; fixture uses S3-compatible SeaweedFS." {
+            tags "External"
         }
         integrator -> platform "Run and verify workloads"
         product -> platform "Supply config; read verdicts"
@@ -58,6 +72,16 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         platform.documents -> platform.evidence "Write documents" "Files"
         platform.evaluation -> platform.evidence "Read bytes / write verdicts" "JSON / JUnit"
         platform.host -> platform.evidence "Export / cleanup proof" "Callback refs"
+        integrator -> identity "Obtain configured token" "OIDC"
+        integrator -> externalSdk "Provide project and token" "Client configuration"
+        externalSdk -> platform.externalApi "Six REST operations" "JWT / HTTP"
+        externalSdk -> objectStorage "Opaque upload" "Presigned PUT / required headers"
+        platform.externalApi -> identity "Verify JWT with configured JWKS" "jose / RS256"
+        platform.externalApi -> platform.apiMetadata "Authorized metadata and proof checkpoints" "Same-client transaction / forced RLS"
+        platform.externalApi -> objectStorage "Presign and bind exact upload version" "AWS SDK / HEAD"
+        platform.externalApi -> platform.custody "Fixed server-owned operations" "Public core Jobs / bounded argv"
+        platform.custody -> objectStorage "Verify retained bytes at exact VersionId" "Bounded public CLI / GET"
+
         deploymentEnvironment "Home" {
             deploymentNode "Home workstation" "Source WSL CPU topology; qualification is profile-scoped." "Windows / WSL2" {
                 deploymentNode "dev WSL" "Source components; native and media coverage is profile-scoped." "Ubuntu 24.04 / WSL2" {
@@ -96,13 +120,18 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         }
         container platform "Container" "Owned processes and retained data; native interfaces are in ContainerDetail." {
             title "Process composition"
-            include platform.host platform.documents platform.evaluation platform.native platform.media platform.evidence
+            include platform.host platform.documents platform.evaluation platform.native platform.media platform.evidence platform.externalApi platform.apiMetadata platform.custody externalSdk identity objectStorage
             autoLayout lr 60 60
         }
         container platform "ContainerDetail" "Complete consumer, controller, simulator and media interface graph." {
             title "Native and consumer interfaces"
             include *
             autoLayout lr 80 100
+        }
+        container platform "ExternalTestAPI" "Optional source API; external producer metadata and custody are separate from native qualification." {
+            title "Optional external Test API"
+            include integrator externalSdk identity objectStorage platform.externalApi platform.apiMetadata platform.custody
+            autoLayout lr 70 80
         }
         container platform "NativeInterfaces" "Selected simulator, media and SDK dependencies; no common frame or control bus." {
             title "Native interfaces"

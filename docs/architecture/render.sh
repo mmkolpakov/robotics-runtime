@@ -20,7 +20,7 @@ mkdir -p generated
 "$engine" run --rm --platform linux/amd64 --network none "${mapping[@]}" --user "$owner" \
   -v "$PWD:/usr/local/structurizr" "$structurizr" \
   export -workspace workspace.dsl -format mermaid -output generated
-for view in Context Container ContainerDetail NativeInterfaces ConsumerInterfaces HomeDeployment ExecutionDeployment; do
+for view in Context Container ContainerDetail ExternalTestAPI NativeInterfaces ConsumerInterfaces HomeDeployment ExecutionDeployment; do
   "$engine" run --rm --platform linux/amd64 --network none "${mapping[@]}" --user "$owner" \
     -v "$PWD:/data" "$mermaid" -c mermaid-config.json \
     -i "generated/structurizr-$view.mmd" -o "generated/$view.svg"

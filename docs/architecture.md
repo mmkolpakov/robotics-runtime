@@ -44,57 +44,44 @@ provider/controller responsibility.
 
 ## External API compatibility
 
-External SDK compatibility is a planned adoption path, separate from the native
-runtime model. An optional facade can translate a versioned public API into
-native run, attempt and evidence operations. Vendor identifiers, status models,
-authentication details and metric formats end at that boundary. Execution status
-does not substitute for an independent qualification verdict.
+The optional [external Test API](external-test-api.md) is a source service for
+a limited MIT SignalFlag SDK
+[`sdk-v1.8.0`](https://github.com/resim-ai/open-core/tree/sdk-v1.8.0/signalflag/sdk)
+recipe. An unmodified installed client uses a configured endpoint, a real JWT,
+an existing project and branch, and explicit `metrics_config_path=None` and
+`templates_path=None`.
 
-The first research target is the MIT SignalFlag SDK
-[`sdk-v1.8.0`](https://github.com/resim-ai/open-core/tree/sdk-v1.8.0/signalflag/sdk).
-Its client supports a configurable backend. The candidate subset covers external
-batches, jobs, emissions, artifact uploads and closure with a preconfigured
-project/branch and `metrics_config_path=None`. Default metrics configuration uses
-a separate GraphQL path and is outside this initial subset.
+The supported journey creates a light batch and test, emits single-point,
+series and event JSONL, uploads files, and closes both contexts. Six REST
+operations and actual presigned PUTs are exercised together. Current source CI
+covers two tenants, JSONL/PNG/empty uploads, lost registration/close responses,
+eight concurrent closes, and recovery of a missing PUT across an API restart.
+Exact-version payloads, signatures, public receipts and preserved checkpoints
+are verified independently.
 
-The initial qualification journey is a completed external test, not a scheduled
-workload. With an existing project and branch, the installed SDK must create a
-batch and test, emit single-point/series/event data, attach a file and close both
-contexts. Six REST operations plus the actual presigned PUT transfer form this
-bounded surface. Successful metadata responses alone do not qualify uploads,
-retention or result processing.
+The service uses Fastify, jose JWT verification, PostgreSQL tenant/project RLS,
+and versioned S3 storage. Existing public core Jobs run bounded public custody
+CLIs; they download and verify the original bytes, sign statements and produce
+receipts. Per-upload proof checkpoints are committed before the final close.
+Producer-reported `SUCCEEDED` or `ERROR` remains external metadata. This API
+does not create a native RunOwner, schedule a simulator, convert emissions into
+native observations or produce a qualification verdict.
 
-SDK compatibility is counted by completed supported journeys. Native contracts,
-evaluation and export are reusable components, not completed SDK operations.
-The full default configuration path adds GraphQL configuration synchronization;
-project-name lookup, systems and test-suite options also need their own API
-support. They remain outside the initial surface until separately qualified.
+Default SDK metrics configuration adds GraphQL synchronization and BFF routing.
+Project-name lookup, systems, test suites, metrics sets and SDK Auth0 helpers
+are also outside this recipe. Web UI and product MCP remain separate work.
+Opaque retention does not imply native time, topic, unit or result semantics.
 
-The installed SDK producer uses the upstream Emitter for its JSONL format.
-The adapter retains those original bytes as artifacts. Explicit topic, unit and
-timestamp mappings can create native observations without replacing the source.
-Missing mappings, unsupported types, unknown units or an unbound clock block
-only conversion or evaluation that requires them. Opaque upload and retention
-remain available without a metrics configuration or timestamp.
+This is a source integration, separate from the released host and Python
+packages. It has no published API image or deployment qualification. The local
+S3-compatible fixture establishes the tested protocol behavior, not AWS
+qualification. Compatibility does not cover the vendor's closed backend,
+full SDK parity, an SLA or a security certification.
 
-This facade is not implemented or qualified. Support requires an unmodified
-installed SDK to pass against our endpoint, including required response fields,
-authorization, upload verification, errors and duplicate submissions. Unsupported
-operations and options must fail explicitly. Compatibility claims name the SDK
-version, schema and supported operations; they do not cover the vendor's closed
-backend or worker protocol.
-
-Native MCAP, OTLP and signed evidence remain authoritative. Core installation and
-offline evaluation do not require the external SDK or a vendor account.
-Product-specific extensions use a separate namespace and capability declaration,
-so the platform can improve its internals without silently changing supported
-external behavior.
-
-Self-hosting, identity integration, tenant isolation, configurable retention,
-comparison and cost controls are platform requirements with separate acceptance.
-They use maintained identity, storage, query and deployment services. Adding an
-API facade does not qualify those services, establish an SLA or confer a security
-certification.
+Native contracts, evaluation and evidence remain independent. Core installation
+and offline evaluation require no external SDK or vendor account. See the
+[optional API process view](architecture/generated/ExternalTestAPI.svg) for the
+JWT, metadata, storage and custody boundary.
 
 ## Agent access
 

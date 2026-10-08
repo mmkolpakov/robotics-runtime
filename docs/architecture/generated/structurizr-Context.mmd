@@ -6,6 +6,12 @@ graph LR
 
     1["<div style='font-weight: bold'>Integrator</div><div style='font-size: 80%; margin-top:10px'>Selects profiles and verifies<br />evidence.</div>"]
     style 1 fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
+    17("<div style='font-weight: bold'>External SDK client</div><div style='font-size: 80%; margin-top:10px'>Limited SignalFlag SDK 1.8.0<br />recipe; project ID and<br />explicit token.</div>")
+    style 17 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    18("<div style='font-weight: bold'>OIDC issuer</div><div style='font-size: 80%; margin-top:10px'>Configured JWT issuer and<br />JWKS; fixture uses Keycloak.</div>")
+    style 18 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    19("<div style='font-weight: bold'>Versioned S3 service</div><div style='font-size: 80%; margin-top:10px'>Opaque objects; fixture uses<br />S3-compatible SeaweedFS.</div>")
+    style 19 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
     2("<div style='font-weight: bold'>Product application</div><div style='font-size: 80%; margin-top:10px'>Robot, NSU, control and<br />vision behavior.</div>")
     style 2 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
     3("<div style='font-weight: bold'>Simulation engines</div><div style='font-size: 80%; margin-top:10px'>Gazebo / Webots / Isaac;<br />profile-scoped.</div>")
@@ -25,5 +31,8 @@ graph LR
     7-- "<div>Selected SDK</div><div style='font-size: 70%'></div>" -->4
     7-- "<div>Selected media</div><div style='font-size: 70%'></div>" -->5
     7-- "<div>Install / verify</div><div style='font-size: 70%'></div>" -->6
+    17-- "<div>Six REST operations</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->7
+    7-- "<div>Verify JWT with configured<br />JWKS</div><div style='font-size: 70%'>[jose / RS256]</div>" -->18
+    7-- "<div>Presign and bind exact upload<br />version</div><div style='font-size: 70%'>[AWS SDK / HEAD]</div>" -->19
 
   end

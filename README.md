@@ -70,6 +70,13 @@ graph LR
   subgraph diagram ["Process composition"]
     style diagram fill:#ffffff,stroke:#ffffff
 
+    17("<div style='font-weight: bold'>External SDK client</div><div style='font-size: 80%; margin-top:10px'>Limited SignalFlag SDK 1.8.0<br />recipe; project ID and<br />explicit token.</div>")
+    style 17 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    18("<div style='font-weight: bold'>OIDC issuer</div><div style='font-size: 80%; margin-top:10px'>Configured JWT issuer and<br />JWKS; fixture uses Keycloak.</div>")
+    style 18 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    19("<div style='font-weight: bold'>Versioned S3 service</div><div style='font-size: 80%; margin-top:10px'>Opaque objects; fixture uses<br />S3-compatible SeaweedFS.</div>")
+    style 19 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+
     subgraph 7 ["Robotics runtime platform"]
       style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
 
@@ -81,6 +88,12 @@ graph LR
       style 12 fill:#ecfeff,stroke:#0e7490,color:#0f172a
       13[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Retained bytes.</div>")]
       style 13 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
+      14("<div style='font-weight: bold'>Optional external Test API</div><div style='font-size: 80%; margin-top:10px'>Source service; external<br />producer metadata and opaque<br />byte custody.</div>")
+      style 14 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
+      15[("<div style='font-weight: bold'>External Test metadata</div><div style='font-size: 80%; margin-top:10px'>Tenant/project RLS; upload<br />versions, proof checkpoints<br />and producer claims.</div>")]
+      style 15 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
+      16("<div style='font-weight: bold'>Custody CLI processes</div><div style='font-size: 80%; margin-top:10px'>Finite public download,<br />verification, signature and<br />receipt operations.</div>")
+      style 16 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
       8("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Prerelease ESM host.</div>")
       style 8 fill:#dbeafe,stroke:#2563eb,color:#0f172a
       9("<div style='font-weight: bold'>Document CLI</div><div style='font-size: 80%; margin-top:10px'>Published contracts.</div>")
@@ -96,6 +109,13 @@ graph LR
     9-- "<div>Write documents</div><div style='font-size: 70%'>[Files]</div>" -->13
     10-- "<div>Read bytes / write verdicts</div><div style='font-size: 70%'>[JSON / JUnit]</div>" -->13
     8-- "<div>Export / cleanup proof</div><div style='font-size: 70%'>[Callback refs]</div>" -->13
+    17-- "<div>Six REST operations</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->14
+    17-- "<div>Opaque upload</div><div style='font-size: 70%'>[Presigned PUT / required headers]</div>" -->19
+    14-- "<div>Verify JWT with configured<br />JWKS</div><div style='font-size: 70%'>[jose / RS256]</div>" -->18
+    14-- "<div>Authorized metadata and proof<br />checkpoints</div><div style='font-size: 70%'>[Same-client transaction / forced RLS]</div>" -->15
+    14-- "<div>Presign and bind exact upload<br />version</div><div style='font-size: 70%'>[AWS SDK / HEAD]</div>" -->19
+    14-- "<div>Fixed server-owned operations</div><div style='font-size: 70%'>[Public core Jobs / bounded argv]</div>" -->16
+    16-- "<div>Verify retained bytes at<br />exact VersionId</div><div style='font-size: 70%'>[Bounded public CLI / GET]</div>" -->19
 
   end
 ```
@@ -122,6 +142,12 @@ graph LR
 
     1["<div style='font-weight: bold'>Integrator</div><div style='font-size: 80%; margin-top:10px'>Selects profiles and verifies<br />evidence.</div>"]
     style 1 fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
+    17("<div style='font-weight: bold'>External SDK client</div><div style='font-size: 80%; margin-top:10px'>Limited SignalFlag SDK 1.8.0<br />recipe; project ID and<br />explicit token.</div>")
+    style 17 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    18("<div style='font-weight: bold'>OIDC issuer</div><div style='font-size: 80%; margin-top:10px'>Configured JWT issuer and<br />JWKS; fixture uses Keycloak.</div>")
+    style 18 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    19("<div style='font-weight: bold'>Versioned S3 service</div><div style='font-size: 80%; margin-top:10px'>Opaque objects; fixture uses<br />S3-compatible SeaweedFS.</div>")
+    style 19 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
     2("<div style='font-weight: bold'>Product application</div><div style='font-size: 80%; margin-top:10px'>Robot, NSU, control and<br />vision behavior.</div>")
     style 2 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
     3("<div style='font-weight: bold'>Simulation engines</div><div style='font-size: 80%; margin-top:10px'>Gazebo / Webots / Isaac;<br />profile-scoped.</div>")
@@ -141,6 +167,9 @@ graph LR
     7-- "<div>Selected SDK</div><div style='font-size: 70%'></div>" -->4
     7-- "<div>Selected media</div><div style='font-size: 70%'></div>" -->5
     7-- "<div>Install / verify</div><div style='font-size: 70%'></div>" -->6
+    17-- "<div>Six REST operations</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->7
+    7-- "<div>Verify JWT with configured<br />JWKS</div><div style='font-size: 70%'>[jose / RS256]</div>" -->18
+    7-- "<div>Presign and bind exact upload<br />version</div><div style='font-size: 70%'>[AWS SDK / HEAD]</div>" -->19
 
   end
 ```
@@ -177,9 +206,11 @@ Current public compatibility is recorded in
 [harness compatibility](packages/harness/docs/compatibility.md) and the package
 [compatibility policy](packages/contracts/COMPATIBILITY.md).
 
-[External SDK compatibility](docs/architecture.md#external-api-compatibility)
-is a planned optional adapter boundary. It keeps native evidence and qualification
-independent of vendor APIs; no external facade is implemented or qualified yet.
+The optional [external Test API](docs/external-test-api.md) supports a limited
+SignalFlag SDK 1.8.0 recipe: existing project/branch, explicit JWT and disabled
+configuration synchronization. It retains opaque uploads through existing custody
+tools. This source service is separate from native execution and qualification;
+it has no published API image release.
 
 ## Host development
 
