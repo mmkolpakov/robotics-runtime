@@ -20,11 +20,12 @@ mkdir -p generated
 "$engine" run --rm --platform linux/amd64 --network none "${mapping[@]}" --user "$owner" \
   -v "$PWD:/usr/local/structurizr" "$structurizr" \
   export -workspace workspace.dsl -format mermaid -output generated
-for view in Context Container ContainerDetail ExternalTestAPI NativeInterfaces ConsumerInterfaces HomeDeployment ExecutionDeployment; do
-  configuration=mermaid-config.json
+for view in Context Container ContainerDetail ExternalTestAPI NativeInterfaces ConsumerInterfaces DevelopmentDeployment ExecutionDeployment; do
+  configuration="generated/mermaid-$view.json"
+  python3 -c 'import json,sys; from pathlib import Path; c=json.loads(Path("mermaid-config.json").read_text()); c["themeCSS"]="path.flowchart-link { fill: none !important; }"; Path(sys.argv[1]).write_text(json.dumps(c,indent=2)+"\n")' "$configuration"
   if [[ "$view" == ExternalTestAPI || "$view" == Container || "$view" == Context ]]; then
     configuration="generated/mermaid-$view.json"
-    python3 -c 'import json,sys; from pathlib import Path; c=json.loads(Path("mermaid-config.json").read_text()); c["themeVariables"]["fontSize"]="26px"; c["layout"]="elk"; c["flowchart"].update(nodeSpacing=16,rankSpacing=20,inheritDir=True); c["flowchart"].update(wrappingWidth=140) if "ExternalTestAPI" not in sys.argv[1] else c.update(themeCSS="g.cluster:not([id$=-diagram]) > rect, g.cluster:not([id$=-diagram]) > g.cluster-label { visibility: hidden; }"); Path(sys.argv[1]).write_text(json.dumps(c,indent=2)+"\n")' "$configuration"
+    python3 -c 'import json,sys; from pathlib import Path; c=json.loads(Path("mermaid-config.json").read_text()); c["themeVariables"]["fontSize"]="26px"; c["layout"]="elk"; c["flowchart"].update(nodeSpacing=16,rankSpacing=20,inheritDir=True); c["themeCSS"]="path.flowchart-link { fill: none !important; }"; c["flowchart"].update(wrappingWidth=240 if "-Context." in sys.argv[1] else 140) if "ExternalTestAPI" not in sys.argv[1] else c.update(themeCSS=c["themeCSS"]+" g.cluster:not([id$=-diagram]) > rect, g.cluster:not([id$=-diagram]) > g.cluster-label { visibility: hidden; }"); Path(sys.argv[1]).write_text(json.dumps(c,indent=2)+"\n")' "$configuration"
   fi
   if [[ "$view" == ContainerDetail ]]; then
     configuration="generated/mermaid-ContainerDetail.json"

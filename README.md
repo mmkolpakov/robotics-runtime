@@ -12,8 +12,7 @@ The workspace contains two independently versioned Python packages:
 [robotics-runtime-infra](https://github.com/mmkolpakov/robotics-runtime-infra)
 owns worker images, simulator providers, product provisioning, deployment and
 execution qualification. Product repositories own robot models, scenes, control
-logic and vision models. Home machine administration is a separate project and
-supplies target prerequisites.
+logic and vision models. Deployment operators supply host prerequisites.
 
 ## Start with the part you need
 
@@ -68,7 +67,7 @@ execution qualification.
 
 <!-- architecture:Container:end -->
 
-Colors distinguish roles: composition, published Python tools, native candidates,
+Colors distinguish roles: composition, published Python tools, native workers,
 media and retained files. They are not qualification verdicts. Control and video
 use their native connections; lifecycle completion and evidence evaluation are
 separate outcomes.
@@ -102,10 +101,6 @@ connections. Its implementation and simulator providers are separate from the
 published Python pair.
 
 [Composition framework and its limits](docs/architecture.md#composition-framework).
-The process overview shows execution/evidence and the optional external Test boundary;
-[complete worker and tool interfaces](docs/architecture/generated/ContainerDetail.svg)
-are shown separately.
-
 Common document/evaluation code does not require Gazebo, Isaac Sim, Webots or
 ROS. Engine-specific APIs and assets belong to selected infra providers.
 Simulator support does not imply the same physics, frame output or autopilot
@@ -124,10 +119,18 @@ retains opaque uploads through existing custody tools. This source service is se
 native execution and qualification;
 it has no published API image release.
 
+## Planned integrations
+
+These designs are not released capabilities:
+
+- [Product MCP](docs/architecture.md#agent-access) over authorized status,
+  diagnostics and verified artifact-reference operations, using the maintained MCP SDK.
+- Additional native autopilot profiles through upstream ROS 2/DDS interfaces,
+  with [separate control-operation acceptance](docs/architecture.md#native-data).
+
 ## Host development
 
-The source host uses the pinned Node version in `host/.node-version`.
-Its own lockfile is separate from the Python workspace:
+The host uses the Node version in `host/.node-version` and its own npm lockfile:
 
 ```bash
 npm --prefix host ci --ignore-scripts
@@ -135,54 +138,10 @@ npm --prefix host test
 npm --prefix host run check:boundary
 ```
 
-See [host configuration and worker integration](host/README.md).
-The compiled host prerelease has passed package and external installation checks.
-A new host/provider composition still requires its own consumer qualification.
-
-The separate `host-release.yml` workflow builds the compiled core host as a
-GitHub Release TGZ, retaining `private: true` and ordinary npm `file:` installation.
-PR and manual runs check the archive, a clean rebuild and installation outside
-the source workspace; they do not publish or establish native acceptance.
-
-The first host prerelease is published with release immutability enabled.
-Further publication requires the current setting, the exact live tag and the
-accepted archive to be verified. Historical immutable releases do not prove the
-current setting. Its authenticated settings
-API requires Administration read, which the workflow's ordinary GitHub token
-cannot acquire; missing authorization does not mean the setting is disabled.
-
-The owner then completes the current host/provider source cohort, including
-cancellation and retained verification after source deletion, and sets
-`HOST_QUALIFIED_SOURCE_SHA` and `HOST_QUALIFIED_ASSET_SHA256`. The built archive
-and source tree must match that explicit reference. Its original source identity
-is retained separately from the actual release tag/build commit. Only then enable
-`HOST_RELEASE_PUBLISH_ENABLED=true` and create a unique tag that exactly matches
-`host-v<host/package.json version>` and belongs to main.
-
-The current host version is an RC; this package path grants no general simulator,
-hardware or cloud qualification. Published artifacts require a fresh independent
-consumer of the admitted profiles. Existing PyPI environments and their required
-reviews remain separate.
-
-The workflow stages new assets as a draft, not a completed host release. Before
-accepting a new or existing draft, it downloads the five expected assets to a
-fresh directory, compares every byte with this run and requires the exact remote
-asset set. Partial, stale or surplus drafts fail without replacing remote assets.
-After the accepted source cohort and current setting are verified, the owner uses
-stock
-`gh release edit <tag> --draft=false` to publish, rechecking the live peeled tag
-against the built manifest and tag-trigger SHA immediately before that transition.
-Repeat the workflow's `check_draft_assets` and `check_live_tag` functions with
-the same archived run inputs immediately before that transition. An earlier draft
-check does not freeze mutable assets.
-A refused draft requires explicit owner repair before retrying.
-No new approval environment or credential service is introduced.
-
-For an existing published release, the job requires `isImmutable`, verifies the
-signed release with `gh release verify --format json`, rechecks the locked live
-commit and verifies each immutable asset. Release jobs recheck the live
-peeled tag against the actual build and tag-trigger commit, independently of the
-earlier byte-equivalent reference, and never replace existing tags or release assets.
+[Host configuration and worker integration](host/README.md) describes admission,
+native clients and retained recovery.
+[Host publication](docs/releasing.md#compiled-host) covers the separate TGZ release,
+immutable assets and independent consumer checks.
 
 ## Development
 

@@ -19,8 +19,8 @@ PENDING. Required Fiber ACTIVE, binding existence and backend readiness are inde
 facts.
 
 The host uses native Cordis logging and the console exporter. js-yaml 4.3.2 satisfies Include's
-upstream `^4.1.0` range and replaces the initially proposed 4.1.1 pin to address the published YAML
-CPU denial-of-service advisories. Native Include/CLI tests exercise the patched package.
+upstream `^4.1.0` range and includes the published YAML CPU denial-of-service fixes.
+Native Include/CLI tests exercise this package.
 
 Jobs is a Cordis service that invokes Execa 10.0.1 with literal argv, bounded wall timeout and
 output buffers, cancellation, exit status and retained diagnostics. Each owner cancels and reaps its
@@ -128,7 +128,8 @@ overwritten.
 
 Run npm run generate:mavsdk to verify official proto identities and regenerate types. The verified
 MAVSDK server installer uses tools/mavsdk-server.v4.0.3.json and stores the binary only in .tools.
-Native HOME tests additionally require the infra C12 GI image localhost/rr-c-media:c12-locked, its
+Native source-profile tests additionally require the infra C12 GI image
+localhost/rr-c-media:c12-locked, its
 recorded APT closure, project Tini and the hash-locked pymavlink fixture environment. Run npm run
 test:native after preparing those inputs. These native tests are separate from test:workers so the
 Node/Python CI job does not pretend that a GI media image is installed.
@@ -140,7 +141,8 @@ it proves discovery only. Native GStreamer 1.24.2 emitted a 27648-byte synthetic
 missing-input ERROR, bounded timeout and canceled-state NULL cleanup. Vehicle health, flight action
 effects, real cameras, RTSP and GPU rendering are outside these C12 observations.
 
-For HOME preparation, provide uv at /usr/local/bin/uv and the pinned infra media image, then run npm
+For local profile preparation, provide uv at /usr/local/bin/uv and the pinned infra media image,
+then run npm
 run prepare:native and npm run fetch:mavsdk-server before npm run test:native. The setup installs
 only a project test environment inside the worker container. Native output facts and synthetic
 payloads are retained in artifacts/host/c12 for independent review.

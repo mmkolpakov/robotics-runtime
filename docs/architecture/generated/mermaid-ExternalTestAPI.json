@@ -35,5 +35,5 @@
     "useMaxWidth": false
   },
   "layout": "elk",
-  "themeCSS": "g.cluster:not([id$=-diagram]) > rect, g.cluster:not([id$=-diagram]) > g.cluster-label { visibility: hidden; }"
+  "themeCSS": "path.flowchart-link { fill: none !important; } g.cluster:not([id$=-diagram]) > rect, g.cluster:not([id$=-diagram]) > g.cluster-label { visibility: hidden; }"
 }
