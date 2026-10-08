@@ -22,11 +22,7 @@
     "nodeSpacing": 16,
     "rankSpacing": 20,
     "useMaxWidth": false,
-    "inheritDir": true,
-    "subGraphTitleMargin": {
-      "top": 40,
-      "bottom": 0
-    }
+    "inheritDir": true
   },
   "sequence": {
     "useMaxWidth": false,
@@ -38,5 +34,6 @@
   "state": {
     "useMaxWidth": false
   },
-  "layout": "elk"
+  "layout": "elk",
+  "themeCSS": "g.cluster:not([id$=-diagram]) > rect, g.cluster:not([id$=-diagram]) > g.cluster-label { visibility: hidden; }"
 }
