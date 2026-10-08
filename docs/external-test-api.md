@@ -21,8 +21,9 @@ not a long-running service deployment. A refused check or
 unverified cleanup returns a nonzero exit. Safe reports and original custody
 proofs are retained under `artifacts/api-ci-safe/`.
 
-The fixture exercises both tenants, all six REST operations, JSONL/PNG/empty
-PUTs, authorization refusals, lost registration/close responses, eight concurrent
+The fixture exercises both tenants, default configuration sync, all six REST
+operations, JSONL/PNG/empty PUTs, authorization refusals, lost configuration,
+registration and close responses, eight concurrent
 closes and two-upload recovery after a refused close and API restart. It verifies
 exact VersionId payloads and preserves the first committed proof checkpoint.
 SeaweedFS is a local S3-compatible protocol fixture; this is not AWS qualification.
@@ -49,14 +50,15 @@ client = AuthenticatedClient(
     timeout=httpx.Timeout(90.0),
 )
 
+config = Path(".resim/metrics/config.resim.yml")
+config.parent.mkdir(parents=True, exist_ok=True)
+config.write_text("version: 1\ntopics:\n  motion:\n    schema:\n      speed: float\n")
 Path("empty.log").write_bytes(b"")
 with Batch(
     client=client,
     project_id="YOUR_EXISTING_PROJECT_UUID",
     branch="main",
     name="External Test",
-    metrics_config_path=None,
-    templates_path=None,
 ) as batch:
     with Test(client=client, batch=batch, name="opaque external test") as run:
         run.emit("motion", {"speed": 1}, timestamp=1_791_000_000_000_000_000)
@@ -68,13 +70,16 @@ The example uses the fixture's container-network API address. Replace the
 endpoint and project UUID with configured values, and supply the PNG file.
 Both the API and returned S3 upload URL must be reachable from the client.
 The Test context flushes and uploads the SDK's original emissions JSONL.
-Both `None` options are required: the SDK's default metrics config path invokes
-GraphQL configuration synchronization before the REST journey. Do not add
-`project_name`, system, test-suite or metrics-set options to this recipe.
+The default config path synchronizes this file before the REST journey.
+Optional immediate `.liquid` files under `.resim/metrics/templates` are stored
+as bytes; a missing template directory sends an empty list. Passing
+`metrics_config_path=None` still supports the recipe without configuration sync.
+Do not add `project_name`, system, test-suite or metrics-set options.
 
 The service implements this bounded surface:
 
 ~~~text
+POST /graphql  (UpdateMetricsConfig only)
 GET  /projects/{projectID}/branches?name=main
 POST /projects/{projectID}/batches/light
 POST /projects/{projectID}/batches/{batchID}/jobs
@@ -90,10 +95,39 @@ close. A close retry must preserve the original producer claim. Registration
 identity and close recovery do not provide exactly-once batch/job creation:
 those POSTs have no client nonce or idempotency key.
 
+## Configuration snapshots
+
+`UpdateMetricsConfig` accepts `projectId: String!`, `config: String!`,
+`templateFiles: [MetricsTemplate!]!` and `branch: String`. Each template contains
+`name` and base64 `contents`. This recipe requires an existing project and branch.
+Successful acknowledgement follows the SQL commit; GraphQL errors remain errors
+to the SDK. Multiple fields use standard GraphQL serial mutation semantics:
+a refused later field does not roll back an earlier committed field.
+
+Canonical base64 is bounded before decoding: configuration up to 256 KiB,
+at most 32 templates of up to 64 KiB each, and 512 KiB combined decoded bytes.
+Template names are unique basenames. A single configuration file preserves its
+original bytes; multiple paths upload the YAML merged by the unchanged SDK.
+The server stores configuration and template bytes without executing Liquid
+or evaluating metrics. The SDK may validate emissions locally.
+
+A batch pins the current branch snapshot atomically. Later updates preserve
+that batch's original snapshot. The SDK passes no snapshot identity between
+sync and batch creation, so concurrent callers cannot assume a batch uses their
+own last uploaded configuration. Repeating identical config bytes on the same
+branch reuses the snapshot; `sync_config` itself does not retry a lost response.
+The fixture's retry is an explicit new call by the caller.
+
+The SDK derives `/graphql` by replacing the first `api.` in the hostname with
+`bff.` and dropping the base path. The example's `http://api:3000` stays on the
+same host. A deployment using `api.example` must route the derived
+`bff.example` hostname to this same optional service.
+
 ## Service boundary
 
 The [entry point](../api/src/main.ts) configures a separate Fastify process.
-The [SQL migration](../api/sql/001-external-tests.sql) uses forced tenant/project
+The [base migration](../api/sql/001-external-tests.sql) and
+[configuration migration](../api/sql/002-metrics-config.sql) use forced tenant/project
 RLS; the application role must not own tables or reach privileged roles.
 JWT verification fixes issuer, audience, RS256, subject, expiry and the
 `sdk-write` role. Each SQL transaction sets the verified issuer/subject on the
@@ -109,8 +143,9 @@ committed per upload, and the job closes only when every upload is retained.
 
 This optional package is private and has no published API image release.
 Released Python packages and host artifacts do not install the service.
-GraphQL/BFF, default configuration sync, Auth0 helpers, Web UI and product MCP
-are not supplied. Producer status is not a native verdict, opaque emissions are
+Only the configuration mutation is supplied through GraphQL; metrics evaluation,
+other vendor GraphQL operations, SDK Auth0 helpers, Web UI and product MCP are
+not supplied. Producer status is not a native verdict, opaque emissions are
 not converted into native observations, and the service does not use RunOwner.
 The source fixture does not establish deployment, AWS, full vendor-platform
 compatibility or an SLA.

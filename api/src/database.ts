@@ -1,6 +1,6 @@
 import {Pool,type PoolClient} from 'pg';
 import type {Principal} from './identity.js';
-export class ApiError extends Error {constructor(readonly status:number,message:string){super(message)}}
+export class ApiError extends Error {readonly statusCode:number;constructor(readonly status:number,message:string){super(message);this.statusCode=status}}
 export async function transactionClient<T>(client:PoolClient,principal:Principal,work:(client:PoolClient)=>Promise<T>):Promise<T>{
  try{
   await client.query('BEGIN');
@@ -21,6 +21,7 @@ export async function project(client:PoolClient,id:string){
 export async function verifyApplicationRole(pool:Pool){
  const state=await pool.query("SELECT r.rolsuper,r.rolbypassrls,r.rolcreaterole,EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='api' AND (pg_has_role(current_user,c.relowner,'USAGE') OR pg_has_role(current_user,c.relowner,'SET') OR pg_has_role(current_user,c.relowner,'MEMBER'))) AS owns_tables,EXISTS(SELECT 1 FROM pg_roles elevated WHERE (elevated.rolsuper OR elevated.rolbypassrls OR elevated.rolcreaterole) AND (pg_has_role(current_user,elevated.oid,'USAGE') OR pg_has_role(current_user,elevated.oid,'SET'))) AS privileged_role FROM pg_roles r WHERE r.rolname=current_user");
  const actual=state.rows[0];if(!actual||actual.rolsuper||actual.rolbypassrls||actual.rolcreaterole||actual.owns_tables||actual.privileged_role)throw new Error('application role must not own tables or bypass RLS');
- const tables=await pool.query("SELECT count(*)::int AS total,bool_and(c.relrowsecurity AND c.relforcerowsecurity) AS protected FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='api' AND c.relkind='r'");
- if(tables.rows[0].total!==10||tables.rows[0].protected!==true)throw new Error('all metadata tables require forced RLS');
+ const tables=await pool.query("SELECT array_agg(c.relname::text ORDER BY c.relname) AS names,count(*)::int AS total,bool_and(c.relrowsecurity AND c.relforcerowsecurity) AS protected FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='api' AND c.relkind='r'");
+ const expected=['batches','branches','config_snapshots','experiences','jobs','memberships','project_memberships','projects','tenants','upload_proofs','uploads'];
+ if(JSON.stringify(tables.rows[0].names)!==JSON.stringify(expected)||tables.rows[0].total!==expected.length||tables.rows[0].protected!==true)throw new Error('all metadata tables require forced RLS');
 }

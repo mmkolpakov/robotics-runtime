@@ -48,6 +48,7 @@ try{
  for(const sql of ['CREATE ROLE api_owner NOLOGIN',"CREATE ROLE api_app LOGIN PASSWORD '"+apiPassword+"'","CREATE ROLE keycloak_user LOGIN PASSWORD '"+kcPassword+"'",'CREATE DATABASE api OWNER api_owner','CREATE DATABASE identity OWNER keycloak_user'])await pgAdmin.query(sql);
  apiAdmin=new Pool({host:'127.0.0.1',port:pgPort,user:'postgres',password,database:'api'});
  await apiAdmin.query(await readFile(join(root,'api/sql/001-external-tests.sql'),'utf8'));
+ await apiAdmin.query(await readFile(join(root,'api/sql/002-metrics-config.sql'),'utf8'));
  const kc=launch('keycloak',lock.keycloak,['start-dev','--http-port=8080'],['--memory','768m','-e','KC_DB=postgres','-e','KC_DB_URL=jdbc:postgresql://pg:5432/identity','-e','KC_DB_USERNAME=keycloak_user','-e','KC_DB_PASSWORD','-e','KC_BOOTSTRAP_ADMIN_USERNAME=fixture-admin','-e','KC_BOOTSTRAP_ADMIN_PASSWORD','-e','KC_HOSTNAME=http://keycloak:8080','-p','127.0.0.1::8080']);
  const kcUrl='http://127.0.0.1:'+port(kc,8080);
  await eventually(()=>http(kcUrl+'/realms/master/.well-known/openid-configuration'));
@@ -227,11 +228,74 @@ try{
  cmd(['cp',consumer+':/work/attachment.png',join(custody,'sdk-attachment.png')]);
  cmd(['cp',consumer+':/work/empty.log',join(custody,'sdk-empty.log')]);
  report.steps.push({name:'installed-unmodified-SDK-Batch-Test-two-tenants',jobs:2,retainedUploads:6,independentExactVersionReadback:true,preservedProofFiles:30});
+ const configDirectory=join(output,'config');await mkdir(configDirectory);
+ cmd(['cp',consumer+':/work/.resim/metrics/config.resim.yml',join(configDirectory,'sdk-config.yml')]);
+ cmd(['cp',consumer+':/work/.resim/metrics/templates/opaque.liquid',join(configDirectory,'sdk-template.liquid')]);
+ const sdkConfig=await readFile(join(configDirectory,'sdk-config.yml')),sdkTemplate=await readFile(join(configDirectory,'sdk-template.liquid'));
+ const snapshots=(await apiAdmin.query('SELECT b.id AS batch_id,b.tenant_id,b.project_id,b.branch_id,b.config_snapshot_id,s.config,s.config_sha256,s.template_files,s.snapshot_sha256,s.created_by,s.created_at FROM api.batches b JOIN api.config_snapshots s ON s.tenant_id=b.tenant_id AND s.project_id=b.project_id AND s.branch_id=b.branch_id AND s.id=b.config_snapshot_id ORDER BY b.id')).rows;
+ assert.equal(snapshots.length,2);assert.equal((await apiAdmin.query('SELECT count(*)::int AS n FROM api.config_snapshots')).rows[0].n,2);
+ for(const tenant of sdk.tenants){
+  const row=snapshots.find(row=>row.batch_id===tenant.batch);assert.ok(row);assert.equal(row.project_id,tenant.project);
+  assert.ok(tenant.local_sdk_validation_refused_wrong_type);assert.deepEqual(row.config,sdkConfig);
+  assert.equal(row.config_sha256,tenant.default_config_sha256);assert.equal(sdkConfig.length,tenant.default_config_size);
+  assert.equal(row.template_files.length,1);assert.equal(row.template_files[0].name,'opaque.liquid');
+  assert.deepEqual(Buffer.from(row.template_files[0].contents,'base64'),sdkTemplate);assert.equal(row.template_files[0].sha256,tenant.template_sha256);
+  assert.equal(sdkTemplate.length,tenant.template_size);
+ }
+ assert.equal(sdk.tenants.filter(row=>row.caller_retries_after_lost_config_response).length,1);
+ await writeFile(join(configDirectory,'snapshots.json'),JSON.stringify(snapshots.map(({config,...row})=>({...row,config_base64:config.toString('base64')})),null,2)+'\n');
+ report.configWitnesses=snapshots.map(row=>({project:row.project_id,batch:row.batch_id,snapshot:row.config_snapshot_id,snapshotSha256:row.snapshot_sha256,configSha256:row.config_sha256,configSize:row.config.length,templates:row.template_files.map(({name,sha256,size})=>({name,sha256,size}))}));
+ report.steps.push({name:'unchanged-SDK-default-config-sync-opaque-bytes-local-emitter-validation-and-current-batch-snapshot',tenants:2,snapshots:2,explicitCallerRetryAfterLostResponse:true});
 
- cmd(['cp',proxy+':/work/proxy-report.json',join(output,'proxy-report.json')]);const audit=JSON.parse(await readFile(join(output,'proxy-report.json'),'utf8'));assert.ok(audit.droppedLog&&audit.droppedClose);assert.ok(audit.observations.every(r=>audit.permitted.includes(r.host)&&!r.refused));
+
+ cmd(['cp',proxy+':/work/proxy-report.json',join(output,'proxy-report.json')]);const audit=JSON.parse(await readFile(join(output,'proxy-report.json'),'utf8'));assert.ok(audit.droppedLog&&audit.droppedClose&&audit.droppedConfig);assert.ok(audit.observations.every(r=>audit.permitted.includes(r.host)&&!r.refused));
  report.steps.push({name:'actual-request-allowlist-and-lost-response-log-close',requests:audit.observations.length});
+ const configRequests=audit.observations.map((row,index)=>({...row,index})).filter(row=>row.host==='api:3000'&&row.path==='/graphql');
+ assert.equal(configRequests.length,3);assert.ok(configRequests.every(row=>row.method==='POST'));
+ const firstBranch=audit.observations.findIndex(row=>row.method==='GET'&&row.path.endsWith('/branches'));
+ assert.ok(configRequests[1].index<firstBranch);
+ const actualBatchInputs=audit.observations.filter(row=>row.method==='POST'&&row.path.endsWith('/batches/light'));
+ assert.equal(actualBatchInputs.length,2);assert.ok(actualBatchInputs.every(row=>row.metricsSetName&&row.metricsSetName.value===null&&!row.batchInputObservation));
+ report.sdkDefaultBatchSelectors=actualBatchInputs.map(row=>row.metricsSetName);
+
+ report.steps.push({name:'actual-GraphQL-before-REST-and-no-vendor-cloud',graphqlRequests:3,explicitCallerRetry:true,configSyncHasNoAutomaticRetry:true});
+
  const headers={Authorization:'Bearer '+tenants[0].token,'Content-Type':'application/json'};
  async function post(path,body){return http(apiUrl+path,{method:'POST',headers,...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(120000)})}
+
+ const mutation='mutation UpdateMetricsConfig($projectId:String!,$config:String!,$templateFiles:[MetricsTemplate!]!,$branch:String){updateMetricsConfig(projectId:$projectId,config:$config,templateFiles:$templateFiles,branch:$branch)}';
+ const configVariables={projectId:tenants[0].project,config:sdkConfig.toString('base64'),templateFiles:[],branch:'main'};
+ const gql=async variables=>{
+  const response=await fetch(apiUrl+'/graphql',{method:'POST',headers,body:JSON.stringify({query:mutation,operationName:'UpdateMetricsConfig',variables}),signal:AbortSignal.timeout(10000)});
+  return {status:response.status,json:await response.json()};
+ };
+ const configCount=async()=>(await apiAdmin.query('SELECT count(*)::int AS n FROM api.config_snapshots')).rows[0].n;
+ const beforeConfigFaults=await configCount(),configFaults=[];
+ for(const [name,variables]of [
+  ['foreign-project',{...configVariables,projectId:tenants[1].project}],
+  ['unknown-branch',{...configVariables,branch:'unknown'}],
+  ['null-branch',{...configVariables,branch:null}],
+  ['base64-noncanonical',{...configVariables,config:'YR=='}],
+  ['config-size',{...configVariables,config:Buffer.alloc(262145).toString('base64')}],
+  ['template-size',{...configVariables,templateFiles:[{name:'large.liquid',contents:Buffer.alloc(65537).toString('base64')}]}],
+  ['template-count',{...configVariables,templateFiles:Array.from({length:33},(_,i)=>({name:i+'.liquid',contents:''}))}],
+  ['template-path',{...configVariables,templateFiles:[{name:'../probe.liquid',contents:''}]}],
+  ['template-duplicate',{...configVariables,templateFiles:[{name:'same.liquid',contents:''},{name:'same.liquid',contents:''}]}],
+  ['wrong-variable-type',{...configVariables,projectId:7}],
+ ]){
+  const result=await gql(variables);assert.ok(result.json.errors);assert.equal(await configCount(),beforeConfigFaults);configFaults.push({name,status:result.status});
+ }
+ const partialDocument='mutation { first:updateMetricsConfig(projectId:"'+tenants[0].project+'",config:"'+Buffer.from('partial config\n').toString('base64')+'",templateFiles:[],branch:"main") second:updateMetricsConfig(projectId:"'+tenants[0].project+'",config:"",templateFiles:[],branch:"unknown") }';
+ const partialResponse=await fetch(apiUrl+'/graphql',{method:'POST',headers,body:JSON.stringify({query:partialDocument}),signal:AbortSignal.timeout(10000)}),partial=await partialResponse.json();
+ assert.equal(partialResponse.status,200);assert.deepEqual(partial.data,{first:true,second:null});assert.ok(partial.errors);assert.equal(await configCount(),beforeConfigFaults+1);
+ const retainedSnapshots=(await apiAdmin.query('SELECT id,config FROM api.config_snapshots WHERE id=ANY($1::uuid[])',[snapshots.map(row=>row.config_snapshot_id)])).rows;
+ assert.equal(retainedSnapshots.length,2);assert.ok(retainedSnapshots.every(row=>row.config.equals(sdkConfig)));
+ report.steps.push({name:'real-JWT-GraphQL-admission-before-effects-and-standard-partial-mutation',refusals:configFaults,firstFieldCommittedSecondRefused:true,previousSDKBatchSnapshotsUnchanged:true});
+ const batchCount=(await apiAdmin.query('SELECT count(*)::int AS n FROM api.batches')).rows[0].n;
+ const unsupportedSelector=await fetch(apiUrl+'/projects/'+tenants[0].project+'/batches/light',{method:'POST',headers,body:JSON.stringify({branchID:tenants[0].branch,metricsSetName:'unsupported-selector'}),signal:AbortSignal.timeout(10000)});
+ assert.equal(unsupportedSelector.status,400);assert.equal((await apiAdmin.query('SELECT count(*)::int AS n FROM api.batches')).rows[0].n,batchCount);
+ report.steps.push({name:'nondefault-metrics-set-selector-refused-before-batch-effects',status:400});
+
  const batch=await post('/projects/'+tenants[0].project+'/batches/light',{branchID:tenants[0].branch,batchName:'Concurrency'});
  const closePaths=[];
  for(let index=0;index<8;index++){

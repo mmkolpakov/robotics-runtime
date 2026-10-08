@@ -4,6 +4,8 @@ import {transaction,transactionClient,project,ApiError} from './database.js';
 import type {Principal} from './identity.js';
 import {UploadStorage,mediaType,type Upload} from './uploads.js';
 import {Retention} from './retention.js';
+import {projectIdentifier,branchName} from './admission.js';
+import {metricsConfigBytes,type MetricsConfigInput} from './metrics-config.js';
 export interface Addresses {projectID:string;batchID?:string;jobID?:string}
 export class Domain {
  constructor(readonly pool:Pool,readonly storage:UploadStorage,readonly retention:Retention,readonly maximumUploads=64){
@@ -25,15 +27,31 @@ export class Domain {
     creationTimestamp:row.created_at.toISOString(),userID:row.created_by,orgID:p.tenant_id}))};
   });
  }
+ async updateMetricsConfig(principal:Principal,input:MetricsConfigInput,signal:AbortSignal){
+  const projectID=projectIdentifier(input.projectId),name=branchName(input.branch);
+  const bytes=metricsConfigBytes(input);signal.throwIfAborted();
+  return transaction(this.pool,principal,async client=>{
+   const p=await project(client,projectID);
+   const branch=await client.query('SELECT id FROM api.branches WHERE tenant_id=$1 AND project_id=$2 AND name=$3 FOR UPDATE',[p.tenant_id,p.id,name]);
+   if(branch.rows.length!==1)throw new ApiError(404,'branch not found');signal.throwIfAborted();
+   const branchID=branch.rows[0].id;
+   const prior=await client.query('SELECT id FROM api.config_snapshots WHERE tenant_id=$1 AND project_id=$2 AND branch_id=$3 AND snapshot_sha256=$4',[p.tenant_id,p.id,branchID,bytes.snapshotSha256]);
+   const id=prior.rows[0]?.id??randomUUID();
+   if(!prior.rows.length)await client.query('INSERT INTO api.config_snapshots(tenant_id,project_id,branch_id,id,config,config_sha256,template_files,snapshot_sha256,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+    [p.tenant_id,p.id,branchID,id,bytes.config,bytes.configSha256,JSON.stringify(bytes.templates),bytes.snapshotSha256,p.principal_id]);
+   await client.query('UPDATE api.branches SET config_snapshot_id=$4 WHERE tenant_id=$1 AND project_id=$2 AND id=$3',[p.tenant_id,p.id,branchID,id]);
+   signal.throwIfAborted();return id;
+  });
+ }
  createBatch(principal:Principal,projectID:string,input:{branchID:string;batchName?:string;version?:string;metricsSetName?:string|null}){
   if(input.metricsSetName!==undefined&&input.metricsSetName!==null)throw new ApiError(400,'metrics configuration is outside this recipe');
   return transaction(this.pool,principal,async client=>{
    const p=await project(client,projectID);
-   const branch=await client.query('SELECT id FROM api.branches WHERE tenant_id=$1 AND project_id=$2 AND id=$3',[p.tenant_id,p.id,input.branchID]);
+   const branch=await client.query('SELECT id,config_snapshot_id FROM api.branches WHERE tenant_id=$1 AND project_id=$2 AND id=$3 FOR UPDATE',[p.tenant_id,p.id,input.branchID]);
    if(branch.rows.length!==1)throw new ApiError(404,'branch not found');
    const id=randomUUID(),name=input.batchName??id;
-   const found=await client.query('INSERT INTO api.batches(tenant_id,project_id,id,branch_id,name,version,account,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
-    [p.tenant_id,p.id,id,input.branchID,name,input.version??null,p.account,p.principal_id]);
+   const found=await client.query('INSERT INTO api.batches(tenant_id,project_id,id,branch_id,name,version,account,created_by,config_snapshot_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
+    [p.tenant_id,p.id,id,input.branchID,name,input.version??null,p.account,p.principal_id,branch.rows[0].config_snapshot_id]);
    const row=found.rows[0];return {associatedAccount:row.account,batchID:id,branchID:row.branch_id,projectID:p.id,
     orgID:p.tenant_id,userID:p.principal_id,friendlyName:name,batchType:'LIGHT',status:'EXPERIENCES_RUNNING',creationTimestamp:row.created_at.toISOString()};
   });

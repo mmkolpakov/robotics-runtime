@@ -67,9 +67,14 @@ Producer-reported `SUCCEEDED` or `ERROR` remains external metadata. This API
 does not create a native RunOwner, schedule a simulator, convert emissions into
 native observations or produce a qualification verdict.
 
-Default SDK metrics configuration adds GraphQL synchronization and BFF routing.
+The same Fastify service accepts the SDK configuration mutation through
+Mercurius and GraphQL.js. Configuration and template bytes are bounded, immutable
+SQL snapshots; batch creation pins the current branch snapshot. Liquid is not
+executed and configurations do not evaluate metrics or establish native verdicts.
+The SDK carries no snapshot ID between sync and batch creation, so concurrent
+callers cannot rely on receiving their own last uploaded configuration.
 Project-name lookup, systems, test suites, metrics sets and SDK Auth0 helpers
-are also outside this recipe. Web UI and product MCP remain separate work.
+are outside this recipe. Web UI and product MCP remain separate work.
 Opaque retention does not imply native time, topic, unit or result semantics.
 
 This is a source integration, separate from the released host and Python

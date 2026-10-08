@@ -118,9 +118,10 @@ Current public compatibility is recorded in
 [compatibility policy](packages/contracts/COMPATIBILITY.md).
 
 The optional [external Test API](docs/external-test-api.md) supports a limited
-SignalFlag SDK 1.8.0 recipe: existing project/branch, explicit JWT and disabled
-configuration synchronization. It retains opaque uploads through existing custody
-tools. This source service is separate from native execution and qualification;
+SignalFlag SDK 1.8.0 recipe: existing project/branch, explicit JWT, configuration
+sync and six REST operations. It stores immutable configuration snapshots and
+retains opaque uploads through existing custody tools. This source service is separate from
+native execution and qualification;
 it has no published API image release.
 
 ## Host development

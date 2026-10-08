@@ -7,7 +7,9 @@ from pathlib import Path
 
 import httpx
 from signalflag.sdk.batch import Batch
+from signalflag.sdk.bff_client.metrics import sync_config
 from signalflag.sdk.client import AuthenticatedClient
+from signalflag.sdk.metrics.emissions import ReSimValidationError
 from signalflag.sdk.test import LogType, Test
 
 configuration = json.loads(Path("/run/secrets/consumer.json").read_text())
@@ -15,6 +17,20 @@ result = {
     "scope": "SDK1.8.0 limited external Test on local API; no native qualification",
     "tenants": [],
 }
+config_path = Path(".resim/metrics/config.resim.yml")
+config_path.parent.mkdir(parents=True, exist_ok=True)
+config_bytes = (
+    b"version: 1\n"
+    b"topics:\n"
+    b"  motion:\n    event: true\n    schema:\n      speed: float\n"
+    b"  note:\n    event: true\n    schema:\n      text: string\n"
+    b"  untimed:\n    schema:\n      value: int\n"
+)
+config_path.write_bytes(config_bytes)
+templates = Path(".resim/metrics/templates")
+templates.mkdir()
+template_bytes = b'{% include "/etc/passwd" %} {{ secret | eval }}\n'
+(templates / "opaque.liquid").write_bytes(template_bytes)
 png = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aHioAAAAASUVORK5CYII="
 )
@@ -23,6 +39,14 @@ for tenant in configuration["tenants"]:
     client = AuthenticatedClient(
         base_url="http://api:3000", token=tenant["token"], timeout=httpx.Timeout(90.0)
     )
+    lost_config_response = False
+    if not result["tenants"]:
+        try:
+            sync_config(client, tenant["project"], "main")
+        except httpx.RemoteProtocolError:
+            lost_config_response = True
+        assert lost_config_response
+    # The caller explicitly invokes Batch after the lost response; sync_config itself has no retry.
     Path("attachment.png").write_bytes(png)
     Path("empty.log").write_bytes(b"")
     with Batch(
@@ -30,10 +54,14 @@ for tenant in configuration["tenants"]:
         project_id=tenant["project"],
         branch="main",
         name="External Test",
-        metrics_config_path=None,
-        templates_path=None,
     ) as batch:
         with Test(client=client, batch=batch, name="opaque external test") as run:
+            rejected_invalid_emission = False
+            try:
+                run.emit("motion", {"speed": "wrong-type"})
+            except ReSimValidationError:
+                rejected_invalid_emission = True
+            assert rejected_invalid_emission
             epoch = 1_791_000_000_000_000_000
             run.emit("motion", {"speed": 1}, timestamp=epoch)
             run.emit_series("motion", {"speed": [2, 3]}, timestamps=[epoch + 1, epoch + 2])
@@ -48,6 +76,12 @@ for tenant in configuration["tenants"]:
         result["tenants"].append(
             {
                 "project": tenant["project"],
+                "caller_retries_after_lost_config_response": lost_config_response,
+                "default_config_sha256": hashlib.sha256(config_bytes).hexdigest(),
+                "default_config_size": len(config_bytes),
+                "template_sha256": hashlib.sha256(template_bytes).hexdigest(),
+                "template_size": len(template_bytes),
+                "local_sdk_validation_refused_wrong_type": rejected_invalid_emission,
                 "batch": batch.id,
                 "job": job_id,
                 "emissions_sha256": hashlib.sha256(raw).hexdigest(),
