@@ -21,11 +21,7 @@
     "htmlLabels": true,
     "nodeSpacing": 28,
     "rankSpacing": 35,
-    "useMaxWidth": false,
-    "subGraphTitleMargin": {
-      "top": 0,
-      "bottom": 40
-    }
+    "useMaxWidth": false
   },
   "sequence": {
     "useMaxWidth": false,
@@ -37,5 +33,6 @@
   "state": {
     "useMaxWidth": false
   },
-  "layout": "elk"
+  "layout": "elk",
+  "themeCSS": "path.flowchart-link { fill: none !important; }"
 }

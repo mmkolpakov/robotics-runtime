@@ -28,7 +28,7 @@ for view in Context Container ContainerDetail ExternalTestAPI NativeInterfaces C
   fi
   if [[ "$view" == ContainerDetail ]]; then
     configuration="generated/mermaid-ContainerDetail.json"
-    python3 -c 'import json,sys; from pathlib import Path; c=json.loads(Path("mermaid-config.json").read_text()); c["layout"]="elk"; c["flowchart"]["subGraphTitleMargin"]={"top":0,"bottom":40}; Path(sys.argv[1]).write_text(json.dumps(c,indent=2)+"\n")' "$configuration"
+    python3 -c 'import json,sys; from pathlib import Path; c=json.loads(Path("mermaid-config.json").read_text()); c["layout"]="elk"; c["themeCSS"]="path.flowchart-link { fill: none !important; }"; Path(sys.argv[1]).write_text(json.dumps(c,indent=2)+"\n")' "$configuration"
   fi
   "$engine" run --rm --platform linux/amd64 --network none "${mapping[@]}" --user "$owner" \
     -v "$PWD:/data" "$mermaid" -c "$configuration" \
