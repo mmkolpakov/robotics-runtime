@@ -2,14 +2,14 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
     !identifiers hierarchical
     model {
         integrator = person "Integrator" "Selects profiles and verifies evidence."
-        product = softwareSystem "Product" "Robot / NSU / control / vision." {
+        product = softwareSystem "Product" "Robot / ground station / control / vision." {
             tags "External"
         }
         group "Native dependencies" {
         simulators = softwareSystem "Simulators" "Gazebo / Webots / Isaac; scoped." {
             tags "External"
         }
-        autopilot = softwareSystem "MAVSDK endpoint" "Separate transport / peer / effects." {
+        autopilot = softwareSystem "Control endpoint" "Selected SDK; transport, peer and effects differ." {
             tags "External"
         }
         mediaSource = softwareSystem "Media source" "Native camera / RTSP / fixture." {
@@ -20,7 +20,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             tags "External"
         }
         platform = softwareSystem "Runtime platform" "Host / Python tools; scoped providers." {
-            host = container "Run host" "Prerelease ESM host." "Node 24 / Cordis / Execa" {
+            host = container "Run host" "Lifecycle and owned jobs." "Node 24 / Cordis / Execa" {
                 tags "Host"
             }
             group "Python tools" {
@@ -32,17 +32,17 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             }
             }
             group "Native workers" {
-            native = container "Provider worker" "Native SDK candidate." "Native SDK / Python or C++" {
-                tags "Candidate"
+            native = container "Provider worker" "Selected simulator SDK." "Native SDK / Python or C++" {
+                tags "Provider"
             }
-            media = container "Media worker" "Source GStreamer." "Python GI / GStreamer" {
+            media = container "Media worker" "GStreamer pipeline and reports." "Python GI / GStreamer" {
                 tags "Media"
             }
             }
             evidence = container "Evidence store" "Retained bytes." "Files / object storage" {
                 tags "Database"
             }
-            externalApi = container "External Test API" "Source; producer claims and opaque bytes." "Fastify / jose / public core Jobs"
+            externalApi = container "External Test API" "Producer metadata and upload custody." "Fastify / jose / public core Jobs"
             apiMetadata = container "Test metadata" "Tenant RLS, versions and proofs." "PostgreSQL" {
                 tags "Database"
             }
@@ -52,10 +52,10 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         externalSdk = softwareSystem "SDK client" "SignalFlag 1.8.0; project + JWT." {
             tags "External"
         }
-        identity = softwareSystem "OIDC issuer" "JWT and JWKS; Keycloak fixture." {
+        identity = softwareSystem "OIDC issuer" "JWT and JWKS." {
             tags "External"
         }
-        objectStorage = softwareSystem "Versioned S3" "Opaque versions; local fixture." {
+        objectStorage = softwareSystem "Versioned S3" "Opaque object versions." {
             tags "External"
         }
         }
@@ -63,7 +63,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         product -> platform "Configure / verdicts"
         product -> autopilot "Control / telemetry"
         platform -> simulators "Native runtimes"
-        platform -> autopilot "Selected SDK"
+        platform -> autopilot "Native control SDK"
         platform -> mediaSource "Selected media"
         platform -> registries "Install / verify"
         integrator -> platform.host "Trusted profile" "Consumer CLI/API"
@@ -90,9 +90,9 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         platform.externalApi -> platform.custody "Custody commands" "Core Jobs / argv"
         platform.custody -> objectStorage "Exact-version bytes" "CLI / GET"
 
-        deploymentEnvironment "Home" {
-            deploymentNode "Home workstation" "Source WSL CPU topology; qualification is profile-scoped." "Windows / WSL2" {
-                deploymentNode "dev WSL" "Source components; native and media coverage is profile-scoped." "Ubuntu 24.04 / WSL2" {
+        deploymentEnvironment "Development" {
+            deploymentNode "Development host" "Example CPU topology; qualification is profile-scoped." "Windows / WSL2" {
+                deploymentNode "Linux environment" "Source components; native and media coverage is profile-scoped." "Ubuntu 24.04 / WSL2" {
                     infrastructureNode "Rootless engine" "Owned socket; namespace mapping." "Podman 4.9.3 / Compose 5.3.1"
                     containerInstance platform.host
                     containerInstance platform.documents
@@ -151,8 +151,8 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             include integrator product platform.host platform.documents platform.evaluation platform.evidence autopilot
             autoLayout lr 60 70
         }
-        deployment platform "Home" "HomeDeployment" "Source WSL CPU topology; this view is not a complete consumer qualification." {
-            title "Source WSL CPU topology"
+        deployment platform "Development" "DevelopmentDeployment" "Example CPU development profile; qualification remains profile-scoped." {
+            title "Example CPU development topology"
             include *
             autoLayout tb 100 40
         }
@@ -225,7 +225,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
                 background "#f8fafc"
                 stroke "#94a3b8"
             }
-            element "Candidate" {
+            element "Provider" {
                 background "#fffbeb"
                 stroke "#b45309"
                 border Dashed

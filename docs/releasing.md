@@ -150,3 +150,32 @@ seven days; maintainers must preserve it when investigating a partial publicatio
 [pending]: https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/
 [verify-release]: https://cli.github.com/manual/gh_release_verify
 [verify-asset]: https://cli.github.com/manual/gh_release_verify-asset
+
+## Compiled host
+
+`.github/workflows/host-release.yml` builds a TGZ with `private: true` and ordinary
+npm dependency installation. PR and manual runs verify a clean rebuild, archive
+identity and installation outside the source workspace; they do not publish or
+qualify native execution.
+
+Before publication, verify the repository's current release-immutability setting,
+the host/provider source cohort, cancellation and retained verification after
+source deletion. Set `HOST_QUALIFIED_SOURCE_SHA` and `HOST_QUALIFIED_ASSET_SHA256`
+to that accepted cohort. The build must match its source tree and archive bytes;
+the original source identity stays separate from the tag/build commit. Enable
+`HOST_RELEASE_PUBLISH_ENABLED=true` and create a unique main-reachable
+`host-v<host/package.json version>` tag. PyPI environments remain separate.
+The immutability settings API requires Administration read; an unauthorized
+response does not establish whether the setting is enabled.
+
+The workflow stages a draft with five assets. Immediately before publishing,
+repeat `check_draft_assets` and `check_live_tag` using the archived run inputs:
+download the exact remote asset set, compare every byte, and verify the peeled
+live tag against the build manifest and tag-trigger SHA. Reject partial, stale
+or surplus drafts without replacing their assets. Publish the accepted draft
+with `gh release edit <tag> --draft=false`.
+
+For a published release, require `isImmutable`, verify it with
+`gh release verify --format json`, recheck the exact live commit and verify every
+asset. Never move an existing tag or replace published bytes. Native provider,
+hardware and cloud qualification require their own independent consumer gates.

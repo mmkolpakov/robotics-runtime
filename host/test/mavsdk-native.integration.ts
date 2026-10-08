@@ -5,7 +5,7 @@ import { createServer, createConnection } from 'node:net';
 import { createSocket } from 'node:dgram';
 import { resolve, join } from 'node:path';
 import { readFile, writeFile, mkdir, copyFile, mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir, userInfo } from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 import { setTimeout as pause } from 'node:timers/promises';
 import { Jobs } from '../src/plugins/jobs/index.js';
@@ -42,7 +42,7 @@ test('native MAVSDK discovery uses only upstream heartbeat codec and preserves q
     '--entrypoint', '/workspace/.tools/mavlink/bin/python', 'localhost/rr-c-media:c12-locked',
     '/workspace/test/producers/mavlink_heartbeat.py', '--endpoint', 'udpout:127.0.0.1:' + mavlinkPort,
     '--seconds', '4', '--report', '/run/robotics/heartbeat.json'], cancelSignal: abort.signal,
-    env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/home/dev', USER: 'dev', LOGNAME: 'dev', DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/' + process.getuid!() + '/bus', XDG_RUNTIME_DIR: '/run/user/' + process.getuid!() } });
+    env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: homedir(), USER: userInfo().username, LOGNAME: userInfo().username, DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/' + process.getuid!() + '/bus', XDG_RUNTIME_DIR: '/run/user/' + process.getuid!() } });
   let fiber: ReturnType<Context['plugin']> | undefined;
   try {
     let ready = false;
