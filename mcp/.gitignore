@@ -1,0 +1,5 @@
+node_modules/
+.public-workers/
+bootstrap.json
+mcp-scratch/
+evidence/

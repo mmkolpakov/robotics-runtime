@@ -4,38 +4,38 @@ graph TB
   subgraph diagram ["Example CPU development topology"]
     style diagram fill:#ffffff,stroke:#ffffff
 
-    subgraph 53 ["Development host"]
-      style 53 fill:#ffffff,stroke:#94a3b8,color:#0f172a
+    subgraph 60 ["Development host"]
+      style 60 fill:#ffffff,stroke:#94a3b8,color:#0f172a
 
-      subgraph 54 ["Linux environment"]
-        style 54 fill:#ffffff,stroke:#94a3b8,color:#0f172a
+      subgraph 61 ["Linux environment"]
+        style 61 fill:#ffffff,stroke:#94a3b8,color:#0f172a
 
-        55("<div style='font-weight: bold'>Rootless engine</div><div style='font-size: 80%; margin-top:10px'>Owned socket; namespace<br />mapping.</div>")
-        style 55 fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
-        56("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Lifecycle and owned jobs.</div>")
-        style 56 fill:#dbeafe,stroke:#2563eb,color:#0f172a
-        57("<div style='font-weight: bold'>Document CLI</div><div style='font-size: 80%; margin-top:10px'>Published contracts.</div>")
-        style 57 fill:#ecfdf5,stroke:#047857,color:#0f172a
-        59("<div style='font-weight: bold'>Evaluation CLI</div><div style='font-size: 80%; margin-top:10px'>Published evaluator.</div>")
-        style 59 fill:#ecfdf5,stroke:#047857,color:#0f172a
-        61("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Selected simulator SDK.</div>")
-        style 61 fill:#fffbeb,stroke:#b45309,color:#0f172a
-        63("<div style='font-weight: bold'>Media worker</div><div style='font-size: 80%; margin-top:10px'>GStreamer pipeline and<br />reports.</div>")
-        style 63 fill:#ecfeff,stroke:#0e7490,color:#0f172a
-        65[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Retained bytes.</div>")]
-        style 65 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
+        62("<div style='font-weight: bold'>Rootless engine</div><div style='font-size: 80%; margin-top:10px'>Owned socket; namespace<br />mapping.</div>")
+        style 62 fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
+        63("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Lifecycle and owned jobs.</div>")
+        style 63 fill:#dbeafe,stroke:#2563eb,color:#0f172a
+        64("<div style='font-weight: bold'>Document CLI</div><div style='font-size: 80%; margin-top:10px'>Published contracts.</div>")
+        style 64 fill:#ecfdf5,stroke:#047857,color:#0f172a
+        66("<div style='font-weight: bold'>Evaluation CLI</div><div style='font-size: 80%; margin-top:10px'>Published evaluator.</div>")
+        style 66 fill:#ecfdf5,stroke:#047857,color:#0f172a
+        68("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Selected simulator SDK.</div>")
+        style 68 fill:#fffbeb,stroke:#b45309,color:#0f172a
+        70("<div style='font-weight: bold'>Media worker</div><div style='font-size: 80%; margin-top:10px'>GStreamer pipeline and<br />reports.</div>")
+        style 70 fill:#ecfeff,stroke:#0e7490,color:#0f172a
+        72[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Retained bytes.</div>")]
+        style 72 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
       end
 
     end
 
-    56-- "<div>Validate documents</div><div style='font-size: 70%'>[argv / files]</div>" -->57
-    56-- "<div>Evaluate evidence</div><div style='font-size: 70%'>[argv / files]</div>" -->59
-    56-- "<div>Lifecycle jobs</div><div style='font-size: 70%'>[Compose / argv]</div>" -->61
-    56-- "<div>Media jobs</div><div style='font-size: 70%'>[argv / files]</div>" -->63
-    56-- "<div>Export / cleanup proof</div><div style='font-size: 70%'>[Callback refs]</div>" -->65
-    57-- "<div>Write documents</div><div style='font-size: 70%'>[Files]</div>" -->65
-    59-- "<div>Read bytes / write verdicts</div><div style='font-size: 70%'>[JSON / JUnit]</div>" -->65
-    61-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->65
-    63-- "<div>Frames / reports</div><div style='font-size: 70%'>[Exact files]</div>" -->65
+    63-- "<div>Validate documents</div><div style='font-size: 70%'>[argv / files]</div>" -->64
+    63-- "<div>Evaluate evidence</div><div style='font-size: 70%'>[argv / files]</div>" -->66
+    63-- "<div>Lifecycle jobs</div><div style='font-size: 70%'>[Compose / argv]</div>" -->68
+    63-- "<div>Media jobs</div><div style='font-size: 70%'>[argv / files]</div>" -->70
+    63-- "<div>Export / cleanup proof</div><div style='font-size: 70%'>[Callback refs]</div>" -->72
+    64-- "<div>Write documents</div><div style='font-size: 70%'>[Files]</div>" -->72
+    66-- "<div>Read bytes / write verdicts</div><div style='font-size: 70%'>[JSON / JUnit]</div>" -->72
+    68-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->72
+    70-- "<div>Frames / reports</div><div style='font-size: 70%'>[Exact files]</div>" -->72
 
   end

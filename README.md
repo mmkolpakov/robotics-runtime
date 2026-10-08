@@ -121,10 +121,12 @@ it has no published API image release.
 
 ## Planned integrations
 
+The [optional offline MCP source package](mcp/README.md) provides six read tools
+through stdio and published CLI workers. It has no published MCP artifact.
+
 These designs are not released capabilities:
 
-- [Product MCP](docs/architecture.md#agent-access) over authorized status,
-  diagnostics and verified artifact-reference operations, using the maintained MCP SDK.
+- Effectful MCP run operations over admitted consumer/controller interfaces.
 - Additional native autopilot profiles through upstream ROS 2/DDS interfaces,
   with [separate control-operation acceptance](docs/architecture.md#native-data).
 

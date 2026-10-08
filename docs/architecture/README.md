@@ -5,9 +5,11 @@
 not a Python package or Docker image.
 
 - [Context](generated/Context.svg): users, product ownership and external systems.
-- [Container](generated/Container.svg): execution, retained evidence and the optional Test API.
+- [Container](generated/Container.svg): execution, retained evidence, offline MCP
+  and the optional Test API.
 - [Native interfaces](generated/NativeInterfaces.svg): selected SDK, simulator and media paths.
-- [Consumer interfaces](generated/ConsumerInterfaces.svg): host, documents and evaluation.
+- [Consumer interfaces](generated/ConsumerInterfaces.svg): host,
+  document/evaluation workers and offline MCP.
 - [External Test API](generated/ExternalTestAPI.svg): identity, metadata, uploads and custody.
 - [Complete graph](generated/ContainerDetail.svg): all declared interfaces.
 - [Local execution](generated/ExecutionDeployment.svg): admitted files and owned Engine/Compose jobs.
