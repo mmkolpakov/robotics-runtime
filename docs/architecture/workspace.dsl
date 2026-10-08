@@ -82,7 +82,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         platform.host -> platform.evidence "Export / cleanup proof" "Callback refs"
         integrator -> identity "Obtain JWT" "OIDC"
         integrator -> externalSdk "Configure client" "Project / JWT"
-        externalSdk -> platform.externalApi "Six REST operations" "JWT / HTTP"
+        externalSdk -> platform.externalApi "REST ×6" "JWT / HTTP"
         externalSdk -> objectStorage "Opaque upload" "Presigned PUT"
         platform.externalApi -> identity "Verify JWT / JWKS" "jose / RS256"
         platform.externalApi -> platform.apiMetadata "Metadata / proofs" "SQL / forced RLS"
@@ -187,6 +187,9 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
                 style solid
                 routing Orthogonal
                 thickness 2
+            }
+            element "Group" {
+                color "#0f172a"
             }
             element "Person" {
                 shape Person

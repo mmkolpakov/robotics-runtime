@@ -5,7 +5,7 @@ graph LR
     style diagram fill:#ffffff,stroke:#ffffff
 
     subgraph group1 ["Native dependencies"]
-      style group1 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+      style group1 fill:#ffffff,stroke:#0f172a,color:#0f172a,stroke-dasharray:5
 
       3("<div style='font-weight: bold'>Simulators</div><div style='font-size: 80%; margin-top:10px'>Gazebo / Webots / Isaac;<br />scoped.</div>")
       style 3 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
@@ -16,7 +16,7 @@ graph LR
     end
 
     subgraph group2 ["SDK interfaces"]
-      style group2 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+      style group2 fill:#ffffff,stroke:#0f172a,color:#0f172a,stroke-dasharray:5
 
       17("<div style='font-weight: bold'>SDK client</div><div style='font-size: 80%; margin-top:10px'>SignalFlag 1.8.0; project +<br />JWT.</div>")
       style 17 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
@@ -41,7 +41,7 @@ graph LR
     7-- "<div>Selected SDK</div><div style='font-size: 70%'></div>" -->4
     7-- "<div>Selected media</div><div style='font-size: 70%'></div>" -->5
     7-- "<div>Install / verify</div><div style='font-size: 70%'></div>" -->6
-    17-- "<div>Six REST operations</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->7
+    17-- "<div>REST ×6</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->7
     7-- "<div>Verify JWT / JWKS</div><div style='font-size: 70%'>[jose / RS256]</div>" -->18
     7-- "<div>Bind VersionId</div><div style='font-size: 70%'>[Presign / HEAD]</div>" -->19
 

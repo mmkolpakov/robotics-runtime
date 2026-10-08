@@ -11,7 +11,7 @@ graph LR
       style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
 
       subgraph group1 ["Native workers"]
-        style group1 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+        style group1 fill:#ffffff,stroke:#0f172a,color:#0f172a,stroke-dasharray:5
 
         11("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Native SDK candidate.</div>")
         style 11 fill:#fffbeb,stroke:#b45309,color:#0f172a
@@ -28,6 +28,6 @@ graph LR
     8-- "<div>Lifecycle jobs</div><div style='font-size: 70%'>[Compose / argv]</div>" -->11
     11-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->13
     8-- "<div>Export / cleanup proof</div><div style='font-size: 70%'>[Callback refs]</div>" -->13
-    17-- "<div>Six REST operations</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->14
+    17-- "<div>REST ×6</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->14
 
   end
