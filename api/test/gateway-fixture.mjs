@@ -162,10 +162,10 @@ try{
  }
  report.steps.push({name:'owned-two-network-bootstrap-and-isolated-SDK-proxy',topology,SDKAndProxyInternalOnly:true,noDefaultIPv4Route:true});
  cmd(['exec',proxy,'/usr/local/bin/node','-e',"require('node:fs').writeFileSync('/work/network-ready','ready\\n')"]);
- const exit=await eventually(async()=>{const detail=JSON.parse(cmd(['inspect',consumer]))[0];if(detail.State.Running)throw new Error('consumer active');return detail.State.ExitCode});
- if(exit!==0){
+ async function captureConsumerRefusal(reason){
   const detail=JSON.parse(cmd(['inspect',consumer]))[0];
-  report.consumerFailure={state:detail.State,image:detail.Image,command:detail.Config.Cmd,entrypoint:detail.Config.Entrypoint};
+  report.consumerFailure={reason,image:detail.Image,state:{status:detail.State.Status,running:detail.State.Running,
+   exitCode:detail.State.ExitCode,oomKilled:detail.State.OOMKilled,startedAt:detail.State.StartedAt,finishedAt:detail.State.FinishedAt}};
   const registered=await apiAdmin.query('SELECT id,job_id,checksum,size_bytes,media_type,object_key,version_id FROM api.uploads ORDER BY id');
   report.objectIdentity=[];
   for(const row of registered.rows){
@@ -176,8 +176,19 @@ try{
   }
   await retainDiagnostic(output,'consumer-failure.log',logs(consumer),privateValues);
   await retainDiagnostic(output,'api-failure.log',logs(api),privateValues);
-  throw new Error('installed SDK consumer exited '+exit);
+  report.custodyProgress=(await apiAdmin.query('SELECT u.id,u.job_id,u.version_id,u.retained_at,j.close_status,j.closed_at,(SELECT count(*) FROM api.upload_proofs p WHERE p.upload_id=u.id) AS proof_count FROM api.uploads u JOIN api.jobs j ON j.id=u.job_id ORDER BY u.id')).rows;
+  const events=cmd(['exec',api,'/usr/local/bin/node','-e',"const fs=require('node:fs');const p='/fixture/cli-attempts.jsonl';if(fs.existsSync(p))process.stdout.write(fs.readFileSync(p,'utf8'))"]);
+  if(events)await writeFile(join(output,'cli-attempts.jsonl'),events+'\n');
  }
+ async function preserveConsumerRefusal(reason){
+  report.consumerRefusal=reason;
+  try{await captureConsumerRefusal(reason)}
+  catch(error){report.diagnosticCaptureFailure={errorName:error.name,errorCode:error.code??null}}
+ }
+ let exit;
+ try{exit=await eventually(async()=>{const detail=JSON.parse(cmd(['inspect',consumer]))[0];if(detail.State.Running)throw new Error('consumer active');return detail.State.ExitCode})}
+ catch(error){await preserveConsumerRefusal('settlement-wait-refused');throw error}
+ if(exit!==0){await preserveConsumerRefusal('settled-nonzero');throw new Error('installed SDK consumer exited '+exit)}
  cmd(['cp',consumer+':/work/sdk-report.json',join(output,'sdk-report.json')]);const sdk=JSON.parse(await readFile(join(output,'sdk-report.json'),'utf8'));assert.equal(sdk.tenants.length,2);
  const records=await apiAdmin.query('SELECT j.id,j.close_status,j.closed_at,u.id AS upload_id,u.file_name,u.checksum,u.version_id,u.retained_at,(SELECT count(*) FROM api.upload_proofs p WHERE p.upload_id=u.id) AS proof_count FROM api.jobs j JOIN api.uploads u ON u.job_id=j.id ORDER BY j.id,u.file_name');
  assert.equal(records.rows.length,6);assert.ok(records.rows.every(r=>r.close_status==='SUCCEEDED'&&r.closed_at&&r.retained_at&&r.version_id&&Number(r.proof_count)===5));
