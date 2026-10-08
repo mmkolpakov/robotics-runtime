@@ -1,10 +1,10 @@
 import Fastify,{type FastifyInstance,type FastifyError} from 'fastify';
 import type {Domain,Addresses} from './domain.js';
 import {ApiError} from './database.js';
+import {uuid,text} from './admission.js';
+import {registerMetricsConfig} from './graphql.js';
 import {tokenVerifier,type IdentityConfiguration,type Principal} from './identity.js';
 declare module 'fastify' {interface FastifyRequest {principal?:Principal;operationSignal?:AbortSignal}}
-const uuid={type:'string',pattern:'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'};
-const text={type:'string',minLength:1,maxLength:256};
 const parameters=(names:string[])=>({type:'object',required:names,additionalProperties:false,properties:Object.fromEntries(names.map(name=>[name,uuid]))});
 const body=(properties:Record<string,unknown>,required:string[])=>({type:'object',additionalProperties:false,properties,required});
 export function createApi(domain:Domain,identity:IdentityConfiguration):FastifyInstance{
@@ -46,5 +46,6 @@ export function createApi(domain:Domain,identity:IdentityConfiguration):FastifyI
   async(request,reply)=>{await domain.closeJob(request.principal!,request.params as Addresses,request.body as Parameters<Domain['closeJob']>[2],request.operationSignal!);return reply.status(204).send()});
  api.post('/projects/:projectID/batches/:batchID/close',{schema:{params:parameters(['projectID','batchID'])},preValidation:async request=>{if(request.body!==undefined)throw new ApiError(400,'batch close accepts no body')}},
   async(request,reply)=>{await domain.closeBatch(request.principal!,request.params as Addresses);return reply.status(204).send()});
+ registerMetricsConfig(api,domain);
  return api;
 }
