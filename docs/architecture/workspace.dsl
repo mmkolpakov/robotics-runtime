@@ -2,45 +2,67 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
     !identifiers hierarchical
     model {
         integrator = person "Integrator" "Selects profiles and verifies evidence."
-        product = softwareSystem "Product application" "Robot, NSU, control and vision behavior." {
+        product = softwareSystem "Product" "Robot / NSU / control / vision." {
             tags "External"
         }
-        simulators = softwareSystem "Simulation engines" "Gazebo / Webots / Isaac; profile-scoped." {
+        group "Native dependencies" {
+        simulators = softwareSystem "Simulators" "Gazebo / Webots / Isaac; scoped." {
             tags "External"
         }
-        autopilot = softwareSystem "MAVSDK endpoint" "MAVSDK: separate transport, peer and effect facts." {
+        autopilot = softwareSystem "MAVSDK endpoint" "Separate transport / peer / effects." {
             tags "External"
         }
-        mediaSource = softwareSystem "Media source" "Camera, RTSP or fixture; native frame semantics." {
+        mediaSource = softwareSystem "Media source" "Native camera / RTSP / fixture." {
             tags "External"
         }
-        registries = softwareSystem "Artifact registries" "Immutable packages, images and attestations." {
+        }
+        registries = softwareSystem "Registries" "Immutable packages / images / attestations." {
             tags "External"
         }
-        platform = softwareSystem "Robotics runtime platform" "Published host and Python tools; providers per profile." {
+        platform = softwareSystem "Runtime platform" "Host / Python tools; scoped providers." {
             host = container "Run host" "Prerelease ESM host." "Node 24 / Cordis / Execa" {
                 tags "Host"
             }
+            group "Python tools" {
             documents = container "Document CLI" "Published contracts." "Python CLI" {
                 tags "Published"
             }
             evaluation = container "Evaluation CLI" "Published evaluator." "Python CLI" {
                 tags "Published"
             }
+            }
+            group "Native workers" {
             native = container "Provider worker" "Native SDK candidate." "Native SDK / Python or C++" {
                 tags "Candidate"
             }
             media = container "Media worker" "Source GStreamer." "Python GI / GStreamer" {
                 tags "Media"
             }
+            }
             evidence = container "Evidence store" "Retained bytes." "Files / object storage" {
                 tags "Database"
             }
+            externalApi = container "External Test API" "Source; producer claims and opaque bytes." "Fastify / jose / public core Jobs"
+            apiMetadata = container "Test metadata" "Tenant RLS, versions and proofs." "PostgreSQL" {
+                tags "Database"
+            }
+            custody = container "Custody CLI" "Bounded verify, sign and receipt." "AWS CLI / cosign / retained-artifact / contracts CLI"
         }
-        integrator -> platform "Run and verify workloads"
-        product -> platform "Supply config; read verdicts"
+        group "SDK interfaces" {
+        externalSdk = softwareSystem "SDK client" "SignalFlag 1.8.0; project + JWT." {
+            tags "External"
+        }
+        identity = softwareSystem "OIDC issuer" "JWT and JWKS; Keycloak fixture." {
+            tags "External"
+        }
+        objectStorage = softwareSystem "Versioned S3" "Opaque versions; local fixture." {
+            tags "External"
+        }
+        }
+        integrator -> platform "Run / verify"
+        product -> platform "Configure / verdicts"
         product -> autopilot "Control / telemetry"
-        platform -> simulators "Selected native runtimes"
+        platform -> simulators "Native runtimes"
         platform -> autopilot "Selected SDK"
         platform -> mediaSource "Selected media"
         platform -> registries "Install / verify"
@@ -58,6 +80,16 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         platform.documents -> platform.evidence "Write documents" "Files"
         platform.evaluation -> platform.evidence "Read bytes / write verdicts" "JSON / JUnit"
         platform.host -> platform.evidence "Export / cleanup proof" "Callback refs"
+        integrator -> identity "Obtain JWT" "OIDC"
+        integrator -> externalSdk "Configure client" "Project / JWT"
+        externalSdk -> platform.externalApi "REST ×6" "JWT / HTTP"
+        externalSdk -> objectStorage "Opaque upload" "Presigned PUT"
+        platform.externalApi -> identity "Verify JWT / JWKS" "jose / RS256"
+        platform.externalApi -> platform.apiMetadata "Metadata / proofs" "SQL / forced RLS"
+        platform.externalApi -> objectStorage "Bind VersionId" "Presign / HEAD"
+        platform.externalApi -> platform.custody "Custody commands" "Core Jobs / argv"
+        platform.custody -> objectStorage "Exact-version bytes" "CLI / GET"
+
         deploymentEnvironment "Home" {
             deploymentNode "Home workstation" "Source WSL CPU topology; qualification is profile-scoped." "Windows / WSL2" {
                 deploymentNode "dev WSL" "Source components; native and media coverage is profile-scoped." "Ubuntu 24.04 / WSL2" {
@@ -92,17 +124,22 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         systemContext platform "Context" "Actors and system boundary." {
             title "Platform context"
             include *?
-            autoLayout lr 60 60
+            autoLayout lr 20 25
         }
-        container platform "Container" "Owned processes and retained data; native interfaces are in ContainerDetail." {
-            title "Process composition"
-            include platform.host platform.documents platform.evaluation platform.native platform.media platform.evidence
-            autoLayout lr 60 60
+        container platform "Container" "Execution/evidence and optional external Test boundaries; complete worker/tool interfaces are in ContainerDetail." {
+            title "Execution and external Test boundaries"
+            include platform.host platform.native platform.evidence platform.externalApi externalSdk
+            autoLayout lr 20 25
         }
         container platform "ContainerDetail" "Complete consumer, controller, simulator and media interface graph." {
             title "Native and consumer interfaces"
             include *
             autoLayout lr 80 100
+        }
+        container platform "ExternalTestAPI" "Optional source API; external producer metadata and custody are separate from native qualification." {
+            title "Optional external Test API"
+            include externalSdk identity objectStorage platform.externalApi platform.apiMetadata platform.custody
+            autoLayout tb 20 25
         }
         container platform "NativeInterfaces" "Selected simulator, media and SDK dependencies; no common frame or control bus." {
             title "Native interfaces"
@@ -150,6 +187,9 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
                 style solid
                 routing Orthogonal
                 thickness 2
+            }
+            element "Group" {
+                color "#0f172a"
             }
             element "Person" {
                 shape Person

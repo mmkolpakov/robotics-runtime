@@ -20,9 +20,14 @@ mkdir -p generated
 "$engine" run --rm --platform linux/amd64 --network none "${mapping[@]}" --user "$owner" \
   -v "$PWD:/usr/local/structurizr" "$structurizr" \
   export -workspace workspace.dsl -format mermaid -output generated
-for view in Context Container ContainerDetail NativeInterfaces ConsumerInterfaces HomeDeployment ExecutionDeployment; do
+for view in Context Container ContainerDetail ExternalTestAPI NativeInterfaces ConsumerInterfaces HomeDeployment ExecutionDeployment; do
+  configuration=mermaid-config.json
+  if [[ "$view" == ExternalTestAPI || "$view" == Container || "$view" == Context ]]; then
+    configuration="generated/mermaid-$view.json"
+    python3 -c 'import json,sys; from pathlib import Path; c=json.loads(Path("mermaid-config.json").read_text()); c["themeVariables"]["fontSize"]="26px"; c["layout"]="elk"; c["flowchart"].update(nodeSpacing=16,rankSpacing=20,inheritDir=True); c["flowchart"].update(wrappingWidth=140) if "ExternalTestAPI" not in sys.argv[1] else c.update(themeCSS="g.cluster:not([id$=-diagram]) > rect, g.cluster:not([id$=-diagram]) > g.cluster-label { visibility: hidden; }"); Path(sys.argv[1]).write_text(json.dumps(c,indent=2)+"\n")' "$configuration"
+  fi
   "$engine" run --rm --platform linux/amd64 --network none "${mapping[@]}" --user "$owner" \
-    -v "$PWD:/data" "$mermaid" -c mermaid-config.json \
+    -v "$PWD:/data" "$mermaid" -c "$configuration" \
     -i "generated/structurizr-$view.mmd" -o "generated/$view.svg"
 done
 for diagram in run-sequence run-state; do

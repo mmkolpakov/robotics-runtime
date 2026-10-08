@@ -1,9 +1,8 @@
-"""Embed upstream-generated C4 Mermaid views in the repository README."""
+"""Embed pinned-renderer C4 SVG views and their canonical source in README."""
 
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -12,10 +11,7 @@ VIEWS = ("Container", "Context")
 
 def render_readme() -> str:
     readme = (ROOT / "README.md").read_text()
-    directory = ROOT / "docs/architecture"
-    configuration = json.loads((directory / "mermaid-config.json").read_text())
-    initialization = "%%{init: " + json.dumps(configuration, separators=(",", ":")) + "}%%"
-    fence = chr(96) * 3
+    labels = {"Container": "Execution and external Test boundaries", "Context": "Platform context"}
     for view in VIEWS:
         start = f"<!-- architecture:{view}:start -->"
         end = f"<!-- architecture:{view}:end -->"
@@ -24,8 +20,12 @@ def render_readme() -> str:
         first, last = readme.index(start), readme.index(end)
         if last <= first:
             raise ValueError(f"README markers are reversed for {view}")
-        source = (directory / f"generated/structurizr-{view}.mmd").read_text().strip()
-        block = f"{start}\n\n{fence}mermaid\n{initialization}\n{source}\n{fence}\n\n{end}"
+        block = (
+            f"{start}\n\n"
+            f"![{labels[view]}](docs/architecture/generated/{view}.svg)\n\n"
+            "[Canonical C4 source](docs/architecture/workspace.dsl) · "
+            f"[Generated Mermaid](docs/architecture/generated/structurizr-{view}.mmd)\n\n{end}"
+        )
         readme = readme[:first] + block + readme[last + len(end) :]
     return readme
 

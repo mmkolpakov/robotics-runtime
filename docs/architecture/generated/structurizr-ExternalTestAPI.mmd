@@ -1,0 +1,33 @@
+graph TB
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Optional external Test API"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    17("<div style='font-weight: bold'>SDK client</div><div style='font-size: 80%; margin-top:10px'>SignalFlag 1.8.0; project +<br />JWT.</div>")
+    style 17 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    18("<div style='font-weight: bold'>OIDC issuer</div><div style='font-size: 80%; margin-top:10px'>JWT and JWKS; Keycloak<br />fixture.</div>")
+    style 18 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    19("<div style='font-weight: bold'>Versioned S3</div><div style='font-size: 80%; margin-top:10px'>Opaque versions; local<br />fixture.</div>")
+    style 19 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+
+    subgraph 7 ["Runtime platform"]
+      style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
+
+      14("<div style='font-weight: bold'>External Test API</div><div style='font-size: 80%; margin-top:10px'>Source; producer claims and<br />opaque bytes.</div>")
+      style 14 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
+      15[("<div style='font-weight: bold'>Test metadata</div><div style='font-size: 80%; margin-top:10px'>Tenant RLS, versions and<br />proofs.</div>")]
+      style 15 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
+      16("<div style='font-weight: bold'>Custody CLI</div><div style='font-size: 80%; margin-top:10px'>Bounded verify, sign and<br />receipt.</div>")
+      style 16 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
+    end
+
+    17-- "<div>REST ×6</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->14
+    17-- "<div>Opaque upload</div><div style='font-size: 70%'>[Presigned PUT]</div>" -->19
+    14-- "<div>Verify JWT / JWKS</div><div style='font-size: 70%'>[jose / RS256]</div>" -->18
+    14-- "<div>Metadata / proofs</div><div style='font-size: 70%'>[SQL / forced RLS]</div>" -->15
+    14-- "<div>Bind VersionId</div><div style='font-size: 70%'>[Presign / HEAD]</div>" -->19
+    14-- "<div>Custody commands</div><div style='font-size: 70%'>[Core Jobs / argv]</div>" -->16
+    16-- "<div>Exact-version bytes</div><div style='font-size: 70%'>[CLI / GET]</div>" -->19
+
+  end
