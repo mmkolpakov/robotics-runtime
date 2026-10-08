@@ -20,7 +20,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             tags "External"
         }
         platform = softwareSystem "Runtime platform" "Host / Python tools; scoped providers." {
-            host = container "Run host" "Prerelease ESM host." "Node 24 / Cordis / Execa" {
+            host = container "Run host" "Lifecycle and owned jobs." "Node 24 / Cordis / Execa" {
                 tags "Host"
             }
             group "Python tools" {
@@ -32,17 +32,17 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             }
             }
             group "Native workers" {
-            native = container "Provider worker" "Native SDK candidate." "Native SDK / Python or C++" {
-                tags "Candidate"
+            native = container "Provider worker" "Selected simulator SDK." "Native SDK / Python or C++" {
+                tags "Provider"
             }
-            media = container "Media worker" "Source GStreamer." "Python GI / GStreamer" {
+            media = container "Media worker" "GStreamer pipeline and reports." "Python GI / GStreamer" {
                 tags "Media"
             }
             }
             evidence = container "Evidence store" "Retained bytes." "Files / object storage" {
                 tags "Database"
             }
-            externalApi = container "External Test API" "Source; producer claims and opaque bytes." "Fastify / jose / public core Jobs"
+            externalApi = container "External Test API" "Producer metadata and upload custody." "Fastify / jose / public core Jobs"
             apiMetadata = container "Test metadata" "Tenant RLS, versions and proofs." "PostgreSQL" {
                 tags "Database"
             }
@@ -52,10 +52,10 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         externalSdk = softwareSystem "SDK client" "SignalFlag 1.8.0; project + JWT." {
             tags "External"
         }
-        identity = softwareSystem "OIDC issuer" "JWT and JWKS; Keycloak fixture." {
+        identity = softwareSystem "OIDC issuer" "JWT and JWKS." {
             tags "External"
         }
-        objectStorage = softwareSystem "Versioned S3" "Opaque versions; local fixture." {
+        objectStorage = softwareSystem "Versioned S3" "Opaque object versions." {
             tags "External"
         }
         }
@@ -225,7 +225,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
                 background "#f8fafc"
                 stroke "#94a3b8"
             }
-            element "Candidate" {
+            element "Provider" {
                 background "#fffbeb"
                 stroke "#b45309"
                 border Dashed

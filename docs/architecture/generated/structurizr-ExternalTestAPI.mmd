@@ -6,15 +6,15 @@ graph TB
 
     17("<div style='font-weight: bold'>SDK client</div><div style='font-size: 80%; margin-top:10px'>SignalFlag 1.8.0; project +<br />JWT.</div>")
     style 17 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    18("<div style='font-weight: bold'>OIDC issuer</div><div style='font-size: 80%; margin-top:10px'>JWT and JWKS; Keycloak<br />fixture.</div>")
+    18("<div style='font-weight: bold'>OIDC issuer</div><div style='font-size: 80%; margin-top:10px'>JWT and JWKS.</div>")
     style 18 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    19("<div style='font-weight: bold'>Versioned S3</div><div style='font-size: 80%; margin-top:10px'>Opaque versions; local<br />fixture.</div>")
+    19("<div style='font-weight: bold'>Versioned S3</div><div style='font-size: 80%; margin-top:10px'>Opaque object versions.</div>")
     style 19 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
 
     subgraph 7 ["Runtime platform"]
       style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
 
-      14("<div style='font-weight: bold'>External Test API</div><div style='font-size: 80%; margin-top:10px'>Source; producer claims and<br />opaque bytes.</div>")
+      14("<div style='font-weight: bold'>External Test API</div><div style='font-size: 80%; margin-top:10px'>Producer metadata and upload<br />custody.</div>")
       style 14 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
       15[("<div style='font-weight: bold'>Test metadata</div><div style='font-size: 80%; margin-top:10px'>Tenant RLS, versions and<br />proofs.</div>")]
       style 15 fill:#eef2ff,stroke:#6d28d9,color:#0f172a

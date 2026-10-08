@@ -67,7 +67,7 @@ execution qualification.
 
 <!-- architecture:Container:end -->
 
-Colors distinguish roles: composition, published Python tools, native candidates,
+Colors distinguish roles: composition, published Python tools, native workers,
 media and retained files. They are not qualification verdicts. Control and video
 use their native connections; lifecycle completion and evidence evaluation are
 separate outcomes.
