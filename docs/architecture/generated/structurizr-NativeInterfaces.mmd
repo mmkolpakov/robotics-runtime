@@ -4,20 +4,25 @@ graph LR
   subgraph diagram ["Native interfaces"]
     style diagram fill:#ffffff,stroke:#ffffff
 
-    3("<div style='font-weight: bold'>Simulation engines</div><div style='font-size: 80%; margin-top:10px'>Gazebo / Webots / Isaac;<br />profile-scoped.</div>")
+    3("<div style='font-weight: bold'>Simulators</div><div style='font-size: 80%; margin-top:10px'>Gazebo / Webots / Isaac;<br />scoped.</div>")
     style 3 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    4("<div style='font-weight: bold'>MAVSDK endpoint</div><div style='font-size: 80%; margin-top:10px'>MAVSDK: separate transport,<br />peer and effect facts.</div>")
+    4("<div style='font-weight: bold'>MAVSDK endpoint</div><div style='font-size: 80%; margin-top:10px'>Separate transport / peer /<br />effects.</div>")
     style 4 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    5("<div style='font-weight: bold'>Media source</div><div style='font-size: 80%; margin-top:10px'>Camera, RTSP or fixture;<br />native frame semantics.</div>")
+    5("<div style='font-weight: bold'>Media source</div><div style='font-size: 80%; margin-top:10px'>Native camera / RTSP /<br />fixture.</div>")
     style 5 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
 
-    subgraph 7 ["Robotics runtime platform"]
+    subgraph 7 ["Runtime platform"]
       style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
 
-      11("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Native SDK candidate.</div>")
-      style 11 fill:#fffbeb,stroke:#b45309,color:#0f172a
-      12("<div style='font-weight: bold'>Media worker</div><div style='font-size: 80%; margin-top:10px'>Source GStreamer.</div>")
-      style 12 fill:#ecfeff,stroke:#0e7490,color:#0f172a
+      subgraph group1 ["Native workers"]
+        style group1 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        11("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Native SDK candidate.</div>")
+        style 11 fill:#fffbeb,stroke:#b45309,color:#0f172a
+        12("<div style='font-weight: bold'>Media worker</div><div style='font-size: 80%; margin-top:10px'>Source GStreamer.</div>")
+        style 12 fill:#ecfeff,stroke:#0e7490,color:#0f172a
+      end
+
       8("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Prerelease ESM host.</div>")
       style 8 fill:#dbeafe,stroke:#2563eb,color:#0f172a
     end

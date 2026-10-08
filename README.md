@@ -62,63 +62,9 @@ execution qualification.
 
 <!-- architecture:Container:start -->
 
-```mermaid
-%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, Segoe UI, sans-serif","fontSize":"18px","primaryTextColor":"#0f172a","lineColor":"#475569","edgeLabelBackground":"#ffffff","clusterBkg":"#f8fafc","clusterBorder":"#94a3b8","primaryColor":"#eff6ff","primaryBorderColor":"#64748b","secondaryColor":"#f1f5f9","tertiaryColor":"#f8fafc","noteBkgColor":"#fff7ed","noteBorderColor":"#b45309","noteTextColor":"#0f172a"},"flowchart":{"curve":"basis","htmlLabels":true,"nodeSpacing":28,"rankSpacing":35,"useMaxWidth":false},"sequence":{"useMaxWidth":false,"actorMargin":35,"width":165,"wrap":true,"noteMargin":10},"state":{"useMaxWidth":false}}}%%
-graph LR
-  linkStyle default fill:#ffffff
+![Execution and external Test boundaries](docs/architecture/generated/Container.svg)
 
-  subgraph diagram ["Process composition"]
-    style diagram fill:#ffffff,stroke:#ffffff
-
-    17("<div style='font-weight: bold'>External SDK client</div><div style='font-size: 80%; margin-top:10px'>Limited SignalFlag SDK 1.8.0<br />recipe; project ID and<br />explicit token.</div>")
-    style 17 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    18("<div style='font-weight: bold'>OIDC issuer</div><div style='font-size: 80%; margin-top:10px'>Configured JWT issuer and<br />JWKS; fixture uses Keycloak.</div>")
-    style 18 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    19("<div style='font-weight: bold'>Versioned S3 service</div><div style='font-size: 80%; margin-top:10px'>Opaque objects; fixture uses<br />S3-compatible SeaweedFS.</div>")
-    style 19 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-
-    subgraph 7 ["Robotics runtime platform"]
-      style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
-
-      10("<div style='font-weight: bold'>Evaluation CLI</div><div style='font-size: 80%; margin-top:10px'>Published evaluator.</div>")
-      style 10 fill:#ecfdf5,stroke:#047857,color:#0f172a
-      11("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Native SDK candidate.</div>")
-      style 11 fill:#fffbeb,stroke:#b45309,color:#0f172a
-      12("<div style='font-weight: bold'>Media worker</div><div style='font-size: 80%; margin-top:10px'>Source GStreamer.</div>")
-      style 12 fill:#ecfeff,stroke:#0e7490,color:#0f172a
-      13[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Retained bytes.</div>")]
-      style 13 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
-      14("<div style='font-weight: bold'>Optional external Test API</div><div style='font-size: 80%; margin-top:10px'>Source service; external<br />producer metadata and opaque<br />byte custody.</div>")
-      style 14 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
-      15[("<div style='font-weight: bold'>External Test metadata</div><div style='font-size: 80%; margin-top:10px'>Tenant/project RLS; upload<br />versions, proof checkpoints<br />and producer claims.</div>")]
-      style 15 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
-      16("<div style='font-weight: bold'>Custody CLI processes</div><div style='font-size: 80%; margin-top:10px'>Finite public download,<br />verification, signature and<br />receipt operations.</div>")
-      style 16 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
-      8("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Prerelease ESM host.</div>")
-      style 8 fill:#dbeafe,stroke:#2563eb,color:#0f172a
-      9("<div style='font-weight: bold'>Document CLI</div><div style='font-size: 80%; margin-top:10px'>Published contracts.</div>")
-      style 9 fill:#ecfdf5,stroke:#047857,color:#0f172a
-    end
-
-    8-- "<div>Validate documents</div><div style='font-size: 70%'>[argv / files]</div>" -->9
-    8-- "<div>Evaluate evidence</div><div style='font-size: 70%'>[argv / files]</div>" -->10
-    8-- "<div>Lifecycle jobs</div><div style='font-size: 70%'>[Compose / argv]</div>" -->11
-    8-- "<div>Media jobs</div><div style='font-size: 70%'>[argv / files]</div>" -->12
-    12-- "<div>Frames / reports</div><div style='font-size: 70%'>[Exact files]</div>" -->13
-    11-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->13
-    9-- "<div>Write documents</div><div style='font-size: 70%'>[Files]</div>" -->13
-    10-- "<div>Read bytes / write verdicts</div><div style='font-size: 70%'>[JSON / JUnit]</div>" -->13
-    8-- "<div>Export / cleanup proof</div><div style='font-size: 70%'>[Callback refs]</div>" -->13
-    17-- "<div>Six REST operations</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->14
-    17-- "<div>Opaque upload</div><div style='font-size: 70%'>[Presigned PUT / required headers]</div>" -->19
-    14-- "<div>Verify JWT with configured<br />JWKS</div><div style='font-size: 70%'>[jose / RS256]</div>" -->18
-    14-- "<div>Authorized metadata and proof<br />checkpoints</div><div style='font-size: 70%'>[Same-client transaction / forced RLS]</div>" -->15
-    14-- "<div>Presign and bind exact upload<br />version</div><div style='font-size: 70%'>[AWS SDK / HEAD]</div>" -->19
-    14-- "<div>Fixed server-owned operations</div><div style='font-size: 70%'>[Public core Jobs / bounded argv]</div>" -->16
-    16-- "<div>Verify retained bytes at<br />exact VersionId</div><div style='font-size: 70%'>[Bounded public CLI / GET]</div>" -->19
-
-  end
-```
+[Canonical C4 source](docs/architecture/workspace.dsl) · [Generated Mermaid](docs/architecture/generated/structurizr-Container.mmd)
 
 <!-- architecture:Container:end -->
 
@@ -132,47 +78,9 @@ separate outcomes.
 
 <!-- architecture:Context:start -->
 
-```mermaid
-%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, Segoe UI, sans-serif","fontSize":"18px","primaryTextColor":"#0f172a","lineColor":"#475569","edgeLabelBackground":"#ffffff","clusterBkg":"#f8fafc","clusterBorder":"#94a3b8","primaryColor":"#eff6ff","primaryBorderColor":"#64748b","secondaryColor":"#f1f5f9","tertiaryColor":"#f8fafc","noteBkgColor":"#fff7ed","noteBorderColor":"#b45309","noteTextColor":"#0f172a"},"flowchart":{"curve":"basis","htmlLabels":true,"nodeSpacing":28,"rankSpacing":35,"useMaxWidth":false},"sequence":{"useMaxWidth":false,"actorMargin":35,"width":165,"wrap":true,"noteMargin":10},"state":{"useMaxWidth":false}}}%%
-graph LR
-  linkStyle default fill:#ffffff
+![Platform context](docs/architecture/generated/Context.svg)
 
-  subgraph diagram ["Platform context"]
-    style diagram fill:#ffffff,stroke:#ffffff
-
-    1["<div style='font-weight: bold'>Integrator</div><div style='font-size: 80%; margin-top:10px'>Selects profiles and verifies<br />evidence.</div>"]
-    style 1 fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
-    17("<div style='font-weight: bold'>External SDK client</div><div style='font-size: 80%; margin-top:10px'>Limited SignalFlag SDK 1.8.0<br />recipe; project ID and<br />explicit token.</div>")
-    style 17 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    18("<div style='font-weight: bold'>OIDC issuer</div><div style='font-size: 80%; margin-top:10px'>Configured JWT issuer and<br />JWKS; fixture uses Keycloak.</div>")
-    style 18 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    19("<div style='font-weight: bold'>Versioned S3 service</div><div style='font-size: 80%; margin-top:10px'>Opaque objects; fixture uses<br />S3-compatible SeaweedFS.</div>")
-    style 19 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    2("<div style='font-weight: bold'>Product application</div><div style='font-size: 80%; margin-top:10px'>Robot, NSU, control and<br />vision behavior.</div>")
-    style 2 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    3("<div style='font-weight: bold'>Simulation engines</div><div style='font-size: 80%; margin-top:10px'>Gazebo / Webots / Isaac;<br />profile-scoped.</div>")
-    style 3 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    4("<div style='font-weight: bold'>MAVSDK endpoint</div><div style='font-size: 80%; margin-top:10px'>MAVSDK: separate transport,<br />peer and effect facts.</div>")
-    style 4 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    5("<div style='font-weight: bold'>Media source</div><div style='font-size: 80%; margin-top:10px'>Camera, RTSP or fixture;<br />native frame semantics.</div>")
-    style 5 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    6("<div style='font-weight: bold'>Artifact registries</div><div style='font-size: 80%; margin-top:10px'>Immutable packages, images<br />and attestations.</div>")
-    style 6 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    7("<div style='font-weight: bold'>Robotics runtime platform</div><div style='font-size: 80%; margin-top:10px'>Published host and Python<br />tools; providers per profile.</div>")
-    style 7 fill:#dbeafe,stroke:#2563eb,color:#0f172a
-
-    1-- "<div>Run and verify workloads</div><div style='font-size: 70%'></div>" -->7
-    2-- "<div>Supply config; read verdicts</div><div style='font-size: 70%'></div>" -->7
-    7-- "<div>Selected native runtimes</div><div style='font-size: 70%'></div>" -->3
-    7-- "<div>Selected SDK</div><div style='font-size: 70%'></div>" -->4
-    7-- "<div>Selected media</div><div style='font-size: 70%'></div>" -->5
-    7-- "<div>Install / verify</div><div style='font-size: 70%'></div>" -->6
-    17-- "<div>Six REST operations</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->7
-    7-- "<div>Verify JWT with configured<br />JWKS</div><div style='font-size: 70%'>[jose / RS256]</div>" -->18
-    7-- "<div>Presign and bind exact upload<br />version</div><div style='font-size: 70%'>[AWS SDK / HEAD]</div>" -->19
-
-  end
-```
+[Canonical C4 source](docs/architecture/workspace.dsl) · [Generated Mermaid](docs/architecture/generated/structurizr-Context.mmd)
 
 <!-- architecture:Context:end -->
 
@@ -194,6 +102,9 @@ connections. Its implementation and simulator providers are separate from the
 published Python pair.
 
 [Composition framework and its limits](docs/architecture.md#composition-framework).
+The process overview shows execution/evidence and the optional external Test boundary;
+[complete worker and tool interfaces](docs/architecture/generated/ContainerDetail.svg)
+are shown separately.
 
 Common document/evaluation code does not require Gazebo, Isaac Sim, Webots or
 ROS. Engine-specific APIs and assets belong to selected infra providers.
