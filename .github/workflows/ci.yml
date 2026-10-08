@@ -184,9 +184,57 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  mcp:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container:
+      options: --init
+      image: node:24.21.0-trixie-slim@sha256:b64fccfbcd1ae10d11b969a868b50e1c2530a7054813d5cdea04ac3bce551697
+    defaults:
+      run:
+        shell: sh
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - run: node --version && npm --version
+      - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=high
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.23"
+          python-version: "3.12"
+          enable-cache: true
+          prune-cache: true
+          cache-dependency-glob: mcp/public-cli.lock
+      - name: Install the pinned public worker interfaces
+        run: |
+          uv venv --python 3.12 .public-workers
+          uv pip install --python .public-workers/bin/python --require-hashes --no-deps \
+            --only-binary :all: --requirement public-cli.lock
+      - name: Exercise the real MCP client and public CLI workers
+        run: |
+          mkdir -p ../artifacts/mcp-cli-integration
+          MCP_TEST_CONTRACTS_CLI="$PWD/.public-workers/bin/robotics-contracts" \
+          MCP_TEST_HARNESS_CLI="$PWD/.public-workers/bin/robotics-acceptance" \
+          MCP_TEST_REPORT_DIR="$PWD/../artifacts/mcp-cli-integration" \
+            npm test > ../artifacts/mcp-cli-integration-test.log 2>&1
+          cat ../artifacts/mcp-cli-integration-test.log
+      - name: Retain MCP integration outputs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mcp-cli-integration-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            artifacts/mcp-cli-integration/
+            artifacts/mcp-cli-integration-test.log
+          if-no-files-found: error
+          retention-days: 7
+
   required-validation:
     name: ci
-    needs: [package, quality, consumers, live-ros]
+    needs: [package, quality, consumers, live-ros, mcp]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -197,8 +245,10 @@ jobs:
           QUALITY_RESULT: ${{ needs.quality.result }}
           CONSUMERS_RESULT: ${{ needs.consumers.result }}
           ROS_RESULT: ${{ needs.live-ros.result }}
+          MCP_RESULT: ${{ needs.mcp.result }}
         run: |
           test "$PACKAGE_RESULT" = success
           test "$QUALITY_RESULT" = success
           test "$CONSUMERS_RESULT" = success
           test "$ROS_RESULT" = success
+          test "$MCP_RESULT" = success
