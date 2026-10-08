@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {retainDiagnostic,assertSafeArtifact,redactDiagnostics} from './safe-diagnostics.mjs';
 import {waitForConsumerExit} from './consumer-settlement.mjs';
+import {ownedLoopbackEndpoint} from './owned-loopback.mjs';
 import {request as wireRequest} from 'node:http';
 import {randomUUID,randomBytes,createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
@@ -104,7 +105,9 @@ try{
  cmd(['exec','--user','1000:1000',helper,'/usr/local/bin/cosign','signing-config','create','--out','/run/secrets/signing.json']);
  cmd(['exec','--user','1000:1000',helper,'/usr/local/bin/cosign','trusted-root','create','--out','/run/secrets/trusted-root.json']);
  const api=launch('api',apiImage,[],['--memory','1536m','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--tmpfs','/work/api-custody:rw,mode=1777,size=64m','--mount','type=volume,source='+secretVolume+',target=/run/secrets,readonly','--mount','type=volume,source='+workVolume+',target=/fixture','-e','API_S3_ENDPOINT=http://s3-fixture:8333','-e','API_S3_REGION=us-east-1','-e','API_S3_BUCKET='+bucket,'-e','API_OIDC_ISSUER=http://keycloak:8080/realms/sdk','-e','API_OIDC_AUDIENCE=sdk-api','-e','API_OIDC_JWKS=http://keycloak:8080/realms/sdk/protocol/openid-connect/certs','-e','EVIDENCE_MAX_ARTIFACT_BYTES=8388608','-p','127.0.0.1::3000']);
- const apiUrl='http://127.0.0.1:'+port(api,3000);
+ const apiId=JSON.parse(cmd(['inspect',api]))[0].Id;
+ const apiInventory={id:apiId,owner,suite,networks};
+ let apiUrl=ownedLoopbackEndpoint(JSON.parse(cmd(['inspect',api]))[0],apiInventory).url;
  await eventually(()=>http(apiUrl+'/projects/'+tenants[0].project+'/branches?name=main',{headers:{Authorization:'Bearer '+tenants[0].token}}));
  const foreign=await fetch(apiUrl+'/projects/'+tenants[1].project+'/branches?name=main',{headers:{Authorization:'Bearer '+tenants[0].token}});assert.equal(foreign.status,404);
  report.steps.push({name:'actual-API-JWT-and-cross-project-refusal',foreignStatus:foreign.status});
@@ -284,10 +287,11 @@ try{
    request.once('error',reject);request.end(log.raw);
   });assert.equal(status,200);
  }
- await putRecovery(recoveryLogs[0]);
+ report.recoveryPhase='first-upload-PUT';await putRecovery(recoveryLogs[0]);
+ report.recoveryPhase='missing-upload-close';
  const incomplete=await fetch(apiUrl+recoveryBase+'/jobs/'+recoveryJob.jobID+'/close',{method:'POST',headers,
   body:JSON.stringify({status:'ERROR',errorMessage:'producer reports the interrupted upload'}),signal:AbortSignal.timeout(120000)});
- assert.equal(incomplete.status,503);
+ assert.equal(incomplete.status,503);report.recoveryPhase='first-checkpoint-readback';
  const before=await apiAdmin.query('SELECT u.id,u.version_id,u.retained_at::text AS retained_time,p.role,p.sha256,p.raw FROM api.uploads u LEFT JOIN api.upload_proofs p ON p.upload_id=u.id WHERE u.job_id=$1 ORDER BY u.id,p.role',[recoveryJob.jobID]);
  const firstBefore=before.rows.filter(r=>r.id===recoveryLogs[0].value.logID);assert.equal(firstBefore.length,5);assert.ok(firstBefore.every(r=>r.retained_time));
  const secondBefore=before.rows.filter(r=>r.id===recoveryLogs[1].value.logID);assert.equal(secondBefore.length,1);assert.equal(secondBefore[0].retained_time,null);
@@ -296,8 +300,15 @@ try{
  const dir=join(output,'recovery');await mkdir(dir);
  for(const proof of firstBefore)await writeFile(join(dir,'before-'+proof.role),proof.raw);
  await writeFile(join(dir,'before.json'),JSON.stringify({uploads:before.rows.map(({raw,...r})=>r),claim:claimBefore.rows[0]},null,2)+'\n');
- cmd(['stop','--time','15',api]);const stopped=JSON.parse(cmd(['inspect',api]))[0];assert.equal(stopped.State.Running,false);
- cmd(['start',api]);await eventually(()=>http(apiUrl+'/projects/'+tenants[0].project+'/branches?name=main',{headers:{Authorization:'Bearer '+tenants[0].token}}));
+ report.recoveryPhase='api-restart';
+ report.recoveryRestart={before:ownedLoopbackEndpoint(JSON.parse(cmd(['inspect',api]))[0],apiInventory)};
+ cmd(['stop','--time','15',api]);const stopped=JSON.parse(cmd(['inspect',api]))[0];assert.equal(stopped.Id,apiId);assert.equal(stopped.State.Running,false);
+ report.recoveryRestart.stoppedState={running:stopped.State.Running,exitCode:stopped.State.ExitCode,oomKilled:stopped.State.OOMKilled};
+ cmd(['start',api]);
+ const restarted=ownedLoopbackEndpoint(JSON.parse(cmd(['inspect',api]))[0],apiInventory);report.recoveryRestart.after=restarted;apiUrl=restarted.url;
+ report.recoveryPhase='restarted-api-readiness';
+ await eventually(()=>http(apiUrl+'/projects/'+tenants[0].project+'/branches?name=main',{headers:{Authorization:'Bearer '+tenants[0].token}}));
+ report.recoveryPhase='unbound-same-identity-renewal';
  const renewed=await post(recoveryBase+'/jobs/'+recoveryJob.jobID+'/logs',recoveryLogs[1].identity);
  assert.equal(renewed.logID,recoveryLogs[1].value.logID);
  assert.equal(new URL(renewed.uploadURL).pathname,new URL(recoveryLogs[1].value.uploadURL).pathname);
@@ -307,12 +318,15 @@ try{
   {name:'changed-identity-after-close-claim',body:{...recoveryLogs[1].identity,checksum:'0'.repeat(64)},status:409},
   {name:'bound-first-upload-renewal',body:recoveryLogs[0].identity,status:400},
  ];
+ report.recoveryPhase='claimed-close-renewal-refusals';
  for(const test of refusalCases){
   const response=await fetch(apiUrl+recoveryBase+'/jobs/'+recoveryJob.jobID+'/logs',{method:'POST',headers,body:JSON.stringify(test.body)});
   assert.equal(response.status,test.status);
  }
- await putRecovery(recoveryLogs[1]);
+ report.recoveryPhase='renewed-upload-PUT';await putRecovery(recoveryLogs[1]);
+ report.recoveryPhase='original-claim-close-retry';
  await post(recoveryBase+'/jobs/'+recoveryJob.jobID+'/close',{status:'ERROR',errorMessage:'producer reports the interrupted upload'});
+ report.recoveryPhase='checkpoint-readback';
  const after=await apiAdmin.query('SELECT u.id,u.version_id,u.retained_at::text AS retained_time,p.role,p.sha256,p.raw FROM api.uploads u JOIN api.upload_proofs p ON p.upload_id=u.id WHERE u.job_id=$1 ORDER BY u.id,p.role',[recoveryJob.jobID]);
  const firstAfter=after.rows.filter(r=>r.id===recoveryLogs[0].value.logID);
  assert.deepEqual(firstAfter.map(({raw,...r})=>r),firstBefore.map(({raw,...r})=>r));
@@ -326,6 +340,7 @@ try{
  report.recoveryWitnesses=await captureUploads(recoveryUploads.rows,dir);
  report.steps.push({name:'two-upload-first-real-custody-second-S3-refusal-restart-retry',initialClose:503,firstProofBytesAndTimestampUnchanged:true,
   secondCompleted:true,claimedStatusPreserved:'ERROR',actualApiRestart:true,unboundSameIdentityRenewal:true,refusalCases});
+ report.recoveryPhase='final-custody-attempt-count';
  cmd(['cp',api+':/fixture/cli-attempts.jsonl',join(output,'cli-attempts.jsonl')]);
  const attempts=(await readFile(join(output,'cli-attempts.jsonl'),'utf8')).trim().split('\n').map(line=>JSON.parse(line));
  const counts={};
@@ -335,12 +350,25 @@ try{
  for(const upload of allUploads)for(const operation of ['predicate','verify'])assert.equal(counts[upload.id+':'+operation],1);
  assert.equal(attempts.length,32);
  report.custodyAttempts={events:32,uploads:16,eachPredicateAndVerifyExactlyOnce:true,counts};
+ report.recoveryPhase='tool-version-readback';
  report.images=Object.fromEntries([apiImage,sdkImage,lock.node,lock.postgres,lock.keycloak,lock.s3].map(image=>{const d=JSON.parse(cmd(['image','inspect',image]))[0];return[image,{id:d.Id,digest:d.Digest}]}));
  report.toolVersions={node:cmd(['exec',api,'node','--version']),aws:cmd(['exec',api,'aws','--version']),cosign:cmd(['exec',api,'cosign','version','--json']),postgres:(await apiAdmin.query('SHOW server_version')).rows[0].server_version};
- report.records=records.rows;report.passed=true;
+ report.records=records.rows;report.recoveryPhase='completed';report.passed=true;
 
 
-}catch(error){report.passed=false;report.error=redactDiagnostics(String(error),privateValues);process.exitCode=1}
+}catch(error){
+ report.passed=false;report.error=redactDiagnostics(String(error),privateValues);process.exitCode=1;
+ if(report.recoveryPhase){
+  const scalar=value=>typeof value==='string'&&/^[A-Za-z0-9_.-]{1,64}$/.test(value)?value:null;
+  report.recoveryError={errorName:scalar(error.name),code:scalar(error.code),causeCode:scalar(error.cause?.code)};
+  try{
+   const api=names.find(name=>name===owner+'-api');assert.ok(api);
+   await retainDiagnostic(output,'api-failure.log',logs(api),privateValues);
+   const events=cmd(['exec',api,'/usr/local/bin/node','-e',"const fs=require('node:fs');const p='/fixture/cli-attempts.jsonl';if(fs.existsSync(p))process.stdout.write(fs.readFileSync(p,'utf8'))"]);
+   if(events)await writeFile(join(output,'cli-attempts.jsonl'),events+'\n');
+  }catch(capture){report.recoveryDiagnosticCaptureFailure={errorName:scalar(capture.name),code:scalar(capture.code)}}
+ }
+}
 finally{
  await apiAdmin?.end();await pgAdmin?.end();s3?.destroy();
  for(const name of names.reverse()){try{const d=JSON.parse(cmd(['inspect',name]))[0];assert.equal(d.Config.Labels['org.robotics.runtime.fixture-owner'],owner);cmd(['stop','--time','15',name]);cmd(['rm',name])}catch(e){report.cleanupError=String(e)}}
