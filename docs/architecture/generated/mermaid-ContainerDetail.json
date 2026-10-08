@@ -21,7 +21,11 @@
     "htmlLabels": true,
     "nodeSpacing": 28,
     "rankSpacing": 35,
-    "useMaxWidth": false
+    "useMaxWidth": false,
+    "subGraphTitleMargin": {
+      "top": 0,
+      "bottom": 40
+    }
   },
   "sequence": {
     "useMaxWidth": false,
