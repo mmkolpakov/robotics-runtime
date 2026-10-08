@@ -18,7 +18,6 @@ class DatasetMigration:
     row: dict[str, Any]
     before_raw: bytes
     after_raw: bytes
-    published_dataset_name: str = "dataset-manifest.v1"
 
     def verify(self) -> None:
         old, new = self.row["before"], self.row["after"]
@@ -55,17 +54,6 @@ class DatasetMigration:
             old["schema_name"] + ".schema.json",
             new["schema_name"] + ".schema.json",
         )
-        if self.published_dataset_name == new["schema_name"]:
-            if (
-                old_catalog["roles"].get("dataset_manifest") != new["schema_name"]
-                or new_catalog["roles"].get("dataset_manifest") != new["schema_name"]
-                or old_file in before
-                or old_file in after
-                or token(before.get(new_file)) != token(json.loads(self.after_raw))
-                or token(after.get(new_file)) != token(json.loads(self.after_raw))
-            ):
-                raise ReviewRequired("Applied dataset migration snapshot differs")
-            return None
         if (
             old_catalog["roles"].get("dataset_manifest") != old["schema_name"]
             or new_catalog["roles"].get("dataset_manifest") != new["schema_name"]
@@ -127,26 +115,20 @@ def dataset_migration(
     new_catalog = json.loads((new_path / "catalog.v1.json").read_bytes())
     old_name = old_catalog["roles"].get("dataset_manifest")
     new_name = new_catalog["roles"].get("dataset_manifest")
-    if new_name != "dataset-manifest.v2" and old_name == new_name:
+    if old_name == new_name:
         return None
     row = json.loads((Path(__file__).with_name("dataset-v2-migration.json")).read_bytes())
     old, new = row["before"], row["after"]
-    if old_name == old["schema_name"]:
-        if (release.tag, release.commit) != (old["tag"], old["commit"]):
-            raise ReviewRequired("Dataset migration published baseline differs")
-        versions = (
-            tomllib.loads((candidate / "pyproject.toml").read_text())["project"]["version"],
-            tomllib.loads((root / "packages/harness/pyproject.toml").read_text())["project"][
-                "version"
-            ],
-        )
-        if versions != (new["contracts_version"], new["harness_version"]):
-            raise ReviewRequired("Dataset migration requires contracts0.19.0/harness0.20.0 train")
-    elif old_name != new["schema_name"] or (release.tag, release.commit) != (
-        "contracts-v0.19.0",
-        "6c8bc47d1bc416e1b40cdaebf04983e172e78c21",
-    ):
+    if old_name != old["schema_name"] or new_name != new["schema_name"]:
+        raise ReviewRequired("Unsupported dataset role transition")
+    if (release.tag, release.commit) != (old["tag"], old["commit"]):
         raise ReviewRequired("Dataset migration published baseline differs")
+    versions = (
+        tomllib.loads((candidate / "pyproject.toml").read_text())["project"]["version"],
+        tomllib.loads((root / "packages/harness/pyproject.toml").read_text())["project"]["version"],
+    )
+    if versions != (new["contracts_version"], new["harness_version"]):
+        raise ReviewRequired("Dataset migration requires contracts0.19.0/harness0.20.0 train")
     original = git(root, "rev-parse", f"refs/tags/{old['tag']}^{{commit}}").decode().strip()
     if original != old["commit"]:
         raise ReviewRequired("Dataset migration immutable source tag moved")
@@ -159,7 +141,6 @@ def dataset_migration(
             f"{old['schema_name']}.schema.json",
         ),
         (new_path / (new["schema_name"] + ".schema.json")).read_bytes(),
-        old_name,
     )
     witness.verify()
     return witness

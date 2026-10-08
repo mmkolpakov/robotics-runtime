@@ -210,8 +210,11 @@ def fake_modules(node: FakeNode) -> dict[str, object]:
             qos_profile_services_default="services-default",
             qos_profile_parameters="parameters",
             QoSProfile=SimpleNamespace,
-            ReliabilityPolicy=SimpleNamespace(BEST_EFFORT="best-effort"),
-            DurabilityPolicy=SimpleNamespace(VOLATILE="volatile"),
+            ReliabilityPolicy=SimpleNamespace(BEST_EFFORT="best-effort", RELIABLE="reliable"),
+            DurabilityPolicy=SimpleNamespace(
+                VOLATILE="volatile", TRANSIENT_LOCAL="transient-local"
+            ),
+            HistoryPolicy=SimpleNamespace(KEEP_LAST="keep-last"),
             QoSCompatibility=SimpleNamespace(ERROR="error"),
             qos_check_compatible=lambda *_args: ("ok", ""),
         ),
@@ -459,3 +462,26 @@ def test_an_unanswered_lifecycle_request_expires_the_cached_state(
         if "lifecycle_nodes" in issue.json_path
     )
     assert issue.status == "error"
+
+
+@pytest.mark.parametrize(
+    "name, expected",
+    [
+        ("system_default", "system-default"),
+        ("sensor_data", "sensor-data"),
+        ("services_default", "services-default"),
+        ("parameters", "parameters"),
+        (
+            "transient_local",
+            SimpleNamespace(
+                history="keep-last", depth=10, reliability="reliable", durability="transient-local"
+            ),
+        ),
+    ],
+)
+def test_named_topic_qos_reaches_the_subscription_unchanged(name: str, expected: object) -> None:
+    node = FakeNode()
+    graph = expected_graph()
+    graph["topics"][0]["qos_profile"] = name
+    with RosGraphObserver(graph, observe_clock=False, module_loader=fake_modules(node).__getitem__):
+        assert node.subscription_qos["/camera/image"] == expected

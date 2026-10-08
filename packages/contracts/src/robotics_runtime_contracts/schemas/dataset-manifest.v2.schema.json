@@ -110,6 +110,7 @@
             "sensor_data",
             "services_default",
             "parameters",
+            "transient_local",
             "custom"
           ]
         },

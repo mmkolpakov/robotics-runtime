@@ -465,7 +465,8 @@
             "system_default",
             "sensor_data",
             "services_default",
-            "parameters"
+            "parameters",
+            "transient_local"
           ]
         }
       },

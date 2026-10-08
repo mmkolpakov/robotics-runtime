@@ -190,6 +190,11 @@ it does not compare every application publisher/subscriber pair. The harness
 excludes its own subscriptions from the observed subscriber count. When the
 scenario does not declare `/clock`, its observation subscription uses depth 1,
 best-effort reliability, and volatile durability.
+The explicit `transient_local` profile uses reliable delivery, transient-local
+durability and keep-last history with depth 10. It can receive retained samples
+when the publisher offers compatible durability and retains them. It does not
+make a cached sample fresh or establish ongoing production; consumers choose
+this profile explicitly for retained topics. Existing profiles are unchanged.
 
 ## Offline Evaluation
 

@@ -439,3 +439,12 @@ def test_confined_nested_members_preserve_native_metadata_order(tmp_path: Path) 
     info["relative_file_paths"] = [member["relative_path"] for member in document["bag"]["members"]]
     validate_document(document)
     validate_bag_metadata(document, metadata, summaries, expected_run_id="source-run")
+
+
+@pytest.mark.parametrize(
+    "name", ["system_default", "sensor_data", "services_default", "parameters", "transient_local"]
+)
+def test_dataset_accepts_supported_named_qos(tmp_path: Path, name: str) -> None:
+    document, _metadata, _summaries = bag_fixture(tmp_path)
+    document["channels"][0]["qos_profile"] = name
+    validate_document(document)

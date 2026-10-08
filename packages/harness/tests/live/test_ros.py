@@ -117,3 +117,70 @@ def test_measurement_retains_real_lifecycle_deactivation_after_recovery(
         assert assertion.status == "failed"
         assert "observed inactive" in assertion.message
         assert live_graph.lifecycle in assertion.message
+
+
+@pytest.mark.parametrize(
+    "profile",
+    ["system_default", "sensor_data", "services_default", "parameters", "transient_local"],
+)
+def test_late_observer_receives_cache_only_with_explicit_durability(
+    live_graph: LiveGraph, profile: str
+) -> None:
+    from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
+    from std_msgs.msg import String
+
+    topic = live_graph.namespace + "/retained"
+    # This regression uses the Jazzy/Fast DDS default cohort, not universal RMW defaults.
+    # The offered cache has one sample; the observer's named profile keeps at most ten.
+    publisher = live_graph.producer.create_publisher(
+        String,
+        topic,
+        QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        ),
+    )
+    try:
+        # No timer or later publish supplies this sample after observer construction.
+        publisher.publish(String(data="retained-before-observer"))
+        graph: ExpectedGraph = {
+            "topics": [
+                {
+                    "name": topic,
+                    "type": "std_msgs/msg/String",
+                    "min_publishers": 1,
+                    "min_subscribers": 0,
+                    "first_message_timeout_sec": 5,
+                    "qos_profile": profile,
+                }
+            ],
+            "services": [],
+            "actions": [],
+            "lifecycle_nodes": [],
+        }
+        with RosGraphObserver(graph, observe_clock=False) as observer:
+            deadline = monotonic() + 10
+            while observer.snapshot().topics[topic].publishers != 1:
+                if monotonic() >= deadline:
+                    pytest.fail("test publisher was not discovered")
+                sleep(0.02)
+            if profile == "transient_local":
+                wait_for_readiness(
+                    graph, observer, timeout_sec=5, stable_for_sec=0, poll_interval_sec=0.02
+                )
+                assert observer.snapshot().topics[topic].first_message_at_ns is not None
+            else:
+                end = monotonic() + 0.5
+                while monotonic() < end:
+                    assert observer.snapshot().topics[topic].first_message_at_ns is None
+                    sleep(0.02)
+                publisher.publish(String(data="fresh-after-observer"))
+                wait_for_readiness(
+                    graph, observer, timeout_sec=5, stable_for_sec=0, poll_interval_sec=0.02
+                )
+                assert observer.snapshot().topics[topic].first_message_at_ns is not None
+            assert observer.snapshot().topics[topic].qos_compatible
+    finally:
+        live_graph.producer.destroy_publisher(publisher)
