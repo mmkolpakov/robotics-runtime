@@ -1,0 +1,10 @@
+**
+!api/
+!api/node_modules/**
+!api/dist/**
+!api/package.json
+!api/test/
+!api/test/Dockerfile
+!api/test/retention-witness.py
+!artifacts/
+!artifacts/worker-assets/**

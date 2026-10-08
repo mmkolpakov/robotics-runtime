@@ -1,0 +1,49 @@
+---
+name: external-test-api
+on:
+  pull_request:
+    paths: [api/**, .github/workflows/external-test-api.yml]
+  push:
+    branches: [main]
+    paths: [api/**, .github/workflows/external-test-api.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: external-test-api-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  external-test-api:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: mmkolpakov/robotics-runtime-infra
+          ref: 2da1a0fae011cf59e8acfc5ec1ec340ca990cd4f
+          path: artifacts/api-ci-inputs/infra
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: mmkolpakov/robotics-runtime
+          ref: efeac712ea512b19523ce41be40752f703fa782b
+          path: artifacts/api-ci-inputs/foundation
+          persist-credentials: false
+      - uses: ./artifacts/api-ci-inputs/infra/.github/actions/setup-buildx
+        with:
+          driver: docker
+      - name: Build exact custody inputs and run the real SDK vertical
+        env:
+          API_FIXTURE_ENGINE: docker
+        run: api/test/run-fixture.sh
+      - name: Retain raw test and custody evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: external-test-api-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/api-ci-safe/
+          if-no-files-found: error
+          retention-days: 7
