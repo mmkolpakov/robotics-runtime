@@ -73,7 +73,7 @@ try{
   tenants.push({tenant,project,branch,subject:account.id,token:token.access_token,clientId:client.clientId,clientSecret,accountId:account.id});
  }
  report.steps.push({name:'actual-Keycloak-two-service-account-JWT-and-PG-membership',tenants:2});
- seaweed=launch('s3-fixture',lock.s3,['server','-s3','-dir=/data','-s3.port=8333','-volume.max=2','-master.volumeSizeLimitMB=64'],['--memory','512m','-e','AWS_ACCESS_KEY_ID','-e','AWS_SECRET_ACCESS_KEY','-p','127.0.0.1::8333','--mount','type=volume,source='+s3Volume+',target=/data']);
+ seaweed=launch('s3-fixture',lock.s3,['server','-s3','-dir=/data','-s3.port=8333','-s3.ip.bind=0.0.0.0','-volume.max=2','-master.volumeSizeLimitMB=64'],['--memory','512m','-e','AWS_ACCESS_KEY_ID','-e','AWS_SECRET_ACCESS_KEY','-p','127.0.0.1::8333','--mount','type=volume,source='+s3Volume+',target=/data']);
  s3=new S3Client({endpoint:'http://127.0.0.1:'+port(seaweed,8333),region:'us-east-1',forcePathStyle:true,credentials:{accessKeyId:access,secretAccessKey:secret},requestChecksumCalculation:'WHEN_REQUIRED'});
  const bucket='sdk-api-evidence';
  async function bootstrapS3(operation,work){
@@ -84,7 +84,7 @@ try{
     statusCode:error.$metadata?.httpStatusCode??null,attempts:error.$metadata?.attempts??null};
    const d=JSON.parse(cmd(['inspect',seaweed]))[0];
    report.s3Failure={state:{running:d.State.Running,exitCode:d.State.ExitCode,oomKilled:d.State.OOMKilled,error:d.State.Error},
-    networks:Object.keys(d.NetworkSettings.Networks),bindings:d.NetworkSettings.Ports};
+    networks:Object.fromEntries(Object.entries(d.NetworkSettings.Networks).map(([name,n])=>[name,{ipAddress:n.IPAddress,aliases:n.Aliases}])),bindings:d.NetworkSettings.Ports};
    await retainDiagnostic(output,'s3-failure.log',logs(seaweed),privateValues);
    throw error;
   }
