@@ -22,7 +22,11 @@
     "nodeSpacing": 16,
     "rankSpacing": 20,
     "useMaxWidth": false,
-    "inheritDir": true
+    "inheritDir": true,
+    "subGraphTitleMargin": {
+      "top": 40,
+      "bottom": 0
+    }
   },
   "sequence": {
     "useMaxWidth": false,

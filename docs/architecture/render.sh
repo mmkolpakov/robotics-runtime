@@ -24,7 +24,7 @@ for view in Context Container ContainerDetail ExternalTestAPI NativeInterfaces C
   configuration=mermaid-config.json
   if [[ "$view" == ExternalTestAPI || "$view" == Container || "$view" == Context ]]; then
     configuration="generated/mermaid-$view.json"
-    python3 -c 'import json,sys; from pathlib import Path; c=json.loads(Path("mermaid-config.json").read_text()); c["themeVariables"]["fontSize"]="26px"; c["layout"]="elk"; c["flowchart"].update(nodeSpacing=16,rankSpacing=20,inheritDir=True); c["flowchart"].update(wrappingWidth=140) if "ExternalTestAPI" not in sys.argv[1] else None; Path(sys.argv[1]).write_text(json.dumps(c,indent=2)+"\n")' "$configuration"
+    python3 -c 'import json,sys; from pathlib import Path; c=json.loads(Path("mermaid-config.json").read_text()); c["themeVariables"]["fontSize"]="26px"; c["layout"]="elk"; c["flowchart"].update(nodeSpacing=16,rankSpacing=20,inheritDir=True); c["flowchart"].update(wrappingWidth=140) if "ExternalTestAPI" not in sys.argv[1] else c["flowchart"].update(subGraphTitleMargin={"top":40,"bottom":0}); Path(sys.argv[1]).write_text(json.dumps(c,indent=2)+"\n")' "$configuration"
   fi
   "$engine" run --rm --platform linux/amd64 --network none "${mapping[@]}" --user "$owner" \
     -v "$PWD:/data" "$mermaid" -c "$configuration" \
