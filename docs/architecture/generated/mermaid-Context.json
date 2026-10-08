@@ -23,7 +23,7 @@
     "rankSpacing": 20,
     "useMaxWidth": false,
     "inheritDir": true,
-    "wrappingWidth": 140
+    "wrappingWidth": 240
   },
   "sequence": {
     "useMaxWidth": false,
@@ -35,5 +35,6 @@
   "state": {
     "useMaxWidth": false
   },
-  "layout": "elk"
+  "layout": "elk",
+  "themeCSS": "path.flowchart-link { fill: none !important; }"
 }
