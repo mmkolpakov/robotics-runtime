@@ -73,10 +73,17 @@ try{
  report.steps.push({name:'config-snapshot-two-tenant-RLS-immutable-retry-concurrent-batch-and-real-pointer-rollback',passed:true,snapshotCount:countBefore,oldBatchSnapshot:first,concurrentBatchSnapshot:pinned.config_snapshot_id});
  await admin.query('ALTER TABLE api.config_snapshots NO FORCE ROW LEVEL SECURITY');
  try{await assert.rejects(verifyApplicationRole(app),/all metadata tables require forced RLS/)}finally{await admin.query('ALTER TABLE api.config_snapshots FORCE ROW LEVEL SECURITY')}
- // An unexpected metadata table must not be silently admitted by a count-only guard.
- await admin.query('CREATE TABLE api.unexpected_metadata(id uuid); ALTER TABLE api.unexpected_metadata ENABLE ROW LEVEL SECURITY; ALTER TABLE api.unexpected_metadata FORCE ROW LEVEL SECURITY');
- try{await assert.rejects(verifyApplicationRole(app),/all metadata tables require forced RLS/)}finally{await admin.query('DROP TABLE api.unexpected_metadata')}
- report.steps.push({name:'exact-eleven-table-and-config-FORCE-RLS-startup-inventory',passed:true});
+ // Renaming preserves cardinality and FORCE flags: only the exact-name inventory can refuse it.
+ await admin.query('ALTER TABLE api.experiences RENAME TO unexpected_metadata');
+ let sameCount;
+ try{
+  sameCount=(await app.query("SELECT count(*)::int AS total,bool_and(c.relrowsecurity AND c.relforcerowsecurity) AS protected,array_agg(c.relname::text ORDER BY c.relname) AS names FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='api' AND c.relkind='r'")).rows[0];
+  assert.equal(sameCount.total,11);assert.equal(sameCount.protected,true);
+  assert.ok(sameCount.names.includes('unexpected_metadata'));assert.ok(!sameCount.names.includes('experiences'));
+  await assert.rejects(verifyApplicationRole(app),/all metadata tables require forced RLS/);
+ }finally{await admin.query('ALTER TABLE api.unexpected_metadata RENAME TO experiences')}
+ await verifyApplicationRole(app);
+ report.steps.push({name:'exact-eleven-table-and-config-FORCE-RLS-startup-inventory',passed:true,sameCardinalityControl:sameCount,countOnlyGuardWouldPass:true,renamedInventoryRefused:true,originalNameRestored:true});
  const rawSnapshots=(await admin.query('SELECT tenant_id,project_id,branch_id,id,config,config_sha256,template_files,snapshot_sha256,created_by,created_at FROM api.config_snapshots ORDER BY id')).rows;
  for(const row of rawSnapshots){
   assert.equal(createHash('sha256').update(row.config).digest('hex'),row.config_sha256);
