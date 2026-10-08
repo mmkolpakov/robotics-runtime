@@ -7,7 +7,7 @@ const artifacts=resolve(new URL('../../artifacts/',import.meta.url).pathname);
 const destination=join(artifacts,'api-ci-safe',suite);
 await mkdir(destination,{recursive:true});
 const proofRole='(?:receipt|verification|statement|trust-policy|signature)';
-const allowed=new RegExp('^(?:fixture-owner\\.json|role-report\\.json|gateway-report\\.json|sdk-report\\.json|proxy-report\\.json|cli-attempts\\.jsonl|(?:consumer|api)-failure\\.log|(?:custody|concurrency|recovery)/[0-9a-f-]{36}/(?:payload|object\\.json|'+proofRole+')|custody/(?:custody\\.pub|signing\\.json|trusted-root\\.json|sdk-emissions-[0-9a-f-]{36}\\.jsonl|sdk-attachment\\.png|sdk-empty\\.log)|recovery/(?:before\\.json|after\\.json|before-'+proofRole+'|after-[0-9a-f-]{36}-'+proofRole+'))$');
+const allowed=new RegExp('^(?:fixture-owner\\.json|role-report\\.json|gateway-report\\.json|sdk-report\\.json|proxy-report\\.json|cli-attempts\\.jsonl|(?:consumer|api|s3)-failure\\.log|(?:custody|concurrency|recovery)/[0-9a-f-]{36}/(?:payload|object\\.json|'+proofRole+')|custody/(?:custody\\.pub|signing\\.json|trusted-root\\.json|sdk-emissions-[0-9a-f-]{36}\\.jsonl|sdk-attachment\\.png|sdk-empty\\.log)|recovery/(?:before\\.json|after\\.json|before-'+proofRole+'|after-[0-9a-f-]{36}-'+proofRole+'))$');
 async function walk(base,prefix=''){
  const result=[];
  for(const entry of await readdir(join(base,prefix),{withFileTypes:true})){

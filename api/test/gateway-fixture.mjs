@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import {retainDiagnostic,assertSafeArtifact} from './safe-diagnostics.mjs';
+import {retainDiagnostic,assertSafeArtifact,redactDiagnostics} from './safe-diagnostics.mjs';
 import {request as wireRequest} from 'node:http';
 import {randomUUID,randomBytes,createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {mkdir,writeFile,readFile,rm} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {Pool} from 'pg';
-import {S3Client,CreateBucketCommand,PutBucketVersioningCommand,HeadObjectCommand,GetObjectCommand} from '@aws-sdk/client-s3';
+import {S3Client,CreateBucketCommand,PutBucketVersioningCommand,HeadObjectCommand,GetObjectCommand,ListBucketsCommand} from '@aws-sdk/client-s3';
 const root=resolve(new URL('../../',import.meta.url).pathname),lock=JSON.parse(await readFile(join(root,'api/test/upstream-lock.json'),'utf8'));
 const owner='rr-sdk-api-'+randomUUID().slice(0,8),network=owner+'-net',bootstrap=owner+'-bootstrap',names=[],volumes=[],networks=[];
 const engine=process.env.API_FIXTURE_ENGINE??'podman',suite=process.env.API_FIXTURE_SUITE??owner;
@@ -28,7 +28,7 @@ function launch(suffix,image,args,extra=[]){const name=owner+'-'+suffix;cmd(['ru
 function port(name,p){return Number(cmd(['port',name,p+'/tcp']).split(':').at(-1))}
 async function eventually(work){let last;for(let i=0;i<120;i++){try{return await work()}catch(e){last=e;await new Promise(r=>setTimeout(r,250))}}throw last}
 async function http(url,options={}){const response=await fetch(url,{...options,signal:options.signal??AbortSignal.timeout(10000)});if(!response.ok)throw new Error('HTTP bootstrap refused '+response.status);if(response.status===204||response.headers.get('content-length')==='0')return null;const raw=await response.text();return raw?JSON.parse(raw):null}
-let pgAdmin,apiAdmin,s3;
+let pgAdmin,apiAdmin,s3,seaweed;
 try{
  for(const [name,internal]of [[network,true],[bootstrap,false]]){
   cmd(['network','create',...(internal?['--internal']:[]),'--label','org.robotics.runtime.fixture-owner='+owner,'--label','org.robotics.runtime.fixture-suite='+suite,name]);
@@ -73,11 +73,27 @@ try{
   tenants.push({tenant,project,branch,subject:account.id,token:token.access_token,clientId:client.clientId,clientSecret,accountId:account.id});
  }
  report.steps.push({name:'actual-Keycloak-two-service-account-JWT-and-PG-membership',tenants:2});
- const seaweed=launch('s3-fixture',lock.s3,['server','-s3','-dir=/data','-s3.port=8333','-volume.max=2','-master.volumeSizeLimitMB=64'],['--memory','512m','-e','AWS_ACCESS_KEY_ID','-e','AWS_SECRET_ACCESS_KEY','-p','127.0.0.1::8333','--mount','type=volume,source='+s3Volume+',target=/data']);
+ seaweed=launch('s3-fixture',lock.s3,['server','-s3','-dir=/data','-s3.port=8333','-volume.max=2','-master.volumeSizeLimitMB=64'],['--memory','512m','-e','AWS_ACCESS_KEY_ID','-e','AWS_SECRET_ACCESS_KEY','-p','127.0.0.1::8333','--mount','type=volume,source='+s3Volume+',target=/data']);
  s3=new S3Client({endpoint:'http://127.0.0.1:'+port(seaweed,8333),region:'us-east-1',forcePathStyle:true,credentials:{accessKeyId:access,secretAccessKey:secret},requestChecksumCalculation:'WHEN_REQUIRED'});
  const bucket='sdk-api-evidence';
- await eventually(()=>s3.send(new CreateBucketCommand({Bucket:bucket}),{abortSignal:AbortSignal.timeout(10000)}));
- await s3.send(new PutBucketVersioningCommand({Bucket:bucket,VersioningConfiguration:{Status:'Enabled'}}),{abortSignal:AbortSignal.timeout(10000)});
+ async function bootstrapS3(operation,work){
+  report.bootstrapS3={operation,status:'pending'};
+  try{const value=await work();report.bootstrapS3={operation,status:'passed'};return value}
+  catch(error){
+   report.bootstrapS3={operation,status:'refused',errorName:error.name,errorCode:error.code??null,
+    statusCode:error.$metadata?.httpStatusCode??null,attempts:error.$metadata?.attempts??null};
+   const d=JSON.parse(cmd(['inspect',seaweed]))[0];
+   report.s3Failure={state:{running:d.State.Running,exitCode:d.State.ExitCode,oomKilled:d.State.OOMKilled,error:d.State.Error},
+    networks:Object.keys(d.NetworkSettings.Networks),bindings:d.NetworkSettings.Ports};
+   await retainDiagnostic(output,'s3-failure.log',logs(seaweed),privateValues);
+   throw error;
+  }
+ }
+ await bootstrapS3('ListBuckets-ready',()=>eventually(()=>s3.send(new ListBucketsCommand({}),{abortSignal:AbortSignal.timeout(10000)})));
+ await bootstrapS3('CreateBucket',()=>s3.send(new CreateBucketCommand({Bucket:bucket}),{abortSignal:AbortSignal.timeout(10000)}));
+ await bootstrapS3('PutBucketVersioning',()=>s3.send(new PutBucketVersioningCommand({Bucket:bucket,VersioningConfiguration:{Status:'Enabled'}}),{abortSignal:AbortSignal.timeout(10000)}));
+ report.steps.push({name:'authenticated-S3-ready-create-and-versioning',readyOperation:'ListBuckets'});
+
  const material={'api-database-url':'postgresql://api_app:'+apiPassword+'@pg:5432/api','s3-credentials':'[default]\naws_access_key_id='+access+'\naws_secret_access_key='+secret+'\n','s3-config':'[default]\nregion=us-east-1\n','custody-password':signingPassword,'consumer.json':JSON.stringify({tenants:tenants.map(({project,token})=>({project,token}))})};
  for(const [name,raw]of Object.entries(material))await writeFile(join(secrets,name),raw,{mode:0o600});
  const helper=launch('secrets',apiImage,['-c','sleep 300'],['--user','0','--entrypoint','/bin/sh','--mount','type=volume,source='+secretVolume+',target=/run/secrets','--mount','type=volume,source='+workVolume+',target=/work','-e','COSIGN_PASSWORD']);
@@ -312,7 +328,7 @@ try{
  report.records=records.rows;report.passed=true;
 
 
-}catch(error){report.passed=false;report.error=String(error);throw error}
+}catch(error){report.passed=false;report.error=redactDiagnostics(String(error),privateValues);process.exitCode=1}
 finally{
  await apiAdmin?.end();await pgAdmin?.end();s3?.destroy();
  for(const name of names.reverse()){try{const d=JSON.parse(cmd(['inspect',name]))[0];assert.equal(d.Config.Labels['org.robotics.runtime.fixture-owner'],owner);cmd(['stop','--time','15',name]);cmd(['rm',name])}catch(e){report.cleanupError=String(e)}}

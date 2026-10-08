@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {redactDiagnostics,assertSafeArtifact} from '../src/diagnostics.mjs';
 export {redactDiagnostics,assertSafeArtifact};
 export async function retainDiagnostic(directory,name,raw,privateValues=[]){
- if(!['consumer-failure.log','api-failure.log'].includes(name))throw new Error('fixed diagnostic name required');
+ if(!['consumer-failure.log','api-failure.log','s3-failure.log'].includes(name))throw new Error('fixed diagnostic name required');
  const safe=Buffer.from(redactDiagnostics(raw,privateValues));assertSafeArtifact(safe,privateValues);
  await writeFile(join(directory,name),safe);
 }
