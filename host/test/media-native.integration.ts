@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Context } from 'cordis';
 import { mkdtemp, writeFile, readFile, mkdir, copyFile, stat, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir, userInfo } from 'node:os';
 import { join, resolve } from 'node:path';
 import { Jobs } from '../src/plugins/jobs/index.js';
 import { MediaEndpoint } from '../src/plugins/media-endpoint/index.js';
@@ -13,7 +13,7 @@ test('native GI worker observes EOS, error, cancellation and NULL cleanup withou
     command: { executable: '/usr/bin/podman', prefixArgs: ['run', '--rm', '--init', '--init-path', resolve('.tools/tini'),
       '--userns=keep-id:uid=1000,gid=1000', '--user', '1000:1000', '-v', resolve('.') + ':/workspace:ro', '-v', directory + ':' + directory,
       '--entrypoint', 'python3', 'localhost/rr-c-media:c12-locked'],
-      env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/home/dev', USER: 'dev', LOGNAME: 'dev', DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/' + process.getuid!() + '/bus', XDG_RUNTIME_DIR: '/run/user/' + process.getuid!() } } });
+      env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: homedir(), USER: userInfo().username, LOGNAME: userInfo().username, DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/' + process.getuid!() + '/bus', XDG_RUNTIME_DIR: '/run/user/' + process.getuid!() } } });
   try {
     const config = join(directory, 'eos.json'); const payload = join(directory, 'frames.rgb');
     await writeFile(config, JSON.stringify({ pipeline: 'videotestsrc num-buffers=3 ! video/x-raw,format=RGB,width=64,height=48 ! filesink location=' + payload }));

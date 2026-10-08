@@ -1,13 +1,13 @@
 graph TB
   linkStyle default fill:#ffffff
 
-  subgraph diagram ["Source WSL CPU topology"]
+  subgraph diagram ["Example CPU development topology"]
     style diagram fill:#ffffff,stroke:#ffffff
 
-    subgraph 53 ["Home workstation"]
+    subgraph 53 ["Development host"]
       style 53 fill:#ffffff,stroke:#94a3b8,color:#0f172a
 
-      subgraph 54 ["dev WSL"]
+      subgraph 54 ["Linux environment"]
         style 54 fill:#ffffff,stroke:#94a3b8,color:#0f172a
 
         55("<div style='font-weight: bold'>Rootless engine</div><div style='font-size: 80%; margin-top:10px'>Owned socket; namespace<br />mapping.</div>")

@@ -1,87 +1,51 @@
 # Architecture diagrams
 
-The model covers the joint platform implemented by `robotics-runtime` and
-`robotics-runtime-infra`. The separately published Python packages are libraries
-and CLI applications, not additional software systems.
+[workspace.dsl](workspace.dsl) is the shared C4 model for `robotics-runtime` and
+`robotics-runtime-infra`. A C4 container is a running application or data store,
+not a Python package or Docker image.
 
-[workspace.dsl](workspace.dsl) is the C4 source. Context shows users and external
-systems. [Container](generated/Container.svg) shows the owned process composition
-and retained data. [NativeInterfaces](generated/NativeInterfaces.svg) isolates
-SDK, simulator and media dependencies; retention paths remain in Container.
-[ConsumerInterfaces](generated/ConsumerInterfaces.svg) shows product and
-document/evaluation ownership. [ContainerDetail](generated/ContainerDetail.svg)
-keeps the complete graph for reference. A C4 container
-is not a package or a Docker image. The
-[local execution view](generated/ExecutionDeployment.svg) shows the selected
-native-worker path, admitted read-only inputs and owned Engine/Compose jobs.
-The [home deployment view](generated/HomeDeployment.svg) maps the broader source
-composition onto WSL. Candidate wording distinguishes unpublished provider/media components from the
-separately released host and Python packages. Role colors do not encode a passed verdict.
-Box and arrow labels are kept
-short for README display; [the architecture reference](../architecture.md) and
-[host reference](../../host/README.md) describe native endpoints, producer
-verification, frame ownership, release scope and infra-supplied environments.
-Native Windows standalone
-diagnostics are separate from this route: they do not establish Compose control
-or evidence transport between WSL and a Windows worker. Product Ansible and
-Terraform provisioning sources live in infra; real AWS/EKS execution and
-application qualification remain separate gates. This view does not qualify
-the complete composition: installed Webots CPU lifecycle and byte-retention
-checks, ROS evaluation, media fixtures and real camera/GPU paths have separate
-acceptance evidence. Generic boxes do not imply that every combination passed.
+- [Context](generated/Context.svg): users, product ownership and external systems.
+- [Container](generated/Container.svg): execution, retained evidence and the optional Test API.
+- [Native interfaces](generated/NativeInterfaces.svg): selected SDK, simulator and media paths.
+- [Consumer interfaces](generated/ConsumerInterfaces.svg): host, documents and evaluation.
+- [External Test API](generated/ExternalTestAPI.svg): identity, metadata, uploads and custody.
+- [Complete graph](generated/ContainerDetail.svg): all declared interfaces.
+- [Local execution](generated/ExecutionDeployment.svg): admitted files and owned Engine/Compose jobs.
+- [Development example](generated/DevelopmentDeployment.svg): one Linux/WSL CPU deployment.
 
-[run-sequence.mmd](run-sequence.mmd) describes the source `RunOwner` API and
-consumer-supplied completion callbacks. The consumer starts its workload and
-recorder; `beginMeasurement()` only changes the lifecycle phase. It also invokes
-the Python evaluator after receiving the lifecycle outcome. These two outcomes
-are distinct.
+The README starts with Container; detailed views are linked separately. Colors
+identify responsibilities, not qualification verdicts. Deployment examples do not
+establish every provider combination or GPU capability. Ansible, Terraform and
+Kubernetes responsibilities are defined in the
+[infra architecture](https://github.com/mmkolpakov/robotics-runtime-infra/blob/main/docs/architecture.md).
+A Windows diagnostic does not establish a Compose-controlled Windows worker.
 
-[run-state.mmd](run-state.mmd) shows export retention and cleanup states.
-A callback must persist and verify its payloads before returning references.
-The host checks that export returns references; it does not validate every
-referenced file itself. Contracts and qualification checks validate the
-retained documents and bytes. Failed or empty export, including an explicit
-startup recovery attempt, keeps the run retained. A deadline bounds the caller
-and requests cancellation; an unsettled managed producer blocks later stages,
-export and tracked resource cleanup. After settlement, explicit recovery
-continues unattempted stages. Destructive cleanup requires a successful export
-with nonempty descriptors. Enclosing context disposal can still consume Cordis
-teardown; terminal cleanup retry and crash recovery are not supported.
+[Sequence](run-sequence.mmd) shows `RunOwner`, consumer callbacks and the separate
+evaluator. `beginMeasurement()` changes phase; the consumer starts its workload
+and recorder. [State](run-state.mmd) shows retained export and cleanup behavior.
+A deadline requests cancellation; an active callback blocks dependent work and
+tracked cleanup until it settles. Explicit recovery resumes unattempted stages
+and preserves earlier errors. Reservations are process-local; terminal cleanup
+retry and crash recovery are not supported.
 
-The sequence keeps lifecycle completion separate from public qualification.
-The existing [post-cleanup coordinator](https://github.com/mmkolpakov/robotics-runtime-infra/blob/main/host/workers/legacy-finalization/README.md)
-packages and signs retained evidence,
-then independent portable verification checks it. An ephemeral fixture key
-proves integrity; trusted producer identity requires an independently accepted
-publisher and signing policy. Storage itself neither signs nor verifies data.
+Callbacks must persist and verify payloads before returning references. The host
+checks returned descriptors; public contracts and qualification checks validate
+the referenced documents and bytes. Storage does not sign or verify evidence.
+An ephemeral fixture signature proves integrity, not trusted publisher identity
+or safety certification. See the [architecture reference](../architecture.md)
+and [host API](../../host/README.md) for these boundaries.
 
-The runtime README starts with Container and keeps Context under disclosure.
-The infra README starts with local execution and links to the shared C4 views.
-Add Sequence when ordering
-changes behavior, State when recovery matters, and Deployment when a supported
-environment has a material constraint. Backend-specific native calls belong
-in provider documentation. Component and class diagrams are not required for
-every module.
+## Rendering
 
-Render with the pinned upstream tools in [render.sh](render.sh). Structurizr
-exports the authoritative C4 model to Mermaid; the pinned Mermaid CLI renders
-SVG files with the shared [theme](mermaid-config.json). The same generated
-Container and Context definitions are embedded into README by
-[publish_readme.py](publish_readme.py). GitHub renders these blocks with its
-standard diagram controls. No geometry or graph-layout renderer is maintained
-here. Generated views are derived assets; edit the source instead.
-
-Colors identify roles, not accepted execution scopes: composition, published
-Python tools, native candidates, media and retained files. Short labels keep
-the entry views readable; native endpoints and scope limits remain in the
-reference pages and the full interface graph.
-
-After rendering, check README synchronization with:
+Edit DSL/Mermaid sources, not generated SVGs. [render.sh](render.sh) uses pinned
+Structurizr and Mermaid CLI images, with the shared [theme](mermaid-config.json).
+No custom graph-layout renderer or SVG postprocessor is maintained.
 
 ```bash
+CONTAINER_ENGINE=podman docs/architecture/render.sh
 python3 docs/architecture/publish_readme.py --check
 ```
 
-On Linux, run `docs/architecture/render.sh` from any directory. On the declared
-rootless Podman environment, set `CONTAINER_ENGINE=podman`. The script uses
-pinned image digests and produces review assets without installing host tools.
+The default engine is Docker. Rendering embeds the generated Container and
+Context views into README and checks source synchronization. Review each changed
+view for readable labels, arrow directions and qualification boundaries.

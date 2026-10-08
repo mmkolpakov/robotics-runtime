@@ -33,72 +33,44 @@ They do not implement another document validator, wire protocol or simulator SDK
 
 Native data stays in its native path:
 
-- control clients use the selected SDK, such as MAVSDK/gRPC;
+- control clients use generated MAVSDK Core/Action/Telemetry interfaces;
 - camera consumers use the declared media endpoint, such as RTSP/GStreamer;
 - simulator workers use their engine's controller, stepping and sensor APIs;
 - evaluators consume retained files and exact references.
 
-ROS is a selected integration profile, not a requirement of the common host or
-document model. The observer remains attach-only; changing a simulation is a
-provider/controller responsibility.
+ROS is an integration profile; the common host and document model do not
+require it. A middleware connection alone does not establish an autopilot control
+path. Each native SDK integration needs its own accepted operations and profile.
+The observer remains attach-only; the provider/controller owns simulation changes.
 
 ## External API compatibility
 
-The optional [external Test API](external-test-api.md) is a source service for
-a limited MIT SignalFlag SDK
-[`sdk-v1.8.0`](https://github.com/resim-ai/open-core/tree/sdk-v1.8.0/signalflag/sdk)
-recipe. An unmodified installed client uses a configured endpoint, a real JWT,
-an existing project and branch, and explicit `metrics_config_path=None` and
-`templates_path=None`.
+The optional [external Test API](external-test-api.md) supports a limited
+MIT [SignalFlag SDK 1.8.0 recipe](https://github.com/resim-ai/open-core/tree/sdk-v1.8.0/signalflag/sdk).
+The client supplies an endpoint, JWT and existing project/branch. Six REST
+operations accept batches, tests, emissions and opaque uploads; the configuration
+mutation stores bounded immutable snapshots through Mercurius/GraphQL.js.
+Batch creation pins the branch snapshot. The SDK provides no snapshot ID between
+sync and batch creation, so concurrent callers cannot bind their own last upload.
 
-The supported journey creates a light batch and test, emits single-point,
-series and event JSONL, uploads files, and closes both contexts. Six REST
-operations and actual presigned PUTs are exercised together. Current source CI
-covers two tenants, JSONL/PNG/empty uploads, lost registration/close responses,
-eight concurrent closes, and recovery of a missing PUT across an API restart.
-Exact-version payloads, signatures, public receipts and preserved checkpoints
-are verified independently.
+Fastify verifies JWTs with jose. PostgreSQL enforces tenant/project RLS; versioned
+S3 retains exact upload bytes. Existing public Jobs invoke custody CLIs to verify,
+sign and write receipts, preserving checkpoints across retries. Producer-reported
+results remain metadata: this service neither launches a native run nor evaluates
+metrics or produces a qualification verdict. Liquid templates are not executed.
 
-The service uses Fastify, jose JWT verification, PostgreSQL tenant/project RLS,
-and versioned S3 storage. Existing public core Jobs run bounded public custody
-CLIs; they download and verify the original bytes, sign statements and produce
-receipts. Per-upload proof checkpoints are committed before the final close.
-Producer-reported `SUCCEEDED` or `ERROR` remains external metadata. This API
-does not create a native RunOwner, schedule a simulator, convert emissions into
-native observations or produce a qualification verdict.
-
-The same Fastify service accepts the SDK configuration mutation through
-Mercurius and GraphQL.js. Configuration and template bytes are bounded, immutable
-SQL snapshots; batch creation pins the current branch snapshot. Liquid is not
-executed and configurations do not evaluate metrics or establish native verdicts.
-The SDK carries no snapshot ID between sync and batch creation, so concurrent
-callers cannot rely on receiving their own last uploaded configuration.
-Project-name lookup, systems, test suites, metrics sets and SDK Auth0 helpers
-are outside this recipe. Web UI and product MCP remain separate work.
-Opaque retention does not imply native time, topic, unit or result semantics.
-
-This is a source integration, separate from the released host and Python
-packages. It has no published API image or deployment qualification. The local
-S3-compatible fixture establishes the tested protocol behavior, not AWS
-qualification. Compatibility does not cover the vendor's closed backend,
-full SDK parity, an SLA or a security certification.
-
-Native contracts, evaluation and evidence remain independent. Core installation
-and offline evaluation require no external SDK or vendor account. See the
-[optional API process view](architecture/generated/ExternalTestAPI.svg) for the
-JWT, metadata, storage and custody boundary.
+The [API reference](external-test-api.md) defines supported operations, limits and
+failure behavior. This source service has no published API image. It does not
+implement the vendor's closed backend, full SDK parity, an SLA or certification.
+Core installation and offline evaluation need no vendor account.
 
 ## Agent access
 
-Product MCP is planned as an optional adapter over the same public operations,
-using the maintained MCP SDK. Its first scope is reading run status, evaluation
-diagnostics, metrics and verified artifact references. The development
-home-compute and CodeGraph servers are not product interfaces.
-
-A Web UI is outside the current implementation sequence. This does not remove
-the metadata, identity, storage and authorization required by SDK clients.
-Execution controls can be exposed through MCP only with the existing admission
-and ownership rules; they do not create a second run manager.
+Product MCP is not a supported interface. Its design uses the maintained MCP SDK
+as an optional adapter over public operations and existing authorization.
+Development tools are not product interfaces. A future adapter must reuse
+admission and ownership rather than introduce a second run manager.
+A Web UI is outside the current product surface.
 
 ## Simulator providers
 
@@ -160,10 +132,9 @@ verdict.
 
 ## Qualification boundaries
 
-The compiled core host has passed release integrity and external installation
-checks. Each cross-simulator host/provider composition remains a development
-target until its own published consumer gates pass. Existing package and ROS-profile evidence retains
-its original scope; new providers are not qualified by an architecture diagram.
+Package integrity, external installation and native execution are separate
+checks. Qualification belongs to an exact provider, asset set and environment;
+a diagram or successful package install does not establish it.
 
 Qualification separates physics-only execution, offscreen sensor rendering and
 visual review of real frames. Desktop GUI is an additional deployment capability.

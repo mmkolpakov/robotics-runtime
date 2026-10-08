@@ -2,14 +2,14 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
     !identifiers hierarchical
     model {
         integrator = person "Integrator" "Selects profiles and verifies evidence."
-        product = softwareSystem "Product" "Robot / NSU / control / vision." {
+        product = softwareSystem "Product" "Robot / ground station / control / vision." {
             tags "External"
         }
         group "Native dependencies" {
         simulators = softwareSystem "Simulators" "Gazebo / Webots / Isaac; scoped." {
             tags "External"
         }
-        autopilot = softwareSystem "MAVSDK endpoint" "Separate transport / peer / effects." {
+        autopilot = softwareSystem "Control endpoint" "Selected SDK; transport, peer and effects differ." {
             tags "External"
         }
         mediaSource = softwareSystem "Media source" "Native camera / RTSP / fixture." {
@@ -63,7 +63,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         product -> platform "Configure / verdicts"
         product -> autopilot "Control / telemetry"
         platform -> simulators "Native runtimes"
-        platform -> autopilot "Selected SDK"
+        platform -> autopilot "Native control SDK"
         platform -> mediaSource "Selected media"
         platform -> registries "Install / verify"
         integrator -> platform.host "Trusted profile" "Consumer CLI/API"
@@ -90,9 +90,9 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         platform.externalApi -> platform.custody "Custody commands" "Core Jobs / argv"
         platform.custody -> objectStorage "Exact-version bytes" "CLI / GET"
 
-        deploymentEnvironment "Home" {
-            deploymentNode "Home workstation" "Source WSL CPU topology; qualification is profile-scoped." "Windows / WSL2" {
-                deploymentNode "dev WSL" "Source components; native and media coverage is profile-scoped." "Ubuntu 24.04 / WSL2" {
+        deploymentEnvironment "Development" {
+            deploymentNode "Development host" "Example CPU topology; qualification is profile-scoped." "Windows / WSL2" {
+                deploymentNode "Linux environment" "Source components; native and media coverage is profile-scoped." "Ubuntu 24.04 / WSL2" {
                     infrastructureNode "Rootless engine" "Owned socket; namespace mapping." "Podman 4.9.3 / Compose 5.3.1"
                     containerInstance platform.host
                     containerInstance platform.documents
@@ -151,8 +151,8 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             include integrator product platform.host platform.documents platform.evaluation platform.evidence autopilot
             autoLayout lr 60 70
         }
-        deployment platform "Home" "HomeDeployment" "Source WSL CPU topology; this view is not a complete consumer qualification." {
-            title "Source WSL CPU topology"
+        deployment platform "Development" "DevelopmentDeployment" "Example CPU development profile; qualification remains profile-scoped." {
+            title "Example CPU development topology"
             include *
             autoLayout tb 100 40
         }

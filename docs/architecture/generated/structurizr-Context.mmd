@@ -9,7 +9,7 @@ graph LR
 
       3("<div style='font-weight: bold'>Simulators</div><div style='font-size: 80%; margin-top:10px'>Gazebo / Webots / Isaac;<br />scoped.</div>")
       style 3 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-      4("<div style='font-weight: bold'>MAVSDK endpoint</div><div style='font-size: 80%; margin-top:10px'>Separate transport / peer /<br />effects.</div>")
+      4("<div style='font-weight: bold'>Control endpoint</div><div style='font-size: 80%; margin-top:10px'>Selected SDK; transport, peer<br />and effects differ.</div>")
       style 4 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
       5("<div style='font-weight: bold'>Media source</div><div style='font-size: 80%; margin-top:10px'>Native camera / RTSP /<br />fixture.</div>")
       style 5 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
@@ -28,7 +28,7 @@ graph LR
 
     1["<div style='font-weight: bold'>Integrator</div><div style='font-size: 80%; margin-top:10px'>Selects profiles and verifies<br />evidence.</div>"]
     style 1 fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
-    2("<div style='font-weight: bold'>Product</div><div style='font-size: 80%; margin-top:10px'>Robot / NSU / control /<br />vision.</div>")
+    2("<div style='font-weight: bold'>Product</div><div style='font-size: 80%; margin-top:10px'>Robot / ground station /<br />control / vision.</div>")
     style 2 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
     6("<div style='font-weight: bold'>Registries</div><div style='font-size: 80%; margin-top:10px'>Immutable packages / images /<br />attestations.</div>")
     style 6 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
@@ -38,7 +38,7 @@ graph LR
     1-- "<div>Run / verify</div><div style='font-size: 70%'></div>" -->7
     2-- "<div>Configure / verdicts</div><div style='font-size: 70%'></div>" -->7
     7-- "<div>Native runtimes</div><div style='font-size: 70%'></div>" -->3
-    7-- "<div>Selected SDK</div><div style='font-size: 70%'></div>" -->4
+    7-- "<div>Native control SDK</div><div style='font-size: 70%'></div>" -->4
     7-- "<div>Selected media</div><div style='font-size: 70%'></div>" -->5
     7-- "<div>Install / verify</div><div style='font-size: 70%'></div>" -->6
     17-- "<div>REST ×6 + config</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->7
