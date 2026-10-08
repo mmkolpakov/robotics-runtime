@@ -104,12 +104,18 @@ def test_other_published_resources_remain_compatible_with_exact_dataset_witness(
     )
     release = history.baseline(ROOT)
     published = history.extract(ROOT, release, tmp_path / "published")
-    witness = dataset_migration(ROOT, release, published, ROOT / "packages/contracts")
-    assert witness is not None
-    witness.verify()
+    assert dataset_migration(ROOT, release, published, ROOT / "packages/contracts") is None
+    # Already-v2 additions use the normal complete published-to-candidate comparison.
     assert (
-        sha256((RESOURCES / "dataset-manifest.v2.schema.json").read_bytes()).hexdigest()
-        == (witness.row["after"]["sha256"])
+        check_structure(
+            read_schemas(published / "src/robotics_runtime_contracts/schemas"),
+            read_schemas(RESOURCES),
+            json.loads(
+                (published / "src/robotics_runtime_contracts/schemas/catalog.v1.json").read_bytes()
+            ),
+            json.loads((RESOURCES / "catalog.v1.json").read_bytes()),
+        )
+        > 0
     )
     old_catalog = json.loads(SNAPSHOT["resources"]["catalog.v1.json"])
     new_catalog = json.loads((RESOURCES / "catalog.v1.json").read_bytes())

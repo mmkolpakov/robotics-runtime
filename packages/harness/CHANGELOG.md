@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.21.0
+
+Requires contracts 0.20 (`>=0.20,<0.21`), with release prerequisite
+[contracts-v0.20.0](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.20.0).
+
+- Observe late-joining retained ROS topics through an explicit `transient_local`
+  profile: reliable, transient-local durability and keep-last history with depth
+  10. Cached delivery requires a compatible retained publisher; no republish or
+  application-specific readiness exception is introduced. The four previous
+  profiles and implicit volatile `/clock` observation remain unchanged.
+
 ## 0.20.1
 
 Requires contracts 0.19 (`>=0.19,<0.20`), with release prerequisite

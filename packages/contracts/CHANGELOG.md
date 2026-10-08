@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.0
+
+- Add the `transient_local` named topic QoS profile to scenario and dataset
+  declarations. Existing schema versions and the four previous named profiles
+  remain supported; the addition changes no readiness/metric limits.
+
 ## 0.19.0
 
 The current dataset contract moves to `dataset-manifest.v2`. This is a breaking

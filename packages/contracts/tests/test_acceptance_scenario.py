@@ -77,3 +77,21 @@ def test_scenario_rejects_runtime_owned_assertion_ids() -> None:
         validate_document(document)
 
     assert caught.value.json_path == "$.assertions[0].assertion_id"
+
+
+@pytest.mark.parametrize(
+    "name", ["system_default", "sensor_data", "services_default", "parameters", "transient_local"]
+)
+def test_scenario_accepts_supported_named_qos(name: str) -> None:
+    document = scenario()
+    document["expected_ros_graph"]["topics"][0]["qos_profile"] = name
+    validate_document(document)
+
+
+def test_scenario_rejects_unknown_named_qos() -> None:
+    document = scenario()
+    document["expected_ros_graph"]["topics"][0]["qos_profile"] = "transient_local_unbounded"
+    with pytest.raises(ContractValidationError) as caught:
+        validate_document(document)
+    assert caught.value.json_path is not None
+    assert caught.value.json_path.endswith(".qos_profile")

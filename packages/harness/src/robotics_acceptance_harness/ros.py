@@ -158,6 +158,13 @@ class RosGraphObserver:
             raise RosObserverError("ROS executor stopped unexpectedly")
 
     def _qos_profile(self, name: str) -> Any:
+        if name == "transient_local":
+            return self._qos.QoSProfile(
+                history=self._qos.HistoryPolicy.KEEP_LAST,
+                depth=10,
+                reliability=self._qos.ReliabilityPolicy.RELIABLE,
+                durability=self._qos.DurabilityPolicy.TRANSIENT_LOCAL,
+            )
         profiles = {
             "system_default": self._qos.qos_profile_system_default,
             "sensor_data": self._qos.qos_profile_sensor_data,

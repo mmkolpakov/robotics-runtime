@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
 
 from scripts.schema_compatibility import snapshot
@@ -94,25 +93,14 @@ def check_semantics(
         compare_request(candidate / "src", captured["request"], captured["expected"])
         # Current raw-input restrictions do not retroactively rewrite legacy YAML.
         return len(captured["request"]["cases"])
-    if (
-        dataset_transition is not None
-        and dataset_transition.published_dataset_name == "dataset-manifest.v2"
-    ):
-        with TemporaryDirectory(prefix="dataset-historical-facts-") as temporary:
-            original = dataset_transition.historical_source(candidate.parents[1], Path(temporary))
-            captured = snapshot.capture(original.parents[1], original / "src")
-            compare_request(
-                published / "src",
-                captured["request"],
-                captured["expected"],
-                dataset_transition=dataset_transition,
-            )
-            historical = snapshot.legacy_corpus()
-            compare_request(original / "src", historical["request"], historical["expected"])
-        baseline_historical_transition = dataset_transition
-    else:
+    if dataset_transition is not None:
         captured = snapshot.capture(published.parents[1], published / "src")
-        baseline_historical_transition = None
+    else:
+        _, documents, contexts = snapshot.read_corpus()
+        request = {"documents": documents, "cases": contexts["cases"]}
+        response = probe(published / "src", request)
+        verify_response(request, response["outcomes"], response)
+        captured = {"request": request, "expected": response["outcomes"]}
     # Both probes receive the same JSON values, descriptors and raw registry bytes.
     # Neither semantic probe decodes YAML or decides which cases survive.
     request = captured["request"]
@@ -120,17 +108,17 @@ def check_semantics(
         candidate / "src", request, captured["expected"], dataset_transition=dataset_transition
     )
     historical = snapshot.legacy_corpus()
+    if dataset_transition is None:
+        # Historical request bytes stay frozen; compare the current published reader's
+        # actual outcomes, without recasting an earlier schema generation as compatible.
+        response = probe(published / "src", historical["request"])
+        expected = response["outcomes"]
+        verify_response(historical["request"], expected, response)
+    else:
+        expected = historical["expected"]
+        compare_request(published / "src", historical["request"], expected)
     compare_request(
-        published / "src",
-        historical["request"],
-        historical["expected"],
-        dataset_transition=baseline_historical_transition,
-    )
-    compare_request(
-        candidate / "src",
-        historical["request"],
-        historical["expected"],
-        dataset_transition=dataset_transition,
+        candidate / "src", historical["request"], expected, dataset_transition=dataset_transition
     )
     raw = snapshot.syntax_request()
     expected = {case["id"]: case["expected"] for case in raw["cases"]}

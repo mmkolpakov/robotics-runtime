@@ -163,13 +163,42 @@ def _capture_release_semantics(
             root, history.baseline(root), published, root / "packages/contracts"
         )
         if transition is None:
-            snapshot = capture(root, root / "packages/contracts/src")
+            inventory, documents, contexts = read_corpus()
+            request = {"documents": documents, "cases": contexts["cases"]}
+            before = execute(published / "src", request)
+            verify_response(request, before["outcomes"], before)
+            current = execute(root / "packages/contracts/src", request)
+            verify_response(request, before["outcomes"], current)
+            snapshot = {
+                "inventory": inventory,
+                "request": request,
+                "expected": current["outcomes"],
+                "origin": current["origin"],
+            }
+            snapshot["inventory"]["raw_fixture_source"] = {
+                "tag": inventory["tag"],
+                "commit": inventory["commit"],
+            }
+            for entry in snapshot["inventory"]["entries"]:
+                if "document" in entry:
+                    name = entry["document"]
+                    entry["outcome"] = current["outcomes"][name]
+                    entry["value_sha256"] = hashlib.sha256(
+                        token(current["documents"][name]).encode()
+                    ).hexdigest()
             historical = historical_snapshot()
+            before_historical = execute(published / "src", historical["request"])
+            verify_response(historical["request"], before_historical["outcomes"], before_historical)
             response = execute(root / "packages/contracts/src", historical["request"])
-            if token(response["documents"]) != token(historical["request"]["documents"]):
-                raise ReviewRequired("Release changed historical JSON values")
-            if token(response["outcomes"]) != token(historical["expected"]):
-                raise ReviewRequired("Release changed historical outcomes")
+            verify_response(historical["request"], before_historical["outcomes"], response)
+            historical["expected"] = response["outcomes"]
+            for entry in historical["inventory"]["entries"]:
+                if "document" in entry:
+                    name = entry["document"]
+                    entry["outcome"] = response["outcomes"][name]
+                    entry["value_sha256"] = hashlib.sha256(
+                        token(response["documents"][name]).encode()
+                    ).hexdigest()
         else:
             original = transition.historical_source(root, Path(temporary) / "original")
             snapshot = capture(original.parents[1], original / "src")

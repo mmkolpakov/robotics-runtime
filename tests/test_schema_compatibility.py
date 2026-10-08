@@ -35,6 +35,9 @@ type DatasetCandidate = tuple[Path, Path, DatasetMigration]
 FROZEN_DATASET_RELEASE = history.Baseline(
     "contracts-v0.18.3", "ecfb0446fddad70e8ab1094694dddacfeb496d53", "packages/contracts/"
 )
+FROZEN_V2_RELEASE = history.Baseline(
+    "contracts-v0.19.0", "6c8bc47d1bc416e1b40cdaebf04983e172e78c21", "packages/contracts/"
+)
 
 
 def schema(body: Schema) -> Schema:
@@ -759,9 +762,10 @@ def test_release_corpus_retains_raw_identity_and_source_plan(tmp_path: Path) -> 
     assert inventory["commit"] == plan["commit"]
     assert inventory["tag"] == plan["candidate"]
     raw_source = inventory["raw_fixture_source"]
+    frozen_inventory, _, _ = snapshot.read_corpus()
     assert raw_source == {
-        "tag": "contracts-v0.18.3",
-        "commit": "ecfb0446fddad70e8ab1094694dddacfeb496d53",
+        "tag": frozen_inventory["tag"],
+        "commit": frozen_inventory["commit"],
     }
     for entry in inventory["entries"]:
         raw = history.git(root, "show", f"{raw_source['commit']}:{entry['path']}")
@@ -782,6 +786,14 @@ def test_release_corpus_retains_raw_identity_and_source_plan(tmp_path: Path) -> 
         "cases": contexts["cases"],
     }
     semantic.compare_request(root / "packages/contracts/src", emitted, contexts["expected"])
+    for entry in inventory["entries"] + inventory["historical"]["entries"]:
+        if "document" in entry:
+            name = entry["document"]
+            assert entry["outcome"] == contexts["expected"][name]
+            assert (
+                entry["value_sha256"]
+                == sha256(token(emitted["documents"][name]).encode()).hexdigest()
+            )
     assert len(inventory["historical"]["entries"]) == 105
     with pytest.raises(FileExistsError):
         snapshot.write_release(root, plan, output)
@@ -828,7 +840,8 @@ def dataset_transition_candidate(published: Path, tmp_path: Path) -> DatasetCand
     history.git(ROOT, "clone", "--quiet", "--no-hardlinks", str(ROOT), str(root))
     candidate = root / "packages/contracts"
     shutil.rmtree(candidate / "src")
-    shutil.copytree(ROOT / "packages/contracts/src", candidate / "src")
+    frozen_v2 = history.extract(ROOT, FROZEN_V2_RELEASE, tmp_path / "frozen-v2")
+    shutil.copytree(frozen_v2 / "src", candidate / "src")
     raw = (ROOT / "packages/contracts/pyproject.toml").read_text()
     current = tomllib.loads(raw)["project"]["version"]
     (candidate / "pyproject.toml").write_text(
@@ -986,6 +999,7 @@ def test_dataset_refusal_labels_cannot_disagree_with_the_pinned_native_outcome(
 def test_dataset_release_snapshot_keeps_old_facts_and_new_refusals_separate(tmp_path: Path) -> None:
     root = tmp_path / "dataset-source"
     history.git(ROOT, "clone", "--quiet", "--no-hardlinks", "--no-tags", str(ROOT), str(root))
+    history.git(root, "checkout", "--detach", FROZEN_V2_RELEASE.commit)
     history.git(
         root,
         "fetch",
@@ -994,14 +1008,6 @@ def test_dataset_release_snapshot_keeps_old_facts_and_new_refusals_separate(tmp_
         str(ROOT),
         "refs/tags/contracts-v0.18.3:refs/tags/contracts-v0.18.3",
     )
-    for key in ("contracts", "harness"):
-        source = ROOT / f"packages/{key}/src"
-        target = root / f"packages/{key}/src"
-        shutil.rmtree(target)
-        shutil.copytree(source, target)
-        shutil.copyfile(
-            ROOT / f"packages/{key}/pyproject.toml", root / f"packages/{key}/pyproject.toml"
-        )
     # This fixture recreates the recorded first v1-to-v2 train, independent of
     # subsequent harness patches using the already published v2 contracts.
     migration = json.loads(
@@ -1013,9 +1019,6 @@ def test_dataset_release_snapshot_keeps_old_facts_and_new_refusals_separate(tmp_
     harness_metadata.write_text(
         harness_metadata.read_text().replace(declaration, f'version = "{historical_version}"', 1)
     )
-    fixtures = root / "packages/contracts/tests/fixtures"
-    shutil.rmtree(fixtures)
-    shutil.copytree(ROOT / "packages/contracts/tests/fixtures", fixtures)
     history.git(root, "add", "packages")
     history.git(
         root,
@@ -1063,9 +1066,8 @@ def test_dataset_release_snapshot_keeps_old_facts_and_new_refusals_separate(tmp_
     )
     later = tmp_path / "after-contracts-tag"
     snapshot.write_release(root, plan, later)
-    assert (later / "semantic-old-tool-contexts.json").read_bytes() == (
-        output / "semantic-old-tool-contexts.json"
-    ).read_bytes()
+    assert not (later / "semantic-old-tool-contexts.json").exists()
+    assert json.loads((output / "semantic-old-tool-contexts.json").read_bytes()) == original
     later_inventory = json.loads((later / "semantic-inventory.json").read_bytes())
     later_contexts = json.loads((later / "semantic-contexts.json").read_bytes())
     for entry in later_inventory["entries"]:
@@ -1075,15 +1077,11 @@ def test_dataset_release_snapshot_keeps_old_facts_and_new_refusals_separate(tmp_
 
     release = history.baseline(root)
     published = history.extract(root, release, tmp_path / "v2-published")
-    witness = dataset_migration(root, release, published, root / "packages/contracts")
-    assert witness is not None
-    assert dataset_structure(published, root / "packages/contracts", witness) == len(
+    assert dataset_migration(root, release, published, root / "packages/contracts") is None
+    assert dataset_structure(published, root / "packages/contracts") == len(
         read_schemas(published / "src/robotics_runtime_contracts/schemas")
     )
-    assert (
-        semantic.check_semantics(published, root / "packages/contracts", dataset_transition=witness)
-        == 375
-    )
+    assert semantic.check_semantics(published, root / "packages/contracts") == 375
 
 
 def test_published_v2_keeps_harness_patch_releases_independent(
@@ -1092,22 +1090,37 @@ def test_published_v2_keeps_harness_patch_releases_independent(
     from scripts.schema_compatibility.dataset_migration import dataset_migration
 
     root, candidate, _ = dataset_transition_candidate
-    release = history.baseline(ROOT)
-    published_v2 = history.extract(ROOT, release, tmp_path / "published-v2")
+    published_v2 = history.extract(ROOT, FROZEN_V2_RELEASE, tmp_path / "published-v2")
     (root / "packages/harness/pyproject.toml").write_text('[project]\nversion = "0.20.1"\n')
-    wrong = history.Baseline(release.tag, "0" * 40, release.prefix)
-    with pytest.raises(ReviewRequired, match="published baseline differs"):
-        dataset_migration(root, wrong, published_v2, candidate)
-    witness = dataset_migration(root, release, published_v2, candidate)
-    assert witness is not None
-    assert dataset_structure(published_v2, candidate, witness) == len(
+    assert dataset_migration(root, FROZEN_V2_RELEASE, published_v2, candidate) is None
+    assert dataset_structure(published_v2, candidate) == len(
         read_schemas(published_v2 / "src/robotics_runtime_contracts/schemas")
     )
-    assert semantic.check_semantics(published_v2, candidate, dataset_transition=witness) == 375
+    assert semantic.check_semantics(published_v2, candidate) == 375
 
-    schema_path = (
-        candidate / "src/robotics_runtime_contracts/schemas/dataset-manifest.v2.schema.json"
-    )
-    schema_path.write_bytes(schema_path.read_bytes() + b" ")
-    with pytest.raises(ReviewRequired, match="SHA256"):
-        dataset_migration(root, release, published_v2, candidate)
+
+@pytest.mark.parametrize("mutation", ["additive-profile", "remove-profile", "topic-type"])
+def test_same_dataset_role_uses_normal_structural_comparison(tmp_path: Path, mutation: str) -> None:
+    from scripts.schema_compatibility.dataset_migration import dataset_migration
+
+    published = history.extract(ROOT, FROZEN_V2_RELEASE, tmp_path / "published")
+    candidate = tmp_path / "candidate"
+    shutil.copytree(published, candidate)
+    path = candidate / "src/robotics_runtime_contracts/schemas/dataset-manifest.v2.schema.json"
+    body = json.loads(path.read_bytes())
+    qos = body["$defs"]["channel"]["properties"]["qos_profile"]["enum"]
+    if mutation == "additive-profile":
+        qos.append("transient_local")
+    elif mutation == "remove-profile":
+        qos.remove("sensor_data")
+    else:
+        body["$defs"]["channel"]["properties"]["topic"]["type"] = "integer"
+    path.write_text(json.dumps(body))
+    assert dataset_migration(ROOT, FROZEN_V2_RELEASE, published, candidate) is None
+    if mutation == "additive-profile":
+        assert dataset_structure(published, candidate) == len(
+            read_schemas(published / "src/robotics_runtime_contracts/schemas")
+        )
+    else:
+        with pytest.raises(ReviewRequired):
+            dataset_structure(published, candidate)
