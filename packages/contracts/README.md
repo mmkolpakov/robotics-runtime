@@ -31,13 +31,13 @@ they do not select a schema.
 ## Install
 
 Python 3.12 through 3.14 is supported. The current published version is
-[0.19.0 on PyPI](https://pypi.org/project/robotics-runtime-contracts/0.19.0/), with
+[0.20.0 on PyPI](https://pypi.org/project/robotics-runtime-contracts/0.20.0/), with
 archives in the root workspace's
-[tagged release](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.19.0):
+[tagged release](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.20.0):
 
 ```bash
 uv venv
-uv pip install robotics-runtime-contracts==0.19.0
+uv pip install robotics-runtime-contracts==0.20.0
 ```
 
 Release assets include build-provenance attestations. See
@@ -113,7 +113,7 @@ evidence or process memory; existing MCAP record/chunk limits still apply.
 
 ## Contract Set
 
-Release 0.19.0 publishes one canonical schema per role. Datasets use
+Release 0.20.0 publishes one canonical schema per role. Datasets use
 `dataset-manifest.v2` for a complete bag of one or multiple MCAP members;
 other existing roles use v1. Historical dataset-v1 documents require their
 matching archived package. The machine-readable source of truth is
@@ -324,11 +324,10 @@ adopting a context-manager API. Paths must not be persisted for another process.
 
 ## Version Policy
 
-The published harness 0.20.0 requires contracts `>=0.19,<0.20`. The current
-pair is contracts 0.19.0 and harness 0.20.0; their tagged package sources and
-installed inventories are verified separately. Infra's accepted R9
-stock profile and published R10 have separate evidence scopes; R10's released
-B3 run is not accepted. See [COMPATIBILITY.md](COMPATIBILITY.md).
+The published harness 0.21.0 requires contracts `>=0.20,<0.21`. The current
+pair is contracts 0.20.0 and harness 0.21.0; their tagged package sources and
+installed inventories are verified separately. Package publication and native
+infra profiles have separate evidence scopes. See [COMPATIBILITY.md](COMPATIBILITY.md).
 Published schema names now permit only additive changes; breaking changes
 require a new schema major and migration notes. The structural compatibility
 gate checks bounded structural rules and public semantic regressions against

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -219,3 +220,192 @@ def test_loaded_bag_dataset_freezes_members_and_captured_digest(tmp_path: Path) 
     assert document.data["bag"]["members"][1]["relative_path"] == "recording_1.mcap"
     with pytest.raises(TypeError):
         document.data["bag"]["members"][0]["recording"]["sha256"] = "f" * 64
+
+
+_EXTENSION_URI = "urn:example:runtime-settings:v1"
+_EXTENSION_SCHEMA = (
+    b'{"$schema":"https://json-schema.org/draft/2020-12/schema",'
+    b'"$id":"urn:example:runtime-settings:v1",'
+    b'"type":"object","required":["sample_count"],'
+    b'"properties":{"sample_count":{"type":"integer","minimum":1}},'
+    b'"additionalProperties":false}'
+)
+
+
+def _runtime_with_extension(tmp_path: Path, *, pinned: bool = True) -> Path:
+    runtime = yaml.safe_load((FIXTURES / "runtime.yaml").read_text(encoding="utf-8"))
+    runtime["extensions"] = {"org.example.settings": {"sample_count": 3}}
+    if pinned:
+        runtime["extension_schemas"] = [
+            {
+                "namespace": "org.example.settings",
+                "schema_uri": _EXTENSION_URI,
+                "sha256": sha256(_EXTENSION_SCHEMA).hexdigest(),
+            }
+        ]
+    path = tmp_path / "runtime.yaml"
+    path.write_text(yaml.safe_dump(runtime), encoding="utf-8")
+    return path
+
+
+def test_bundle_uses_caller_schema_registry_for_runtime(tmp_path: Path) -> None:
+    path = _runtime_with_extension(tmp_path)
+    registry = {_EXTENSION_URI: _EXTENSION_SCHEMA}
+    direct = load_document(path, expected_role="runtime_manifest", extension_schemas=registry)
+    bundle = load_bundle(FIXTURES / "scenario.yaml", runtime_path=path, extension_schemas=registry)
+    assert bundle.runtime.data == direct.data
+    assert bundle.runtime.sha256 == direct.sha256
+    assert bundle.runtime.data["extensions"]["org.example.settings"]["sample_count"] == 3
+
+
+@pytest.mark.parametrize(
+    ("registry", "message"),
+    [
+        ({}, "schema document was not supplied"),
+        ({_EXTENSION_URI: _EXTENSION_SCHEMA + b" "}, "schema digest does not match"),
+    ],
+)
+def test_bundle_preserves_runtime_extension_admission(
+    tmp_path: Path, registry: dict[str, bytes], message: str
+) -> None:
+    path = _runtime_with_extension(tmp_path)
+    with pytest.raises(BundleValidationError, match=message):
+        load_document(path, expected_role="runtime_manifest", extension_schemas=registry)
+    with pytest.raises(BundleValidationError, match=message):
+        load_bundle(FIXTURES / "scenario.yaml", runtime_path=path, extension_schemas=registry)
+
+
+def test_bundle_validates_runtime_payload_before_alignment(tmp_path: Path) -> None:
+    path = _runtime_with_extension(tmp_path)
+    runtime = yaml.safe_load(path.read_text(encoding="utf-8"))
+    runtime["extensions"]["org.example.settings"]["sample_count"] = 0
+    path.write_text(yaml.safe_dump(runtime), encoding="utf-8")
+    with pytest.raises(BundleValidationError, match="less than the minimum"):
+        load_bundle(
+            FIXTURES / "scenario.yaml",
+            runtime_path=path,
+            extension_schemas={_EXTENSION_URI: _EXTENSION_SCHEMA},
+        )
+
+
+def test_bundle_preserves_legacy_unpinned_runtime_extension(tmp_path: Path) -> None:
+    path = _runtime_with_extension(tmp_path, pinned=False)
+    bundle = load_bundle(FIXTURES / "scenario.yaml", runtime_path=path)
+    assert bundle.runtime.data["extensions"]["org.example.settings"]["sample_count"] == 3
+
+
+_OPTIONAL_ARTIFACTS = {
+    "model": "model_artifact_manifest",
+    "dataset": "dataset_manifest",
+    "permit": "execution_permit",
+    "verification": "execution_verification",
+}
+
+
+def _write_artifact(path: Path, document: dict[str, Any]) -> str:
+    raw = (json.dumps(document, indent=2) + "\n").encode()
+    path.write_bytes(raw)
+    return sha256(raw).hexdigest()
+
+
+def _extended_artifact_bundle(
+    tmp_path: Path, role: str, *, sample_count: int = 3
+) -> tuple[Path, dict[str, Any]]:
+    def extend(document: dict[str, Any]) -> dict[str, Any]:
+        document["extensions"] = {"org.example.settings": {"sample_count": sample_count}}
+        document["extension_schemas"] = [
+            {
+                "namespace": "org.example.settings",
+                "schema_uri": _EXTENSION_URI,
+                "sha256": sha256(_EXTENSION_SCHEMA).hexdigest(),
+            }
+        ]
+        return document
+
+    if role == "model":
+        fixtures = (
+            Path(__file__).resolve().parents[2] / "contracts/tests/fixtures/qualification/inference"
+        )
+        scenario = json.loads((fixtures / "scenario.json").read_bytes())
+        runtime = json.loads((fixtures / "runtime.json").read_bytes())
+        model = extend(json.loads((fixtures / "model.json").read_bytes()))
+        digest = _write_artifact(tmp_path / "model.json", model)
+        scenario["model_manifest_sha256"] = digest
+        runtime["workload"]["model"]["manifest_sha256"] = digest
+        _write_artifact(tmp_path / "scenario.json", scenario)
+        _write_artifact(tmp_path / "runtime.json", runtime)
+        return tmp_path / "scenario.json", {
+            "runtime_path": tmp_path / "runtime.json",
+            "model_path": tmp_path / "model.json",
+            "dataset_path": fixtures / "dataset.json",
+        }
+
+    if role == "dataset":
+        scenario = yaml.safe_load((FIXTURES / "scenario.yaml").read_bytes())
+        scenario["dataset_manifest_sha256"] = _write_artifact(
+            tmp_path / "dataset.json", extend(_dataset_document())
+        )
+        _write_artifact(tmp_path / "scenario.json", scenario)
+        return tmp_path / "scenario.json", {
+            "runtime_path": FIXTURES / "runtime.yaml",
+            "dataset_path": tmp_path / "dataset.json",
+        }
+
+    fixtures = FIXTURES.parent / "physical"
+    runtime = json.loads((fixtures / "hil-runtime.json").read_bytes())
+    permit = json.loads((fixtures / "hil-permit.json").read_bytes())
+    verification = json.loads((fixtures / "hil-verification.json").read_bytes())
+    extend(permit if role == "permit" else verification)
+    permit_digest = _write_artifact(tmp_path / "permit.json", permit)
+    verification["permit_sha256"] = permit_digest
+    verification_digest = _write_artifact(tmp_path / "verification.json", verification)
+    runtime["authorization"]["permit_sha256"] = permit_digest
+    runtime["authorization"]["execution_verification_sha256"] = verification_digest
+    _write_artifact(tmp_path / "runtime.json", runtime)
+    return fixtures / "hil-scenario.yaml", {
+        "runtime_path": tmp_path / "runtime.json",
+        "permit_path": tmp_path / "permit.json",
+        "verification_path": tmp_path / "verification.json",
+        "now": datetime(2026, 7, 12, 10, 0, tzinfo=UTC),
+    }
+
+
+@pytest.mark.parametrize("role", _OPTIONAL_ARTIFACTS)
+def test_bundle_uses_caller_schema_registry_for_optional_artifact(
+    tmp_path: Path, role: str
+) -> None:
+    scenario, arguments = _extended_artifact_bundle(tmp_path, role)
+    registry = {_EXTENSION_URI: _EXTENSION_SCHEMA}
+    direct = load_document(
+        arguments[f"{role}_path"],
+        expected_role=_OPTIONAL_ARTIFACTS[role],
+        extension_schemas=registry,
+    )
+    bundle = load_bundle(scenario, extension_schemas=registry, **arguments)
+    loaded = getattr(bundle, role)
+    assert loaded.data == direct.data
+    assert loaded.sha256 == direct.sha256
+
+
+@pytest.mark.parametrize("role", _OPTIONAL_ARTIFACTS)
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [
+        ("missing-registry", "schema document was not supplied"),
+        ("changed-schema", "schema digest does not match"),
+        ("payload", "less than the minimum"),
+    ],
+)
+def test_bundle_preserves_optional_artifact_extension_admission(
+    tmp_path: Path, role: str, failure: str, message: str
+) -> None:
+    scenario, arguments = _extended_artifact_bundle(
+        tmp_path, role, sample_count=0 if failure == "payload" else 3
+    )
+    registry = {_EXTENSION_URI: _EXTENSION_SCHEMA}
+    if failure == "missing-registry":
+        registry = {}
+    elif failure == "changed-schema":
+        registry = {_EXTENSION_URI: _EXTENSION_SCHEMA + b" "}
+    with pytest.raises(BundleValidationError, match=message):
+        load_bundle(scenario, extension_schemas=registry, **arguments)
