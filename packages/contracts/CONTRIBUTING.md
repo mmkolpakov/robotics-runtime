@@ -20,6 +20,9 @@ not belong in this repository.
 
 ## Development
 
+See the workspace [documentation reader instructions](../../README.md#documentation-reader)
+when updating public Markdown or SVG documentation.
+
 Requirements: Python 3.12 through 3.14 and [uv](https://docs.astral.sh/uv/).
 Run from the workspace root:
 

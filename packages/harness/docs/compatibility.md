@@ -2,11 +2,11 @@
 
 ## Package Line
 
-The `0.20.x` harness line requires Python `>=3.12,<3.15` and
-`robotics-runtime-contracts>=0.19,<0.20`.
-[Harness 0.20.0](https://pypi.org/project/robotics-acceptance-harness/0.20.0/) and
-[contracts 0.19.0](https://pypi.org/project/robotics-runtime-contracts/0.19.0/)
-are published under `harness-v0.20.0` and `contracts-v0.19.0`.
+The `0.21.x` harness line requires Python `>=3.12,<3.15` and
+`robotics-runtime-contracts>=0.20,<0.21`.
+[Harness 0.21.0](https://pypi.org/project/robotics-acceptance-harness/0.21.0/) and
+[contracts 0.20.0](https://pypi.org/project/robotics-runtime-contracts/0.20.0/)
+are published under `harness-v0.21.0` and `contracts-v0.20.0`.
 Independent installs outside the workspace checked the exact pair, public API,
 CLI and archive contents against their tagged sources.
 
@@ -32,7 +32,7 @@ Provider qualification belongs to runtime infrastructure. A new provider is
 compatible when it emits the existing canonical documents and passes the same
 conformance suite.
 
-Infra's accepted B2 stock profile belongs to
+The historical accepted B2 stock profile belongs to
 [R9 `v0.9.0-rc.1`](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.9.0-rc.1)
 and contracts 0.18.1 / harness 0.19.0. It covers one ROS domain, UInt64 and one
 finalized MCAP recording.

@@ -6,7 +6,11 @@ for release ordering, `harness-vX.Y.Z` tags, publisher registration and protecte
 publication environments. GitHub release creation requires successful PyPI
 publication; a local build or dry run does not establish a published release.
 
-The current published archives are
+The [harness project](https://pypi.org/project/robotics-acceptance-harness/)
+records available releases. The verified 0.21.0/0.20.0 package pair is described
+in the [release procedure](../../../docs/releasing.md#verified-package-pair-and-dry-runs).
+
+A historical verified harness release is
 [`harness-v0.20.0`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/harness-v0.20.0)
 and [PyPI 0.20.0](https://pypi.org/project/robotics-acceptance-harness/0.20.0/).
 Their attestations and installed inventories were verified with contracts
@@ -14,7 +18,7 @@ Their attestations and installed inventories were verified with contracts
 `efeac712ea512b19523ce41be40752f703fa782b`; contracts source is
 `6c8bc47d1bc416e1b40cdaebf04983e172e78c21`. Released bytes and attestations
 retain those identities. This establishes package identity and the tested pair.
-Infra R9's accepted B2 profile uses the historical
+Historical infra R9's accepted B2 profile uses the
 0.18.1/0.19.0 pair; R10 uses 0.18.2/0.19.1 but its released B3 run remains
 unaccepted. See [compatibility](compatibility.md) for those execution scopes.
 
@@ -44,7 +48,7 @@ Trusted Publishing and GitHub provenance gates; neither rebuilds the archives.
 ## Release Verification
 
 Download a published wheel or source archive and verify its attestation before
-installation. For harness `0.19.1`:
+installation. For this historical harness `0.19.1` archive:
 
 ```bash
 gh attestation verify \

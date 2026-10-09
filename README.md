@@ -177,3 +177,30 @@ publication. Shared CI checks Python 3.12, 3.13 and 3.14 and
 consumer verification. Source history lives in `packages/contracts` and
 `packages/harness`; older tags have `contracts-legacy/` and
 `harness-legacy/` prefixes.
+
+## Documentation reader
+
+Edit the public Markdown and SVG files in this repository. The reader uses the
+stock Sphinx, MyST and Furo toolchain; its source allowlist is in
+`docs/reader/build.py`. Keep release instructions current
+when package versions or interfaces change. Preserve the exact version and commit
+pins in archived examples and qualification records.
+
+Build and check documentation in a separate Python 3.12 environment:
+
+```bash
+uv venv .docs-venv --python 3.12
+uv pip sync --python .docs-venv/bin/python --require-hashes docs/reader/requirements.lock
+.docs-venv/bin/python docs/reader/build.py
+```
+
+Refresh the documentation dependency lock, then run the build and CI audit:
+
+```bash
+uv pip compile docs/reader/requirements.in --generate-hashes --python-version 3.12 --output-file docs/reader/requirements.lock
+```
+
+Open `build/docs/html/index.html` or serve that directory locally. The strict PR
+build checks document references; the existing scheduled `links` workflow checks
+external links. Main rebuilds the reader from committed source through the Pages
+workflow. Generated HTML, text and downloads stay in the ignored `build/` directory.
