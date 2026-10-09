@@ -27,7 +27,11 @@ llms_txt_summary = (
     "and the composition host. Published packages and frozen qualification "
     "examples retain their own release and commit identities."
 )
-llms_txt_code_files = []
+llms_txt_code_files = [
+    "+:docs/architecture/workspace.dsl",
+    "+:docs/architecture/run-sequence.mmd",
+    "+:docs/architecture/run-state.mmd",
+]
 
 
 def setup(app):
