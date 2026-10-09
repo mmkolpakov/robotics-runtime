@@ -27,6 +27,13 @@ PUBLIC_ROOTS = (
 )
 PUBLIC_FILES = {"README.md", "host/README.md", "mcp/README.md", "quality/README.md"}
 PACKAGE_ROOTS = {"packages/contracts", "packages/harness"}
+DIAGRAM_SOURCES = frozenset(
+    {
+        "docs/architecture/workspace.dsl",
+        "docs/architecture/run-sequence.mmd",
+        "docs/architecture/run-state.mmd",
+    }
+)
 
 
 def git(root: Path, *arguments: str) -> str:
@@ -38,7 +45,7 @@ def public_document(name: str) -> bool:
     return (
         path.name != "AGENTS.md"
         and not any(part.startswith(".") for part in path.parts)
-        and path.suffix in {".md", ".svg"}
+        and (path.suffix in {".md", ".svg"} or name in DIAGRAM_SOURCES)
         and (
             name in PUBLIC_FILES
             or path.parent.as_posix() in PACKAGE_ROOTS
@@ -166,7 +173,7 @@ def main() -> None:
                     "[Infra documentation]"
                     "(https://github.com/mmkolpakov/robotics-runtime-infra#readme) · "
                     "[Releases](https://github.com/mmkolpakov/robotics-runtime/releases) · "
-                    '<a href="documentation-sources.zip">Markdown and SVG source</a> · '
+                    '<a href="documentation-sources.zip">Markdown, SVG and diagram source</a> · '
                     '<a href="index.txt">Plain text</a> · '
                     '<a href="llms.txt">LLM index</a> · '
                     '<a href="llms-full.txt">Full LLM text</a>\n'
@@ -230,6 +237,16 @@ def main() -> None:
         path = output / "html" / name
         if not path.is_file() or not path.stat().st_size:
             raise ValueError(f"Documentation output is missing or empty: {name}")
+    full_text = (output / "html" / "llms-full.txt").read_text()
+    for name in DIAGRAM_SOURCES:
+        body = "\n".join(
+            f"   {line}" if line.strip() else "" for line in raw_files[name].decode().splitlines()
+        )
+        exported = f"\n{name}\n{'=' * len(name)}\n\n.. code-block:: text\n\n{body}"
+        if full_text.count(exported) != 1:
+            raise ValueError(
+                f"Canonical diagram source must appear exactly once in LLM export: {name}"
+            )
     print(
         json.dumps({"documents": len(documents), "revision": revision, "output": "build/docs/html"})
     )

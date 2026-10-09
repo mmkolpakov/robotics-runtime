@@ -180,11 +180,13 @@ consumer verification. Source history lives in `packages/contracts` and
 
 ## Documentation reader
 
-Edit the public Markdown and SVG files in this repository. The reader uses the
-stock Sphinx, MyST and Furo toolchain; its source allowlist is in
+Edit the public Markdown, SVG and canonical diagram sources in this repository.
+The reader uses the stock Sphinx, MyST and Furo toolchain; its source allowlist is in
 `docs/reader/build.py`. Keep release instructions current
 when package versions or interfaces change. Preserve the exact version and commit
 pins in archived examples and qualification records.
+The LLM export includes the C4 DSL and Mermaid sequence/state sources; the
+source archive and manifest bind those same files to the documentation build.
 
 Build and check documentation in a separate Python 3.12 environment:
 
