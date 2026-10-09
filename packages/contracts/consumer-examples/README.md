@@ -1,6 +1,6 @@
 # Consumer Examples
 
-These documents form a neutral, single-domain simulation exchange. They show
+These documents form a product-independent, single-domain ROS 2 simulation exchange. They show
 how a consumer can declare a scenario, describe the observed runtime, establish
 one run context, report one domain result, index evidence, and aggregate the
 result.
@@ -12,8 +12,9 @@ documents with the public Python API from the current editable checkout:
 uv run --directory packages/contracts pytest tests/test_consumer_examples.py
 ```
 
-Run that command from the workspace root. These examples use the current 0.19.0
-catalog, shared with the published harness 0.20.0. Versioned fixtures retain
+Run that command from the workspace root. These examples use the package
+[catalog](../src/robotics_runtime_contracts/schemas/catalog.v1.json), shared with
+the compatible harness. Versioned fixtures retain
 their original bytes and historical release identities. These examples
 validate document links and original file-byte digests, not a
 live ROS execution or arbitrary infra image. Published package checks and

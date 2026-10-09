@@ -8,12 +8,17 @@ The published package pair and infrastructure evidence have distinct scopes:
 
 | Consumer | Contracts pin | Scope of evidence |
 | --- | --- | --- |
+| [Acceptance harness 0.21.0](https://pypi.org/project/robotics-acceptance-harness/0.21.0/) | `>=0.20,<0.21`; release checks pin 0.20.0 | Independent PyPI installs, public API/CLI checks and verified archive identities |
 | [Acceptance harness 0.20.0](https://pypi.org/project/robotics-acceptance-harness/0.20.0/) | `>=0.19,<0.20`; release checks pin 0.19.0 | Independent PyPI installs, public API/CLI checks and verified archive identities |
 | [Infra R9 v0.9.0-rc.1](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.9.0-rc.1) | contracts 0.18.1 / harness 0.19.0 | Accepted B2 stock profile: one ROS domain, UInt64 and one finalized MCAP recording |
 | [Infra R10 v0.10.0-rc.1](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.10.0-rc.1) | contracts 0.18.2 / harness 0.19.1 | Published image and archive identities verified; released B3 execution is not accepted |
 | [Infra OCI v0.8.0-rc.1](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.8.0-rc.1) | contracts 0.15.4 / harness 0.17.1 | Historical release only; it does not establish support for the current pair |
 
-Contracts 0.19.0 was published from source
+Contracts 0.20.0 and harness 0.21.0 were published from workspace source
+`b241633181f030b23ce0639e83277a7d37b8e7ef`. Their publication does not expand
+previous infrastructure qualification scopes.
+
+Historical contracts 0.19.0 was published from source
 `6c8bc47d1bc416e1b40cdaebf04983e172e78c21`; harness 0.20.0 from
 `efeac712ea512b19523ce41be40752f703fa782b`. Released archives and their
 source identities remain immutable. Infra R10's image source is
@@ -31,7 +36,7 @@ identify the exact installed pair. The 0.15 and 0.16 generations are incompatibl
 
 ## Current Catalog
 
-Release 0.19.0 maps each document role to exactly one schema in
+The published role-to-schema mapping is maintained in
 [`catalog.v1.json`](src/robotics_runtime_contracts/schemas/catalog.v1.json).
 
 Superseded experimental readers and writers are removed rather than carried as
