@@ -42,7 +42,7 @@ version.
 | Component | Baseline |
 | --- | --- |
 | Python | 3.12 through 3.14 |
-| Contracts | `robotics-runtime-contracts>=0.19,<0.20` |
+| Contracts | `robotics-runtime-contracts>=0.20,<0.21` |
 | ROS observation | ROS 2 Jazzy packages in the observer environment |
 | Metrics | OTLP JSON Lines exported by OpenTelemetry Collector |
 
@@ -54,12 +54,12 @@ unrelated published schemas and historical byte identities remain strict.
 ## Install
 
 The published pair is
-[harness 0.20.0](https://pypi.org/project/robotics-acceptance-harness/0.20.0/) with
-[contracts 0.19.0](https://pypi.org/project/robotics-runtime-contracts/0.19.0/):
+[harness 0.21.0](https://pypi.org/project/robotics-acceptance-harness/0.21.0/) with
+[contracts 0.20.0](https://pypi.org/project/robotics-runtime-contracts/0.20.0/):
 
 ```bash
 uv venv
-uv pip install robotics-acceptance-harness==0.20.0 robotics-runtime-contracts==0.19.0
+uv pip install robotics-acceptance-harness==0.21.0 robotics-runtime-contracts==0.20.0
 ```
 
 Development uses both packages and the dependency graph in the root `uv.lock`:

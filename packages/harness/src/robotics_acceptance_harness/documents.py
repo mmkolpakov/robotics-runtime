@@ -343,19 +343,32 @@ def load_bundle(
     runtime = load_document(
         runtime_path,
         expected_role="runtime_manifest",
+        extension_schemas=extension_schemas,
     )
     model = (
-        load_document(model_path, expected_role="model_artifact_manifest")
+        load_document(
+            model_path,
+            expected_role="model_artifact_manifest",
+            extension_schemas=extension_schemas,
+        )
         if model_path is not None
         else None
     )
     dataset = (
-        load_document(dataset_path, expected_role="dataset_manifest")
+        load_document(
+            dataset_path,
+            expected_role="dataset_manifest",
+            extension_schemas=extension_schemas,
+        )
         if dataset_path is not None
         else None
     )
     permit = (
-        load_document(permit_path, expected_role="execution_permit")
+        load_document(
+            permit_path,
+            expected_role="execution_permit",
+            extension_schemas=extension_schemas,
+        )
         if permit_path is not None
         else None
     )
@@ -363,6 +376,7 @@ def load_bundle(
         load_document(
             verification_path,
             expected_role="execution_verification",
+            extension_schemas=extension_schemas,
         )
         if verification_path is not None
         else None
