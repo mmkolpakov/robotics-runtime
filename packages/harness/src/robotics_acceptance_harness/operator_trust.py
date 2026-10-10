@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping, Sequence
 from dataclasses import fields
 from importlib.metadata import distribution
@@ -37,7 +38,7 @@ def _path(value: object, root: Path) -> Path:
 
 
 def _profile(path: Path, evidence_root: Path | None) -> tuple[GitHubVerifierProfile, list[Any]]:
-    path = path.expanduser().absolute()
+    path = Path(os.path.abspath(path.expanduser()))
     if evidence_root is not None and path.is_relative_to(evidence_root.resolve()):
         raise EvaluatorTrustError("operator trust profile must be outside the evidence root")
     raw = read_once(path, 4 * 1024 * 1024)
@@ -75,7 +76,19 @@ def _publisher(value: object) -> GitHubWheelPolicy:
     required = {"repository", "certificate_identity", "wheel_sha256"}
     if not required <= set(value) or not set(value) <= allowed:
         raise EvaluatorTrustError("publisher policy has absent or unknown fields")
-    return GitHubWheelPolicy(**value)
+    nullable = {"source_ref", "source_digest", "signer_digest"}
+    for name, item in value.items():
+        if name == "deny_self_hosted_runners":
+            if type(item) is not bool:
+                raise EvaluatorTrustError("publisher runner policy must be boolean")
+        elif not isinstance(item, str) and not (name in nullable and item is None):
+            raise EvaluatorTrustError(f"publisher {name} must be a string")
+    try:
+        return GitHubWheelPolicy(**value)
+    except EvaluatorTrustError:
+        raise
+    except (TypeError, ValueError) as error:
+        raise EvaluatorTrustError("publisher policy has invalid field values") from error
 
 
 def load_evaluator_authentications(
@@ -88,7 +101,7 @@ def load_evaluator_authentications(
 
     if profile_path is None:
         return MappingProxyType({})
-    path = Path(profile_path)
+    path = Path(os.path.abspath(Path(profile_path).expanduser()))
     root = None if evidence_root is None else Path(evidence_root)
     profile, items = _profile(path, root)
     expected = {str(item["namespace"]): item for item in requirements}

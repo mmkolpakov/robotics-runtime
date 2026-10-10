@@ -156,6 +156,84 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  evaluator-admission:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.23"
+          python-version: "3.12"
+          enable-cache: true
+          prune-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --locked --all-packages --all-groups
+      - name: Build installed SDK and minimal author wheels
+        run: |
+          mkdir -p artifacts/evaluator-admission/wheels
+          uv build --all-packages --no-sources --out-dir artifacts/evaluator-admission/wheels
+          uv build --wheel packages/harness/consumer-examples/evidence-byte-check \
+            --out-dir artifacts/evaluator-admission/wheels
+          uv export --locked --package robotics-acceptance-harness --no-emit-workspace \
+            --no-dev --format requirements-txt > artifacts/evaluator-admission/requirements.txt
+      - name: Attest the CI author artifact
+        id: author-attestation
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6  # v4.2.2
+        with:
+          subject-path: artifacts/evaluator-admission/wheels/example_evidence_byte_check-0.1.0-py3-none-any.whl
+          create-storage-record: false
+      - name: Prepare exact verifier and external expectations
+        env:
+          ATTESTATION_BUNDLE: ${{ steps.author-attestation.outputs.bundle-path }}
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+          EXPECTED_WORKFLOW_REF: ${{ github.workflow_ref }}
+          EXPECTED_SOURCE_REF: ${{ github.ref }}
+          EXPECTED_SOURCE_DIGEST: ${{ github.sha }}
+        run: |
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_linux_amd64.tar.gz \
+            --output "$RUNNER_TEMP/gh.tar.gz"
+          echo "bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386  $RUNNER_TEMP/gh.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/gh.tar.gz" --directory "$RUNNER_TEMP"
+          cp "$RUNNER_TEMP/gh_2.102.0_linux_amd64/bin/gh" artifacts/evaluator-admission/gh
+          echo '7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b  artifacts/evaluator-admission/gh' | sha256sum --check
+          cp packages/harness/tests/admission/trusted-root.jsonl artifacts/evaluator-admission/trusted-root.jsonl
+          cp "$ATTESTATION_BUNDLE" artifacts/evaluator-admission/bundle.json
+          uv run --no-sync python packages/harness/tests/admission/prepare.py \
+            --wheel artifacts/evaluator-admission/wheels/example_evidence_byte_check-0.1.0-py3-none-any.whl \
+            --bundle artifacts/evaluator-admission/bundle.json \
+            --gh artifacts/evaluator-admission/gh \
+            --root artifacts/evaluator-admission/trusted-root.jsonl \
+            --repository "$EXPECTED_REPOSITORY" \
+            --identity "https://github.com/$EXPECTED_WORKFLOW_REF" \
+            --ref "$EXPECTED_SOURCE_REF" --commit "$EXPECTED_SOURCE_DIGEST" \
+            --destination artifacts/evaluator-admission
+      - name: Build the installed pure-Python evaluator fixture
+        run: >-
+          docker build --file packages/harness/tests/admission/Dockerfile
+          --tag evaluator-admission:ci .
+      - name: Execute authenticated author through read-only limited worker
+        run: bash packages/harness/tests/admission/run.sh artifacts/evaluator-admission
+      - name: Retain source, publisher and immutable-input witness
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: evaluator-admission-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            artifacts/evaluator-admission/assessment/
+            artifacts/evaluator-admission/expectations.json
+            artifacts/evaluator-admission/receipts/
+            artifacts/evaluator-admission/bundle.json
+          if-no-files-found: warn
+          retention-days: 7
+
   live-ros:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -258,7 +336,7 @@ jobs:
 
   required-validation:
     name: ci
-    needs: [package, quality, consumers, live-ros, mcp]
+    needs: [package, quality, consumers, live-ros, mcp, evaluator-admission]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -270,9 +348,11 @@ jobs:
           CONSUMERS_RESULT: ${{ needs.consumers.result }}
           ROS_RESULT: ${{ needs.live-ros.result }}
           MCP_RESULT: ${{ needs.mcp.result }}
+          ADMISSION_RESULT: ${{ needs.evaluator-admission.result }}
         run: |
           test "$PACKAGE_RESULT" = success
           test "$QUALITY_RESULT" = success
           test "$CONSUMERS_RESULT" = success
           test "$ROS_RESULT" = success
           test "$MCP_RESULT" = success
+          test "$ADMISSION_RESULT" = success

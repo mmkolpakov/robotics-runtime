@@ -283,3 +283,43 @@ def test_authentication_binding_rejects_original_record_and_namespace_faults(
     authenticated = admit_unit_wheel(monkeypatch, wheel, profile)
     with pytest.raises(EvaluatorTrustError):
         verify_installed_wheel(authenticated, Distribution.at(installed / DIST_INFO))
+
+
+def test_operator_profile_dot_segments_cannot_enter_evidence_root(
+    installation: tuple[Any, ...], tmp_path: Path
+) -> None:
+    *_, requirement, profile, wheel = installation
+    evidence = tmp_path / "evidence"
+    outside = tmp_path / "outside"
+    evidence.mkdir()
+    outside.mkdir()
+    path = evidence / "operator.json"
+    path.write_text(json.dumps(profile_json(profile, wheel, requirement)))
+    path.chmod(0o600)
+    aliased = outside / ".." / "evidence" / "operator.json"
+    with pytest.raises(EvaluatorTrustError, match="outside the evidence root"):
+        operator_trust.load_evaluator_authentications(
+            aliased, [requirement], evidence_root=evidence
+        )
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("wheel_sha256", 123),
+        ("repository", None),
+        ("certificate_identity", []),
+        ("source_ref", 123),
+        ("source_digest", {}),
+        ("deny_self_hosted_runners", "true"),
+    ],
+)
+def test_malformed_publisher_policy_has_a_modeled_error(field: str, value: object) -> None:
+    publisher = {
+        "repository": "example/evaluators",
+        "certificate_identity": "https://github.com/example/evaluators/.github/workflows/ci.yml@refs/heads/main",
+        "wheel_sha256": "a" * 64,
+        field: value,
+    }
+    with pytest.raises(EvaluatorTrustError):
+        operator_trust._publisher(publisher)

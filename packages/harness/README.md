@@ -349,23 +349,25 @@ Product packages register standard PyPA entry points:
 ```
 
 The scenario and runtime must declare the same namespace, target, distribution,
-version, wheel SHA-256, and receipt SHA-256. Before importing the target, the
-harness verifies the released wheel's receipt and provenance chain. Separately,
-it verifies every installed file hash declared by the environment's `RECORD`;
-that installation belongs to the observed execution-subject image. PEP 610
-metadata and an installed `RECORD` are not treated as proof of released wheel
-identity. Unhashed bytecode and module origins outside that `RECORD` fail
-closed; evaluator images should install with bytecode generation disabled.
-Evaluator loading also refuses `sys.pycache_prefix` (including
-`PYTHONPYCACHEPREFIX`), symlinked installed paths, and evaluator modules already
-imported by an unverified loader. Start the harness in a fresh interpreter.
+version, wheel SHA-256, and receipt SHA-256. Before importing a declared target,
+the source harness requires actual wheel
+authentication using an external operator profile, binds installed files and
+original entry-point metadata to that wheel, and compiles captured source
+through its verified import guard. Receipt JSON alone cannot allow execution.
+Derived bytecode caches are ignored; source-less/native/extra namespace code is
+refused. Use ordinary pip on the authenticated captured wheel copy.
 
-The harness compiles the Python source bytes checked against `RECORD` using an
+See [evaluator authentication and operator profile](docs/evaluator-trust.md).
+These APIs and the CLI trust-profile option are absent from published harness
+0.21.0; current source integration does not qualify a published composition.
+
+The harness compiles captured authenticated Python source bytes using an
 explicit source loader, without reading or writing bytecode caches. This covers
 the evaluator's parent packages and imports within the distribution's module
 namespaces, including imports deferred until evaluation. Regular packages,
-namespace packages, relative imports, and dotted entry-point attributes are
-supported. Evaluator-owned modules require hashed Python source; native and
+self-contained namespace packages, relative imports, and dotted entry-point
+attributes are supported. Cross-distribution shared namespaces are outside the
+current authenticated profile. Evaluator-owned modules require hashed Python source; native and
 sourceless evaluator modules are rejected. Dependencies outside those namespaces
 use Python's normal import machinery and remain part of the execution image's
 trust boundary. This loading check is not a sandbox for malicious Python code,
