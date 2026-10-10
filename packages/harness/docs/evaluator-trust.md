@@ -56,16 +56,9 @@ stable Cosign version at least 3.1.3; version alone is not tool approval.
 public-key SHA-256 and explicit `trust_mode="key_only_no_tlog"`.
 The signature bundle's embedded key information is never a trust anchor.
 
-The reviewed fixture uses the publisher-signed Chainguard Cosign index
-`sha256:3fad8be83b93869051c08bb98f36612afe81dabe06c288e70e41ce09a037ba18`,
-with independently admitted amd64 architecture/SBOM subject
-`sha256:70b49cd62302297b3e6a92eb63f86d699bc545c1231fe823147784c5fd742768`.
-The extracted executable SHA-256 is
-`9deba5b08d25e35d107abd491f8f6c774a880d986ecfddc6761c1f9593bdaa81`.
-Its exact version is `v3.1.3+dirty`, commit
-`11926fa5bbbbde47e88fc006b625a17769b743b2`, built with Go 1.27.2.
-This vendor-signed build is recorded as supplied; it is not relabeled clean
-upstream. This tool admission does not qualify the entire production composition.
+The [source fixture](../tests/admission/README.md) records the independently
+admitted vendor tool/index/architecture/SBOM pins and exact reported build version.
+Tool provenance and execution composition admission remain separate records.
 
 The existing private publisher mechanism uses ready
 [Cosign blob attestation](https://github.com/sigstore/cosign/blob/v3.1.3/doc/cosign_attest-blob.md):

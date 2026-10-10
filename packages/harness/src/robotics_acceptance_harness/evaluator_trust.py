@@ -257,7 +257,11 @@ def _run_tool(
     if process.returncode != 0:
         message = diagnostic.decode(errors="replace").strip()
         raise EvaluatorTrustError(f"{label} attestation verification refused: {message}")
-    return report + diagnostic if tool_name == "cosign" and command[1] != "version" else report
+    if tool_name == "cosign" and command[1] != "version":
+        if len(report) + len(diagnostic) > limits.max_report_bytes:
+            raise EvaluatorTrustError("combined verifier audit exceeds its byte limit")
+        return report + diagnostic
+    return report
 
 
 def _verifier_environment(directory: Path) -> dict[str, str]:

@@ -211,3 +211,25 @@ def test_fake_executable_cannot_replace_the_admitted_verifier(
             profile=replace(profile, executable=executable),
             policy=policy,
         )
+
+
+def test_combined_cosign_audit_cannot_exceed_the_declared_report_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from robotics_acceptance_harness import evaluator_trust as trust
+
+    def run(_command: list[str], **keywords: Any) -> SimpleNamespace:
+        keywords["stdout"].write(b"abc")
+        keywords["stderr"].write(b"def")
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(subprocess, "run", run)
+    with pytest.raises(EvaluatorTrustError, match="combined verifier audit"):
+        trust._run_tool(
+            [str(tmp_path / "cosign"), "verify-blob-attestation"],
+            tmp_path,
+            TrustLimits(max_report_bytes=4),
+            tool_name="cosign",
+        )

@@ -53,7 +53,7 @@ def main() -> None:
     auxiliary.mkdir(parents=True, exist_ok=True)
     tool = args.cosign.resolve()
     if digest(tool) != COSIGN_SHA256:
-        raise ValueError("Cosign differs from independently admitted P03 binary pin")
+        raise ValueError("Cosign differs from approved executable SHA-256")
     with TemporaryDirectory(prefix="local-evaluator-publisher-") as private:
         root = Path(private)
         command(tool, root, "signing-config", "create", "--out", "signing.json")
