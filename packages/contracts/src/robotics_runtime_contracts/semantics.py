@@ -1250,9 +1250,7 @@ def _validate_native_scenario(document: Mapping[str, Any]) -> None:
     _validate_native_assessment_controls(schema_name, document)
 
 
-def _validate_native_assessment_controls(
-    schema_name: str, document: Mapping[str, Any]
-) -> None:
+def _validate_native_assessment_controls(schema_name: str, document: Mapping[str, Any]) -> None:
     _require_unique(schema_name, document["assertions"], "assertion_id", "$.assertions")
     _require_unique(
         schema_name, document["evaluator_requirements"], "namespace", "$.evaluator_requirements"
@@ -1360,6 +1358,9 @@ def _validate_native_assertion_sources(document: Mapping[str, Any]) -> None:
     schema_name = str(document["schema_version"])
     assertions = document["assertion_results"]
     evidence_digests = {item["sha256"] for item in document["evidence"]}
+    calibration = document["evaluation"].get("calibration")
+    if calibration is not None and calibration["state"] == "selected":
+        evidence_digests.update(item["sha256"] for item in calibration["artifacts"])
     namespaces = {item["namespace"] for item in document["evaluators"]}
     for index, assertion in enumerate(assertions):
         if assertion["source"] == "core":
@@ -1387,9 +1388,39 @@ def _validate_native_assertion_sources(document: Mapping[str, Any]) -> None:
                 )
 
 
+def _validate_native_assessment_coverage(document: Mapping[str, Any]) -> None:
+    schema_name = str(document["schema_version"])
+    coverage = document["evaluation"].get("coverage")
+    if coverage is None:
+        return
+    covered = coverage["covered_assertions"]
+    uncovered = coverage["uncovered_assertions"]
+    _require_unique(
+        schema_name, covered, "assertion_id", "$.evaluation.coverage.covered_assertions"
+    )
+    _require_unique(
+        schema_name, uncovered, "assertion_id", "$.evaluation.coverage.uncovered_assertions"
+    )
+    if {item["assertion_id"] for item in covered} & {item["assertion_id"] for item in uncovered}:
+        _fail(schema_name, "$.evaluation.coverage", "covered and uncovered criteria overlap")
+    assertions = {item["assertion_id"]: item for item in document["assertion_results"]}
+    original_evidence = {item["sha256"] for item in document["evidence"]}
+    for item in covered:
+        assertion = assertions.get(item["assertion_id"])
+        if assertion is None or assertion["status"] not in {"passed", "failed"}:
+            _fail(schema_name, "$.evaluation.coverage", "covered criterion has no observed outcome")
+        if not set(item["evidence_sha256"]) <= original_evidence:
+            _fail(schema_name, "$.evaluation.coverage", "coverage must bind original raw evidence")
+    if any(
+        f"$.assertions.{item['assertion_id']}" not in document["unevaluated"] for item in uncovered
+    ):
+        _fail(schema_name, "$.evaluation.coverage", "uncovered criterion must remain unevaluated")
+
+
 def _validate_native_result(document: Mapping[str, Any]) -> None:
     schema_name = str(document["schema_version"])
     _validate_native_profile(document)
+    _validate_native_assessment_coverage(document)
     _native_time_order(schema_name, document["original_execution"], "$.original_execution")
     _native_time_order(schema_name, document["evaluation"], "$.evaluation")
     window = document["evaluation"].get("window")
@@ -1422,6 +1453,10 @@ def _validate_native_result(document: Mapping[str, Any]) -> None:
         missing.add("$.assertions")
     missing.update(
         f"$.assertions.{item['assertion_id']}" for item in assertions if item["status"] == "skipped"
+    )
+    missing.update(
+        f"$.assertions.{item['assertion_id']}"
+        for item in document["evaluation"].get("coverage", {}).get("uncovered_assertions", ())
     )
     if set(document["unevaluated"]) != missing:
         _fail(

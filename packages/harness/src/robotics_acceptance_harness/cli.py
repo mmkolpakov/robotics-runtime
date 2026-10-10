@@ -5,7 +5,7 @@ import json
 import sys
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import cast
 
@@ -15,9 +15,16 @@ from robotics_acceptance_harness.aggregate import (
     evaluate_transport_qualification,
 )
 from robotics_acceptance_harness.application import (
+    VerificationOutputs,
+    _offline_metric_samples,
     evaluate_from_evidence,
     explain_bundle,
     run_verification,
+)
+from robotics_acceptance_harness.archive import (
+    AssessmentControls,
+    assess_archive,
+    load_assessment_controls,
 )
 from robotics_acceptance_harness.campaign import aggregate_campaign
 from robotics_acceptance_harness.diagnostics import (
@@ -32,6 +39,8 @@ from robotics_acceptance_harness.errors import (
     HarnessInputError,
     command_error_boundary,
 )
+from robotics_acceptance_harness.evaluation import EvaluationContext
+from robotics_acceptance_harness.evaluator_trust import AuthenticatedInstallation
 from robotics_acceptance_harness.evidence import load_evidence_index
 from robotics_acceptance_harness.extension_schemas import load_extension_schemas
 from robotics_acceptance_harness.hardware_timing import evaluate_hardware_timing
@@ -209,6 +218,11 @@ def _parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--window-start-ns", required=True, type=int)
     evaluate.add_argument("--window-end-ns", required=True, type=int)
     evaluate.add_argument("--output", required=True, metavar="DIR")
+    evaluate.add_argument(
+        "--assessment-controls",
+        metavar="PATH",
+        help="Explicit native method controls; original scenario remains unchanged.",
+    )
 
     aggregate = subparsers.add_parser(
         "aggregate",
@@ -412,6 +426,111 @@ def _report_status(output: Path, status: str, key: str) -> int:
     return 0 if status == "passed" else 1
 
 
+def _archive_evaluation(
+    arguments: argparse.Namespace,
+    bundle: DocumentBundle,
+    controls: AssessmentControls,
+    receipts: VerifiedReceiptSet,
+    authentications: Mapping[str, AuthenticatedInstallation],
+) -> VerificationOutputs:
+    run_context = load_run_context(
+        arguments.run_context,
+        run_id=arguments.run_id,
+        domain_id=arguments.domain_id,
+        scenario_id=str(bundle.scenario.data["scenario_id"]),
+        scenario_sha256=bundle.scenario.sha256,
+    )
+    evidence = load_evidence_index(
+        arguments.evidence_index,
+        expected_run_id=arguments.run_id,
+        receipt_paths=_receipt_source(arguments),
+        verification_paths=arguments.artifact_verification,
+        receipt_dependency_paths=arguments.receipt_dependency,
+    )
+    context = EvaluationContext(
+        arguments.run_id,
+        arguments.domain_id,
+        bundle,
+        evidence,
+        (),
+        arguments.window_start_ns,
+        arguments.window_end_ns,
+        max_raw_evidence_bytes=arguments.max_raw_evidence_bytes,
+        assessment_controls=controls,
+    )
+    if context.window_end_ns <= context.window_start_ns:
+        raise HarnessInputError("offline evaluation window must have positive duration")
+    samples, link = _offline_metric_samples(context, arguments.otel_metrics)
+    context = replace(
+        context,
+        metric_samples=samples,
+        metric_evidence_sha256=str(link["sha256"]) if link is not None else None,
+    )
+    return assess_archive(
+        context,
+        run_context,
+        arguments.output,
+        evaluator_receipts=receipts,
+        evaluator_authentications=authentications,
+    )
+
+
+def _evaluation_admission(
+    arguments: argparse.Namespace, bundle: DocumentBundle
+) -> tuple[
+    AssessmentControls | None,
+    VerifiedReceiptSet,
+    Mapping[str, AuthenticatedInstallation],
+]:
+    controls = (
+        load_assessment_controls(arguments.assessment_controls)
+        if arguments.command == "evaluate" and arguments.assessment_controls is not None
+        else None
+    )
+    requirements = (
+        controls.data["evaluator_requirements"]
+        if controls is not None
+        else bundle.scenario.data["evaluator_requirements"]
+    )
+    return (
+        controls,
+        _evaluator_receipts(arguments),
+        load_evaluator_authentications(
+            arguments.evaluator_trust_profile,
+            requirements,
+            evidence_root=Path(arguments.evidence_index).expanduser().resolve().parent,
+        ),
+    )
+
+
+def _offline_outputs(
+    arguments: argparse.Namespace,
+    bundle: DocumentBundle,
+    controls: AssessmentControls | None,
+    receipts: VerifiedReceiptSet,
+    authentications: Mapping[str, AuthenticatedInstallation],
+) -> VerificationOutputs:
+    if controls is not None:
+        return _archive_evaluation(arguments, bundle, controls, receipts, authentications)
+    return evaluate_from_evidence(
+        run_id=arguments.run_id,
+        domain_id=arguments.domain_id,
+        run_context_path=arguments.run_context,
+        bundle=bundle,
+        evidence_index_path=arguments.evidence_index,
+        artifact_receipt_paths=_receipt_source(arguments),
+        artifact_verification_paths=arguments.artifact_verification,
+        receipt_dependency_paths=arguments.receipt_dependency,
+        evaluator_receipts=receipts,
+        evaluator_authentications=authentications,
+        otel_metrics_path=arguments.otel_metrics,
+        max_raw_evidence_bytes=arguments.max_raw_evidence_bytes,
+        window_start_ns=arguments.window_start_ns,
+        window_end_ns=arguments.window_end_ns,
+        output_dir=arguments.output,
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     arguments = parser.parse_args(argv)
@@ -597,30 +716,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(json.dumps(explain_bundle(bundle), indent=2, sort_keys=True, allow_nan=False))
                 return 0
 
-            evaluator_receipts = _evaluator_receipts(arguments)
-            evaluator_authentications = load_evaluator_authentications(
-                arguments.evaluator_trust_profile,
-                bundle.scenario.data["evaluator_requirements"],
-                evidence_root=Path(arguments.evidence_index).expanduser().resolve().parent,
+            controls, evaluator_receipts, evaluator_authentications = _evaluation_admission(
+                arguments, bundle
             )
 
             if arguments.command == "evaluate":
-                outputs = evaluate_from_evidence(
-                    run_id=arguments.run_id,
-                    domain_id=arguments.domain_id,
-                    run_context_path=arguments.run_context,
-                    bundle=bundle,
-                    evidence_index_path=arguments.evidence_index,
-                    artifact_receipt_paths=_receipt_source(arguments),
-                    artifact_verification_paths=arguments.artifact_verification,
-                    receipt_dependency_paths=arguments.receipt_dependency,
-                    evaluator_receipts=evaluator_receipts,
-                    evaluator_authentications=evaluator_authentications,
-                    otel_metrics_path=arguments.otel_metrics,
-                    max_raw_evidence_bytes=arguments.max_raw_evidence_bytes,
-                    window_start_ns=arguments.window_start_ns,
-                    window_end_ns=arguments.window_end_ns,
-                    output_dir=arguments.output,
+                outputs = _offline_outputs(
+                    arguments, bundle, controls, evaluator_receipts, evaluator_authentications
                 )
             else:
                 outputs = run_verification(

@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from robotics_runtime_contracts.serialization import MAX_DOCUMENT_BYTES
 
-from robotics_acceptance_harness.archive import load_assessment_controls
+from robotics_acceptance_harness import archive
+from robotics_acceptance_harness.archive import AssessmentControls, load_assessment_controls
 from robotics_acceptance_harness.documents import BundleValidationError
 from robotics_acceptance_harness.evidence import EvidenceValidationError
+from tests.test_native import evaluate, produce
 
 
 def controls() -> dict[str, Any]:
@@ -114,3 +118,123 @@ def test_calibration_path_cannot_escape_controls_directory(tmp_path: Path) -> No
     selected(path, payload)
     with pytest.raises(EvidenceValidationError, match="outside"):
         load_assessment_controls(path)
+
+
+def test_explicit_new_method_executes_changed_criteria_without_rewriting_trial(
+    tmp_path: Path,
+) -> None:
+    inputs = produce(tmp_path / "archive", "--error", "7")
+    root = Path(inputs["evidence_index"]).parent
+    original_bytes = {path: path.read_bytes() for path in root.iterdir() if path.is_file()}
+    initial_output = tmp_path / "original"
+    original = evaluate(inputs, initial_output)
+    assert original.returncode == 1, original.stderr
+    original_result = json.loads((initial_output / "acceptance-result.json").read_bytes())
+    assert original_result["status"] == "failed"
+    configuration = json.loads(Path(inputs["scenario"]).read_bytes())
+    selected_controls = {
+        key: configuration[key]
+        for key in ("metric_definitions", "assertions", "evaluator_requirements", "evidence_policy")
+    }
+    selected_controls["calibration"] = {
+        "state": "not_applicable",
+        "reason": "raw software count has no calibration",
+    }
+    for assertion in selected_controls["assertions"]:
+        if assertion["assertion_id"] == "counter-error":
+            assertion["operator"] = "lte"
+            assertion["threshold"] = 10
+    method_path = tmp_path / "method.json"
+    method_bytes = (json.dumps(selected_controls, indent=4) + "\n").encode()
+    method_path.write_bytes(method_bytes)
+    assessed_output = tmp_path / "new-method"
+    completed = evaluate({**inputs, "assessment_controls": method_path}, assessed_output)
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads((assessed_output / "acceptance-result.json").read_bytes())
+    assert result["status"] == "passed"
+    assert result["result_id"] != original_result["result_id"]
+    assert result["scenario_sha256"] == original_result["scenario_sha256"]
+    assert result["original_execution"] == original_result["original_execution"]
+    criterion = next(
+        item for item in result["assertion_results"] if item["assertion_id"] == "counter-error"
+    )
+    assert criterion["observed_value"] == 7 and criterion["status"] == "passed"
+    original_criterion = next(
+        item
+        for item in original_result["assertion_results"]
+        if item["assertion_id"] == "counter-error"
+    )
+    assert original_criterion["observed_value"] == 7 and original_criterion["status"] == "failed"
+    assert (
+        result["evaluation"]["method"]["configuration"]["sha256"]
+        == hashlib.sha256(method_bytes).hexdigest()
+    )
+    assert (assessed_output / "evaluation-method.json").read_bytes() == method_bytes
+    coverage = result["evaluation"]["coverage"]["covered_assertions"]
+    assert {item["assertion_id"] for item in coverage} == {
+        "counter-error",
+        "counter-accepted",
+        "counter-finished",
+    }
+    metrics_digest = hashlib.sha256(Path(inputs["otel_metrics"]).read_bytes()).hexdigest()
+    assert all(item["evidence_sha256"] == [metrics_digest] for item in coverage)
+    assert {path: path.read_bytes() for path in original_bytes} == original_bytes
+
+
+@pytest.mark.parametrize("mutable", [bytearray, memoryview])
+def test_constructor_refuses_mutable_control_buffers(tmp_path: Path, mutable: Any) -> None:
+    raw = json.dumps(controls()).encode()
+    with pytest.raises(BundleValidationError, match="immutable bytes"):
+        AssessmentControls(tmp_path / "method.json", cast(bytes, mutable(raw)), {})
+
+
+@pytest.mark.parametrize("mutable", [bytearray, memoryview])
+def test_constructor_refuses_mutable_calibration_buffers(tmp_path: Path, mutable: Any) -> None:
+    payload = tmp_path / "calibration.json"
+    payload.write_bytes(b'{"offset":7}')
+    path = tmp_path / "method.json"
+    _, reference = selected(path, payload)
+    with pytest.raises(BundleValidationError, match="immutable bytes"):
+        AssessmentControls(
+            path,
+            path.read_bytes(),
+            {reference["sha256"]: cast(bytes, mutable(payload.read_bytes()))},
+        )
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="requires POSIX FIFO")
+def test_controls_fifo_is_refused_without_waiting_for_a_writer(tmp_path: Path) -> None:
+    path = tmp_path / "method.json"
+    os.mkfifo(path)
+    with pytest.raises(BundleValidationError, match="regular file"):
+        load_assessment_controls(path)
+
+
+@pytest.mark.parametrize("sizes", [[MAX_DOCUMENT_BYTES + 1], [MAX_DOCUMENT_BYTES // 2] * 2])
+def test_declared_capture_caps_are_checked_before_input_reads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, sizes: list[int]
+) -> None:
+    payload = tmp_path / "calibration.json"
+    payload.write_bytes(b"{}")
+    path = tmp_path / "method.json"
+    configuration, reference = selected(path, payload)
+    configuration["calibration"]["artifacts"] = [
+        {**reference, "sha256": str(index) * 64, "size_bytes": size}
+        for index, size in enumerate(sizes, 1)
+    ]
+    path.write_text(json.dumps(configuration))
+
+    def unexpected_read(*args: Any, **kwargs: Any) -> bytes:
+        raise AssertionError("capture began before the budget was refused")
+
+    monkeypatch.setattr(archive, "_read_local", unexpected_read)
+    with pytest.raises(BundleValidationError, match="byte limit"):
+        load_assessment_controls(path)
+
+
+def test_constructor_enforces_total_capture_limit(tmp_path: Path) -> None:
+    payload = b"x" * (MAX_DOCUMENT_BYTES + 1)
+    with pytest.raises(BundleValidationError, match="total byte limit"):
+        AssessmentControls(
+            tmp_path / "method.json", json.dumps(controls()).encode(), {"x": payload}
+        )

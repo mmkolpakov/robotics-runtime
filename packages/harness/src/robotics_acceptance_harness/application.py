@@ -522,7 +522,7 @@ def _offline_metric_samples(
     if otel_metrics_path is None:
         if (
             context.bundle.scenario.schema_version == "acceptance-scenario.v1"
-            or context.scenario["metric_definitions"]
+            or context.method_controls["metric_definitions"]
         ):
             raise VerificationError("this scenario requires --otel-metrics evidence")
         return (), None
@@ -597,7 +597,11 @@ def evaluate_from_evidence(
         max_raw_evidence_bytes=max_raw_evidence_bytes,
     )
     metric_samples, metric_link = _offline_metric_samples(context, otel_metrics_path)
-    context = replace(context, metric_samples=metric_samples)
+    context = replace(
+        context,
+        metric_samples=metric_samples,
+        metric_evidence_sha256=str(metric_link["sha256"]) if metric_link is not None else None,
+    )
     if bundle.scenario.schema_version == "acceptance-scenario.v2":
         result = evaluate_native(
             context, run_context, output_dir, evaluator_receipts, evaluator_authentications

@@ -15,6 +15,7 @@ from typing import Any, cast
 
 from packaging.utils import canonicalize_name
 
+from robotics_acceptance_harness.archive import AssessmentControls
 from robotics_acceptance_harness.documents import DocumentBundle
 from robotics_acceptance_harness.errors import HarnessError
 from robotics_acceptance_harness.evaluator_trust import (
@@ -56,6 +57,14 @@ class EvaluationContext:
     window_start_ns: int
     window_end_ns: int
     max_raw_evidence_bytes: int | None = None
+    assessment_controls: AssessmentControls | None = None
+    metric_evidence_sha256: str | None = None
+
+    @property
+    def method_controls(self) -> Mapping[str, Any]:
+        return (
+            self.assessment_controls.data if self.assessment_controls is not None else self.scenario
+        )
 
     @property
     def scenario(self) -> Mapping[str, Any]:
@@ -66,8 +75,15 @@ class EvaluationContext:
         return self.bundle.runtime.data
 
     @property
-    def evidence_sha256(self) -> frozenset[str]:
+    def original_evidence_sha256(self) -> frozenset[str]:
         return frozenset(str(item["sha256"]) for item in self.evidence.links)
+
+    @property
+    def evidence_sha256(self) -> frozenset[str]:
+        method_inputs = (
+            self.assessment_controls.inputs if self.assessment_controls is not None else {}
+        )
+        return self.original_evidence_sha256 | frozenset(method_inputs)
 
 
 type ProductEvaluator = Callable[[EvaluationContext], Iterable[AssertionEvaluation]]
@@ -391,6 +407,32 @@ def _product_evaluations(
     return tuple(evaluations)
 
 
+def _validate_selected_calibration(context: EvaluationContext) -> None:
+    if context.assessment_controls is None:
+        return
+    if context.bundle.scenario.schema_version != "acceptance-scenario.v2":
+        raise EvaluationError("explicit assessment controls require native v2 source inputs")
+    controls = context.method_controls
+    if controls["calibration"]["state"] == "selected" and (
+        controls["assertions"] or not controls["evaluator_requirements"]
+    ):
+        raise EvaluationError("core metric methods cannot apply selected calibration")
+
+
+def _validate_calibration_bindings(
+    context: EvaluationContext, evaluations: Sequence[AssertionEvaluation]
+) -> None:
+    calibration = context.method_controls.get("calibration")
+    if calibration is None or calibration["state"] != "selected":
+        return
+    product = [item for item in evaluations if item.source == "product"]
+    claimed = {digest for item in product for digest in item.evidence_sha256}
+    if {item["sha256"] for item in calibration["artifacts"]} - claimed:
+        raise EvaluationError("selected calibration has no product assertion source binding")
+    if any(not set(item.evidence_sha256) & context.original_evidence_sha256 for item in product):
+        raise EvaluationError("calibrated product assertions require original raw evidence")
+
+
 def evaluate_acceptance(
     context: EvaluationContext,
     *,
@@ -400,7 +442,8 @@ def evaluate_acceptance(
 ) -> tuple[AssertionEvaluation, ...]:
     """Evaluate evidence through the canonical core and installed product evaluators."""
 
-    scenario = context.scenario
+    scenario = context.method_controls
+    _validate_selected_calibration(context)
     validate_metric_definitions(scenario["metric_definitions"], context.metric_samples)
     evaluations = list(
         evaluate_metric_assertions(
@@ -441,6 +484,7 @@ def evaluate_acceptance(
             ),
         )
     )
+    _validate_calibration_bindings(context, evaluations)
     identifiers = [item.assertion_id for item in evaluations]
     if len(identifiers) != len(set(identifiers)):
         duplicates = sorted({item for item in identifiers if identifiers.count(item) > 1})
