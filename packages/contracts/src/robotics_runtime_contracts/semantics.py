@@ -1247,6 +1247,12 @@ def _validate_native_profile(document: Mapping[str, Any]) -> None:
 def _validate_native_scenario(document: Mapping[str, Any]) -> None:
     schema_name = str(document["schema_version"])
     _validate_native_profile(document)
+    _validate_native_assessment_controls(schema_name, document)
+
+
+def _validate_native_assessment_controls(
+    schema_name: str, document: Mapping[str, Any]
+) -> None:
     _require_unique(schema_name, document["assertions"], "assertion_id", "$.assertions")
     _require_unique(
         schema_name, document["evaluator_requirements"], "namespace", "$.evaluator_requirements"
