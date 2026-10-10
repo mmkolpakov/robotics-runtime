@@ -27,6 +27,11 @@ PUBLIC_ROOTS = (
 )
 PUBLIC_FILES = {"README.md", "host/README.md", "mcp/README.md", "quality/README.md"}
 PACKAGE_ROOTS = {"packages/contracts", "packages/harness"}
+CONSUMER_ROOT = "packages/contracts/consumer-examples/published-cli"
+CONSUMER_INPUTS = frozenset(
+    f"{CONSUMER_ROOT}/{name}"
+    for name in ("README.md", "produce.py", "scenario-input.json", "runtime-template.json")
+)
 DIAGRAM_SOURCES = frozenset(
     {
         "docs/architecture/workspace.dsl",
@@ -171,7 +176,7 @@ def main() -> None:
                     "and [harness PyPI](https://pypi.org/project/robotics-acceptance-harness/). "
                     "Frozen examples retain their own release and commit pins.\n```\n\n"
                     "[Infra documentation]"
-                    "(https://github.com/mmkolpakov/robotics-runtime-infra#readme) · "
+                    "(https://github.com/mmkolpakov/robotics-runtime-infra) · "
                     "[Releases](https://github.com/mmkolpakov/robotics-runtime/releases) · "
                     '<a href="documentation-sources.zip">Markdown, SVG and diagram source</a> · '
                     '<a href="index.txt">Plain text</a> · '
@@ -180,22 +185,51 @@ def main() -> None:
                 )
                 title, rest = text.split("\n", 1)
                 text = title + "\n" + notice + rest
+            if name == "docs/first-result.md":
+                title, rest = text.split("\n", 1)
+                text = (
+                    title + "\n\n"
+                    '<a href="../consumer-inputs.zip">Download consumer inputs</a> · '
+                    '<a href="../source-manifest.json">Documentation source manifest</a>\n' + rest
+                )
             destination.write_text(text)
         else:
             destination.write_bytes(raw)
+    for name in sorted(CONSUMER_INPUTS):
+        path = root / name
+        if name not in tracked or path.is_symlink() or not path.is_file():
+            raise ValueError(f"Consumer input must be a regular tracked file: {name}")
+        raw_files[name] = path.read_bytes()
+        hashes[name] = sha256(raw_files[name]).hexdigest()
     manifest = {
         "repository": REPOSITORY,
         "revision": revision,
-        "working_copy": bool(git(root, "diff", "--name-only", "HEAD", "--", *sorted(documents))),
+        "working_copy": bool(git(root, "diff", "--name-only", "HEAD", "--", *sorted(raw_files))),
         "files": hashes,
     }
     (source / "source-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     with ZipFile(source / "documentation-sources.zip", "w", compression=ZIP_DEFLATED) as archive:
-        for name in sorted(documents):
+        for name in sorted(raw_files):
             entry = ZipInfo(name)
             entry.compress_type = ZIP_DEFLATED
             entry.external_attr = 0o100644 << 16
             archive.writestr(entry, raw_files[name])
+    consumer_manifest = {
+        "repository": REPOSITORY,
+        "revision": revision,
+        "working_copy": manifest["working_copy"],
+        "files": {Path(name).name: hashes[name] for name in sorted(CONSUMER_INPUTS)},
+    }
+    with ZipFile(source / "consumer-inputs.zip", "w", compression=ZIP_DEFLATED) as archive:
+        for name in sorted(CONSUMER_INPUTS):
+            entry = ZipInfo(Path(name).name)
+            entry.compress_type = ZIP_DEFLATED
+            entry.external_attr = 0o100644 << 16
+            archive.writestr(entry, raw_files[name])
+        entry = ZipInfo("manifest.json")
+        entry.compress_type = ZIP_DEFLATED
+        entry.external_attr = 0o100644 << 16
+        archive.writestr(entry, json.dumps(consumer_manifest, indent=2) + "\n")
     (source / "text").mkdir()
     configuration = root / "docs" / "reader"
     for builder, destination in (("text", output / "text"), ("html", output / "html")):
@@ -233,11 +267,19 @@ def main() -> None:
         "llms-full.txt",
         "_sources/index.md",
         "documentation-sources.zip",
+        "consumer-inputs.zip",
     ):
         path = output / "html" / name
         if not path.is_file() or not path.stat().st_size:
             raise ValueError(f"Documentation output is missing or empty: {name}")
     full_text = (output / "html" / "llms-full.txt").read_text()
+    with ZipFile(output / "html" / "consumer-inputs.zip") as archive:
+        exported_manifest = json.loads(archive.read("manifest.json"))
+        if set(archive.namelist()) != {"manifest.json", *exported_manifest["files"]}:
+            raise ValueError("Consumer archive contains an unexpected file set")
+        for name, digest in exported_manifest["files"].items():
+            if sha256(archive.read(name)).hexdigest() != digest:
+                raise ValueError(f"Consumer archive digest disagrees with its manifest: {name}")
     for name in DIAGRAM_SOURCES:
         body = "\n".join(
             f"   {line}" if line.strip() else "" for line in raw_files[name].decode().splitlines()

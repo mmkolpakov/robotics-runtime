@@ -1,5 +1,12 @@
 # Consumer Examples
 
+Start with the [published CLI consumer](published-cli/README.md) and its
+[first-result guide](../../../docs/first-result.md) for inputs obtainable without a
+source checkout. Its public producer generates synthetic data and the expected
+offline `incomplete` JSON/JUnit result using the published pair.
+
+## Source document examples
+
 These documents form a product-independent, single-domain ROS 2 simulation exchange. They show
 how a consumer can declare a scenario, describe the observed runtime, establish
 one run context, report one domain result, index evidence, and aggregate the

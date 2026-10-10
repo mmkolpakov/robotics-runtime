@@ -17,6 +17,7 @@ html_show_copyright = False
 html_sourcelink_suffix = ""
 html_extra_path = [
     "../../build/docs/source/documentation-sources.zip",
+    "../../build/docs/source/consumer-inputs.zip",
     "../../build/docs/source/source-manifest.json",
     "../../build/docs/source/text",
 ]
@@ -27,6 +28,15 @@ llms_txt_summary = (
     "and the composition host. Published packages and frozen qualification "
     "examples retain their own release and commit identities."
 )
+llms_txt_exclude = [
+    "packages/contracts/CHANGELOG",
+    "packages/harness/CHANGELOG",
+    "docs/run-history",
+    "docs/future-designs",
+    "packages/contracts/docs/decisions/*",
+    "packages/contracts/docs/migrations/*",
+    "packages/harness/docs/decisions/*",
+]
 llms_txt_code_files = [
     "+:docs/architecture/workspace.dsl",
     "+:docs/architecture/run-sequence.mmd",
