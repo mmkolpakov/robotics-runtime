@@ -65,7 +65,7 @@ execution qualification.
 
 <!-- architecture:Container:start -->
 
-![Execution and external Test boundaries](docs/architecture/generated/Container.svg)
+![Published document workflow](docs/architecture/generated/Container.svg)
 
 [Canonical C4 source](docs/architecture/workspace.dsl) · [Generated Mermaid](docs/architecture/generated/structurizr-Container.mmd)
 
@@ -81,7 +81,7 @@ separate outcomes.
 
 <!-- architecture:Context:start -->
 
-![Platform context](docs/architecture/generated/Context.svg)
+![Verification workflow context](docs/architecture/generated/Context.svg)
 
 [Canonical C4 source](docs/architecture/workspace.dsl) · [Generated Mermaid](docs/architecture/generated/structurizr-Context.mmd)
 

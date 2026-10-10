@@ -1,36 +1,54 @@
 graph LR
   linkStyle default fill:#ffffff
 
-  subgraph diagram ["Native interfaces"]
+  subgraph diagram ["Native consumer application"]
     style diagram fill:#ffffff,stroke:#ffffff
 
     3("<div style='font-weight: bold'>Simulators</div><div style='font-size: 80%; margin-top:10px'>Gazebo / Webots / Isaac;<br />scoped.</div>")
     style 3 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    4("<div style='font-weight: bold'>Control endpoint</div><div style='font-size: 80%; margin-top:10px'>Selected SDK; transport, peer<br />and effects differ.</div>")
+    4("<div style='font-weight: bold'>Selected SDK peer</div><div style='font-size: 80%; margin-top:10px'>MAVSDK server in the PX4<br />example; native peers belong<br />to their selected profiles.</div>")
     style 4 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
     5("<div style='font-weight: bold'>Media source</div><div style='font-size: 80%; margin-top:10px'>Native camera / RTSP /<br />fixture.</div>")
     style 5 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
 
-    subgraph 7 ["Runtime platform"]
+    subgraph 7 ["Verification application"]
       style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
 
       subgraph group1 ["Native workers"]
         style group1 fill:#ffffff,stroke:#0f172a,color:#0f172a,stroke-dasharray:5
 
-        11("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Selected simulator SDK.</div>")
-        style 11 fill:#fffbeb,stroke:#b45309,color:#0f172a
-        12("<div style='font-weight: bold'>Media worker</div><div style='font-size: 80%; margin-top:10px'>GStreamer pipeline and<br />reports.</div>")
-        style 12 fill:#ecfeff,stroke:#0e7490,color:#0f172a
+        12("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Selected simulator SDK.</div>")
+        style 12 fill:#fffbeb,stroke:#b45309,color:#0f172a
+        13("<div style='font-weight: bold'>Media worker</div><div style='font-size: 80%; margin-top:10px'>GStreamer pipeline and<br />reports.</div>")
+        style 13 fill:#ecfeff,stroke:#0e7490,color:#0f172a
       end
 
-      8("<div style='font-weight: bold'>Run host</div><div style='font-size: 80%; margin-top:10px'>Lifecycle and owned jobs.</div>")
-      style 8 fill:#dbeafe,stroke:#2563eb,color:#0f172a
+      subgraph group2 ["Python tools"]
+        style group2 fill:#ffffff,stroke:#0f172a,color:#0f172a,stroke-dasharray:5
+
+        10("<div style='font-weight: bold'>Document CLI</div><div style='font-size: 80%; margin-top:10px'>Published contracts.</div>")
+        style 10 fill:#ecfdf5,stroke:#047857,color:#0f172a
+        11("<div style='font-weight: bold'>Evaluation CLI</div><div style='font-size: 80%; margin-top:10px'>Published evaluator.</div>")
+        style 11 fill:#ecfdf5,stroke:#047857,color:#0f172a
+      end
+
+      14[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Local bytes and retained<br />references.</div>")]
+      style 14 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
+      9("<div style='font-weight: bold'>Consumer coordinator</div><div style='font-size: 80%; margin-top:10px'>Embeds the host library;<br />callbacks own workload and<br />payloads.</div>")
+      style 9 fill:#dbeafe,stroke:#2563eb,color:#0f172a
     end
 
-    8-- "<div>Lifecycle jobs</div><div style='font-size: 70%'>[Compose / argv]</div>" -->11
-    8-- "<div>SDK clients / consumer policy</div><div style='font-size: 70%'>[MAVSDK / gRPC]</div>" -->4
-    8-- "<div>Media jobs</div><div style='font-size: 70%'>[argv / files]</div>" -->12
-    12-- "<div>Declared input</div><div style='font-size: 70%'>[GStreamer / RTSP / fixture]</div>" -->5
-    11-- "<div>Native SDK/controller</div><div style='font-size: 70%'>[Backend API]</div>" -->3
+    9-- "<div>Validate documents</div><div style='font-size: 70%'>[argv / files]</div>" -->10
+    9-- "<div>Evaluate evidence</div><div style='font-size: 70%'>[argv / files]</div>" -->11
+    9-- "<div>Lifecycle jobs</div><div style='font-size: 70%'>[Compose / argv]</div>" -->12
+    9-- "<div>Selected PX4 control profile</div><div style='font-size: 70%'>[MAVSDK / gRPC]</div>" -->4
+    9-- "<div>Media jobs</div><div style='font-size: 70%'>[argv / files]</div>" -->13
+    13-- "<div>Declared input</div><div style='font-size: 70%'>[GStreamer / RTSP / fixture]</div>" -->5
+    13-- "<div>Frames / reports</div><div style='font-size: 70%'>[Exact files]</div>" -->14
+    12-- "<div>Native SDK/controller</div><div style='font-size: 70%'>[Backend API]</div>" -->3
+    12-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->14
+    10-- "<div>Write documents</div><div style='font-size: 70%'>[Files]</div>" -->14
+    11-- "<div>Read bytes / write verdicts</div><div style='font-size: 70%'>[JSON / JUnit]</div>" -->14
+    9-- "<div>Export / cleanup proof</div><div style='font-size: 70%'>[Callback refs]</div>" -->14
 
   end
