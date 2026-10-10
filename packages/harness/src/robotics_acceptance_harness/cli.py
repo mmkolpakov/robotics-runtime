@@ -36,6 +36,7 @@ from robotics_acceptance_harness.evidence import load_evidence_index
 from robotics_acceptance_harness.extension_schemas import load_extension_schemas
 from robotics_acceptance_harness.hardware_timing import evaluate_hardware_timing
 from robotics_acceptance_harness.metrics import MetricSample
+from robotics_acceptance_harness.operator_trust import load_evaluator_authentications
 from robotics_acceptance_harness.otel import (
     OTLP_JSON_LINES_MEDIA_TYPE,
     _validate_raw_evidence_budget,
@@ -68,6 +69,11 @@ def _add_bundle_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--dataset", metavar="PATH")
     parser.add_argument("--permit", metavar="PATH")
     parser.add_argument("--verification", metavar="PATH")
+    parser.add_argument(
+        "--evaluator-trust-profile",
+        metavar="PATH",
+        help="Operator profile outside evidence with pinned verifier and publisher policy.",
+    )
     parser.add_argument("--evaluator-receipt", action="append", default=[], metavar="PATH")
     parser.add_argument("--evaluator-verification", action="append", default=[], metavar="PATH")
     parser.add_argument(
@@ -256,6 +262,7 @@ def _parser() -> argparse.ArgumentParser:
     doctor.add_argument("--evidence-dir", metavar="PATH")
     doctor.add_argument("--measurement-complete", metavar="PATH")
     doctor.add_argument("--scenario", metavar="PATH")
+    doctor.add_argument("--evaluator-trust-profile", metavar="PATH")
     doctor.add_argument("--evaluator-receipt", action="append", default=[], metavar="PATH")
     doctor.add_argument("--evaluator-verification", action="append", default=[], metavar="PATH")
     doctor.add_argument(
@@ -439,6 +446,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     measurement_complete=arguments.measurement_complete,
                     evaluator_requirements=requirements,
                     evaluator_receipts=_evaluator_receipts(arguments),
+                    evaluator_authentications=load_evaluator_authentications(
+                        arguments.evaluator_trust_profile,
+                        requirements,
+                        evidence_root=arguments.evidence_dir,
+                    ),
                 )
                 print(
                     report_markdown(report)
@@ -586,6 +598,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 0
 
             evaluator_receipts = _evaluator_receipts(arguments)
+            evaluator_authentications = load_evaluator_authentications(
+                arguments.evaluator_trust_profile,
+                bundle.scenario.data["evaluator_requirements"],
+                evidence_root=Path(arguments.evidence_index).expanduser().resolve().parent,
+            )
 
             if arguments.command == "evaluate":
                 outputs = evaluate_from_evidence(
@@ -598,6 +615,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     artifact_verification_paths=arguments.artifact_verification,
                     receipt_dependency_paths=arguments.receipt_dependency,
                     evaluator_receipts=evaluator_receipts,
+                    evaluator_authentications=evaluator_authentications,
                     otel_metrics_path=arguments.otel_metrics,
                     max_raw_evidence_bytes=arguments.max_raw_evidence_bytes,
                     window_start_ns=arguments.window_start_ns,
@@ -615,6 +633,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     artifact_verification_paths=arguments.artifact_verification,
                     receipt_dependency_paths=arguments.receipt_dependency,
                     evaluator_receipts=evaluator_receipts,
+                    evaluator_authentications=evaluator_authentications,
                     otel_metrics_path=arguments.otel_metrics,
                     max_raw_evidence_bytes=arguments.max_raw_evidence_bytes,
                     measurement_complete_path=arguments.measurement_complete,

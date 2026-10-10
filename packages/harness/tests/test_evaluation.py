@@ -3,8 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import sys
-from collections.abc import Iterable
-from importlib.metadata import EntryPoint, FileHash, PackagePath, PathDistribution
+from importlib.metadata import EntryPoint
 from pathlib import Path
 from types import MappingProxyType
 
@@ -16,7 +15,6 @@ from robotics_acceptance_harness.evaluation import (
     EvaluationContext,
     EvaluationError,
     _verify_entry_point_origin,
-    _verify_installed_record,
     evaluate_acceptance,
 )
 from robotics_acceptance_harness.evidence import VerifiedEvidence
@@ -32,53 +30,6 @@ from tests.support import write_verified_receipt
 
 FIXTURES = Path(__file__).parent / "fixtures" / "simulation"
 EVIDENCE_DIGEST = "a" * 64
-
-
-def _package_path(name: str, root: Path, digest: str | None) -> PackagePath:
-    package_path = PackagePath(name)
-    package_path.dist = PathDistribution(root / "example_evaluator-1.0.dist-info")
-    package_path.hash = FileHash(f"sha256={digest}") if digest is not None else None
-    package_path.size = (root / name).stat().st_size
-    return package_path
-
-
-def _write_record(root: Path, files: Iterable[PackagePath]) -> None:
-    lines = []
-    for item in files:
-        digest = f"{item.hash.mode}={item.hash.value}" if item.hash is not None else ""
-        lines.append(f"{item},{digest},{item.size}")
-    (root / "example_evaluator-1.0.dist-info" / "RECORD").write_text(
-        "\n".join(lines) + "\n", encoding="utf-8"
-    )
-
-
-def _record_digest(path: Path) -> str:
-    return (
-        base64.urlsafe_b64encode(hashlib.sha256(path.read_bytes()).digest()).rstrip(b"=").decode()
-    )
-
-
-def _installed_distribution(tmp_path: Path) -> tuple[EntryPoint, dict[str, PackagePath]]:
-    files: dict[str, PackagePath] = {}
-    for name, content in (
-        ("example_evaluator.py", "def evaluate():\n    return ()\n"),
-        ("example_evaluator-1.0.dist-info/METADATA", "Name: example-evaluator\n"),
-        (
-            "example_evaluator-1.0.dist-info/entry_points.txt",
-            "[robotics_acceptance.evaluators]\norg.example = example_evaluator:evaluate\n",
-        ),
-    ):
-        path = tmp_path / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
-        files[name] = _package_path(name, tmp_path, _record_digest(path))
-    record_name = "example_evaluator-1.0.dist-info/RECORD"
-    record_path = tmp_path / record_name
-    record_path.write_text("fixture RECORD\n", encoding="utf-8")
-    files[record_name] = _package_path(record_name, tmp_path, None)
-    _write_record(tmp_path, files.values())
-    distribution = PathDistribution(record_path.parent)
-    return distribution.entry_points["org.example"], files
 
 
 def context(bundle: DocumentBundle | None = None) -> EvaluationContext:
@@ -120,66 +71,6 @@ def context(bundle: DocumentBundle | None = None) -> EvaluationContext:
     return EvaluationContext("run-test", "primary", bundle, evidence, (), 0, 1)
 
 
-def test_evaluator_module_requires_an_installed_record_hash(tmp_path: Path) -> None:
-    entry_point, files = _installed_distribution(tmp_path)
-    files["example_evaluator.py"].hash = None
-    _write_record(tmp_path, files.values())
-
-    with pytest.raises(EvaluationError, match="has no RECORD hash"):
-        _verify_installed_record(entry_point)
-
-
-def test_sourceless_bytecode_cannot_bypass_the_record_hash(tmp_path: Path) -> None:
-    entry_point, files = _installed_distribution(tmp_path)
-    pyc_name = "__pycache__/example_evaluator.cpython-312.pyc"
-    pyc_path = tmp_path / pyc_name
-    pyc_path.parent.mkdir(parents=True, exist_ok=True)
-    pyc_path.write_bytes(b"untrusted bytecode")
-    pyc = _package_path(pyc_name, tmp_path, None)
-    _write_record(
-        tmp_path,
-        [item for name, item in files.items() if name != "example_evaluator.py"] + [pyc],
-    )
-
-    with pytest.raises(EvaluationError, match="has no RECORD hash"):
-        _verify_installed_record(entry_point)
-
-
-def test_unregistered_generated_bytecode_is_rejected(tmp_path: Path) -> None:
-    entry_point, _files = _installed_distribution(tmp_path)
-    pyc_name = "__pycache__/example_evaluator.cpython-312.pyc"
-    pyc_path = tmp_path / pyc_name
-    pyc_path.parent.mkdir(parents=True, exist_ok=True)
-    pyc_path.write_bytes(b"derived bytecode")
-
-    with pytest.raises(EvaluationError, match="unverified bytecode cache"):
-        _verify_installed_record(entry_point)
-
-
-def test_bytecode_prefix_outside_the_record_is_rejected(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    entry_point, _files = _installed_distribution(tmp_path)
-    prefix = tmp_path / "bytecode-prefix"
-    cached = prefix / tmp_path.relative_to(tmp_path.anchor) / "__pycache__"
-    cached.mkdir(parents=True)
-    (cached / "example_evaluator.cpython-312.pyc").write_bytes(b"untrusted bytecode")
-    monkeypatch.setattr(sys, "pycache_prefix", str(prefix))
-
-    with pytest.raises(EvaluationError, match="pycache_prefix"):
-        _verify_installed_record(entry_point)
-
-
-def test_installer_metadata_exception_is_scoped_to_dist_info(tmp_path: Path) -> None:
-    entry_point, files = _installed_distribution(tmp_path)
-    installer_path = tmp_path / "INSTALLER"
-    installer_path.write_text("untrusted\n", encoding="utf-8")
-    _write_record(tmp_path, [*files.values(), _package_path("INSTALLER", tmp_path, None)])
-
-    with pytest.raises(EvaluationError, match="has no RECORD hash"):
-        _verify_installed_record(entry_point)
-
-
 def test_entry_point_cannot_be_shadowed_outside_its_distribution(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -199,24 +90,6 @@ def test_entry_point_cannot_be_shadowed_outside_its_distribution(
 
     with pytest.raises(EvaluationError, match="outside its verified RECORD"):
         _verify_entry_point_origin(entry_point, frozenset({trusted.resolve()}))
-
-
-@pytest.mark.parametrize(
-    "name",
-    [
-        "example_evaluator.py",
-        "example_evaluator-1.0.dist-info/entry_points.txt",
-    ],
-)
-def test_evaluator_import_files_must_match_the_installed_record(
-    tmp_path: Path,
-    name: str,
-) -> None:
-    entry_point, files = _installed_distribution(tmp_path)
-    Path(files[name].locate()).write_text("tampered\n", encoding="utf-8")
-
-    with pytest.raises(EvaluationError, match="differs from RECORD"):
-        _verify_installed_record(entry_point)
 
 
 def test_product_evaluator_is_namespaced_and_evidence_bound() -> None:
@@ -268,7 +141,7 @@ def test_product_evaluator_exception_is_a_stable_evaluation_error() -> None:
         evaluate_acceptance(context(), evaluators=(("org.example.sorting", evaluator),))
 
 
-def test_installed_distribution_contributes_a_product_evaluator(
+def test_receipt_alone_cannot_admit_an_installed_product_evaluator(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -337,16 +210,16 @@ def evaluate(context):
     runtime_path.write_text(yaml.safe_dump(runtime, sort_keys=False), encoding="utf-8")
     monkeypatch.syspath_prepend(str(tmp_path))
 
-    evaluations = evaluate_acceptance(
-        context(load_bundle(scenario_path, runtime_path=runtime_path)),
-        evaluator_receipts=load_verified_receipts(
-            receipt_paths=[chain["receipt"]],
-            verification_paths=[chain["verification"]],
-            dependency_paths=chain["dependencies"],
-        ),
-    )
-
-    assert evaluations[-1].assertion_id == "org.example.sorting.detected"
+    with pytest.raises(EvaluationError, match="requires authenticated wheel/source admission"):
+        evaluate_acceptance(
+            context(load_bundle(scenario_path, runtime_path=runtime_path)),
+            evaluator_receipts=load_verified_receipts(
+                receipt_paths=[chain["receipt"]],
+                verification_paths=[chain["verification"]],
+                dependency_paths=chain["dependencies"],
+            ),
+        )
+    assert "example_evaluator" not in sys.modules
 
 
 def test_duration_predicate_requires_contiguous_coverage() -> None:

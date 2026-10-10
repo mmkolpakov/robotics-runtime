@@ -1,0 +1,15 @@
+FROM docker.io/library/python@sha256:8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b
+COPY artifacts/evaluator-admission/requirements.txt /opt/admission/requirements.txt
+RUN python -m pip install --no-cache-dir --require-hashes --no-deps -r /opt/admission/requirements.txt
+COPY artifacts/evaluator-admission/wheels /opt/admission/wheels
+RUN python -m pip install --no-cache-dir --no-deps /opt/admission/wheels/*.whl
+COPY artifacts/evaluator-admission/gh /opt/admission/gh
+COPY artifacts/evaluator-admission/trusted-root.jsonl /opt/admission/trusted-root.jsonl
+COPY artifacts/evaluator-admission/bundle.json /opt/admission/bundle.json
+COPY artifacts/evaluator-admission/profile.json /opt/admission/profile.json
+COPY artifacts/evaluator-admission/receipts /opt/admission/receipts
+RUN chmod 0555 /opt/admission/gh && chmod 0444 /opt/admission/profile.json /opt/admission/trusted-root.jsonl
+COPY packages/harness/tests/admission/witness.py /opt/admission/witness.py
+ENV PYTHONDONTWRITEBYTECODE=1 HOME=/tmp
+WORKDIR /tmp
+ENTRYPOINT ["robotics-acceptance"]
