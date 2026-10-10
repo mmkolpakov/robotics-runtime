@@ -22,9 +22,12 @@ this support boundary.
 
 The source [evaluator trust SDK](../packages/harness/docs/evaluator-trust.md)
 authenticates wheel provenance and binds installed source bytes to the
-authenticated wheel. These helpers are not part of the published harness 0.21.0
-wheel. Standard CLI evaluator admission and execution from authenticated
-snapshots still require integration and acceptance.
+authenticated wheel. The source CLI requires an external operator profile and
+executes captured authenticated source through the retained import guard.
+The limited author fixture exercises the installed CLI with read-only inputs
+in Docker and rootless Podman. These interfaces are absent from published harness
+0.21.0. Production SDK/image/BOM composition admission, package publication and
+native evaluator-method qualification remain separate gates.
 
 Independent archive re-evaluation, distributed recovery and new deployment
 profiles remain outside the current implementation. Physical v2 qualification
