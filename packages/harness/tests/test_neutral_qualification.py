@@ -82,7 +82,7 @@ def _archive(
     tmp_path: Path, domains: tuple[str, ...] = ("primary",), *, native_model: bool = False
 ) -> list[str]:
     state = _write(tmp_path / "native-state.json", {"native_final_state": "completed", "error": 0})
-    method = _write(tmp_path / "method.json", {"method": "comparison", "calibration": "fixed"})
+    method = tmp_path / "method.json"
     environment = _write(tmp_path / "environment.json", {"python": "3.12", "platform": "test"})
     profile: dict[str, Any] = {
         "profile_id": "org.example.native",
@@ -115,6 +115,18 @@ def _archive(
                 "retention_class": "pull-request-7d",
                 "remote_sink_allowed": False,
             },
+        },
+    )
+    _write(
+        method,
+        {
+            key: _document(scenario)[key]
+            for key in (
+                "metric_definitions",
+                "assertions",
+                "evaluator_requirements",
+                "evidence_policy",
+            )
         },
     )
     model = _write(tmp_path / "model.json", {"model": "native-counter"})
@@ -714,7 +726,11 @@ def test_native_link_coverage_independently_refuses_forged_pass(
     tmp_path: Path, all_not_applicable: bool
 ) -> None:
     from robotics_runtime_contracts._qualification_checks import _context
-    from robotics_runtime_contracts._qualification_native import _domain_coverage, _observations
+    from robotics_runtime_contracts._qualification_native import (
+        _domain_coverage,
+        _method_controls,
+        _observations,
+    )
     from robotics_runtime_contracts.qualification import inspect_qualification_artifacts
 
     report = inspect_qualification_artifacts(_archive(tmp_path))
@@ -741,7 +757,12 @@ def test_native_link_coverage_independently_refuses_forged_pass(
     with pytest.raises(
         QualificationError, match="passing despite missing source or criterion coverage"
     ):
-        _domain_coverage(context, "primary", _observations(context)["primary"])
+        _domain_coverage(
+            context,
+            "primary",
+            _observations(context)["primary"],
+            _method_controls(context, "primary"),
+        )
 
 
 def _set_measurement_window(

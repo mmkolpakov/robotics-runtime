@@ -85,6 +85,21 @@ def _load_diagnostic(error: ContractError) -> QualificationDiagnostic:
     )
 
 
+def _control_references(artifact: QualificationArtifact) -> tuple[Mapping[str, Any], ...]:
+    document = artifact.document
+    assert document is not None
+    if artifact.kind == "dataset_manifest":
+        return (document["bag"]["metadata"],)
+    if document["schema_version"] != "acceptance-result.v2":
+        return ()
+    assessment = document["evaluation"]
+    return (
+        assessment["method"]["configuration"],
+        assessment["environment"],
+        *assessment.get("calibration", {}).get("artifacts", ()),
+    )
+
+
 def inspect_qualification_artifacts(
     specifications: Sequence[str],
     extension_schemas: Mapping[str, bytes] | None = None,
@@ -96,18 +111,20 @@ def inspect_qualification_artifacts(
     # Capture dataset controls first; raw MCAP remains streamed. All returned
     # descriptors retain caller order, and each supplied file is opened once.
     for index, specification in enumerate(specifications):
-        if specification.partition(":")[0] != "dataset_manifest":
+        if specification.partition(":")[0] not in {"dataset_manifest", "domain_result"}:
             continue
         try:
-            dataset = load_artifact(specification, extension_schemas)
-            loaded[index] = dataset
-            assert dataset.document is not None
-            reference = dataset.document["bag"]["metadata"]
-            references[reference["sha256"]] = reference["size_bytes"]
+            artifact = load_artifact(specification, extension_schemas)
+            loaded[index] = artifact
+            for reference in _control_references(artifact):
+                references[reference["sha256"]] = reference["size_bytes"]
         except ContractError as error:
             diagnostics.append(_load_diagnostic(error))
     for index, specification in enumerate(specifications):
-        if specification.partition(":")[0] == "dataset_manifest":
+        if index in loaded or specification.partition(":")[0] in {
+            "dataset_manifest",
+            "domain_result",
+        }:
             continue
         try:
             loaded[index] = load_artifact(

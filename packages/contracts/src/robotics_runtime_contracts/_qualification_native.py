@@ -12,7 +12,9 @@ from robotics_runtime_contracts._qualification_types import (
     QualificationReport,
 )
 from robotics_runtime_contracts._timestamps import parse_timestamp_ns
+from robotics_runtime_contracts.assessments import validate_assessment_controls
 from robotics_runtime_contracts.errors import ContractError
+from robotics_runtime_contracts.serialization import loads_mapping
 from robotics_runtime_contracts.status import worst_status
 
 if TYPE_CHECKING:
@@ -90,25 +92,50 @@ def _resolved_observations(
 
 
 def _domain(context: _Context, domain: str, observation_artifact: QualificationArtifact) -> None:
-    _domain_bindings(context, domain, observation_artifact)
+    controls = _method_controls(context, domain)
+    _domain_bindings(context, domain, observation_artifact, controls)
     _domain_window(context, domain, observation_artifact)
-    _domain_assertion_registry(context, domain)
-    _domain_coverage(context, domain, observation_artifact)
+    _domain_assertion_registry(context, domain, controls)
+    _domain_coverage(context, domain, observation_artifact, controls)
     _domain_observation_evidence(context, domain, observation_artifact)
     _domain_assessment_retention(context, domain)
 
 
+def _method_controls(context: _Context, domain: str) -> Mapping[str, Any]:
+    assessment = rules._document(context.results[domain])["evaluation"]
+    reference = assessment["method"]["configuration"]
+    artifact = rules._require_raw(
+        context.grouped,
+        reference["sha256"],
+        f"domain {domain} method controls",
+        kinds=("other_evidence",),
+        size_bytes=reference["size_bytes"],
+    )
+    if artifact.native_metadata_bytes is None:
+        rules._fail(f"domain {domain} method controls require captured metadata bytes")
+    controls = loads_mapping(artifact.native_metadata_bytes, source_name=artifact.subject_name)
+    validate_assessment_controls(controls)
+    expected = controls.get("calibration")
+    supplied = assessment.get("calibration")
+    if expected is not None:
+        rules._require_equal(f"domain {domain} selected calibration", expected, supplied)
+    elif supplied is not None and supplied["state"] != "unobserved":
+        rules._fail(f"domain {domain} original method makes no calibration declaration")
+    return controls
+
+
 def _domain_bindings(
-    context: _Context, domain: str, observation_artifact: QualificationArtifact
+    context: _Context,
+    domain: str,
+    observation_artifact: QualificationArtifact,
+    controls: Mapping[str, Any],
 ) -> None:
     from robotics_runtime_contracts._qualification_checks import (
-        _domain_assertions,
         _domain_evidence,
         _domain_identity,
     )
 
     _domain_identity(context, domain)
-    _domain_assertions(context, domain)
     _domain_evidence(context, domain)
     scenario = context.scenario
     runtime = rules._document(context.runtimes[domain])
@@ -151,7 +178,11 @@ def _domain_bindings(
             scenario["evaluator_requirements"],
             runtime["evaluator_bindings"],
         ),
-        ("result evaluator bindings", scenario["evaluator_requirements"], result["evaluators"]),
+        (
+            "result evaluator bindings",
+            controls["evaluator_requirements"],
+            result["evaluators"],
+        ),
     ):
         rules._require_equal(f"domain {domain} {label}", expected, actual)
     for field in ("execution", "profile"):
@@ -245,18 +276,19 @@ _NATIVE_POLICY_ASSERTIONS = frozenset(
 )
 
 
-def _domain_assertion_registry(context: _Context, domain: str) -> None:
+def _domain_assertion_registry(context: _Context, domain: str, controls: Mapping[str, Any]) -> None:
     result = rules._document(context.results[domain])
     core = {
         item["assertion_id"] for item in result["assertion_results"] if item["source"] == "core"
     }
-    expected = {item["assertion_id"] for item in context.scenario["assertions"]}
+    expected = {item["assertion_id"] for item in controls["assertions"]}
     if core != expected | _NATIVE_POLICY_ASSERTIONS:
         rules._fail(
             f"result {domain} core assertions differ from declared metrics and native policy"
         )
-    namespaces = {item["namespace"] for item in context.scenario["evaluator_requirements"]}
+    namespaces = {item["namespace"] for item in controls["evaluator_requirements"]}
     evidence = {item["sha256"] for item in result["evidence"]}
+    evidence.update(item["sha256"] for item in controls.get("calibration", {}).get("artifacts", ()))
     for assertion in result["assertion_results"]:
         if assertion["source"] == "product":
             namespace = assertion["namespace"]
@@ -298,7 +330,10 @@ def _missing_criterion_coverage(scenario: Mapping[str, Any], result: Mapping[str
 
 
 def _domain_coverage(
-    context: _Context, domain: str, observation_artifact: QualificationArtifact
+    context: _Context,
+    domain: str,
+    observation_artifact: QualificationArtifact,
+    controls: Mapping[str, Any],
 ) -> None:
     scenario = context.scenario
     result = rules._document(context.results[domain])
@@ -306,7 +341,7 @@ def _domain_coverage(
     expected = _resolved_observations(scenario["profile"], observation)
     rules._require_equal(f"result {domain} observations", expected, result["observations"])
     missing = _missing_observation_coverage(scenario, expected) | _missing_criterion_coverage(
-        scenario, result
+        controls, result
     )
     if not missing <= set(result["unevaluated"]):
         rules._fail(f"result {domain} omits unevaluated source and criterion coverage")
@@ -352,6 +387,10 @@ def _domain_assessment_retention(context: _Context, domain: str) -> None:
     for reference, label in (
         (assessment["method"]["configuration"], "method configuration"),
         (assessment["environment"], "assessment environment"),
+        *(
+            (item, "selected calibration")
+            for item in assessment.get("calibration", {}).get("artifacts", ())
+        ),
     ):
         artifact = rules._require_raw(
             context.grouped,
@@ -360,7 +399,7 @@ def _domain_assessment_retention(context: _Context, domain: str) -> None:
             kinds=("other_evidence",),
             size_bytes=reference["size_bytes"],
         )
-        if (artifact.sha256, artifact.size_bytes) in {
+        if label != "selected calibration" and (artifact.sha256, artifact.size_bytes) in {
             _identity(item)
             for index_artifact in context.evidence_indexes.values()
             for item in rules._document(index_artifact)["artifacts"]

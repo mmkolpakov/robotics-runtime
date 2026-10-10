@@ -82,7 +82,7 @@ def _validate_metadata_capture(artifact: QualificationArtifact) -> None:
         raw = artifact.native_metadata_bytes
         if artifact.kind != "other_evidence" or not isinstance(raw, bytes):
             raise QualificationError(
-                "native bag metadata requires bounded raw other_evidence bytes"
+                "native control metadata requires bounded raw other_evidence bytes"
             )
         if len(raw) > MAX_DOCUMENT_BYTES or (len(raw), hashlib.sha256(raw).hexdigest()) != (
             artifact.size_bytes,
@@ -109,8 +109,10 @@ def _capture_native_metadata(
         return None
     sizes = set(references.values())
     advertised_size = path.stat().st_size
-    if advertised_size not in sizes or advertised_size > MAX_DOCUMENT_BYTES:
+    if advertised_size not in sizes:
         return None
+    if advertised_size > MAX_DOCUMENT_BYTES:
+        raise QualificationError("referenced control metadata exceeds the document byte limit")
     # A candidate is read once within the existing control-document bound.
     # Retain immutable bytes only for a referenced metadata identity.
     raw = read_document_bytes(path)
