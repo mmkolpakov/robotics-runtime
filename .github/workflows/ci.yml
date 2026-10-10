@@ -202,14 +202,14 @@ jobs:
             --output "$RUNNER_TEMP/gh.tar.gz"
           echo "bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386  $RUNNER_TEMP/gh.tar.gz" | sha256sum --check
           tar -xzf "$RUNNER_TEMP/gh.tar.gz" --directory "$RUNNER_TEMP"
-          cp "$RUNNER_TEMP/gh_2.102.0_linux_amd64/bin/gh" artifacts/evaluator-admission/gh
-          echo '7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b  artifacts/evaluator-admission/gh' | sha256sum --check
+          cp "$RUNNER_TEMP/gh_2.102.0_linux_amd64/bin/gh" artifacts/evaluator-admission/verifier
+          echo '7469124f706944133d6a169691dd1c6c3511b12e85878d255e044e2948df4c9b  artifacts/evaluator-admission/verifier' | sha256sum --check
           cp packages/harness/tests/admission/trusted-root.jsonl artifacts/evaluator-admission/trusted-root.jsonl
           cp "$ATTESTATION_BUNDLE" artifacts/evaluator-admission/bundle.json
-          uv run --no-sync python packages/harness/tests/admission/prepare.py \
+          PYTHONPATH=packages/harness uv run --no-sync python -m tests.admission.prepare \
             --wheel artifacts/evaluator-admission/wheels/example_evidence_byte_check-0.1.0-py3-none-any.whl \
             --bundle artifacts/evaluator-admission/bundle.json \
-            --gh artifacts/evaluator-admission/gh \
+            --gh artifacts/evaluator-admission/verifier \
             --root artifacts/evaluator-admission/trusted-root.jsonl \
             --repository "$EXPECTED_REPOSITORY" \
             --identity "https://github.com/$EXPECTED_WORKFLOW_REF" \
@@ -221,6 +221,26 @@ jobs:
           --tag evaluator-admission:ci .
       - name: Execute authenticated author through read-only limited worker
         run: bash packages/harness/tests/admission/run.sh artifacts/evaluator-admission
+      - name: Prepare an explicitly private key-only author profile
+        run: |
+          mkdir -p artifacts/evaluator-local-key/wheels
+          cp artifacts/evaluator-admission/wheels/*.whl artifacts/evaluator-local-key/wheels/
+          cp artifacts/evaluator-admission/requirements.txt artifacts/evaluator-local-key/
+          copy_id="$(docker create cgr.dev/chainguard/cosign@sha256:3fad8be83b93869051c08bb98f36612afe81dabe06c288e70e41ce09a037ba18)"
+          trap 'docker rm "$copy_id" >/dev/null 2>&1 || true' EXIT
+          docker cp "$copy_id:/usr/bin/cosign" artifacts/evaluator-local-key/verifier
+          docker rm "$copy_id"
+          trap - EXIT
+          echo '9deba5b08d25e35d107abd491f8f6c774a880d986ecfddc6761c1f9593bdaa81  artifacts/evaluator-local-key/verifier' | sha256sum --check
+          PYTHONPATH=packages/harness uv run --no-sync python -m tests.admission.prepare_key \
+            --wheel artifacts/evaluator-local-key/wheels/example_evidence_byte_check-0.1.0-py3-none-any.whl \
+            --cosign artifacts/evaluator-local-key/verifier --destination artifacts/evaluator-local-key
+      - name: Execute private key-only admission in the limited read-only worker
+        run: |
+          docker build --file packages/harness/tests/admission/Dockerfile \
+            --build-arg ADMISSION_ARTIFACTS=artifacts/evaluator-local-key \
+            --tag evaluator-local-key:ci .
+          bash packages/harness/tests/admission/run.sh artifacts/evaluator-local-key evaluator-local-key:ci
       - name: Retain source, publisher and immutable-input witness
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
@@ -235,6 +255,12 @@ jobs:
             artifacts/evaluator-admission/profile.json
             artifacts/evaluator-admission/inputs.json
             artifacts/evaluator-admission/archive/
+            artifacts/evaluator-local-key/assessment/
+            artifacts/evaluator-local-key/expectations.json
+            artifacts/evaluator-local-key/receipts/
+            artifacts/evaluator-local-key/bundle.json
+            artifacts/evaluator-local-key/profile.json
+            artifacts/evaluator-local-key/auxiliary/
           if-no-files-found: warn
           retention-days: 7
 

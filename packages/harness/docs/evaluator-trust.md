@@ -1,6 +1,7 @@
 # Evaluator wheel authentication
 
-The source SDK provides `authenticate_wheel`, `validate_evaluator_wheel` and
+The source SDK provides `authenticate_wheel`, `authenticate_wheel_with_cosign_key`,
+`validate_evaluator_wheel` and
 `verify_installed_wheel` in `robotics_acceptance_harness.evaluator_trust`.
 These APIs are not part of the published harness 0.21.0 wheel. They verify
 artifact origin and installed bytes. The source loader and CLI require these
@@ -8,6 +9,9 @@ captured bindings before importing a declared evaluator, and retain the existing
 verified-source import guard.
 
 ## Operator profile and publisher policy
+
+The GitHub and local-key profiles are explicit alternatives. There is no automatic
+fallback between them, and saved verifier JSON cannot select a weaker policy.
 
 The integrator supplies a reviewed execution composition with the Python
 interpreter, SDK, dependencies, an approved `gh` executable and trusted roots.
@@ -35,6 +39,66 @@ Sigstore's [verification API](https://sigstore.github.io/sigstore-python/api/ver
 distinguishes authenticated DSSE payload bytes from artifact verification.
 Cryptographic authenticity and expected publisher identity do not prove an
 evaluator's method, a physical model, or a claimed result is correct.
+
+## Private local-key signing
+
+Closed evaluator code can stay on the owner's node. The explicit
+`cosign_key_no_tlog` profile uses stock Cosign blob attestation and an independently
+approved local public key. It proves a signature by the holder of that key,
+the expected raw wheel SHA-256 and exact predicate URI. It does not prove OIDC
+identity, transparency-log inclusion, an authenticated signing timestamp or build
+provenance. Operator approval of the key and tool is outside evidence.
+
+`CosignKeyVerifierProfile` pins the executable SHA-256, exact reported version,
+public-key bytes/SHA-256 and explicit trusted-root bytes/SHA-256. It requires a
+stable Cosign version at least 3.1.3; version alone is not tool approval.
+`CosignKeyWheelPolicy` requires the expected wheel SHA-256, predicate URI,
+public-key SHA-256 and explicit `trust_mode="key_only_no_tlog"`.
+The signature bundle's embedded key information is never a trust anchor.
+
+The reviewed fixture uses the publisher-signed Chainguard Cosign index
+`sha256:3fad8be83b93869051c08bb98f36612afe81dabe06c288e70e41ce09a037ba18`,
+with independently admitted amd64 architecture/SBOM subject
+`sha256:70b49cd62302297b3e6a92eb63f86d699bc545c1231fe823147784c5fd742768`.
+The extracted executable SHA-256 is
+`9deba5b08d25e35d107abd491f8f6c774a880d986ecfddc6761c1f9593bdaa81`.
+Its exact version is `v3.1.3+dirty`, commit
+`11926fa5bbbbde47e88fc006b625a17769b743b2`, built with Go 1.27.2.
+This vendor-signed build is recorded as supplied; it is not relabeled clean
+upstream. This tool admission does not qualify the entire production composition.
+
+The existing private publisher mechanism uses ready
+[Cosign blob attestation](https://github.com/sigstore/cosign/blob/v3.1.3/doc/cosign_attest-blob.md):
+
+```bash
+cosign signing-config create --out offline-signing.json
+cosign trusted-root create --out offline-root.json
+cosign attest-blob --yes --key publisher.key \
+  --signing-config offline-signing.json --trusted-root offline-root.json \
+  --predicate evaluator-method.json --type urn:example:evaluator-method:v1 \
+  --bundle evaluator.sigstore.json example_evaluator-1.0-py3-none-any.whl
+```
+
+The no-service signing configuration and explicit root keep this key-only path
+local. The owner protects the private key; it is not supplied to the verification
+SDK, evidence, worker image or report. The API captures wheel, bundle, tool,
+public key and root once, then calls stock `verify-blob-attestation` with
+`--check-claims=true`, the expected predicate and captured external key.
+`--insecure-ignore-tlog` is the explicitly selected no-log policy; it is never an
+automatic downgrade from the GitHub certificate policy.
+
+A key-only operator profile uses the same top-level version 1 shape, with
+`verifier.kind="cosign_key_no_tlog"`, `public_key` and
+`public_key_sha256` in addition to the common tool/root fields. Its publisher
+binding has exactly `wheel_sha256`, `predicate_type`, `public_key_sha256` and
+`trust_mode="key_only_no_tlog"`. The GitHub profile explicitly uses
+`verifier.kind="github"`; an omitted or unknown kind is refused.
+Evidence document schema versions are unaffected by this operator configuration.
+
+Both factories return the same issued in-memory wheel admission and reuse the
+original wheel/installation/entry-point/source guards and limits. Local signing
+does not require uploading the evaluator wheel to GitHub, and this profile does
+not add a key registry, PKI service, custom cryptography or installer.
 
 ## Authenticate before installation
 
@@ -122,12 +186,14 @@ unsupported members are refused.
 The source CLI accepts `--evaluator-trust-profile PATH` on `evaluate`, `verify`
 and `doctor`. The JSON file belongs to the operator, outside the indexed evidence
 root, and must not be group/other writable. Relative paths resolve from its
-directory. Version 1 has exactly `profile_version`, `verifier` and `evaluators`:
+directory. An explicit verifier kind is required. Version 1 has exactly `profile_version`,
+`verifier` and `evaluators`:
 
 ```json
 {
   "profile_version": 1,
   "verifier": {
+    "kind": "github",
     "executable": "tools/gh",
     "executable_sha256": "<approved gh SHA-256>",
     "version": "2.102.0",
@@ -219,3 +285,10 @@ synthetic method inputs; the byte count is not observed robot performance.
 This source/CI witness is not a published SDK, infra image admission, dependency
 publisher proof or native hardware qualification. Full composition provenance
 and subsequent package publication have separate gates.
+
+The local-key witness additionally creates a temporary local publisher with the
+admitted stock tool, retains only public verification material, installs the
+authenticated captured wheel and runs the same read-only bounded CLI worker.
+Genuine wrong-key, altered DSSE/subject/predicate, fake-report and unissued-token
+controls are distinct from JSON consistency checks. Private key bytes are never
+tracked or included in artifacts.

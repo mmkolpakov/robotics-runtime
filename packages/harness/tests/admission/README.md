@@ -3,6 +3,8 @@
 This fixture uses the installed public CLI and the standalone
 [evidence-byte author example](../../consumer-examples/evidence-byte-check/README.md).
 It verifies source integration, not a released SDK or robot performance.
+The GitHub and explicitly selected Cosign key-only cases share the public writer
+and installed source guard, while retaining distinct publisher proof scopes.
 
 The `evaluator-admission` job in [CI](../../../../.github/workflows/ci.yml) builds
 the candidate SDK wheels and author wheel, then attests only the author wheel
@@ -57,3 +59,13 @@ are retained as CI artifacts.
 Actual author authentication requires the matching genuine signed bundle.
 Unit tests mock the crypto call only for independent binder/loader regressions;
 they never claim those probe wheels prove publisher identity.
+
+The local-key case uses the same admitted Cosign binary as the infra signature
+boundary. The Chainguard signed index/architecture/SBOM and extracted binary pins
+are recorded in [the trust reference](../../docs/evaluator-trust.md#private-local-key-signing).
+Its exact vendor version remains `v3.1.3+dirty`. The temporary signing key lives
+outside the workspace in a private temporary directory; only public keys and the
+signed bundle enter artifacts. Verification uses an external key pin and explicit
+`key_only_no_tlog` policy, with no OIDC/log/timestamp/build-origin claim. The OCI
+worker has no network and the same read-only/resource bounds. Public artifact
+receipts are audit records; they cannot issue admission.
