@@ -1,0 +1,352 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:robotics-runtime-contracts:v2:qualification-bundle",
+  "title": "Archive assessment qualification statement v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "_type",
+    "subject",
+    "predicateType",
+    "predicate"
+  ],
+  "properties": {
+    "_type": {
+      "const": "https://in-toto.io/Statement/v1"
+    },
+    "subject": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "urn:robotics-runtime-contracts:v1:qualification-bundle#/$defs/subject"
+      },
+      "minItems": 7
+    },
+    "predicateType": {
+      "const": "https://robotics-runtime-contracts.dev/attestations/qualification-bundle/v2"
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "generated_at",
+        "original_execution",
+        "acceptance_aggregate",
+        "assessments",
+        "comparison",
+        "artifacts"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "qualification-bundle.v2"
+        },
+        "run_id": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runId"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "original_execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scenario",
+            "acceptance_run",
+            "acceptance_aggregate",
+            "domains"
+          ],
+          "properties": {
+            "scenario": {
+              "$ref": "#/$defs/subjectName"
+            },
+            "acceptance_run": {
+              "$ref": "#/$defs/subjectName"
+            },
+            "acceptance_aggregate": {
+              "$ref": "#/$defs/subjectName"
+            },
+            "domains": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/originalDomain"
+              },
+              "minItems": 1
+            }
+          }
+        },
+        "acceptance_aggregate": {
+          "$ref": "#/$defs/subjectName"
+        },
+        "assessments": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/assessment"
+          },
+          "minItems": 1
+        },
+        "comparison": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rule",
+            "per_domain"
+          ],
+          "properties": {
+            "rule": {
+              "const": "exact_assertion_outcome"
+            },
+            "per_domain": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/domainComparison"
+              },
+              "minItems": 1
+            }
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "urn:robotics-runtime-contracts:v1:qualification-bundle#/$defs/artifact"
+          },
+          "minItems": 7
+        },
+        "extension_schemas": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensionSchemas"
+        },
+        "extensions": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensions"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "subjectName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "originalDomain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "domain_id",
+        "runtime_manifest",
+        "acceptance_observation",
+        "evidence_index",
+        "acceptance_result",
+        "result_id",
+        "status",
+        "evaluation"
+      ],
+      "properties": {
+        "domain_id": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+        },
+        "runtime_manifest": {
+          "$ref": "#/$defs/subjectName"
+        },
+        "acceptance_observation": {
+          "$ref": "#/$defs/subjectName"
+        },
+        "evidence_index": {
+          "$ref": "#/$defs/subjectName"
+        },
+        "acceptance_result": {
+          "$ref": "#/$defs/subjectName"
+        },
+        "result_id": {
+          "$ref": "urn:robotics-runtime-contracts:v2:acceptance-result#/properties/result_id"
+        },
+        "status": {
+          "$ref": "urn:robotics-runtime-contracts:v2:acceptance-result#/properties/status"
+        },
+        "evaluation": {
+          "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/evaluation"
+        }
+      }
+    },
+    "assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "domain_id",
+        "acceptance_result",
+        "result_id",
+        "status",
+        "evaluation"
+      ],
+      "properties": {
+        "domain_id": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+        },
+        "acceptance_result": {
+          "$ref": "#/$defs/subjectName"
+        },
+        "result_id": {
+          "$ref": "urn:robotics-runtime-contracts:v2:acceptance-result#/properties/result_id"
+        },
+        "status": {
+          "$ref": "urn:robotics-runtime-contracts:v2:acceptance-result#/properties/status"
+        },
+        "evaluation": {
+          "allOf": [
+            {
+              "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/evaluation"
+            },
+            {
+              "required": [
+                "calibration",
+                "coverage"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "domainComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "domain_id",
+        "original_result",
+        "assessment_result",
+        "status",
+        "compared_assertions",
+        "excluded_assertions",
+        "reasons"
+      ],
+      "properties": {
+        "domain_id": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+        },
+        "original_result": {
+          "$ref": "#/$defs/subjectName"
+        },
+        "assessment_result": {
+          "$ref": "#/$defs/subjectName"
+        },
+        "status": {
+          "enum": [
+            "matched",
+            "different",
+            "not_comparable"
+          ]
+        },
+        "compared_assertions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "excluded_assertions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "reasons": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "method_changed",
+              "environment_changed",
+              "calibration_changed",
+              "calibration_unobserved",
+              "coverage_unobserved",
+              "window_changed",
+              "no_covered_assertions",
+              "assertion_outcome_changed"
+            ]
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "matched"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "compared_assertions": {
+                "minItems": 1
+              },
+              "reasons": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "different"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "compared_assertions": {
+                "minItems": 1
+              },
+              "reasons": {
+                "const": [
+                  "assertion_outcome_changed"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not_comparable"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "compared_assertions": {
+                "maxItems": 0
+              },
+              "reasons": {
+                "minItems": 1,
+                "items": {
+                  "enum": [
+                    "method_changed",
+                    "environment_changed",
+                    "calibration_changed",
+                    "calibration_unobserved",
+                    "coverage_unobserved",
+                    "window_changed",
+                    "no_covered_assertions"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
