@@ -281,6 +281,10 @@ def produce(arguments: argparse.Namespace) -> dict[str, Any]:
     if arguments.raw_only:
         scenario_document["assertions"] = []
         scenario_document["metric_definitions"] = []
+    bindings = []
+    if arguments.evaluator_binding:
+        bindings = [json.loads(Path(arguments.evaluator_binding).read_bytes())]
+    scenario_document["evaluator_requirements"] = bindings
     scenario_path = write_json(destination / "scenario.json", scenario_document)
     command("robotics-contracts", "validate", str(scenario_path))
     run_path = destination / "run.json"
@@ -308,7 +312,7 @@ def produce(arguments: argparse.Namespace) -> dict[str, Any]:
             "execution": execution(arguments.simulation),
             "profile": native_profile,
             "native_model": reference(model),
-            "evaluator_bindings": [],
+            "evaluator_bindings": bindings,
         },
     )
     runtime_path = destination / "runtime.json"
@@ -442,6 +446,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True)
     parser.add_argument("--domain", default="primary")
+    parser.add_argument("--evaluator-binding", metavar="PATH")
     parser.add_argument("--error", type=int, default=0)
     parser.add_argument("--simulation", action="store_true")
     parser.add_argument("--no-criteria", action="store_true")

@@ -20,6 +20,7 @@ from robotics_acceptance_harness.documents import (
     load_document_bytes,
 )
 from robotics_acceptance_harness.evaluation import EvaluationContext, evaluate_acceptance
+from robotics_acceptance_harness.evaluator_trust import AuthenticatedInstallation
 from robotics_acceptance_harness.receipts import VerifiedReceiptSet
 from robotics_acceptance_harness.result import format_utc_datetime
 
@@ -232,6 +233,7 @@ def evaluate_native(
     run_context: LoadedDocument,
     output_dir: str | Path,
     evaluator_receipts: VerifiedReceiptSet | None,
+    evaluator_authentications: Mapping[str, AuthenticatedInstallation] | None = None,
 ) -> dict[str, Any]:
     """Assess captured native observations without executing or rewriting their source."""
     source = _load_observation(context)
@@ -262,7 +264,11 @@ def evaluate_native(
     )
     environment = _evaluation_environment(destination / "evaluation-environment.json")
     started_at = datetime.now(UTC)
-    assertions = evaluate_acceptance(context, evaluator_receipts=evaluator_receipts)
+    assertions = evaluate_acceptance(
+        context,
+        evaluator_receipts=evaluator_receipts,
+        evaluator_authentications=evaluator_authentications,
+    )
     finished_at = datetime.now(UTC)
     unevaluated = {
         f"$.observations.{name}"

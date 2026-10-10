@@ -33,7 +33,7 @@ def evaluate(context):
     ),)
 """
 EVALUATE = """\
-record = _verify_installed_record(entry_point)
+record = captured_record(entry_point)
 evaluator = _load_evaluator(entry_point, record)
 print(json.dumps([item.observed_value for item in evaluator(context())]))
 """
@@ -126,12 +126,23 @@ import sys
 from pathlib import Path
 from importlib.metadata import distribution
 from robotics_acceptance_harness.evaluation import (
-    EvaluationError, _load_evaluator, _verify_installed_record,
+    EvaluationError, _load_evaluator, _VerifiedRecord,
 )
 from tests.test_evaluation import context
 site = Path(sys.argv[1])
 sys.path.insert(0, str(site))
 entry_point = distribution('spec33-evaluator').entry_points['org.spec33']
+
+# Test-owned captured wheel source exercises only the existing import guard.
+# No publisher authentication or production admission is claimed by this probe.
+from zipfile import ZipFile
+def captured_record(point):
+    root = Path(point.dist.locate_file(''))
+    wheel = root.parent / (point.dist.name.replace('-', '_') + '-1.0-py3-none-any.whl')
+    with ZipFile(wheel) as archive:
+        sources = {root / name: archive.read(name) for name in archive.namelist()
+                   if name.endswith('.py')}
+    return _VerifiedRecord(frozenset(sources), sources)
 """
     return subprocess.run(
         [sys.executable, "-c", setup + textwrap.dedent(body), str(site)],
@@ -212,7 +223,7 @@ def test_prefix_enabled_after_verification_is_rejected(installed: Path, tmp_path
     result = _run(
         installed,
         f"""\
-record = _verify_installed_record(entry_point)
+record = captured_record(entry_point)
 sys.pycache_prefix = {str(tmp_path / "late-cache")!r}
 _load_evaluator(entry_point, record)
 """,
@@ -222,19 +233,25 @@ _load_evaluator(entry_point, record)
 
 
 @pytest.mark.parametrize("location", ["adjacent", "legacy"])
-def test_unrecorded_bytecode_is_rejected(installed: Path, location: str) -> None:
+def test_guard_compiles_captured_source_instead_of_existing_bytecode(
+    installed: Path, location: str
+) -> None:
     result = _run(
         installed,
         f"""\
 import py_compile
 source = site / '{MODULE}.py'
+forged = site.parent / 'forged.py'
+forged.write_text(source.read_text().replace('[20, 22]', '[90, 9]'))
 cache = (importlib.util.cache_from_source(str(source)) if {location!r} == 'adjacent'
          else str(source.with_suffix('.pyc')))
-py_compile.compile(str(source), cfile=cache, doraise=True)
+py_compile.compile(str(forged), cfile=cache, doraise=True,
+                   invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
 """
         + EVALUATE,
     )
-    _assert_rejected(result, "installed evaluator has unverified bytecode cache")
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == [42.0]
 
 
 @pytest.mark.parametrize("mutation", ["source", "cache"])
@@ -244,7 +261,7 @@ def test_import_uses_verified_bytes_despite_late_file_changes(
     result = _run(
         installed,
         f"""\
-record = _verify_installed_record(entry_point)
+record = captured_record(entry_point)
 source = site / '{MODULE}.py'
 forged = source.read_text().replace('[20, 22]', '[90, 9]')
 if {mutation!r} == 'source':
@@ -270,7 +287,7 @@ def test_preimported_module_is_not_authenticated_by_its_file_attribute(installed
     assert "was already imported without verification" in result.stderr
 
 
-def test_normalized_record_paths_remain_loadable(installed: Path) -> None:
+def test_guard_does_not_reread_mutated_record(installed: Path) -> None:
     record_path = installed / DIST_INFO / "RECORD"
     with record_path.open(newline="", encoding="utf-8") as stream:
         rows = list(csv.reader(stream))
@@ -288,7 +305,7 @@ def test_shadow_module_is_rejected_even_after_record_verification(installed: Pat
     result = _run(
         installed,
         f"""\
-record = _verify_installed_record(entry_point)
+record = captured_record(entry_point)
 shadow = site.parent / 'shadow'
 shadow.mkdir()
 (shadow / '{MODULE}.py').write_text('raise RuntimeError("unverified code executed")')
@@ -362,7 +379,7 @@ def test_failed_import_restores_import_state(tmp_path: Path) -> None:
     result = _run(
         installed,
         """\
-record = _verify_installed_record(entry_point)
+record = captured_record(entry_point)
 finders = tuple(sys.meta_path)
 sys.dont_write_bytecode = False
 try:
@@ -424,49 +441,29 @@ def _namespace_run(
     before_qualification: str = "",
 ) -> subprocess.CompletedProcess[str]:
     setup = f"""\
-import hashlib
 from robotics_acceptance_harness.evaluation import (
-    _installed_evaluators, evaluate_acceptance, evaluator_inventory,
+    _VerifiedImports, _verify_entry_point_origin, evaluate_acceptance,
 )
-from robotics_acceptance_harness.receipts import load_verified_receipts
-from tests.support import write_verified_receipt
 peer_site = Path({str(peer_site)!r})
 if peer_site != site:
     sys.path.insert(0, str(peer_site))
-peer = distribution('spec33-peer').entry_points['org.spec33.peer']
+peer = distribution("spec33-peer").entry_points["org.spec33.peer"]
 points = [entry_point, peer] if {include_peer!r} else [entry_point]
-chains, requirements = [], []
-for point in points:
-    wheel_root = Path(point.dist.locate_file('')).parent
-    wheel = wheel_root / (point.dist.name.replace('-', '_') + '-1.0-py3-none-any.whl')
-    digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
-    chain = write_verified_receipt(site.parent, {{
-        'uri': wheel.as_uri(), 'sha256': digest, 'size_bytes': wheel.stat().st_size,
-        'media_type': 'application/vnd.python.wheel', 'immutable_revision': 'sha256:' + digest,
-    }}, stem=point.dist.name)
-    chains.append(chain)
-    requirements.append({{
-        'namespace': point.name, 'entry_point': point.value,
-        'distribution': point.dist.name, 'version': point.dist.version,
-        'artifact_sha256': digest, 'receipt_sha256': chain['receipt_sha256'],
-    }})
-# Receipt chains may refer to the same external-verification bytes.
-dependencies = {{
-    hashlib.sha256(path.read_bytes()).hexdigest(): path
-    for chain in chains for path in chain['dependencies']
-}}
-receipts = load_verified_receipts(
-    receipt_paths=[chain['receipt'] for chain in chains],
-    verification_paths=[chain['verification'] for chain in chains],
-    dependency_paths=list(dependencies.values()),
-)
 """
-    return _run(site, setup + textwrap.dedent(before_qualification) + textwrap.dedent(body))
+    # These tests exercise the existing source-import guard directly. They do
+    # not issue authenticated wheel admissions or establish publisher identity.
+    capture = """
+records = tuple((point, captured_record(point)) for point in points)
+finder = _VerifiedImports(records)
+"""
+    return _run(
+        site, setup + textwrap.dedent(before_qualification) + capture + textwrap.dedent(body)
+    )
 
 
 @pytest.mark.parametrize("split_sites", [False, True])
 @pytest.mark.parametrize("reverse", [False, True])
-def test_qualified_namespace_wheels_load_in_either_order_and_repeat(
+def test_source_guard_namespace_wheels_load_in_either_order_and_repeat(
     tmp_path: Path, split_sites: bool, reverse: bool
 ) -> None:
     site, peer_site = _namespace_wheels(tmp_path, split_sites=split_sites)
@@ -474,42 +471,37 @@ def test_qualified_namespace_wheels_load_in_either_order_and_repeat(
         site,
         peer_site,
         """\
-inventory = evaluator_inventory(requirements, receipts)
-assert len(inventory) == 2 and all(item['status'] == 'qualified' for item in inventory)
+assert len(records) == 2
 for _ in range(2):
-    evaluators = _installed_evaluators(requirements, receipts)
+    evaluators = tuple((p.name, _load_evaluator(p, r, imports=finder)) for p, r in records)
     for _ in range(2):
         results = evaluate_acceptance(context(), evaluators=evaluators)
         values = sorted(item.observed_value for item in results if item.source == 'product')
         assert values == [42.0, 43.0]
 assert not list(site.parent.rglob('*.pyc'))
-print('both qualified')
+print('both guarded')
 """,
-        before_qualification="requirements.reverse()\n" if reverse else "",
+        before_qualification="points.reverse()\n" if reverse else "",
     )
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "both qualified"
-
-
-def test_namespace_peer_record_is_checked_before_any_evaluator_executes(tmp_path: Path) -> None:
-    site, peer_site = _namespace_wheels(
-        tmp_path, primary_source="raise RuntimeError('primary executed before qualification')\n"
-    )
-    (peer_site / "spec33_shared/lazy_beta.py").write_text("raise RuntimeError('tampered peer')")
-    result = _namespace_run(site, peer_site, "_installed_evaluators(requirements, receipts)\n")
-    _assert_rejected(result, "installed evaluator file differs from RECORD")
-    assert "primary executed before qualification" not in result.stderr
-    assert "RuntimeError: tampered peer" not in result.stderr
+    assert result.stdout.strip() == "both guarded"
 
 
 def test_namespace_entry_point_must_belong_to_its_own_wheel(tmp_path: Path) -> None:
     site, peer_site = _namespace_wheels(tmp_path, primary_target="spec33_shared.beta:evaluate")
-    result = _namespace_run(site, peer_site, "_installed_evaluators(requirements, receipts)\n")
+    result = _namespace_run(
+        site,
+        peer_site,
+        """\
+paths = frozenset(path for _, record in records for path in record.paths)
+_verify_entry_point_origin(entry_point, records[0][1].paths, namespace_paths=paths)
+""",
+    )
     _assert_rejected(result, "evaluator module 'spec33_shared.beta' resolves outside")
 
 
 @pytest.mark.parametrize("peer_preverified", [False, True])
-def test_namespace_does_not_authorize_an_unqualified_peer(
+def test_source_guard_does_not_authorize_an_unqualified_peer(
     tmp_path: Path, peer_preverified: bool
 ) -> None:
     site, peer_site = _namespace_wheels(
@@ -523,11 +515,11 @@ def test_namespace_does_not_authorize_an_unqualified_peer(
     result = _namespace_run(
         site,
         peer_site,
-        "evaluators = _installed_evaluators(requirements, receipts)\n"
+        "evaluators = tuple((p.name, _load_evaluator(p, r, imports=finder)) for p, r in records)\n"
         "evaluate_acceptance(context(), evaluators=evaluators)\n",
         include_peer=False,
         before_qualification=(
-            "_load_evaluator(peer, _verify_installed_record(peer))\n" if peer_preverified else ""
+            "_load_evaluator(peer, captured_record(peer))\n" if peer_preverified else ""
         ),
     )
     assert result.returncode != 0
@@ -538,23 +530,23 @@ def test_namespace_does_not_authorize_an_unqualified_peer(
     ) in result.stderr
 
 
-def test_qualified_namespace_rejects_a_normally_preimported_peer(tmp_path: Path) -> None:
+def test_source_guard_namespace_rejects_a_normally_preimported_peer(tmp_path: Path) -> None:
     site, peer_site = _namespace_wheels(tmp_path)
     result = _namespace_run(
         site,
         peer_site,
-        "_installed_evaluators(requirements, receipts)\n",
+        "tuple((p.name, _load_evaluator(p, r, imports=finder)) for p, r in records)\n",
         before_qualification="import spec33_shared.beta\n",
     )
     _assert_rejected(result, "evaluator module 'spec33_shared.beta' was already imported")
 
 
-def test_qualified_namespace_rejects_an_unowned_search_location(tmp_path: Path) -> None:
+def test_source_guard_namespace_rejects_an_unowned_search_location(tmp_path: Path) -> None:
     site, peer_site = _namespace_wheels(tmp_path, split_sites=True)
     result = _namespace_run(
         site,
         peer_site,
-        "_installed_evaluators(requirements, receipts)\n",
+        "tuple((p.name, _load_evaluator(p, r, imports=finder)) for p, r in records)\n",
         before_qualification="""\
 foreign = site.parent / 'foreign'
 (foreign / 'spec33_shared').mkdir(parents=True)
@@ -598,7 +590,7 @@ def test_consumer_rejection_closes_verified_generator_with_retained_traceback(
         f"""\
 from robotics_acceptance_harness.evaluation import evaluate_acceptance
 evaluation_context = context()
-evaluator = _load_evaluator(entry_point, _verify_installed_record(entry_point))
+evaluator = _load_evaluator(entry_point, captured_record(entry_point))
 finders = tuple(sys.meta_path)
 sys.dont_write_bytecode = False
 retained_errors = []

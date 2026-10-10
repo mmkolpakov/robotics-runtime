@@ -3,8 +3,9 @@
 The source SDK provides `authenticate_wheel`, `validate_evaluator_wheel` and
 `verify_installed_wheel` in `robotics_acceptance_harness.evaluator_trust`.
 These APIs are not part of the published harness 0.21.0 wheel. They verify
-artifact origin and installed bytes; they do not launch an evaluator or replace
-the existing verified-source import guard.
+artifact origin and installed bytes. The source loader and CLI require these
+captured bindings before importing a declared evaluator, and retain the existing
+verified-source import guard.
 
 ## Operator profile and publisher policy
 
@@ -116,6 +117,62 @@ the execution profile supplies live filesystem quotas and process resource bound
 Standard ZIP/CSV readers perform the decoding; duplicate paths, traversal and
 unsupported members are refused.
 
+## CLI and SDK execution admission
+
+The source CLI accepts `--evaluator-trust-profile PATH` on `evaluate`, `verify`
+and `doctor`. The JSON file belongs to the operator, outside the indexed evidence
+root, and must not be group/other writable. Relative paths resolve from its
+directory. Version 1 has exactly `profile_version`, `verifier` and `evaluators`:
+
+```json
+{
+  "profile_version": 1,
+  "verifier": {
+    "executable": "tools/gh",
+    "executable_sha256": "<approved gh SHA-256>",
+    "version": "2.102.0",
+    "trusted_root": "policy/trusted-root.jsonl",
+    "trusted_root_sha256": "<approved root SHA-256>"
+  },
+  "evaluators": [{
+    "namespace": "org.example.evidence-bytes",
+    "wheel": "wheels/example_evidence_byte_check-0.1.0-py3-none-any.whl",
+    "bundle": "publisher.bundle.json",
+    "publisher": {
+      "repository": "example/evaluators",
+      "certificate_identity": "https://github.com/example/evaluators/.github/workflows/release.yml@refs/tags/v0.1.0",
+      "wheel_sha256": "<expected wheel SHA-256>",
+      "source_ref": "refs/tags/v0.1.0",
+      "source_digest": "<expected full source commit>",
+      "signer_digest": "<expected full signer commit>"
+    }
+  }]
+}
+```
+
+These placeholders require reviewed values. Every namespace must correspond
+exactly to a scenario requirement; its wheel digest must match that requirement.
+The operator profile is external policy, so a verification JSON in the archive
+cannot choose the verifier, trust roots or expected signer. Audit receipt and
+dependency inputs remain required for document consistency. They cannot issue
+executable admission by themselves.
+
+The loader matches the selected entry point to the captured original
+`(group, name, value)` tuple and wheel subject/distribution/version. It compiles
+captured authenticated source through the existing guard, without rereading
+installed RECORD or bytecode. Both authentication result types require a
+factory-issued in-memory marker; constructing, copying or deserializing a result
+does not recreate admission. This protects accidental API misuse, not a Python
+caller already controlling the process.
+
+SDK callers pass `evaluator_authentications={namespace: installed}` to
+`evaluate_acceptance`, `evaluate_from_evidence` or `run_verification`.
+Explicit `evaluators=` injection remains a trusted application-caller path and
+does not claim publisher authentication. Reading or explaining v1 documents
+remains possible; executing a receipt-only evaluator now fails closed.
+`doctor` with requirements reports authenticated metadata without importing the
+target; discovery without requirements grants no execution admission.
+
 ## Evidence and third-party execution
 
 An evaluator receives the public `EvaluationContext` and produces namespaced
@@ -139,3 +196,26 @@ verification and a native profile's acceptance remain separate records.
 [The standalone author example](../consumer-examples/evidence-byte-check/README.md)
 shows public imports, a PyPA entry point and one captured-evidence assertion.
 Its README identifies the matching SDK and execution-profile requirements.
+
+## Source integration witness
+
+The `evaluator-admission` CI job builds the minimal author wheel, attests it with
+the pinned official `actions/attest`, and supplies exact workflow SAN, source
+ref/commit, signer commit and wheel digest expectations from the CI composition.
+It uses pinned gh 2.102.0 binary and root bytes without ambient verifier
+credentials. Before ordinary pip installation, it authenticates and validates a
+private captured wheel copy.
+
+The installed CLI then runs in a non-root OCI process using the existing
+Docker/Podman fixture mechanism: read-only root and original evidence mounts,
+no network or capabilities, no new privileges, 512 MiB memory, one CPU, 32 PIDs,
+a 256 MiB temporary filesystem and a 180-second outer deadline. The temporary
+filesystem permits execution of the pinned verifier snapshot and sets nosuid/nodev. Assessment
+outputs use a separate writable mount. The witness checks the author byte
+assertion, refused evidence/profile writes, receipt-only and wrong-publisher
+failures, and unchanged original input bytes. Its input counter records are
+synthetic method inputs; the byte count is not observed robot performance.
+
+This source/CI witness is not a published SDK, infra image admission, dependency
+publisher proof or native hardware qualification. Full composition provenance
+and subsequent package publication have separate gates.

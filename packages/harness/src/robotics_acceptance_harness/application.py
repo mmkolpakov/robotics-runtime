@@ -13,6 +13,7 @@ from uuid import uuid4
 from robotics_acceptance_harness.documents import DocumentBundle
 from robotics_acceptance_harness.errors import HarnessError, HarnessInputError
 from robotics_acceptance_harness.evaluation import EvaluationContext, evaluate_acceptance
+from robotics_acceptance_harness.evaluator_trust import AuthenticatedInstallation
 from robotics_acceptance_harness.evidence import (
     EvidenceValidationError,
     VerifiedEvidence,
@@ -253,6 +254,7 @@ def run_verification(
     artifact_verification_paths: Sequence[str | Path] = (),
     receipt_dependency_paths: Sequence[str | Path] = (),
     evaluator_receipts: VerifiedReceiptSet | None = None,
+    evaluator_authentications: Mapping[str, AuthenticatedInstallation] | None = None,
     otel_metrics_path: str | Path,
     measurement_complete_path: str | Path,
     output_dir: str | Path,
@@ -460,6 +462,7 @@ def run_verification(
                 window_end_ns=measurement_finished_ns,
             ),
             evaluator_receipts=evaluator_receipts,
+            evaluator_authentications=evaluator_authentications,
         )
     )
     if timing_failure is not None:
@@ -557,6 +560,7 @@ def evaluate_from_evidence(
     artifact_verification_paths: Sequence[str | Path] = (),
     receipt_dependency_paths: Sequence[str | Path] = (),
     evaluator_receipts: VerifiedReceiptSet | None = None,
+    evaluator_authentications: Mapping[str, AuthenticatedInstallation] | None = None,
     otel_metrics_path: str | Path | None,
     window_start_ns: int,
     window_end_ns: int,
@@ -595,13 +599,19 @@ def evaluate_from_evidence(
     metric_samples, metric_link = _offline_metric_samples(context, otel_metrics_path)
     context = replace(context, metric_samples=metric_samples)
     if bundle.scenario.schema_version == "acceptance-scenario.v2":
-        result = evaluate_native(context, run_context, output_dir, evaluator_receipts)
+        result = evaluate_native(
+            context, run_context, output_dir, evaluator_receipts, evaluator_authentications
+        )
         destination = Path(output_dir).expanduser().resolve()
         result_path = write_contract_json(result, destination / "acceptance-result.json")
         junit_path = write_junit_xml(result, destination / "junit.xml")
         return VerificationOutputs(result, result_path, junit_path)
     assert metric_link is not None
-    assertions = evaluate_acceptance(context, evaluator_receipts=evaluator_receipts)
+    assertions = evaluate_acceptance(
+        context,
+        evaluator_receipts=evaluator_receipts,
+        evaluator_authentications=evaluator_authentications,
+    )
     time_authority = evaluate_time_authority(
         bundle.scenario_data["time_policy"],
         metric_samples,

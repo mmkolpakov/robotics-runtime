@@ -2,7 +2,7 @@
 
 This is a minimal standalone evaluator author example. It declares a standard
 PyPA entry point and imports only public SDK modules. Its method checks that one
-indexed JSON artifact has nonempty verified bytes; it is not a robotics,
+indexed JSON artifact named `native-state` has nonempty verified bytes; it is not a robotics,
 performance, physics or safety qualification.
 
 The execution profile supplies the matching SDK, including the public
@@ -31,7 +31,7 @@ The scenario and runtime bind namespace `org.example.evidence-bytes`, target
 version `0.1.0`, and the exact released wheel/receipt digests. Synthetic or
 locally invented verification JSON is not publisher evidence.
 
-The author profile mounts the original indexed JSON input read-only and limits
+The author profile mounts the original indexed `native-state` JSON input read-only and limits
 capture to 1 MiB. The evaluator calls `read_local` once and uses the resulting
 immutable bytes. Each assertion references the digest of that verified artifact.
 Unknown paths, tampering or over-limit inputs fail through the public reader.

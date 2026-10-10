@@ -13,6 +13,7 @@ from robotics_acceptance_harness import __version__
 from robotics_acceptance_harness.documents import load_document
 from robotics_acceptance_harness.errors import HarnessError, HarnessInputError
 from robotics_acceptance_harness.evaluation import evaluator_inventory
+from robotics_acceptance_harness.evaluator_trust import AuthenticatedInstallation
 from robotics_acceptance_harness.receipts import VerifiedReceiptSet
 
 
@@ -39,6 +40,7 @@ def doctor_report(
     measurement_complete: str | Path | None = None,
     evaluator_requirements: Sequence[Mapping[str, Any]] = (),
     evaluator_receipts: VerifiedReceiptSet | None = None,
+    evaluator_authentications: Mapping[str, AuthenticatedInstallation] | None = None,
 ) -> dict[str, Any]:
     """Check dependencies required by the selected evaluation mode."""
 
@@ -46,7 +48,11 @@ def doctor_report(
         raise HarnessInputError(f"unsupported doctor mode: {mode}")
     checks = [_check("contracts-package", True, "robotics-runtime-contracts is importable")]
     try:
-        inventory = list(evaluator_inventory(evaluator_requirements, evaluator_receipts))
+        inventory = list(
+            evaluator_inventory(
+                evaluator_requirements, evaluator_receipts, evaluator_authentications
+            )
+        )
         namespaces = [str(item["namespace"]) for item in inventory]
         metadata_ready = len(namespaces) == len(set(namespaces)) and all(
             item["distribution"] != "unknown" and item["version"] != "unknown" for item in inventory
@@ -58,7 +64,7 @@ def doctor_report(
                 "evaluator-metadata",
                 metadata_ready and qualified,
                 (
-                    f"qualified {len(inventory)} required evaluator(s)"
+                    f"authenticated {len(inventory)} required evaluator(s)"
                     if evaluator_requirements
                     else f"discovered {len(inventory)} evaluator(s) with valid metadata"
                 ),

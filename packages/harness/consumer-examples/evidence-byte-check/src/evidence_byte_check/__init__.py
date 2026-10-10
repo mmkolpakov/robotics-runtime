@@ -10,10 +10,10 @@ def evaluate(context: EvaluationContext) -> Iterable[AssertionEvaluation]:
     candidates = [
         (path, link)
         for path, link in context.evidence.local_files.items()
-        if link["media_type"] == "application/json"
+        if link["artifact_id"] == "native-state" and link["media_type"] == "application/json"
     ]
     if len(candidates) != 1:
-        raise ValueError("example profile requires exactly one indexed JSON artifact")
+        raise ValueError("example profile requires indexed JSON artifact native-state")
     path, link = candidates[0]
     # The author profile must provide the public captured-byte API.
     reader = getattr(context.evidence, "read_local", None)
