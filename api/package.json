@@ -20,7 +20,8 @@
     "@aws-sdk/client-s3": "3.1147.0",
     "@aws-sdk/s3-request-presigner": "3.1147.0",
     "mercurius": "16.10.1",
-    "graphql": "16.14.2"
+    "graphql": "16.14.2",
+    "structured-headers": "2.1.1"
   },
   "devDependencies": {
     "@types/node": "24.19.1",

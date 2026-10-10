@@ -2,6 +2,7 @@ import Fastify,{type FastifyInstance,type FastifyError} from 'fastify';
 import type {Domain,Addresses} from './domain.js';
 import {ApiError} from './database.js';
 import {uuid,text} from './admission.js';
+import {creationKey} from './idempotency.js';
 import {registerMetricsConfig} from './graphql.js';
 import {tokenVerifier,type IdentityConfiguration,type Principal} from './identity.js';
 declare module 'fastify' {interface FastifyRequest {principal?:Principal;operationSignal?:AbortSignal}}
@@ -33,9 +34,9 @@ export function createApi(domain:Domain,identity:IdentityConfiguration):FastifyI
   });
  api.post('/projects/:projectID/batches/light',{schema:{params:parameters(['projectID']),
   body:body({branchID:uuid,batchName:text,version:{type:'string',maxLength:512},metricsSetName:{type:['string','null'],maxLength:256}},['branchID'])}},
-  async(request,reply)=>reply.status(201).send(await domain.createBatch(request.principal!,(request.params as Addresses).projectID,request.body as Parameters<Domain['createBatch']>[2])));
+  async(request,reply)=>reply.status(201).send(await domain.createBatch(request.principal!,(request.params as Addresses).projectID,request.body as Parameters<Domain['createBatch']>[2],creationKey(request.headers['idempotency-key']))));
  api.post('/projects/:projectID/batches/:batchID/jobs',{schema:{params:parameters(['projectID','batchID']),body:body({name:text},['name'])}},
-  async(request,reply)=>reply.status(201).send(await domain.createJob(request.principal!,request.params as Addresses,request.body as {name:string})));
+  async(request,reply)=>reply.status(201).send(await domain.createJob(request.principal!,request.params as Addresses,request.body as {name:string},creationKey(request.headers['idempotency-key']))));
  api.post('/projects/:projectID/batches/:batchID/jobs/:jobID/logs',{schema:{params:parameters(['projectID','batchID','jobID']),
   body:body({fileName:{type:'string',minLength:1,maxLength:255,pattern:'^[^\\u0000-\\u001f]+$'},fileSize:{type:'integer',minimum:0,maximum:domain.storage.maximumBytes},
    checksum:{type:'string',pattern:'^[0-9a-f]{64}$'},logType:{type:'string',enum:['EMISSIONS_LOG','OTHER_LOG','CONTAINER_LOG','SYSTEM_LOG','ERROR_LOG','EXECUTION_LOG']}},

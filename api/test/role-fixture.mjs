@@ -5,6 +5,9 @@ import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {Pool} from 'pg';
 import {verifyApplicationRole,transaction} from '../dist/src/database.js';
 import {Domain} from '../dist/src/domain.js';
+import {createApi} from '../dist/src/app.js';
+import {createServer} from 'node:http';
+import {generateKeyPair,exportJWK,SignJWT} from 'jose';
 const lock=JSON.parse(await readFile(new URL('./upstream-lock.json',import.meta.url),'utf8'));
 const owner='rr-api-pg-'+randomUUID().slice(0,8),volume=owner+'-data',password=randomBytes(24).toString('hex');
 const environment={...process.env,POSTGRES_PASSWORD:password};
@@ -12,7 +15,7 @@ const engine=process.env.API_FIXTURE_ENGINE??'podman',suite=process.env.API_FIXT
 assert.ok(['podman','docker'].includes(engine));assert.match(suite,/^[a-z0-9-]{1,80}$/);
 const output=new URL('../../artifacts/'+owner+'/',import.meta.url);await mkdir(output,{recursive:true});
 await writeFile(new URL('fixture-owner.json',output),JSON.stringify({owner,suite})+'\n');
-const report={engine,scope:'Actual PostgreSQL18.6 RLS and role-closure regression; no SDK/JWT or API acceptance',owner,steps:[]};
+const report={engine,scope:'PostgreSQL18.6 RLS/role-closure and real HTTP/JWT creation-retry regression; no vendor SDK, custody or native acceptance',owner,steps:[]};
 const command=args=>{const p=spawnSync(engine,args,{env:environment,encoding:'utf8',timeout:60000});if(p.status!==0)throw new Error(args[0]+' failed: '+p.stderr);return p.stdout.trim()};
 let admin,app;
 try{
@@ -26,6 +29,7 @@ try{
  await admin.query("CREATE ROLE api_app LOGIN PASSWORD '"+password+"'");
  await admin.query(await readFile(new URL('../sql/001-external-tests.sql',import.meta.url),'utf8'));
  await admin.query(await readFile(new URL('../sql/002-metrics-config.sql',import.meta.url),'utf8'));
+ await admin.query(await readFile(new URL('../sql/003-creation-idempotency.sql',import.meta.url),'utf8'));
  app=new Pool({host:'127.0.0.1',port,user:'api_app',password,database:'postgres',max:8,connectionTimeoutMillis:5000});
  await verifyApplicationRole(app);report.steps.push({name:'baseline-guard',passed:true});
  report.postgresVersion=(await admin.query('SELECT version() AS version')).rows[0].version;
@@ -93,6 +97,88 @@ try{
  await writeFile(new URL('config/snapshots.json',output),JSON.stringify(rawSnapshots.map(({config,...row})=>({...row,config_base64:config.toString('base64')})),null,2)+'\n');
  report.configSnapshotReadback={rows:rawSnapshots.length,byteAndTemplateSHA:true,originalSnapshot:first};
 
+
+ // Creation retries use committed PostgreSQL rows, not process memory.
+ const a2='55555555-5555-4555-8555-555555555555',pa2='66666666-6666-4666-8666-666666666666';
+ const secondBranch='77777777-7777-4777-8777-777777777777',projectBranch='88888888-8888-4888-8888-888888888888';
+ await admin.query('INSERT INTO api.memberships VALUES($1,$2,$3,$4,$5)',[a,'fixture-issuer','subject-a2','account-a2',a2]);
+ await admin.query('INSERT INTO api.project_memberships VALUES($1,$2,$3,$4)',[a,pa,'fixture-issuer','subject-a2']);
+ await admin.query("INSERT INTO api.projects VALUES($1,$2,'A-second')",[a,pa2]);
+ await admin.query('INSERT INTO api.project_memberships VALUES($1,$2,$3,$4)',[a,pa2,'fixture-issuer','subject-a']);
+ await admin.query("INSERT INTO api.branches(tenant_id,project_id,id,name,branch_type,created_by) VALUES($1,$2,$3,'retry-other','MAIN',$4),($1,$5,$6,'main','MAIN',$4)",[a,pa,secondBranch,pa,pa2,projectBranch]);
+ const {privateKey,publicKey}=await generateKeyPair('RS256'),jwk=await exportJWK(publicKey);jwk.kid='retry-fixture';
+ const jwks=createServer((_request,response)=>{response.setHeader('content-type','application/json');response.end(JSON.stringify({keys:[jwk]}))});
+ await new Promise(resolve=>jwks.listen(0,'127.0.0.1',resolve));
+ const identity={issuer:'fixture-issuer',audience:'sdk-api',jwksUrl:'http://127.0.0.1:'+jwks.address().port,requiredRole:'sdk-write'};
+ const tokens=Object.fromEntries(await Promise.all(['subject-a','subject-a2','subject-b'].map(async subject=>[subject,await new SignJWT({resource_access:{'sdk-api':{roles:['sdk-write']}}}).setProtectedHeader({alg:'RS256',typ:'JWT',kid:jwk.kid}).setIssuer(identity.issuer).setAudience(identity.audience).setSubject(subject).setExpirationTime('10m').sign(privateKey)])));
+ let httpApi;
+ const startApi=async()=>{httpApi=createApi(new Domain(app,{maximumBytes:1},{}),identity);await httpApi.listen({host:'127.0.0.1',port:0});return 'http://127.0.0.1:'+httpApi.server.address().port};
+ let apiUrl=await startApi();
+ const post=async(path,payload,key,subject='subject-a')=>{
+  const response=await fetch(apiUrl+path,{method:'POST',headers:{authorization:'Bearer '+tokens[subject],'content-type':'application/json',...(key===undefined?{}:{'idempotency-key':JSON.stringify(key)})},body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)});
+  return {status:response.status,body:await response.json()};
+ };
+ const batchPath='/projects/'+pa+'/batches/light';
+ try{
+  const firstBatch=await post(batchPath,{branchID:branchA},'batch-retry');assert.equal(firstBatch.status,201);
+  const repeated=await Promise.all(Array.from({length:8},()=>post(batchPath,{metricsSetName:null,branchID:branchA},'batch-retry')));
+  for(const observed of repeated)assert.deepEqual(observed,firstBatch);
+  const snapshotBefore=(await admin.query('SELECT config_snapshot_id FROM api.batches WHERE id=$1',[firstBatch.body.batchID])).rows[0].config_snapshot_id;
+  await domain.updateMetricsConfig(principalA,config(pa,'newer-than-creation\n'),signal());
+  assert.deepEqual(await post(batchPath,{branchID:branchA},'batch-retry'),firstBatch);
+  assert.equal((await admin.query('SELECT config_snapshot_id FROM api.batches WHERE id=$1',[firstBatch.body.batchID])).rows[0].config_snapshot_id,snapshotBefore);
+  for(const changed of [{branchID:branchA,batchName:'different'},{branchID:branchA,version:'different'},{branchID:secondBranch}])assert.equal((await post(batchPath,changed,'batch-retry')).status,409);
+  assert.equal((await admin.query('SELECT count(*)::int AS n FROM api.batches WHERE request_key=$1 AND created_by=$2',['batch-retry',pa])).rows[0].n,1);
+  const simultaneous=await Promise.all(Array.from({length:8},()=>post(batchPath,{branchID:branchA,batchName:'simultaneous'},'simultaneous-batch')));
+  for(const observed of simultaneous)assert.deepEqual(observed,simultaneous[0]);assert.equal(simultaneous[0].status,201);
+  const contenders=await Promise.all([post(batchPath,{branchID:branchA},'competing-intent'),post(batchPath,{branchID:secondBranch},'competing-intent')]);
+  assert.deepEqual(contenders.map(r=>r.status).sort(),[201,409]);
+  const unkeyed=await Promise.all([post(batchPath,{branchID:branchA}),post(batchPath,{branchID:branchA})]);assert.notEqual(unkeyed[0].body.batchID,unkeyed[1].body.batchID);
+  const principalScoped=await post(batchPath,{branchID:branchA},'batch-retry','subject-a2');assert.equal(principalScoped.status,201);assert.notEqual(principalScoped.body.batchID,firstBatch.body.batchID);
+  const projectScoped=await post('/projects/'+pa2+'/batches/light',{branchID:projectBranch},'batch-retry');assert.equal(projectScoped.status,201);assert.notEqual(projectScoped.body.batchID,firstBatch.body.batchID);
+  const tenantScoped=await post('/projects/'+pb+'/batches/light',{branchID:branchB},'batch-retry','subject-b');assert.equal(tenantScoped.status,201);assert.notEqual(tenantScoped.body.batchID,firstBatch.body.batchID);
+  assert.equal((await post('/projects/'+pb+'/batches/light',{branchID:branchB},'batch-retry')).status,404);
+  assert.equal((await post(batchPath,{branchID:branchA},'batch-retry','subject-b')).status,404);
+  await assert.rejects(transaction(app,principalA,c=>c.query('UPDATE api.batches SET request_key=$1 WHERE id=$2',['overwrite',firstBatch.body.batchID])),/permission denied/);
+  await admin.query("CREATE FUNCTION api.fixture_refuse_batch() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.name='refused-before-commit' THEN RAISE EXCEPTION 'fixture-creation-refusal'; END IF; RETURN NEW; END; $$; CREATE TRIGGER fixture_refuse_batch BEFORE INSERT ON api.batches FOR EACH ROW EXECUTE FUNCTION api.fixture_refuse_batch()");
+  assert.equal((await post(batchPath,{branchID:branchA,batchName:'refused-before-commit'},'rollback-key')).status,503);
+  await admin.query('DROP TRIGGER fixture_refuse_batch ON api.batches; DROP FUNCTION api.fixture_refuse_batch()');
+  assert.equal((await post(batchPath,{branchID:branchA,batchName:'different-after-rollback'},'rollback-key')).status,201);
+
+  const jobPath='/projects/'+pa+'/batches/'+firstBatch.body.batchID+'/jobs';
+  const jobs=await Promise.all(Array.from({length:8},()=>post(jobPath,{name:'same-experience'},'job-retry')));
+  for(const observed of jobs)assert.deepEqual(observed,jobs[0]);assert.equal(jobs[0].status,201);
+  assert.equal((await post(jobPath,{name:'different-experience'},'job-retry')).status,409);
+  assert.equal((await admin.query('SELECT count(*)::int AS n FROM api.jobs WHERE batch_id=$1 AND request_key=$2',[firstBatch.body.batchID,'job-retry'])).rows[0].n,1);
+  assert.equal((await admin.query('SELECT count(*)::int AS n FROM api.experiences WHERE name=$1',['different-experience'])).rows[0].n,0);
+  const secondJob=await post('/projects/'+pa+'/batches/'+simultaneous[0].body.batchID+'/jobs',{name:'same-experience'},'job-retry');assert.equal(secondJob.status,201);assert.notEqual(secondJob.body.jobID,jobs[0].body.jobID);
+  const principalJob=await post(jobPath,{name:'same-experience'},'job-retry','subject-a2');assert.equal(principalJob.status,201);assert.notEqual(principalJob.body.jobID,jobs[0].body.jobID);
+  assert.equal((await post(jobPath,{name:'same-experience'},'job-retry','subject-b')).status,404);
+  const unkeyedJobs=await Promise.all([post(jobPath,{name:'same-experience'}),post(jobPath,{name:'same-experience'})]);assert.notEqual(unkeyedJobs[0].body.jobID,unkeyedJobs[1].body.jobID);
+  await assert.rejects(transaction(app,principalA,c=>c.query('UPDATE api.jobs SET request_fingerprint=$1 WHERE id=$2',['0'.repeat(64),jobs[0].body.jobID])),/permission denied/);
+  await admin.query("UPDATE api.jobs SET closed_at=now(),close_status='SUCCEEDED' WHERE batch_id=$1",[firstBatch.body.batchID]);
+  await admin.query('UPDATE api.batches SET closed_at=now() WHERE id=$1',[firstBatch.body.batchID]);
+  assert.deepEqual(await post(batchPath,{branchID:branchA},'batch-retry'),firstBatch);
+  assert.deepEqual(await post(jobPath,{name:'same-experience'},'job-retry'),jobs[0]);
+  assert.equal((await post(jobPath,{name:'different-experience'},'job-retry')).status,409);
+  assert.equal((await post(jobPath,{name:'fresh-job'},'fresh-key')).status,400);
+
+  await httpApi.close();await app.end();await admin.end();
+  command(['stop','--time','15',owner]);command(['start',owner]);
+  const restartedPort=Number(command(['port',owner,'5432/tcp']).split(':').at(-1));
+  admin=new Pool({host:'127.0.0.1',port:restartedPort,user:'postgres',password,database:'postgres',max:2,connectionTimeoutMillis:1000});
+  for(let i=0;i<100;i++){try{await admin.query('SELECT 1');break}catch{await new Promise(r=>setTimeout(r,100))}}
+  app=new Pool({host:'127.0.0.1',port:restartedPort,user:'api_app',password,database:'postgres',max:8,connectionTimeoutMillis:5000});
+  await verifyApplicationRole(app);apiUrl=await startApi();
+  assert.deepEqual(await post(batchPath,{branchID:branchA},'batch-retry'),firstBatch);
+  assert.deepEqual(await post(jobPath,{name:'same-experience'},'job-retry'),jobs[0]);
+  assert.equal((await post(batchPath,{branchID:secondBranch},'batch-retry')).status,409);
+  const afterRestart=await post(batchPath,{branchID:branchA},'new-after-restart');assert.equal(afterRestart.status,201);
+  report.steps.push({name:'creation-keys-real-HTTP-JWT-PG-concurrent-intent-scope-rollback-and-database-service-restart',passed:true,
+   concurrentIdenticalBatches:8,concurrentIdenticalJobs:8,conflictingBranches:[201,409],closedRetryPreservesCreationResponse:true,
+   immutableInitialSnapshot:true,unkeyedCreationRemainsDistinct:true,tenantProjectPrincipalAndBatchScopes:true,
+   failedTransactionDoesNotClaimKey:true,databaseContainerStoppedAndRestarted:true,freshHttpInstanceAndSqlPools:true});
+ }finally{await httpApi?.close();await new Promise((resolve,reject)=>jwks.close(error=>error?reject(error):resolve()))}
 
  await admin.query('GRANT api_owner TO api_app');
  const old=await app.query("SELECT r.rolsuper,r.rolbypassrls,EXISTS(SELECT 1 FROM pg_tables WHERE schemaname='api' AND tableowner=current_user) AS owns_tables FROM pg_roles r WHERE r.rolname=current_user");

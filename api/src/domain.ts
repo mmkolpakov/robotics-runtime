@@ -1,11 +1,12 @@
 import {randomUUID} from 'node:crypto';
-import {Pool,type PoolClient} from 'pg';
+import {Pool,type PoolClient,type QueryResultRow} from 'pg';
 import {transaction,transactionClient,project,ApiError} from './database.js';
 import type {Principal} from './identity.js';
 import {UploadStorage,mediaType,type Upload} from './uploads.js';
 import {Retention} from './retention.js';
 import {projectIdentifier,branchName} from './admission.js';
 import {metricsConfigBytes,type MetricsConfigInput} from './metrics-config.js';
+import {creationFingerprint} from './idempotency.js';
 export interface Addresses {projectID:string;batchID?:string;jobID?:string}
 export class Domain {
  constructor(readonly pool:Pool,readonly storage:UploadStorage,readonly retention:Retention,readonly maximumUploads=64){
@@ -43,30 +44,49 @@ export class Domain {
    signal.throwIfAborted();return id;
   });
  }
- createBatch(principal:Principal,projectID:string,input:{branchID:string;batchName?:string;version?:string;metricsSetName?:string|null}){
+ createBatch(principal:Principal,projectID:string,input:{branchID:string;batchName?:string;version?:string;metricsSetName?:string|null},key?:string){
   if(input.metricsSetName!==undefined&&input.metricsSetName!==null)throw new ApiError(400,'metrics configuration is outside this recipe');
+  const fingerprint=key===undefined?null:creationFingerprint([input.branchID,input.batchName??null,input.version??null]);
   return transaction(this.pool,principal,async client=>{
    const p=await project(client,projectID);
+   const response=(row:QueryResultRow)=>({associatedAccount:row.account,batchID:row.id,branchID:row.branch_id,projectID:row.project_id,
+    orgID:row.tenant_id,userID:row.created_by,friendlyName:row.name,batchType:'LIGHT',status:'EXPERIENCES_RUNNING',creationTimestamp:row.created_at.toISOString()});
+   const retry=async()=>{
+    const previous=await client.query('SELECT * FROM api.batches WHERE tenant_id=$1 AND project_id=$2 AND created_by=$3 AND request_key=$4',[p.tenant_id,p.id,p.principal_id,key]);
+    if(!previous.rows.length)return undefined;
+    if(previous.rows[0].request_fingerprint!==fingerprint)throw new ApiError(409,'Idempotency-Key is already bound to a different creation request');
+    return response(previous.rows[0]);
+   };
+   if(key!==undefined){const previous=await retry();if(previous)return previous}
    const branch=await client.query('SELECT id,config_snapshot_id FROM api.branches WHERE tenant_id=$1 AND project_id=$2 AND id=$3 FOR UPDATE',[p.tenant_id,p.id,input.branchID]);
    if(branch.rows.length!==1)throw new ApiError(404,'branch not found');
    const id=randomUUID(),name=input.batchName??id;
-   const found=await client.query('INSERT INTO api.batches(tenant_id,project_id,id,branch_id,name,version,account,created_by,config_snapshot_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
-    [p.tenant_id,p.id,id,input.branchID,name,input.version??null,p.account,p.principal_id,branch.rows[0].config_snapshot_id]);
-   const row=found.rows[0];return {associatedAccount:row.account,batchID:id,branchID:row.branch_id,projectID:p.id,
-    orgID:p.tenant_id,userID:p.principal_id,friendlyName:name,batchType:'LIGHT',status:'EXPERIENCES_RUNNING',creationTimestamp:row.created_at.toISOString()};
+   const found=await client.query('INSERT INTO api.batches(tenant_id,project_id,id,branch_id,name,version,account,created_by,config_snapshot_id,request_key,request_fingerprint) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(tenant_id,project_id,created_by,request_key) WHERE request_key IS NOT NULL DO NOTHING RETURNING *',
+    [p.tenant_id,p.id,id,input.branchID,name,input.version??null,p.account,p.principal_id,branch.rows[0].config_snapshot_id,key??null,fingerprint]);
+   if(found.rows.length)return response(found.rows[0]);
+   const previous=await retry();if(!previous)throw new ApiError(503,'creation checkpoint unavailable; retry the same key');return previous;
   });
  }
- createJob(principal:Principal,a:Addresses,input:{name:string}){
+ createJob(principal:Principal,a:Addresses,input:{name:string},key?:string){
+  const fingerprint=key===undefined?null:creationFingerprint([input.name]);
   return transaction(this.pool,principal,async client=>{
    const p=await project(client,a.projectID),batch=await this.batch(client,p,a.batchID!,true);
+   const response=(row:QueryResultRow)=>({jobID:row.id,experienceID:row.experience_id,experienceName:row.name,projectID:row.project_id,batchID:row.batch_id,
+    branchID:batch.branch_id,orgID:row.tenant_id,userID:row.created_by,jobStatus:'EXPERIENCE_RUNNING',creationTimestamp:row.created_at.toISOString()});
+   const retry=async()=>{
+    const previous=await client.query('SELECT * FROM api.jobs WHERE tenant_id=$1 AND project_id=$2 AND batch_id=$3 AND created_by=$4 AND request_key=$5',[p.tenant_id,p.id,a.batchID,p.principal_id,key]);
+    if(!previous.rows.length)return undefined;
+    if(previous.rows[0].request_fingerprint!==fingerprint)throw new ApiError(409,'Idempotency-Key is already bound to a different creation request');
+    return response(previous.rows[0]);
+   };
+   if(key!==undefined){const previous=await retry();if(previous)return previous}
    if(batch.closed_at)throw new ApiError(400,'batch is closed');
    const experience=await client.query('INSERT INTO api.experiences(tenant_id,project_id,id,name) VALUES($1,$2,$3,$4) ON CONFLICT(tenant_id,project_id,name) DO UPDATE SET name=EXCLUDED.name RETURNING id',
     [p.tenant_id,p.id,randomUUID(),input.name]);
-   const id=randomUUID(),found=await client.query('INSERT INTO api.jobs(tenant_id,project_id,batch_id,id,experience_id,name,created_by) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING created_at',
-    [p.tenant_id,p.id,a.batchID,id,experience.rows[0].id,input.name,p.principal_id]);
-   return {jobID:id,experienceID:experience.rows[0].id,experienceName:input.name,projectID:p.id,batchID:a.batchID,
-    branchID:batch.branch_id,orgID:p.tenant_id,userID:p.principal_id,jobStatus:'EXPERIENCE_RUNNING',
-    creationTimestamp:found.rows[0].created_at.toISOString()};
+   const id=randomUUID(),found=await client.query('INSERT INTO api.jobs(tenant_id,project_id,batch_id,id,experience_id,name,created_by,request_key,request_fingerprint) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(tenant_id,project_id,batch_id,created_by,request_key) WHERE request_key IS NOT NULL DO NOTHING RETURNING *',
+    [p.tenant_id,p.id,a.batchID,id,experience.rows[0].id,input.name,p.principal_id,key??null,fingerprint]);
+   if(found.rows.length)return response(found.rows[0]);
+   const previous=await retry();if(!previous)throw new ApiError(503,'creation checkpoint unavailable; retry the same key');return previous;
   });
  }
  async registerLog(principal:Principal,a:Addresses,input:{fileName:string;fileSize:number;checksum:string;logType?:string}){

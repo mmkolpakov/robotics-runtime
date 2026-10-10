@@ -49,6 +49,7 @@ try{
  apiAdmin=new Pool({host:'127.0.0.1',port:pgPort,user:'postgres',password,database:'api'});
  await apiAdmin.query(await readFile(join(root,'api/sql/001-external-tests.sql'),'utf8'));
  await apiAdmin.query(await readFile(join(root,'api/sql/002-metrics-config.sql'),'utf8'));
+ await apiAdmin.query(await readFile(join(root,'api/sql/003-creation-idempotency.sql'),'utf8'));
  const kc=launch('keycloak',lock.keycloak,['start-dev','--http-port=8080'],['--memory','768m','-e','KC_DB=postgres','-e','KC_DB_URL=jdbc:postgresql://pg:5432/identity','-e','KC_DB_USERNAME=keycloak_user','-e','KC_DB_PASSWORD','-e','KC_BOOTSTRAP_ADMIN_USERNAME=fixture-admin','-e','KC_BOOTSTRAP_ADMIN_PASSWORD','-e','KC_HOSTNAME=http://keycloak:8080','-p','127.0.0.1::8080']);
  const kcUrl='http://127.0.0.1:'+port(kc,8080);
  await eventually(()=>http(kcUrl+'/realms/master/.well-known/openid-configuration'));
