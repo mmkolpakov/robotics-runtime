@@ -13,7 +13,8 @@
     "robotics-runtime-mcp": "bin/server.mjs"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:native": "node --test test/native-documents.integration.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.3.1",

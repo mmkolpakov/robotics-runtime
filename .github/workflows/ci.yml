@@ -221,6 +221,29 @@ jobs:
           MCP_TEST_REPORT_DIR="$PWD/../artifacts/mcp-cli-integration" \
             npm test > ../artifacts/mcp-cli-integration-test.log 2>&1
           cat ../artifacts/mcp-cli-integration-test.log
+      - name: Build and install the current candidate workers independently
+        working-directory: .
+        run: |
+          mkdir -p artifacts/mcp-candidate-wheels
+          uv export --locked --all-packages --no-dev --no-emit-workspace --no-annotate \
+            --format requirements-txt --output-file artifacts/mcp-candidate-runtime.lock
+          uv build --package robotics-runtime-contracts --wheel \
+            --out-dir artifacts/mcp-candidate-wheels
+          uv build --package robotics-acceptance-harness --wheel \
+            --out-dir artifacts/mcp-candidate-wheels
+          uv venv --python 3.12 mcp/.candidate-workers
+          uv pip install --python mcp/.candidate-workers/bin/python --require-hashes --no-deps \
+            --only-binary :all: --requirement artifacts/mcp-candidate-runtime.lock
+          uv pip install --python mcp/.candidate-workers/bin/python --no-deps \
+            artifacts/mcp-candidate-wheels/*.whl
+          uv pip check --python mcp/.candidate-workers/bin/python
+      - name: Exercise native documents through the same read-only MCP interface
+        run: |
+          MCP_TEST_CONTRACTS_CLI="$PWD/.candidate-workers/bin/robotics-contracts" \
+          MCP_TEST_HARNESS_CLI="$PWD/.candidate-workers/bin/robotics-acceptance" \
+          MCP_TEST_REPORT_DIR="$PWD/../artifacts/mcp-cli-integration" \
+            npm run test:native > ../artifacts/mcp-native-integration-test.log 2>&1
+          cat ../artifacts/mcp-native-integration-test.log
       - name: Retain MCP integration outputs
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -229,6 +252,7 @@ jobs:
           path: |
             artifacts/mcp-cli-integration/
             artifacts/mcp-cli-integration-test.log
+            artifacts/mcp-native-integration-test.log
           if-no-files-found: error
           retention-days: 7
 

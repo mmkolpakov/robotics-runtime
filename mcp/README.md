@@ -16,6 +16,12 @@ These operations do not start observations or run evaluators. Trusted bootstrap
 may supply domain extension schemas as registered immutable artifact IDs.
 Bundle-specific evaluator receipts and live readiness remain outside this interface.
 
+Supported document versions come from the selected installed workers and the
+operator's schema catalog. The `public-cli.lock` installation below supports v1
+roles; native v2 documents require a worker build supporting those versions.
+The adapter forwards either version as exact files without adding ROS fields.
+A native incomplete verdict remains incomplete through `explain_result`.
+
 ## Install and configure
 
 Use Node 24.21.0/npm 11.19.0. Install the locked dependencies and published
@@ -113,3 +119,19 @@ MCP_TEST_HARNESS_CLI="$PWD/.public-workers/bin/robotics-acceptance" \
 Tests use the official MCP client and the installed public CLIs. Controlled
 worker probes separately exercise raw 64-bit output, timeout, output overflow
 and request cancellation. These probes are subprocess-boundary checks.
+
+With installed workers supporting native v2, run the explicit integration check:
+
+```bash
+MCP_TEST_CONTRACTS_CLI="/absolute/environment/bin/robotics-contracts" \
+MCP_TEST_HARNESS_CLI="/absolute/environment/bin/robotics-acceptance" \
+  npm run test:native
+```
+
+This check prepares the public native archive example before starting MCP. It
+then exercises all six read operations, original source hashes, missing
+observation diagnostics and large integer preservation through real CLI
+validation. It does not execute a native workload through MCP.
+
+See [result and recording inspection](../docs/viewing-results.md) for the
+CLI/JUnit path and compatible upstream viewers.
