@@ -69,6 +69,12 @@ def add_writer_commands[ParserT: argparse.ArgumentParser](
         "--artifact", action="append", required=True, metavar="KIND:SUBJECT=PATH"
     )
     statement.add_argument("--output", required=True, metavar="PATH")
+    statement.add_argument(
+        "--schema-version",
+        choices=("qualification-bundle.v1", "qualification-bundle.v2"),
+        default="qualification-bundle.v1",
+    )
+    statement.add_argument("--comparison-rule", choices=("exact_assertion_outcome",))
     add_extensions(statement)
     statement.set_defaults(writer_operation="qualification_statement")
 
@@ -168,7 +174,11 @@ def _qualification_statement(
     arguments: argparse.Namespace, extensions: Mapping[str, bytes]
 ) -> Path:
     return write_qualification_statement(
-        arguments.artifact, arguments.output, extension_schemas=extensions
+        arguments.artifact,
+        arguments.output,
+        extension_schemas=extensions,
+        schema_version=arguments.schema_version,
+        comparison_rule=arguments.comparison_rule,
     )
 
 

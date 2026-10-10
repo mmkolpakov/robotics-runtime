@@ -124,6 +124,26 @@ def _method_controls(context: _Context, domain: str) -> Mapping[str, Any]:
     return controls
 
 
+def _receipt_requirements(context: _Context) -> list[Mapping[str, Any]]:
+    requirements = list(context.scenario["evaluator_requirements"])
+    for domain in sorted(context.domains):
+        for requirement in _method_controls(context, domain)["evaluator_requirements"]:
+            if requirement not in requirements:
+                requirements.append(requirement)
+    return requirements
+
+
+def _native_receipts(context: _Context) -> None:
+    rules._validate_receipts(
+        context.grouped,
+        {"evaluator_requirements": _receipt_requirements(context)},
+        context.run["run_id"],
+        context.evidence_indexes,
+        context.run["created_at"],
+        context.aggregate["generated_at"],
+    )
+
+
 def _domain_bindings(
     context: _Context,
     domain: str,
@@ -526,18 +546,7 @@ def inspect_native_links(
             _Check("native.assessments", partial(_assessment_registry, context)),
             _Check("native.configuration", partial(_configuration, context)),
             _Check("native.evidence", partial(_evidence, context)),
-            _Check(
-                "native.receipts",
-                partial(
-                    rules._validate_receipts,
-                    context.grouped,
-                    context.scenario,
-                    context.run["run_id"],
-                    context.evidence_indexes,
-                    context.run["created_at"],
-                    context.aggregate["generated_at"],
-                ),
-            ),
+            _Check("native.receipts", partial(_native_receipts, context)),
             _Check("native.transport", partial(_transport, context)),
         ):
             _run_check(check, diagnostics)

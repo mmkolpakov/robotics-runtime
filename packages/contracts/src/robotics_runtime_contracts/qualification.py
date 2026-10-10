@@ -100,11 +100,11 @@ def _control_references(artifact: QualificationArtifact) -> tuple[Mapping[str, A
     )
 
 
-def inspect_qualification_artifacts(
+def _capture_artifacts(
     specifications: Sequence[str],
     extension_schemas: Mapping[str, bytes] | None = None,
-) -> QualificationReport:
-    """Read every supplied file once, then inspect links if all files are valid."""
+) -> tuple[tuple[QualificationArtifact, ...], tuple[QualificationDiagnostic, ...]]:
+    """Capture each supplied file once before any version-specific link checks."""
     loaded: dict[int, QualificationArtifact] = {}
     diagnostics: list[QualificationDiagnostic] = []
     references: dict[str, int] = {}
@@ -134,18 +134,46 @@ def inspect_qualification_artifacts(
             )
         except ContractError as error:
             diagnostics.append(_load_diagnostic(error))
-    artifacts = tuple(loaded[index] for index in sorted(loaded))
+    return tuple(loaded[index] for index in sorted(loaded)), tuple(diagnostics)
+
+
+def inspect_qualification_artifacts(
+    specifications: Sequence[str],
+    extension_schemas: Mapping[str, bytes] | None = None,
+) -> QualificationReport:
+    """Read every supplied file once, then inspect links if all files are valid."""
+    artifacts, diagnostics = _capture_artifacts(specifications, extension_schemas)
     if diagnostics:
-        return QualificationReport(artifacts, tuple(diagnostics), blocked_checks=("links",))
+        return QualificationReport(artifacts, diagnostics, blocked_checks=("links",))
     return inspect_links(artifacts)
 
 
 def validate_qualification_artifacts(
     specifications: Sequence[str],
     extension_schemas: Mapping[str, bytes] | None = None,
+    *,
+    schema_version: str = "qualification-bundle.v1",
+    comparison_rule: str | None = None,
 ) -> dict[str, Any]:
     """Validate a complete artifact set and return metadata for the exact bytes read."""
-    return inspect_qualification_artifacts(specifications, extension_schemas).metadata()
+    if schema_version not in ("qualification-bundle.v1", "qualification-bundle.v2"):
+        raise QualificationError(
+            "unsupported qualification bundle version",
+            error_id="qualification.schema_unsupported",
+        )
+    if schema_version == "qualification-bundle.v1" and comparison_rule is None:
+        return inspect_qualification_artifacts(specifications, extension_schemas).metadata()
+    if schema_version != "qualification-bundle.v2" or comparison_rule != "exact_assertion_outcome":
+        raise QualificationError(
+            "v1 accepts no comparison rule; v2 requires exact_assertion_outcome",
+            error_id="qualification.comparison_rule_invalid",
+        )
+    from robotics_runtime_contracts._qualification_archive import validate_archive_documents
+
+    artifacts, diagnostics = _capture_artifacts(specifications, extension_schemas)
+    if diagnostics:
+        QualificationReport(artifacts, diagnostics, blocked_checks=("links",)).raise_for_errors()
+    return validate_archive_documents(artifacts, extension_schemas)
 
 
 __all__ = [
