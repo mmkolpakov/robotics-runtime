@@ -36,8 +36,9 @@ archives in the root workspace's
 [tagged release](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.20.0):
 
 ```bash
-uv venv
-uv pip install robotics-runtime-contracts==0.20.0
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install robotics-runtime-contracts==0.20.0
 ```
 
 Release assets include build-provenance attestations. See

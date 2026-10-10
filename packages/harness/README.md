@@ -58,8 +58,9 @@ The published pair is
 [contracts 0.20.0](https://pypi.org/project/robotics-runtime-contracts/0.20.0/):
 
 ```bash
-uv venv
-uv pip install robotics-acceptance-harness==0.21.0 robotics-runtime-contracts==0.20.0
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install robotics-acceptance-harness==0.21.0 robotics-runtime-contracts==0.20.0
 ```
 
 Development uses both packages and the dependency graph in the root `uv.lock`:
