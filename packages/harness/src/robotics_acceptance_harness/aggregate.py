@@ -253,8 +253,6 @@ def _validate_native_declarations(
         scenario.get("native_model")
     ):
         raise BundleValidationError("$.native_model", "result identifies another native model")
-    if result["evaluators"] != scenario["evaluator_requirements"]:
-        raise BundleValidationError("$.evaluators", "result evaluator bindings differ")
     clock = scenario["profile"].get("clock")
     if clock is not None and any(
         clock[field] != context.data["time_authority"][field] for field in ("kind", "source_id")
@@ -278,6 +276,8 @@ def _calibration_identity(assessment: Mapping[str, Any]) -> tuple[str, tuple[tup
 def _validate_native_assessment(result: Mapping[str, Any], first: Mapping[str, Any]) -> None:
     assessment = result["evaluation"]
     baseline = first["evaluation"]
+    if result["evaluators"] != first["evaluators"]:
+        raise BundleValidationError("$.evaluators", "assessment evaluator bindings cannot be mixed")
     if _calibration_identity(assessment) != _calibration_identity(baseline):
         raise BundleValidationError(
             "$.evaluation.calibration", "assessment calibrations cannot be mixed"

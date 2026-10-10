@@ -1040,3 +1040,31 @@ def test_native_aggregate_uses_calibration_content_identity_without_authenticati
         QualificationError, match="original method makes no calibration declaration"
     ):
         validate_qualification_artifacts(specs)
+
+
+def test_native_aggregate_refuses_mixed_selected_evaluator_bindings(tmp_path: Path) -> None:
+    _archive(tmp_path, ("first", "second"))
+    requirement = {
+        "namespace": "org.example.method",
+        "entry_point": "example:evaluate",
+        "distribution": "method-example",
+        "version": "1",
+        "artifact_sha256": "a" * 64,
+        "receipt_sha256": "b" * 64,
+    }
+    for domain in ("first", "second"):
+        path = tmp_path / f"result-{domain}.json"
+        result = _document(path)
+        result["evaluators"] = [{**requirement, "version": "2" if domain == "second" else "1"}]
+        _write(path, result)
+    with pytest.raises(
+        BundleValidationError, match="assessment evaluator bindings cannot be mixed"
+    ):
+        aggregate_results(
+            scenario_path=tmp_path / "scenario.json",
+            run_context_path=tmp_path / "run.json",
+            result_paths=[tmp_path / "result-first.json", tmp_path / "result-second.json"],
+            output_path=tmp_path / "refused.json",
+            generated_at=datetime.fromisoformat(T6),
+        )
+    assert not (tmp_path / "refused.json").exists()
