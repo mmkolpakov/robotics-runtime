@@ -22,6 +22,7 @@ from robotics_runtime_contracts import (
     schema_path,
     schema_registry,
     schema_resource_names,
+    schema_versions_for_role,
     validate_document,
     worst_status,
 )
@@ -47,7 +48,10 @@ def test_schemas_satisfy_draft_2020_12_metaschema(schema_name: str) -> None:
 def test_catalog_defines_one_canonical_public_schema_per_role() -> None:
     assert contract_set() == "v1"
     assert contract_roles() == tuple(role_schemas())
-    assert set(role_schemas().values()) == set(schema_names())
+    assert set(role_schemas().values()) <= set(schema_names())
+    assert {name for role in contract_roles() for name in schema_versions_for_role(role)} == set(
+        schema_names()
+    )
     assert schema_for_role("dataset_manifest") == "dataset-manifest.v2"
     for role, schema_name in role_schemas().items():
         assert schema_for_role(role) == schema_name

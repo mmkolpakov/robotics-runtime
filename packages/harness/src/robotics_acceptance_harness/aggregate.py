@@ -70,6 +70,7 @@ def aggregate_results(
         )
         for path in resolved_result_paths
     ]
+    native = _validate_registry_version(scenario.data, results, transport_qualification_path)
     qualification_path = (
         Path(transport_qualification_path).expanduser().resolve()
         if transport_qualification_path is not None
@@ -85,6 +86,8 @@ def aggregate_results(
     )
     expected_domains = {item["domain_id"] for item in context.data["domains"]}
     observed_domains = {item.data["domain_id"] for item in results}
+    if len(observed_domains) != len(results):
+        raise BundleValidationError("$.per_domain_results", "domain results must be unique")
     if observed_domains != expected_domains:
         missing = sorted(expected_domains - observed_domains)
         unexpected = sorted(observed_domains - expected_domains)
@@ -96,25 +99,7 @@ def aggregate_results(
     result_ids = [item.data["result_id"] for item in results]
     if len(result_ids) != len(set(result_ids)):
         raise BundleValidationError("$.per_domain_results", "result_id values must be unique")
-    for result in results:
-        if result.data["run_id"] != context.data["run_id"]:
-            raise BundleValidationError("$.run_id", "result belongs to another run")
-        if result.data["scenario_id"] != context.data["scenario_id"]:
-            raise BundleValidationError("$.scenario_id", "result belongs to another scenario")
-        if result.data["scenario_sha256"] != context.data["scenario_sha256"]:
-            raise BundleValidationError(
-                "$.scenario_sha256",
-                "result scenario digest differs from the run context",
-            )
-        if (
-            result.data["time_authority_observation"]["source_id"]
-            != context.data["time_authority"]["source_id"]
-        ):
-            raise BundleValidationError(
-                "$.time_authority_observation.source_id",
-                "result uses another time authority",
-            )
-
+    _validate_aggregation_results(scenario.data, context, results, native, generated_at)
     aggregate_status = worst_status({str(item.data["status"]) for item in results})
     if qualification is None:
         cross_domain: dict[str, Any] = {
@@ -190,6 +175,138 @@ def aggregate_results(
             "transport qualification changed during aggregation",
         )
     return write_contract_json(aggregate, output_path)
+
+
+def _validate_registry_version(
+    scenario: Mapping[str, Any],
+    results: Sequence[Any],
+    transport_qualification_path: str | Path | None,
+) -> bool:
+    native = bool(scenario["schema_version"] == "acceptance-scenario.v2")
+    expected_schema = "acceptance-result.v2" if native else "acceptance-result.v1"
+    if any(result.data["schema_version"] != expected_schema for result in results):
+        raise BundleValidationError(
+            "$.per_domain_results", "scenario and result registry must use one contract version"
+        )
+    if native and transport_qualification_path is not None:
+        raise BundleValidationError(
+            "$.transport_qualification",
+            "transport-qualification-result.v1 does not support native v2 execution profiles",
+        )
+    return native
+
+
+def _validate_aggregation_results(
+    scenario: Mapping[str, Any],
+    context: Any,
+    results: Sequence[Any],
+    native: bool,
+    generated_at: datetime | None,
+) -> None:
+    for result in results:
+        if result.data["run_id"] != context.data["run_id"]:
+            raise BundleValidationError("$.run_id", "result belongs to another run")
+        if result.data["scenario_id"] != context.data["scenario_id"]:
+            raise BundleValidationError("$.scenario_id", "result belongs to another scenario")
+        if result.data["scenario_sha256"] != context.data["scenario_sha256"]:
+            raise BundleValidationError(
+                "$.scenario_sha256",
+                "result scenario digest differs from the run context",
+            )
+        if native:
+            _validate_native_result(scenario, context, result.data, results[0].data)
+            continue
+        if (
+            result.data["time_authority_observation"]["source_id"]
+            != context.data["time_authority"]["source_id"]
+        ):
+            raise BundleValidationError(
+                "$.time_authority_observation.source_id",
+                "result uses another time authority",
+            )
+
+    if native:
+        aggregate_time = generated_at or datetime.now(UTC)
+        for result in results:
+            if datetime.fromisoformat(result.data["evaluation"]["finished_at"]) > aggregate_time:
+                raise BundleValidationError(
+                    "$.generated_at", "aggregate precedes a completed assessment"
+                )
+
+
+def _reference_identity(reference: Mapping[str, Any] | None) -> tuple[str, int] | None:
+    if reference is None:
+        return None
+    return str(reference["sha256"]), int(reference["size_bytes"])
+
+
+def _validate_native_declarations(
+    scenario: Mapping[str, Any], context: Any, result: Mapping[str, Any]
+) -> None:
+    for field in ("execution", "profile"):
+        if result[field] != scenario[field]:
+            raise BundleValidationError(f"$.{field}", "result differs from the scenario")
+    if _reference_identity(result.get("native_model")) != _reference_identity(
+        scenario.get("native_model")
+    ):
+        raise BundleValidationError("$.native_model", "result identifies another native model")
+    if result["evaluators"] != scenario["evaluator_requirements"]:
+        raise BundleValidationError("$.evaluators", "result evaluator bindings differ")
+    clock = scenario["profile"].get("clock")
+    if clock is not None and any(
+        clock[field] != context.data["time_authority"][field] for field in ("kind", "source_id")
+    ):
+        raise BundleValidationError("$.profile.clock", "profile identifies another time authority")
+
+
+def _validate_native_assessment(result: Mapping[str, Any], first: Mapping[str, Any]) -> None:
+    assessment = result["evaluation"]
+    baseline = first["evaluation"]
+    for field in ("implementation", "version"):
+        if assessment["method"][field] != baseline["method"][field]:
+            raise BundleValidationError("$.evaluation.method", "assessment methods cannot be mixed")
+    for reference, expected, label in (
+        (assessment["method"]["configuration"], baseline["method"]["configuration"], "method"),
+        (assessment["environment"], baseline["environment"], "environment"),
+    ):
+        if _reference_identity(reference) != _reference_identity(expected):
+            raise BundleValidationError(
+                f"$.evaluation.{label}", "assessment configurations or environments cannot be mixed"
+            )
+
+
+def _validate_native_result(
+    scenario: Mapping[str, Any],
+    context: Any,
+    result: Mapping[str, Any],
+    first: Mapping[str, Any],
+) -> None:
+    _validate_native_declarations(scenario, context, result)
+    _validate_native_assessment(result, first)
+    original = result["original_execution"]
+    if original["acceptance_run_sha256"] != context.sha256:
+        raise BundleValidationError(
+            "$.original_execution.acceptance_run_sha256", "result identifies another original run"
+        )
+    assessment = result["evaluation"]
+    values = (
+        context.data["created_at"],
+        original["started_at"],
+        original["finished_at"],
+        assessment["started_at"],
+        assessment["finished_at"],
+    )
+    times = [datetime.fromisoformat(value) for value in values]
+    if times != sorted(times):
+        raise BundleValidationError("$.evaluation", "original and assessment times are not ordered")
+
+
+def _require_legacy_transport_scenario(scenario: Mapping[str, Any]) -> None:
+    if scenario["schema_version"] == "acceptance-scenario.v2":
+        raise BundleValidationError(
+            "$.scenario",
+            "transport-qualification-result.v1 does not support native v2 execution profiles",
+        )
 
 
 def _trace_link(
@@ -281,6 +398,7 @@ def evaluate_transport_qualification(
         expected_role="acceptance_scenario",
         extension_schemas=extension_schemas,
     )
+    _require_legacy_transport_scenario(scenario.data)
     clock_policy = scenario.data["time_policy"].get("cross_domain_clock")
     if clock_policy is None:
         raise BundleValidationError(

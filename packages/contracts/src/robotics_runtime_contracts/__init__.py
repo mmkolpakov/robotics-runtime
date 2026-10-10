@@ -23,6 +23,7 @@ from robotics_runtime_contracts.catalog import (
     internal_schema_names,
     role_schemas,
     schema_for_role,
+    schema_versions_for_role,
 )
 from robotics_runtime_contracts.datasets import (
     DatasetValidationError,
@@ -76,7 +77,11 @@ from robotics_runtime_contracts.workloads import (
     validate_robot_description_binding,
 )
 
-_PUBLIC_SCHEMA_FILES = {name: f"{name}.schema.json" for name in role_schemas().values()}
+_PUBLIC_SCHEMA_FILES = {
+    name: f"{name}.schema.json"
+    for role in contract_roles()
+    for name in schema_versions_for_role(role)
+}
 _INTERNAL_SCHEMA_FILES = {name: f"{name}.schema.json" for name in internal_schema_names()}
 _SCHEMA_FILES = _PUBLIC_SCHEMA_FILES | _INTERNAL_SCHEMA_FILES
 
@@ -244,7 +249,12 @@ def validate_role(
 ) -> None:
     """Validate a document against the canonical schema for its role."""
 
-    validate_document(document, schema_for_role(role), extension_schemas=extension_schemas)
+    declared = document.get("schema_version")
+    if declared is None and role == "qualification_bundle":
+        declared = document.get("predicate", {}).get("schema_version")
+    names = schema_versions_for_role(role)
+    selected = declared if declared in names else names[0]
+    validate_document(document, selected, extension_schemas=extension_schemas)
 
 
 __all__ = [
@@ -282,6 +292,7 @@ __all__ = [
     "schema_digest",
     "schema_dir",
     "schema_for_role",
+    "schema_versions_for_role",
     "schema_names",
     "schema_path",
     "schema_registry",

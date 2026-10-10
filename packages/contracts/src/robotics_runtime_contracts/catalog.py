@@ -39,13 +39,26 @@ def contract_roles() -> tuple[str, ...]:
     return tuple(role_schemas())
 
 
-def schema_for_role(role: str) -> str:
-    """Resolve a public document role to its canonical schema."""
-
+def schema_versions_for_role(role: str) -> tuple[str, ...]:
+    """Return the supported schemas without changing the role's canonical default."""
     try:
-        return role_schemas()[role]
+        canonical = role_schemas()[role]
     except KeyError as error:
         raise UnknownContractRoleError(f"Unknown contract role: {role}") from error
+    additional = _catalog().get("supported_versions", {}).get(role, ())
+    return (canonical, *(str(name) for name in additional))
+
+
+def schema_for_role(role: str, *, version: int | None = None) -> str:
+    """Resolve a public document role to its canonical schema."""
+
+    names = schema_versions_for_role(role)
+    if version is None:
+        return names[0]
+    for name in names:
+        if name.endswith(f".v{version}"):
+            return name
+    raise UnknownContractRoleError(f"Unsupported version {version} for contract role: {role}")
 
 
 def internal_schema_names() -> tuple[str, ...]:

@@ -1,0 +1,501 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:robotics-runtime-contracts:v2:internal:native-execution",
+  "title": "Native execution declarations and observation states",
+  "$defs": {
+    "implementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implementation",
+        "version"
+      ],
+      "properties": {
+        "implementation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "configuration": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+        }
+      }
+    },
+    "sourceType": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "type_support": {
+          "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/implementation"
+        },
+        "codec": {
+          "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/implementation"
+        },
+        "descriptor": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+        }
+      }
+    },
+    "recorder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implementation",
+        "version",
+        "transformation"
+      ],
+      "properties": {
+        "implementation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "transformation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "configuration": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+        }
+      }
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "original_type",
+        "backend",
+        "wire_envelope",
+        "native_encoding",
+        "recorder"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "original_type": {
+          "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/sourceType"
+        },
+        "backend": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "wire_envelope": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "native_encoding": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "recorder": {
+          "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/recorder"
+        }
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "requirement"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "metric",
+            "command_acceptance",
+            "native_final_state",
+            "postcondition",
+            "graph",
+            "clock",
+            "shutdown",
+            "other"
+          ]
+        },
+        "requirement": {
+          "enum": [
+            "required",
+            "optional",
+            "not_applicable"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "requirement": {
+                "const": "not_applicable"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ]
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "channels",
+        "observations"
+      ],
+      "properties": {
+        "profile_id": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/channel"
+          }
+        },
+        "executor": {
+          "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/implementation"
+        },
+        "clock": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "source_id"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "source_id": {
+              "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+            },
+            "configuration": {
+              "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+            }
+          }
+        },
+        "observations": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+          },
+          "additionalProperties": {
+            "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/requirement"
+          }
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_environment",
+        "data_source"
+      ],
+      "properties": {
+        "target_environment": {
+          "enum": [
+            "software",
+            "data_only",
+            "simulation",
+            "hil",
+            "real_robot"
+          ]
+        },
+        "data_source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "plant_backend": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "time_mode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "security_profile": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "hardware_scope": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "physical_effect": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "target_environment": {
+                "enum": [
+                  "hil",
+                  "real_robot"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "security_profile",
+              "hardware_scope",
+              "physical_effect"
+            ]
+          }
+        }
+      ]
+    },
+    "observed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "value",
+        "evidence"
+      ],
+      "properties": {
+        "state": {
+          "const": "measured"
+        },
+        "value": {
+          "not": {
+            "type": "null"
+          }
+        },
+        "evidence": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+        }
+      }
+    },
+    "notApplicable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason"
+      ],
+      "properties": {
+        "state": {
+          "const": "not_applicable"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "unobserved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason"
+      ],
+      "properties": {
+        "state": {
+          "const": "unobserved"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "invalid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason"
+      ],
+      "properties": {
+        "state": {
+          "const": "invalid"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "evidence": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+        }
+      }
+    },
+    "observation": {
+      "oneOf": [
+        {
+          "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/observed"
+        },
+        {
+          "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/notApplicable"
+        },
+        {
+          "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/unobserved"
+        },
+        {
+          "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/invalid"
+        }
+      ]
+    },
+    "observations": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+      },
+      "additionalProperties": {
+        "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/observation"
+      }
+    },
+    "evaluationMethod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implementation",
+        "version",
+        "configuration"
+      ],
+      "properties": {
+        "implementation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "configuration": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "environment",
+        "started_at",
+        "finished_at"
+      ],
+      "properties": {
+        "method": {
+          "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/evaluationMethod"
+        },
+        "environment": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "finished_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start_unix_ns",
+            "end_unix_ns"
+          ],
+          "properties": {
+            "start_unix_ns": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "end_unix_ns": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "originalExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acceptance_run_sha256",
+        "observation_sha256",
+        "evidence_index_sha256",
+        "started_at",
+        "finished_at"
+      ],
+      "properties": {
+        "acceptance_run_sha256": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
+        },
+        "observation_sha256": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
+        },
+        "evidence_index_sha256": {
+          "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "finished_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

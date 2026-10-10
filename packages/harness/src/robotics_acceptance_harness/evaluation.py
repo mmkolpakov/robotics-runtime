@@ -29,6 +29,7 @@ from robotics_acceptance_harness.metrics import (
 from robotics_acceptance_harness.policy import (
     evaluate_data_plane_policy,
     evaluate_evidence_policy,
+    evaluate_native_evidence_policy,
 )
 from robotics_acceptance_harness.receipts import VerifiedReceiptSet
 
@@ -53,6 +54,7 @@ class EvaluationContext:
     metric_samples: tuple[MetricPoint, ...]
     window_start_ns: int
     window_end_ns: int
+    max_raw_evidence_bytes: int | None = None
 
     @property
     def scenario(self) -> Mapping[str, Any]:
@@ -447,17 +449,23 @@ def evaluate_acceptance(
             window_end_ns=context.window_end_ns,
         )
     )
-    evaluations.extend(
-        evaluate_data_plane_policy(
-            scenario["data_plane_policy"],
-            context.runtime,
-            context.metric_samples,
-            domain_id=context.domain_id,
-            window_start_ns=context.window_start_ns,
-            window_end_ns=context.window_end_ns,
+    if context.bundle.scenario.schema_version == "acceptance-scenario.v1":
+        evaluations.extend(
+            evaluate_data_plane_policy(
+                scenario["data_plane_policy"],
+                context.runtime,
+                context.metric_samples,
+                domain_id=context.domain_id,
+                window_start_ns=context.window_start_ns,
+                window_end_ns=context.window_end_ns,
+            )
         )
+    evidence_policy = (
+        evaluate_native_evidence_policy
+        if context.bundle.scenario.schema_version == "acceptance-scenario.v2"
+        else evaluate_evidence_policy
     )
-    evaluations.extend(evaluate_evidence_policy(scenario["evidence_policy"], context.evidence))
+    evaluations.extend(evidence_policy(scenario["evidence_policy"], context.evidence))
     evaluations.extend(
         _product_evaluations(
             context,

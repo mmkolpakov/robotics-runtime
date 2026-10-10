@@ -9,7 +9,7 @@ from robotics_runtime_contracts import (
     ArtifactReceiptValidationError,
     ClockEvidenceValidationError,
     ProviderRequirementError,
-    schema_for_role,
+    schema_versions_for_role,
     validate_artifact_receipt,
     validate_clock_relation_evidence,
     validate_provider_requirements,
@@ -49,7 +49,7 @@ _ARTIFACT_ROLES = {
     "execution_verification": "execution_verification",
 }
 _CONTRACT_SCHEMAS = {
-    kind: frozenset({schema_for_role(role)}) for kind, role in _ARTIFACT_ROLES.items()
+    kind: frozenset(schema_versions_for_role(role)) for kind, role in _ARTIFACT_ROLES.items()
 }
 _RAW_ARTIFACT_KINDS = frozenset(
     {

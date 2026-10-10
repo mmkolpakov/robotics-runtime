@@ -142,12 +142,17 @@ def bundle(sources: Path = SOURCES, resources: Path = RESOURCES) -> dict[str, by
     inputs = read_schemas(sources)
     registry = registry_for(inputs)
     outputs = {
-        name: assemble(schema, registry)
-        for name, schema in inputs.items()
-        if "/" not in name and name.endswith("-core.v1.schema.json")
+        name: assemble(schema, registry) for name, schema in inputs.items() if "/" not in name
     }
     packaged = read_schemas(resources)
-    expected = {name for name in packaged if name.endswith("-core.v1.schema.json")}
+    # Historical dataset-manifest.v2 predates this source workflow. New v2
+    # contracts and their internal resources are authored and checked here.
+    expected = {
+        name
+        for name in packaged
+        if name.endswith("-core.v1.schema.json")
+        or (name.endswith(".v2.schema.json") and name != "dataset-manifest.v2.schema.json")
+    }
     if not outputs or set(outputs) != expected:
         raise ValueError(f"Core source inventory differs: expected {sorted(expected)}")
     check_references(packaged | outputs)

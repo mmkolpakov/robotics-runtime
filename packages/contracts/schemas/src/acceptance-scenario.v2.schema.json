@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:robotics-runtime-contracts:v2:acceptance-scenario",
+  "title": "Native acceptance scenario v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "execution",
+    "profile",
+    "metric_definitions",
+    "assertions",
+    "evaluator_requirements",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "acceptance-scenario.v2"
+    },
+    "scenario_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+    },
+    "execution": {
+      "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/execution"
+    },
+    "profile": {
+      "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/profile"
+    },
+    "native_model": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+    },
+    "metric_definitions": {
+      "$ref": "urn:robotics-runtime-contracts:v1:acceptance-scenario#/properties/metric_definitions"
+    },
+    "assertions": {
+      "$ref": "urn:robotics-runtime-contracts:v1:acceptance-scenario#/properties/assertions"
+    },
+    "evaluator_requirements": {
+      "$ref": "urn:robotics-runtime-contracts:v1:acceptance-scenario#/properties/evaluator_requirements"
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_artifact_size_bytes",
+        "max_archive_size_bytes",
+        "max_upload_lag_sec",
+        "upload_mode",
+        "retention_class",
+        "remote_sink_allowed"
+      ],
+      "properties": {
+        "max_artifact_size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_archive_size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_upload_lag_sec": {
+          "type": "number",
+          "minimum": 0
+        },
+        "upload_mode": {
+          "enum": [
+            "local_only",
+            "remote_optional",
+            "remote_required"
+          ]
+        },
+        "retention_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "remote_sink_allowed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "authorization": {
+      "$ref": "urn:robotics-runtime-contracts:v1:acceptance-scenario#/properties/authorization"
+    },
+    "extension_schemas": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensionSchemas"
+    },
+    "extensions": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensions"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "execution": {
+            "properties": {
+              "target_environment": {
+                "enum": [
+                  "hil",
+                  "real_robot"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "authorization"
+        ]
+      }
+    }
+  ]
+}

@@ -195,7 +195,11 @@ def _parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--run-context", required=True, metavar="PATH")
     evaluate.add_argument("--evidence-index", required=True, metavar="PATH")
     _add_evidence_receipt_arguments(evaluate)
-    evaluate.add_argument("--otel-metrics", required=True, metavar="PATH")
+    evaluate.add_argument(
+        "--otel-metrics",
+        metavar="PATH",
+        help="Verified OTLP/JSON evidence; required for v1 and declared metric definitions.",
+    )
     evaluate.add_argument("--window-start-ns", required=True, type=int)
     evaluate.add_argument("--window-end-ns", required=True, type=int)
     evaluate.add_argument("--output", required=True, metavar="DIR")
