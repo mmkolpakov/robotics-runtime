@@ -342,6 +342,7 @@ def _result_assertions(result: Mapping[str, Any]) -> list[Mapping[str, Any]]:
             assertion_results.append(
                 {
                     "assertion_id": f"observation-{name}",
+                    "classname": "robotics.acceptance.observation",
                     "status": "passed" if observation["state"] == "measured" else "skipped",
                     "message": observation.get("reason", ""),
                 }
@@ -350,6 +351,7 @@ def _result_assertions(result: Mapping[str, Any]) -> list[Mapping[str, Any]]:
             assertion_results.append(
                 {
                     "assertion_id": "evaluation-coverage",
+                    "classname": "robotics.acceptance.coverage",
                     "status": "skipped",
                     "message": f"unevaluated declarations: {', '.join(result['unevaluated'])}",
                 }
@@ -415,7 +417,10 @@ def write_junit_xml(result: Mapping[str, Any], path: str | Path) -> Path:
             "evaluation_environment_sha256", result["evaluation"]["environment"]["sha256"]
         )
     for assertion in _result_assertions(result):
-        case = TestCase(assertion["assertion_id"], classname="robotics.acceptance")
+        case = TestCase(
+            assertion["assertion_id"],
+            classname=assertion.get("classname", "robotics.acceptance"),
+        )
         message = assertion.get("message", "")
         if assertion["status"] == "failed":
             case.result = [Failure(message or "acceptance assertion failed")]

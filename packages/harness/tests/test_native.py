@@ -16,6 +16,7 @@ from robotics_runtime_contracts import schema_for_role, schema_versions_for_role
 from robotics_acceptance_harness import native
 from robotics_acceptance_harness.documents import BundleValidationError, load_bundle
 from robotics_acceptance_harness.evidence import EvidenceValidationError, load_evidence_index
+from robotics_acceptance_harness.result import write_junit_xml
 from tests.support import local_evidence_artifact, write_evidence_index
 
 ROOT = Path(__file__).parents[3]
@@ -316,3 +317,27 @@ def test_environment_inventory_refuses_ambiguous_distribution_versions(
     monkeypatch.setattr(native, "distributions", lambda: distributions)
     with pytest.raises(BundleValidationError, match="ambiguous versions"):
         native._evaluation_environment(tmp_path / "environment.json")
+
+
+def test_native_junit_keeps_user_assertions_distinct_from_synthetic_cases(tmp_path: Path) -> None:
+    inputs = produce(tmp_path / "archive", "--error", "7", "--omit", "terminal")
+    output = tmp_path / "assessment"
+    completed = evaluate(inputs, output)
+    assert completed.returncode == 1, completed.stderr
+    result = json.loads((output / "acceptance-result.json").read_bytes())
+    for assertion in result["assertion_results"]:
+        if assertion["assertion_id"] == "counter-error":
+            assertion["assertion_id"] = "observation-condition"
+        elif assertion["assertion_id"] == "counter-finished":
+            assertion["assertion_id"] = "evaluation-coverage"
+    original = json.dumps(result, sort_keys=True)
+    xml = ElementTree.parse(write_junit_xml(result, tmp_path / "collision.xml"))
+    cases = xml.findall(".//testcase")
+    identities = {(case.attrib["classname"], case.attrib["name"]) for case in cases}
+    assert len(cases) == len(identities) == 16
+    assert sum(case.find("failure") is not None for case in cases) == 1
+    assert sum(case.find("error") is not None for case in cases) == 0
+    assert sum(case.find("skipped") is not None for case in cases) == 3
+    assert len([case for case in cases if case.attrib["name"] == "observation-condition"]) == 2
+    assert len([case for case in cases if case.attrib["name"] == "evaluation-coverage"]) == 2
+    assert json.dumps(result, sort_keys=True) == original
