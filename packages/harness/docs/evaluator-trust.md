@@ -1,0 +1,141 @@
+# Evaluator wheel authentication
+
+The source SDK provides `authenticate_wheel`, `validate_evaluator_wheel` and
+`verify_installed_wheel` in `robotics_acceptance_harness.evaluator_trust`.
+These APIs are not part of the published harness 0.21.0 wheel. They verify
+artifact origin and installed bytes; they do not launch an evaluator or replace
+the existing verified-source import guard.
+
+## Operator profile and publisher policy
+
+The integrator supplies a reviewed execution composition with the Python
+interpreter, SDK, dependencies, an approved `gh` executable and trusted roots.
+`GitHubVerifierProfile` requires the executable's exact SHA-256, exact version
+(at least 2.102.0), and the trusted-root file's exact SHA-256. Those pins come
+from the approved profile/BOM, outside the evidence directory. A checksum
+calculated from an arbitrary executable is not an independent approval of it.
+This SDK does not download or install a verifier.
+
+`GitHubWheelPolicy` supplies the expected repository, exact certificate identity,
+OIDC issuer, predicate type and wheel SHA-256. Optional source ref, source digest
+and signer digest further constrain the build. The default policy rejects
+self-hosted runners. The certificate identity includes the selected workflow and
+ref; `gh` treats `--cert-identity` and `--signer-workflow` as mutually exclusive.
+
+The helper captures wheel, bundle, executable and root bytes once. It checks their
+limits and profile hashes, then invokes the copied official executable on private
+wheel/bundle/root snapshots. It passes the publisher and subject policy to
+[GitHub attestation verification](https://cli.github.com/manual/gh_attestation_verify).
+The returned report is audit output from that invocation. A caller-supplied
+verification JSON, an artifact receipt, or a saved report cannot establish this
+admission.
+
+Sigstore's [verification API](https://sigstore.github.io/sigstore-python/api/verify/verifier/)
+distinguishes authenticated DSSE payload bytes from artifact verification.
+Cryptographic authenticity and expected publisher identity do not prove an
+evaluator's method, a physical model, or a claimed result is correct.
+
+## Authenticate before installation
+
+An operator-owned Python application constructs the profile and policy from its
+reviewed configuration, then calls:
+
+```python
+from pathlib import Path
+from robotics_acceptance_harness.evaluator_trust import (
+    authenticate_wheel,
+    validate_evaluator_wheel,
+)
+
+wheel = authenticate_wheel(
+    Path("example_evaluator-1.0-py3-none-any.whl"),
+    Path("evaluator.bundle.jsonl"),
+    policy=publisher_policy,
+    profile=verifier_profile,
+)
+validate_evaluator_wheel(wheel)
+```
+
+The helper validates the original PyPA wheel filename. Install a private copy of
+`wheel.wheel_bytes`, retaining `wheel.filename`, with ordinary pip. Installing
+the original mutable input path after verification would introduce another read
+of bytes that were not captured for the installation. No `--no-compile` flag is
+required by the authenticated-source profile.
+
+The supported evaluator profile is a self-contained purelib wheel with
+Wheel-Version 1.0. It rejects native/source-less code, `.data` installation
+transforms, generated console/GUI wrappers and Python startup hooks such as root
+`.pth`, `sitecustomize.py` and `usercustomize.py`. Check this profile before pip
+installation. A helper imported after interpreter startup cannot undo previously
+executed startup code; the starting interpreter and environment belong to the
+approved execution composition.
+
+## Bind installed code to the original wheel
+
+```python
+from importlib.metadata import distribution
+from robotics_acceptance_harness.evaluator_trust import verify_installed_wheel
+
+installed = verify_installed_wheel(wheel, distribution("example-evaluator"))
+```
+
+The binder uses the [PyPA wheel format](https://packaging.python.org/en/latest/specifications/binary-distribution-format/)
+and [installed-file metadata](https://packaging.python.org/en/latest/specifications/recording-installed-packages/).
+It checks the original wheel RECORD and compares each installed member with its
+authenticated original bytes. Rewriting installed code and its local RECORD
+together still fails. Installer metadata and the rewritten installed RECORD are
+not authentication roots.
+
+The supplied distribution's METADATA, WHEEL and entry-point metadata must match
+the authenticated wheel metadata. `installed.entry_points` retains original
+`(group, name, value)` bindings for the caller's admission checks. A loader must
+compare its selected entry point with these captured bindings, not rely on a
+later mutable metadata read.
+
+The returned `paths`, `files` and `sources` hold immutable captured bytes.
+Use them with the existing verified-source loader; ordinary Python import is not
+a replacement for that guard. The guard remains necessary for namespace/origin,
+prior-import, native and source-less restrictions. Dependencies outside the
+wheel remain part of the approved interpreter/image/BOM boundary.
+
+Extra files in the admitted namespace are rejected, including sources or native
+code omitted from installed RECORD. Ordinary PEP 3147/488 caches may be ignored
+only when they map to an existing authenticated Python source. Their bytes are
+not read, admitted or added to the proof: the verified-source loader compiles the
+captured source instead. Source-less/top-level bytecode and cache symlinks fail.
+Cross-distribution shared namespaces are outside this initial profile.
+
+The input profile requires POSIX nonblocking/no-follow regular-file opens.
+Platforms without those flags are refused rather than claiming equivalent
+pre-open protection.
+
+Wheel member count, per-member and aggregate expansion, raw inputs, verifier
+deadline and installed namespace/cache entry counts have explicit limits.
+Verifier reports and diagnostics are checked against capture limits after exit;
+the execution profile supplies live filesystem quotas and process resource bounds.
+Standard ZIP/CSV readers perform the decoding; duplicate paths, traversal and
+unsupported members are refused.
+
+## Evidence and third-party execution
+
+An evaluator receives the public `EvaluationContext` and produces namespaced
+`AssertionEvaluation` records with verified evidence digests. Read an admitted
+local evidence path once through the matching SDK public API
+`context.evidence.read_local(path, max_raw_evidence_bytes=...)`; process the returned
+immutable bytes rather than
+reopening a mutable path. Evidence inputs must be read-only in the author profile.
+
+Run third-party evaluators in the selected limited process/image profile with
+read-only evidence mounts and declared resource/deadline limits. The infrastructure
+owns that boundary; this SDK is not a sandbox or a process supervisor. The
+existing import guard is retained until any replacement establishes equivalent
+protection.
+
+The installed-byte result covers this wheel's files. A complete qualification also
+needs the agreed interpreter, dependencies, verifier/root provenance and execution
+composition, plus evaluator-method evidence. Package publication, composition
+verification and a native profile's acceptance remain separate records.
+
+[The standalone author example](../consumer-examples/evidence-byte-check/README.md)
+shows public imports, a PyPA entry point and one captured-evidence assertion.
+Its README identifies the matching SDK and execution-profile requirements.
