@@ -97,6 +97,40 @@ def _observations(context: EvaluationContext, source: LoadedDocument) -> dict[st
     return observations
 
 
+def _measurement_window(
+    context: EvaluationContext, source: LoadedDocument, run_context: LoadedDocument
+) -> dict[str, Any] | None:
+    window = source.as_dict().get("measurement_window")
+    if window is None:
+        if context.scenario["metric_definitions"]:
+            raise BundleValidationError(
+                "$.measurement_window", "metric assessment requires a captured source window"
+            )
+        return None
+    if window["clock"] != dict(run_context.data["time_authority"]):
+        raise BundleValidationError(
+            "$.measurement_window.clock", "differs from the run's declared measurement clock"
+        )
+    if context.scenario["metric_definitions"] and window["timestamp_encoding"] != "unix_ns":
+        raise BundleValidationError(
+            "$.measurement_window", "OTLP metric assessment requires unix_ns source timestamps"
+        )
+    if (
+        not window["start_ns"]
+        <= context.window_start_ns
+        < context.window_end_ns
+        <= window["end_ns"]
+    ):
+        raise BundleValidationError(
+            "$.evaluation.window", "must lie within the captured source window"
+        )
+    return {
+        **window,
+        "start_ns": context.window_start_ns,
+        "end_ns": context.window_end_ns,
+    }
+
+
 def _artifact(content: Mapping[str, Any], path: Path) -> dict[str, Any]:
     raw = dumps_canonical(dict(content))
     destination = write_bytes_atomically(raw, path)
@@ -192,6 +226,7 @@ def evaluate_native(
     source = _load_observation(context)
     _validate_source(context, source)
     observations = _observations(context, source)
+    measurement_window = _measurement_window(context, source, run_context)
     if "clock" in context.scenario["profile"]:
         clock = context.scenario["profile"]["clock"]
         if any(
@@ -260,10 +295,7 @@ def evaluate_native(
                 "configuration": configuration,
             },
             "environment": environment,
-            "window": {
-                "start_unix_ns": context.window_start_ns,
-                "end_unix_ns": context.window_end_ns,
-            },
+            **({"window": measurement_window} if measurement_window is not None else {}),
             "started_at": format_utc_datetime(started_at),
             "finished_at": format_utc_datetime(finished_at),
         },

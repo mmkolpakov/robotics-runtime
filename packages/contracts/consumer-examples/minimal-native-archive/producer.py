@@ -405,6 +405,12 @@ def produce(arguments: argparse.Namespace) -> dict[str, Any]:
             "started_at": started_at.isoformat(),
             "finished_at": finished_at.isoformat(),
             "observations": observations,
+            "measurement_window": {
+                "start_ns": window_start_ns,
+                "end_ns": window_end_ns,
+                "clock": {"kind": "external", "source_id": "system-utc"},
+                "timestamp_encoding": "unix_ns",
+            },
             "native_model": loaded_model_reference,
             "evidence": [reference(raw_native), reference(metrics)],
         },

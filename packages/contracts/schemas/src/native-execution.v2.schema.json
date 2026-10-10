@@ -448,22 +448,7 @@
           "format": "date-time"
         },
         "window": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "start_unix_ns",
-            "end_unix_ns"
-          ],
-          "properties": {
-            "start_unix_ns": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "end_unix_ns": {
-              "type": "integer",
-              "minimum": 0
-            }
-          }
+          "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/measurementWindow"
         }
       }
     },
@@ -494,6 +479,35 @@
         "finished_at": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "measurementWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_ns",
+        "end_ns",
+        "clock",
+        "timestamp_encoding"
+      ],
+      "properties": {
+        "start_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "clock": {
+          "$ref": "urn:robotics-runtime-contracts:v1:acceptance-run#/properties/time_authority"
+        },
+        "timestamp_encoding": {
+          "enum": [
+            "unix_ns",
+            "native_ns"
+          ]
         }
       }
     }

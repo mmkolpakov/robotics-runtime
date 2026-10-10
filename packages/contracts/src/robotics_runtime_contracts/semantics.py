@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from typing import Any, NoReturn
 
-from robotics_runtime_contracts._timestamps import parse_timestamp
+from robotics_runtime_contracts._timestamps import parse_timestamp, parse_timestamp_ns
 from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.qualification_policy import (
     RESERVED_ASSERTION_IDS,
@@ -1272,9 +1272,16 @@ def _validate_native_runtime(document: Mapping[str, Any]) -> None:
     )
 
 
+def _native_timestamp(schema_name: str, path: str, value: str) -> int:
+    try:
+        return parse_timestamp_ns(value, json_path=path)
+    except ContractError as error:
+        _fail(schema_name, path, f"must be an exact UTC date-time: {error}")
+
+
 def _native_time_order(schema_name: str, values: Mapping[str, Any], path: str) -> None:
-    start = _timestamp(schema_name, f"{path}.started_at", values["started_at"])
-    finish = _timestamp(schema_name, f"{path}.finished_at", values["finished_at"])
+    start = _native_timestamp(schema_name, f"{path}.started_at", values["started_at"])
+    finish = _native_timestamp(schema_name, f"{path}.finished_at", values["finished_at"])
     if finish < start:
         _fail(schema_name, f"{path}.finished_at", "must not be earlier than started_at")
 
@@ -1298,6 +1305,11 @@ def _validate_native_observation_evidence(document: Mapping[str, Any]) -> None:
 
 def _validate_native_observation(document: Mapping[str, Any]) -> None:
     _native_time_order(str(document["schema_version"]), document, "$")
+    window = document.get("measurement_window")
+    if window is not None and window["end_ns"] <= window["start_ns"]:
+        _fail(
+            str(document["schema_version"]), "$.measurement_window", "must have positive duration"
+        )
     _validate_native_observation_evidence(document)
 
 
@@ -1375,14 +1387,14 @@ def _validate_native_result(document: Mapping[str, Any]) -> None:
     _native_time_order(schema_name, document["original_execution"], "$.original_execution")
     _native_time_order(schema_name, document["evaluation"], "$.evaluation")
     window = document["evaluation"].get("window")
-    if window is not None and window["end_unix_ns"] <= window["start_unix_ns"]:
+    if window is not None and window["end_ns"] <= window["start_ns"]:
         _fail(schema_name, "$.evaluation.window", "must have positive duration")
-    original_finish = _timestamp(
+    original_finish = _native_timestamp(
         schema_name,
         "$.original_execution.finished_at",
         document["original_execution"]["finished_at"],
     )
-    evaluated_at = _timestamp(
+    evaluated_at = _native_timestamp(
         schema_name, "$.evaluation.started_at", document["evaluation"]["started_at"]
     )
     if evaluated_at < original_finish:

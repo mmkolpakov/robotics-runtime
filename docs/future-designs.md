@@ -13,10 +13,17 @@ Additional autopilot or simulator integrations need their own pinned native SDK
 composition, supported operations and execution evidence. General provider
 bindings and a connection to middleware do not establish those capabilities.
 
-Neutral scenario/runtime/result formats, authenticated installed evaluator bytes,
-independent archive re-evaluation, distributed recovery and new deployment
-profiles require their own implementation and acceptance. Current v1 interfaces
-retain their existing ROS-oriented semantics. No future design described here
+Native v2 scenario/runtime/observation/result formats cover the documented
+software and recorded-observation path. Runtime inputs precede execution;
+assessment context and captured measurement windows are separate from the
+original run. V1 formats retain their ROS-oriented fields and semantics.
+The [compatibility reference](../packages/harness/docs/compatibility.md) defines
+this support boundary.
+
+Authenticated installed evaluator bytes, independent archive re-evaluation,
+distributed recovery and new deployment profiles still require their own
+implementation and acceptance. Physical v2 qualification and cross-clock
+conversion are outside the native archive path. No future design described here
 changes the meaning of historical signed documents or recorded run outcomes.
 
 For implemented interfaces, use the [current guide](../README.md),

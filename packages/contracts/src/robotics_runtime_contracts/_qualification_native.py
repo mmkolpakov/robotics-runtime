@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
-from datetime import UTC, datetime
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
@@ -12,7 +11,7 @@ from robotics_runtime_contracts._qualification_types import (
     QualificationDiagnostic,
     QualificationReport,
 )
-from robotics_runtime_contracts._timestamps import parse_timestamp
+from robotics_runtime_contracts._timestamps import parse_timestamp_ns
 from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.status import worst_status
 
@@ -78,8 +77,10 @@ def _resolved_observations(
                 "state": "not_applicable",
                 "reason": requirement["reason"],
             }
-            if value["state"] != "not_applicable":
-                rules._fail(f"source observation {name} violates declared non-applicability")
+            if value["state"] != "not_applicable" or value["reason"] != requirement["reason"]:
+                rules._fail(
+                    f"source observation {name} must preserve declared non-applicability and reason"
+                )
         else:
             value = value or {"state": "unobserved", "reason": "producer supplied no observation"}
             if value["state"] == "not_applicable":
@@ -170,10 +171,15 @@ def _domain_bindings(
             clock,
             ("kind", "source_id"),
         )
-    rules._require_time_order(
+    for label, prepared_at in (
+        ("run context", context.run["created_at"]),
+        ("runtime manifest", runtime["generated_at"]),
+    ):
+        _require_native_time_order(
+            f"{label} {domain} before execution", prepared_at, observation["started_at"]
+        )
+    _require_native_time_order(
         f"original execution {domain}",
-        context.run["created_at"],
-        runtime["generated_at"],
         observation["started_at"],
         observation["finished_at"],
         index["generated_at"],
@@ -183,9 +189,10 @@ def _domain_bindings(
     )
 
 
-def _timestamp_ns(value: str) -> int:
-    delta = parse_timestamp(value) - datetime(1970, 1, 1, tzinfo=UTC)
-    return ((delta.days * 86400 + delta.seconds) * 1_000_000 + delta.microseconds) * 1000
+def _require_native_time_order(label: str, *values: str) -> None:
+    timestamps = [parse_timestamp_ns(value) for value in values]
+    if timestamps != sorted(timestamps):
+        rules._fail(f"{label} is not chronologically ordered")
 
 
 def _domain_window(
@@ -193,13 +200,33 @@ def _domain_window(
 ) -> None:
     window = rules._document(context.results[domain])["evaluation"].get("window")
     if window is None:
+        if context.scenario["metric_definitions"]:
+            rules._fail(f"domain {domain} metric assessment has no captured measurement window")
         return
+    if context.scenario["metric_definitions"] and window["timestamp_encoding"] != "unix_ns":
+        rules._fail(f"domain {domain} OTLP metric assessment requires unix_ns timestamps")
     observation = rules._document(observation_artifact)
+    source_window = observation.get("measurement_window")
+    if source_window is None:
+        rules._fail(f"domain {domain} assessment window has no captured measurement window")
+    rules._require_equal(
+        f"domain {domain} assessment clock", source_window["clock"], window["clock"]
+    )
+    rules._require_equal(
+        f"domain {domain} timestamp encoding",
+        source_window["timestamp_encoding"],
+        window["timestamp_encoding"],
+    )
+    rules._require_equal(
+        f"domain {domain} captured measurement clock",
+        context.run["time_authority"],
+        source_window["clock"],
+    )
     if not (
-        _timestamp_ns(observation["started_at"])
-        <= window["start_unix_ns"]
-        < window["end_unix_ns"]
-        <= _timestamp_ns(observation["finished_at"])
+        source_window["start_ns"]
+        <= window["start_ns"]
+        < window["end_ns"]
+        <= source_window["end_ns"]
     ):
         rules._fail(f"domain {domain} assessment window exceeds its actual source interval")
 
@@ -243,6 +270,33 @@ def _domain_assertion_registry(context: _Context, domain: str) -> None:
                 )
 
 
+def _missing_observation_coverage(
+    scenario: Mapping[str, Any], expected: Mapping[str, Any]
+) -> set[str]:
+    missing = {
+        f"$.observations.{name}"
+        for name, requirement in scenario["profile"]["observations"].items()
+        if requirement["requirement"] == "required" and expected[name]["state"] != "measured"
+    }
+    if not any(value["state"] == "measured" for value in expected.values()):
+        missing.add("$.observations")
+    return missing
+
+
+def _missing_criterion_coverage(scenario: Mapping[str, Any], result: Mapping[str, Any]) -> set[str]:
+    missing: set[str] = set()
+    if not scenario["assertions"] and not any(
+        item["source"] == "product" for item in result["assertion_results"]
+    ):
+        missing.add("$.assertions")
+    missing.update(
+        f"$.assertions.{item['assertion_id']}"
+        for item in result["assertion_results"]
+        if item["status"] == "skipped"
+    )
+    return missing
+
+
 def _domain_coverage(
     context: _Context, domain: str, observation_artifact: QualificationArtifact
 ) -> None:
@@ -251,15 +305,13 @@ def _domain_coverage(
     observation = rules._document(observation_artifact)
     expected = _resolved_observations(scenario["profile"], observation)
     rules._require_equal(f"result {domain} observations", expected, result["observations"])
-    missing = {
-        f"$.observations.{name}"
-        for name, requirement in scenario["profile"]["observations"].items()
-        if requirement["requirement"] == "required" and expected[name]["state"] != "measured"
-    }
+    missing = _missing_observation_coverage(scenario, expected) | _missing_criterion_coverage(
+        scenario, result
+    )
     if not missing <= set(result["unevaluated"]):
-        rules._fail(f"result {domain} omits unevaluated required observation coverage")
+        rules._fail(f"result {domain} omits unevaluated source and criterion coverage")
     if missing and worst_status((result["status"], "incomplete")) != result["status"]:
-        rules._fail(f"result {domain} is passing despite missing required observations")
+        rules._fail(f"result {domain} is passing despite missing source or criterion coverage")
 
 
 def _domain_observation_evidence(

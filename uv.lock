@@ -978,6 +978,7 @@ version = "0.20.0"
 source = { editable = "packages/contracts" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },
+    { name = "protobuf" },
     { name = "pyyaml" },
     { name = "referencing" },
 ]
@@ -994,6 +995,7 @@ requires-dist = [
     { name = "jsonschema", extras = ["format-nongpl"], specifier = ">=4.26,<5" },
     { name = "lz4", marker = "extra == 'mcap'", specifier = ">=4,<5" },
     { name = "mcap", marker = "extra == 'mcap'", specifier = ">=1.4,<2" },
+    { name = "protobuf", specifier = ">=5,<8" },
     { name = "pyyaml", specifier = ">=6.0.3,<7" },
     { name = "referencing", specifier = ">=0.37,<1" },
     { name = "zstandard", marker = "extra == 'mcap'", specifier = ">=0.25,<1" },

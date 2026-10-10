@@ -649,14 +649,10 @@ def test_native_qualification_binds_assessment_window_to_source_interval(
     tmp_path: Path, outside: bool
 ) -> None:
     specs = _archive(tmp_path)
+    _set_measurement_window(tmp_path, start_ns=2000, end_ns=3000)
     path = tmp_path / "result-primary.json"
     result = _document(path)
-    start = int(datetime.fromisoformat(T2).timestamp()) * 1_000_000_000
-    end = int(datetime.fromisoformat(T3).timestamp()) * 1_000_000_000
-    result["evaluation"]["window"] = {
-        "start_unix_ns": start - (1 if outside else 0),
-        "end_unix_ns": end,
-    }
+    result["evaluation"]["window"]["start_ns"] -= 1 if outside else 0
     _write(path, result)
     _refresh_domain(tmp_path)
     if outside:
@@ -680,3 +676,206 @@ def test_native_transport_evaluation_refuses_legacy_format(tmp_path: Path) -> No
             output_path=tmp_path / "refused.json",
         )
     assert not (tmp_path / "refused.json").exists()
+
+
+def test_native_qualification_accepts_runtime_prepared_before_run_context(tmp_path: Path) -> None:
+    specs = _archive(tmp_path)
+    runtime_path = tmp_path / "runtime-primary.json"
+    runtime = _document(runtime_path)
+    runtime["generated_at"] = "2026-10-10T11:59:59Z"
+    _write(runtime_path, runtime)
+    observation_path = tmp_path / "observation-primary.json"
+    observation = _document(observation_path)
+    observation["runtime_manifest_sha256"] = _digest(runtime_path)
+    _write(observation_path, observation)
+    result_path = tmp_path / "result-primary.json"
+    result = _document(result_path)
+    result["runtime_manifest_sha256"] = _digest(runtime_path)
+    _write(result_path, result)
+    _refresh_domain(tmp_path)
+    assert validate_qualification_artifacts(specs)["run_id"] == RUN_ID
+
+
+def test_native_qualification_requires_exact_declared_nonapplicability_reason(
+    tmp_path: Path,
+) -> None:
+    specs = _archive(tmp_path)
+    path = tmp_path / "observation-primary.json"
+    source = _document(path)
+    source["observations"]["clock-delivery"]["reason"] = "different inapplicability"
+    _write(path, source)
+    _refresh_domain(tmp_path)
+    with pytest.raises(QualificationError, match="preserve declared non-applicability and reason"):
+        validate_qualification_artifacts(specs)
+
+
+@pytest.mark.parametrize("all_not_applicable", [False, True])
+def test_native_link_coverage_independently_refuses_forged_pass(
+    tmp_path: Path, all_not_applicable: bool
+) -> None:
+    from robotics_runtime_contracts._qualification_checks import _context
+    from robotics_runtime_contracts._qualification_native import _domain_coverage, _observations
+    from robotics_runtime_contracts.qualification import inspect_qualification_artifacts
+
+    report = inspect_qualification_artifacts(_archive(tmp_path))
+    assert report.valid
+    context = _context(report.artifacts, [])
+    assert context is not None
+    result = context.results["primary"].document
+    assert isinstance(result, dict)
+    result["status"] = "passed"
+    if all_not_applicable:
+        source_artifact = _observations(context)["primary"]
+        source = source_artifact.document
+        assert isinstance(source, dict)
+        declaration = {
+            "kind": "postcondition",
+            "requirement": "not_applicable",
+            "reason": "unavailable",
+        }
+        context.scenario["profile"]["observations"]["error"] = declaration
+        value = {"state": "not_applicable", "reason": "unavailable"}
+        source["observations"]["error"] = value
+        result["observations"]["error"] = value
+        result["unevaluated"].append("$.observations")
+    with pytest.raises(
+        QualificationError, match="passing despite missing source or criterion coverage"
+    ):
+        _domain_coverage(context, "primary", _observations(context)["primary"])
+
+
+def _set_measurement_window(
+    tmp_path: Path, *, start_ns: int, end_ns: int, clock: dict[str, str] | None = None
+) -> None:
+    run_path = tmp_path / "run.json"
+    run = _document(run_path)
+    if clock is not None:
+        scenario_path = tmp_path / "scenario.json"
+        scenario = _document(scenario_path)
+        scenario["profile"]["clock"] = clock
+        _write(scenario_path, scenario)
+        run["time_authority"] = clock
+        run["scenario_sha256"] = _digest(scenario_path)
+        _write(run_path, run)
+        runtime_path = tmp_path / "runtime-primary.json"
+        runtime = _document(runtime_path)
+        runtime["scenario_sha256"] = _digest(scenario_path)
+        runtime["profile"] = scenario["profile"]
+        _write(runtime_path, runtime)
+    source_path = tmp_path / "observation-primary.json"
+    source = _document(source_path)
+    source["scenario_sha256"] = _digest(tmp_path / "scenario.json")
+    source["runtime_manifest_sha256"] = _digest(tmp_path / "runtime-primary.json")
+    window = {
+        "start_ns": start_ns,
+        "end_ns": end_ns,
+        "clock": run["time_authority"],
+        "timestamp_encoding": "native_ns",
+    }
+    source["measurement_window"] = window
+    _write(source_path, source)
+    result_path = tmp_path / "result-primary.json"
+    result = _document(result_path)
+    result["scenario_sha256"] = source["scenario_sha256"]
+    result["runtime_manifest_sha256"] = source["runtime_manifest_sha256"]
+    result["profile"] = _document(tmp_path / "scenario.json")["profile"]
+    result["original_execution"]["acceptance_run_sha256"] = _digest(run_path)
+    result["evaluation"]["window"] = window
+    _write(result_path, result)
+    aggregate_path = tmp_path / "aggregate.json"
+    aggregate = _document(aggregate_path)
+    aggregate["acceptance_run_sha256"] = _digest(run_path)
+    _write(aggregate_path, aggregate)
+    _refresh_domain(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "2026-10-10T12:00:02.123456789Z",
+        "2026-10-10T14:00:02.123456789+02:00",
+        "2026-10-10T11:00:02.123456789-01:00",
+        "2026-10-10t12:00:02.123456789z",
+    ],
+)
+def test_exact_utc_provenance_parser_preserves_nine_digits(value: str) -> None:
+    from robotics_runtime_contracts._timestamps import parse_timestamp_ns
+
+    assert parse_timestamp_ns(value) == 1791633602_123456789
+
+
+def test_exact_utc_provenance_parser_refuses_excess_precision() -> None:
+    from robotics_runtime_contracts._timestamps import parse_timestamp_ns
+
+    with pytest.raises(ContractError, match="invalid timestamp") as caught:
+        parse_timestamp_ns("2026-10-10T12:00:02.1234567890Z", json_path="$.started_at")
+    assert caught.value.error_id == "input.invalid_timestamp"
+    assert caught.value.json_path == "$.started_at"
+
+
+def test_native_qualification_keeps_zero_based_measurement_clock_separate_from_utc(
+    tmp_path: Path,
+) -> None:
+    specs = _archive(tmp_path)
+    _set_measurement_window(
+        tmp_path,
+        start_ns=0,
+        end_ns=1_000_000_000,
+        clock={"kind": "external", "source_id": "native-zero"},
+    )
+    assert _document(tmp_path / "observation-primary.json")["started_at"] == T2
+    assert validate_qualification_artifacts(specs)["run_id"] == RUN_ID
+
+
+@pytest.mark.parametrize(
+    "change", ["source-absent", "foreign-clock", "foreign-configuration", "foreign-encoding"]
+)
+def test_native_qualification_requires_captured_window_and_matching_clock(
+    tmp_path: Path, change: str
+) -> None:
+    specs = _archive(tmp_path)
+    _set_measurement_window(tmp_path, start_ns=0, end_ns=1_000_000_000)
+    if change == "source-absent":
+        path = tmp_path / "observation-primary.json"
+        source = _document(path)
+        del source["measurement_window"]
+        _write(path, source)
+    else:
+        path = tmp_path / "result-primary.json"
+        result = _document(path)
+        clock = result["evaluation"]["window"]["clock"]
+        if change == "foreign-clock":
+            clock["source_id"] = "foreign-clock"
+        elif change == "foreign-configuration":
+            clock["configuration_sha256"] = "a" * 64
+        else:
+            result["evaluation"]["window"]["timestamp_encoding"] = "unix_ns"
+        _write(path, result)
+    _refresh_domain(tmp_path)
+    with pytest.raises(
+        QualificationError, match="measurement window|assessment clock|timestamp encoding"
+    ):
+        validate_qualification_artifacts(specs)
+
+
+def test_native_qualification_detects_one_nanosecond_provenance_boundary_violation(
+    tmp_path: Path,
+) -> None:
+    specs = _archive(tmp_path)
+    runtime_path = tmp_path / "runtime-primary.json"
+    runtime = _document(runtime_path)
+    runtime["generated_at"] = "2026-10-10T12:00:02.000000901Z"
+    _write(runtime_path, runtime)
+    source_path = tmp_path / "observation-primary.json"
+    source = _document(source_path)
+    source["runtime_manifest_sha256"] = _digest(runtime_path)
+    source["started_at"] = "2026-10-10T12:00:02.000000900Z"
+    _write(source_path, source)
+    result_path = tmp_path / "result-primary.json"
+    result = _document(result_path)
+    result["runtime_manifest_sha256"] = _digest(runtime_path)
+    result["original_execution"]["started_at"] = source["started_at"]
+    _write(result_path, result)
+    _refresh_domain(tmp_path)
+    with pytest.raises(QualificationError, match="runtime manifest primary before execution"):
+        validate_qualification_artifacts(specs)

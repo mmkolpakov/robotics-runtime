@@ -36,8 +36,13 @@ identify the exact installed pair. The 0.15 and 0.16 generations are incompatibl
 
 ## Current Catalog
 
-The published role-to-schema mapping is maintained in
+The role-to-schema mapping is maintained in
 [`catalog.v1.json`](src/robotics_runtime_contracts/schemas/catalog.v1.json).
+Canonical defaults are retained; `supported_versions` in that same catalog
+adds opt-in native v2 scenario, runtime, observation and result schemas.
+`schema_versions_for_role()` lists those supported versions, while
+`schema_for_role(role, version=2)` selects an explicit version.
+The published 0.20.0/0.21.0 package pair predates this native path.
 
 Superseded experimental readers and writers are removed rather than carried as
 parallel APIs. Historical releases remain reproducible from immutable Git tags
@@ -64,7 +69,7 @@ supersedes the former pre-1.0 replacement policy.
 - Documents declare `schema_version`; historical 0.15/0.16 evidence also needs
   its producer's exact package version because some identifiers were reused.
 - Readers resolve document roles through the catalog and never guess a version.
-- Writers emit only the catalogued schema for a role.
+- Writers emit a declared supported schema for the role; canonical defaults remain unchanged.
 - Validation never mutates input and never retrieves a schema from the network.
 - Migrations are introduced only for a real consumer and remain separate from
   validation.
@@ -82,8 +87,9 @@ The schema identifier, schema bytes and catalog are unchanged.
 
 ## Schema Identity
 
-Dataset IDs use `urn:robotics-runtime-contracts:v2:*`; other current roles
-use `urn:robotics-runtime-contracts:v1:*`.
+Dataset and native v2 IDs use `urn:robotics-runtime-contracts:v2:*`.
+Retained v1 roles keep `urn:robotics-runtime-contracts:v1:*` and their original
+schema bytes and semantics.
 Public role schemas and internal reusable resources have disjoint IDs. Schema
 digests are derived from packaged bytes with `schema_digest()`.
 
@@ -116,9 +122,14 @@ their integration evidence when adopting a release.
 
 ## Neutrality
 
-Common contracts do not select a robot or product. They model ROS 2/SROS2 and
-runtime-specific constraints; concrete provider identities and capabilities are
-observed data. All public roles support digest-pinned, reverse-domain extension
+Common contracts do not select a robot or product. V1 retains its ROS 2/SROS2
+constraints. Native v2 profiles declare the actual type support or codec, backend,
+wire envelope, executor/clock bindings and recorder transformations in use.
+Descriptors and native models are ArtifactRef bindings where they exist; IDL
+and URDF are not universal requirements. Observations belong to the selected
+profile and distinguish measured, not_applicable, unobserved and invalid states.
+V2 physical qualification remains unsupported. Concrete provider identities and
+capabilities are observed data. All public roles support digest-pinned, reverse-domain extension
 schemas. Seven existing roles retain unpinned legacy extensions only when
 `extension_schemas` is absent; the [README](README.md#extensions) lists that boundary.
 

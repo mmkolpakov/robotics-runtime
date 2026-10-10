@@ -38,10 +38,23 @@ Native data stays in its native path:
 - simulator workers use their engine's controller, stepping and sensor APIs;
 - evaluators consume retained files and exact references.
 
-ROS is an integration profile; the common host and document model do not
-require it. A middleware connection alone does not establish an autopilot control
-path. Each native SDK integration needs its own accepted operations and profile.
-The observer remains attach-only; the provider/controller owns simulation changes.
+The common host and Python document workers install without ROS. The v1
+scenario, runtime, observation and result formats retain required ROS graph,
+lifecycle and timing fields. Their semantics remain unchanged.
+
+The opt-in v2 formats describe native software and recorded observations through
+explicit profile bindings and retained ArtifactRef bytes. Runtime configuration
+is a pre-run input; completed observations are separate evidence. Results bind
+the original execution separately from the assessment method, environment and
+time. A measured zero, inapplicability, an absent observation and an invalid
+measurement have distinct states. Missing required coverage is incomplete.
+
+Native command acceptance, final state and postcondition observations remain
+separate profile facts. The core evaluator does not add SDK control operations.
+V2 physical qualification and v1 transport evaluation with v2 profiles are
+unsupported. Each native SDK integration needs its own accepted operations and
+profile; a middleware connection alone establishes no autopilot control path.
+The ROS observer remains attach-only; the provider/controller owns simulation changes.
 
 ## External API compatibility
 
@@ -109,10 +122,17 @@ Feature discovery describes advertised support. Qualification checks the actual
 operation for the pinned version and environment. A simulator's frame update is
 not assumed to be one physics step.
 
-Every run records time authority, domain/epoch, units, resolution and observed
-advance. Wall deadlines, physics time, render time and capture time remain
+Runs declare time authority; each selected profile records the clock facts it
+actually uses. Wall deadlines, physics time, render time and capture time remain
 distinct. Reset begins a new simulation epoch. Floating-point seconds are not
 reported as exact integer nanoseconds.
+
+V2 UTC provenance timestamps use exact RFC3339 nanosecond parsing. Measurement
+windows carry captured integer bounds, a clock declaration and timestamp encoding;
+assessment windows must use that same clock and lie within the source window.
+The built-in OTLP metric method uses unix_ns. A selected SDK/product assessment
+may use native_ns; it does not acquire an invented UTC relation. UTC provenance
+start/finish dates do not define a simulation or device measurement epoch.
 
 Coordinate conventions are explicit. ROS profiles follow REP-103/105; native
 stage units, world axes and camera axes are retained with their evidence.
@@ -147,9 +167,18 @@ Qualification separates physics-only execution, offscreen sensor rendering and
 visual review of real frames. Desktop GUI is an additional deployment capability.
 A headless camera stream does not qualify a desktop GUI.
 
-An independent consumer selects Webots or Isaac without installing Gazebo or ROS
-in the common host/evaluator. Unsupported capabilities, wrong assets, cancellation,
-missing facts and foreign-resource isolation are explicit failures.
+A consumer can select Webots or Isaac bindings without installing Gazebo or ROS
+in the common host/evaluator. That composition choice does not establish a full
+public native verdict. The provider's documented profile must supply the actual
+observations and qualified source/runtime/assets. Unsupported capabilities,
+wrong assets, cancellation, missing facts and foreign-resource isolation are
+explicit failures.
+
+The [native archive example](../packages/contracts/consumer-examples/minimal-native-archive/README.md)
+covers a software counter and a discrete counter simulation through installed
+public CLIs. It preserves original bytes and checks JSON/JUnit, aggregation and
+qualification links. This scope does not qualify physical execution, a simulator
+SDK, camera rendering or archive re-evaluation by a new method.
 
 The initial flight reference is stock PX4/Gazebo. General Webots/Isaac provider
 support does not qualify drone dynamics, a vision model, physical actuation,

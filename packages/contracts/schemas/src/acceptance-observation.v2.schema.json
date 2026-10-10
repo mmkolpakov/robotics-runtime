@@ -64,6 +64,9 @@
     },
     "native_model": {
       "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+    },
+    "measurement_window": {
+      "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/measurementWindow"
     }
   }
 }

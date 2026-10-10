@@ -12,6 +12,7 @@ from robotics_runtime_contracts import (
     validate_clock_relation_evidence,
     worst_status,
 )
+from robotics_runtime_contracts._timestamps import parse_timestamp_ns
 
 from robotics_acceptance_harness import __version__
 from robotics_acceptance_harness.documents import BundleValidationError, load_document
@@ -228,7 +229,9 @@ def _validate_aggregation_results(
     if native:
         aggregate_time = generated_at or datetime.now(UTC)
         for result in results:
-            if datetime.fromisoformat(result.data["evaluation"]["finished_at"]) > aggregate_time:
+            if parse_timestamp_ns(result.data["evaluation"]["finished_at"]) > parse_timestamp_ns(
+                aggregate_time.isoformat()
+            ):
                 raise BundleValidationError(
                     "$.generated_at", "aggregate precedes a completed assessment"
                 )
@@ -296,7 +299,7 @@ def _validate_native_result(
         assessment["started_at"],
         assessment["finished_at"],
     )
-    times = [datetime.fromisoformat(value) for value in values]
+    times = [parse_timestamp_ns(value) for value in values]
     if times != sorted(times):
         raise BundleValidationError("$.evaluation", "original and assessment times are not ordered")
 
