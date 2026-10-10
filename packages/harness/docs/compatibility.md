@@ -24,6 +24,12 @@ Unknown schema versions, wrong document roles, and contradictory bundle facts
 fail before observation or evaluation begins. Scenario extensions remain
 separately versioned and digest-pinned by their canonical URI.
 
+The 0.21.0 wheel forwards the caller's extension registry to the scenario only
+when loading a bundle. Extension-bearing runtime, model, dataset, permit or
+verification documents do not receive it on that path. Current development
+source fixes the forwarding; that fix is not a published 0.21.0 capability.
+The [first-result path](../../../docs/first-result.md) uses no custom extensions.
+
 ## Provider Compatibility
 
 The stable interface contains observed capabilities and implementation
@@ -32,20 +38,9 @@ Provider qualification belongs to runtime infrastructure. A new provider is
 compatible when it emits the existing canonical documents and passes the same
 conformance suite.
 
-The historical accepted B2 stock profile belongs to
-[R9 `v0.9.0-rc.1`](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.9.0-rc.1)
-and contracts 0.18.1 / harness 0.19.0. It covers one ROS domain, UInt64 and one
-finalized MCAP recording.
-[R10 `v0.10.0-rc.1`](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.10.0-rc.1)
-uses 0.18.2/0.19.1 and has verified release identities; its
-[released B3 run](https://github.com/mmkolpakov/robotics-runtime-infra/actions/runs/37157837270)
-passed entity checks, then failed with a 107 ms exact-step overshoot and a
-JointState timeout. B3 remains unaccepted. The infrastructure
-[compatibility policy](https://github.com/mmkolpakov/robotics-runtime-infra/blob/main/docs/compatibility.md)
-distinguishes caller, tooling and image-source commits. Historical
-`v0.8.0-rc.1` remains bound to 0.15.4/0.17.1. Source fixtures, archive checks
-and live observer tests do not establish arbitrary consumer or hardware
-qualification.
+[Preserved run and release records](../../../docs/run-history.md) hold the
+original package versions, source identities and native profile outcomes.
+A current package install or source fixture does not qualify those compositions.
 
 The Python-only commands work without ROS. Live observation requires the ROS 2
 packages and message interfaces declared by the runtime. Exact provider and

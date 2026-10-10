@@ -16,6 +16,10 @@ logic and vision models. Deployment operators supply host prerequisites.
 
 ## Start with the part you need
 
+[Install the published Python tools and produce your first result](docs/first-result.md).
+The guide includes downloadable exact inputs, their producers, expected JSON/JUnit,
+exit codes and an integrity refusal. The document path needs no Node or ROS.
+
 Use contracts to validate files independently of ROS or a simulator. Use the
 harness to evaluate evidence for a supported qualification profile. Use infra
 to launch a composition and record what actually ran.
@@ -119,16 +123,13 @@ retains opaque uploads through existing custody tools. This source service is se
 native execution and qualification;
 it has no published API image release.
 
-## Planned integrations
-
 The [optional offline MCP source package](mcp/README.md) provides six read tools
 through stdio and published CLI workers. It has no published MCP artifact.
 
-These designs are not released capabilities:
-
-- Effectful MCP run operations over admitted consumer/controller interfaces.
-- Additional native autopilot profiles through upstream ROS 2/DDS interfaces,
-  with [separate control-operation acceptance](docs/architecture.md#native-data).
+[Preserved run and release records](docs/run-history.md) retain the versions,
+scope and outcomes of their original evidence.
+[Future design boundaries](docs/future-designs.md) are separate from this current
+guide and are not implemented capabilities.
 
 ## Host development
 
@@ -185,8 +186,11 @@ The reader uses the stock Sphinx, MyST and Furo toolchain; its source allowlist 
 `docs/reader/build.py`. Keep release instructions current
 when package versions or interfaces change. Preserve the exact version and commit
 pins in archived examples and qualification records.
-The LLM export includes the C4 DSL and Mermaid sequence/state sources; the
-source archive and manifest bind those same files to the documentation build.
+The LLM export includes current guidance and the C4 DSL and Mermaid sequence/state
+sources exactly once. Historical run records, future designs, ADRs and migration
+archives remain readable in HTML and the source download but are excluded from
+the LLM text. The source archive and manifest bind the exported bytes to the build.
+The consumer-inputs archive contains the first-result producer and templates.
 
 Build and check documentation in a separate Python 3.12 environment:
 

@@ -45,6 +45,10 @@ Release assets include build-provenance attestations. See
 
 ## CLI
 
+For exact obtainable inputs and expected outputs, follow the
+[published first-result guide](../../docs/first-result.md). Individual validation
+does not require harness installation or `doctor`.
+
 Validate JSON or YAML using its declared `schema_version`:
 
 ```bash
@@ -119,14 +123,17 @@ other existing roles use v1. Historical dataset-v1 documents require their
 matching archived package. The machine-readable source of truth is
 [`catalog.v1.json`](src/robotics_runtime_contracts/schemas/catalog.v1.json).
 
-| Area | Public roles |
-| --- | --- |
-| Execution | scenario, run, observation, result, aggregate, campaign |
-| Runtime | runtime manifest, model manifest, dataset manifest, robot description |
-| Evidence | evidence index, recording summary, artifact receipt |
-| Qualification | profile, conformance result, bundle, policy |
-| Physical safety | execution permit, verification, trust policy |
-| Cross-domain transport | channel, observation, clock relation, causal chain, qualification result |
+The public role names are `acceptance_scenario`, `acceptance_run`,
+`acceptance_observation`, `acceptance_result`, `acceptance_aggregate`,
+`campaign_summary`, `runtime_manifest`, `model_artifact_manifest`,
+`dataset_manifest`, `robot_description`, `evidence_index`, `recording_summary`,
+`artifact_receipt`, `artifact_verification`, `qualification_profile`,
+`conformance_result`, `qualification_bundle`, `qualification_policy`,
+`execution_permit`, `execution_verification`, `execution_trust_policy`,
+`transport_channel`, `transport_channel_observation`, `clock_relation`,
+`causal_chain` and `transport_qualification_result`. These are catalog/API role
+keys. For example `schema_for_role("acceptance_scenario")` returns
+`acceptance-scenario.v1`; CLI `validate` selects that schema from the document.
 
 Every public document uses JSON Schema Draft 2020-12, declares
 `schema_version`, and rejects unknown root fields. Dataset IDs use the

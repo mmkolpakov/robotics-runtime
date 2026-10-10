@@ -75,25 +75,25 @@ cd packages/harness
 Release consumers should install the published wheel together with the locked
 contracts wheel and verify release provenance as described in
 [`docs/supply-chain.md`](docs/supply-chain.md).
-Published archives and earlier infra R9/R10 profile results retain their original
-versions and source identities. The current workspace's new dataset format does
-not retroactively qualify those images. R10's released B3 run failed and is not
-accepted. See
-[compatibility](docs/compatibility.md) for the evidence boundaries. They do
-not qualify an infra image, accelerator backend, arbitrary product evaluator
-or physical target; those require their own execution evidence.
+[Preserved run and release records](../../docs/run-history.md) retain each
+archive's original versions, identities, scope and outcome. Installing these Python
+packages does not qualify an infra image, simulator, accelerator or physical target.
 
 ## Quick Start
 
-Validate and cross-check a known-good bundle without ROS:
+Follow [the published first-result path](../../docs/first-result.md) to install the
+exact pair, obtain all inputs, validate documents, evaluate synthetic evidence and
+read the resulting JSON/JUnit. Offline evaluation exits `1` with `incomplete`
+because live graph, clock and shutdown coverage is absent.
 
-```bash
-uv run robotics-acceptance explain \
-  --scenario tests/fixtures/simulation/scenario.yaml \
-  --runtime tests/fixtures/simulation/runtime.yaml
-```
+A scenario comes from its author, a runtime manifest from the selected runtime
+producer, a run context from `create-run` or a public document writer, and evidence
+from the workload's recorder and telemetry collector. The guide names each exact
+example file and producer. `tests/fixtures` is source-development data and is not
+installed by pip. `doctor` is not required for contracts-only validation; `why`
+takes an existing result.
 
-Create the immutable context shared by every domain in one run:
+Create the immutable context shared by every domain in a new real run:
 
 ```bash
 robotics-acceptance create-run \
@@ -332,6 +332,10 @@ matching archived package, rather than converted inside the current evaluator.
 
 Scenario extensions are explicit and digest-pinned. Pass the same
 `--extension-schema URI=PATH` mapping to every command that reads the scenario.
+Harness 0.21.0 does not forward that registry to additional bundle documents
+(runtime, model, dataset, permit or verification); the fix in development source
+is separate from this published wheel. See
+[published extension limits](../../docs/first-result.md#published-boundaries).
 Extensions cannot replace common safety, timing, transport, or evidence rules.
 
 ## Product Evaluators
