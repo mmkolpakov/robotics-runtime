@@ -55,17 +55,22 @@ def write_document(
 def write_bytes_atomically(content: bytes, output: str | Path) -> Path:
     """Replace ``output`` in one rename; keep the previous file on failure.
 
-    A symlinked output replaces its target, and the result gets the mode of an
-    ordinary new file rather than the private mode of the temporary file.
+    A symlinked output replaces its target. New files honor the process umask;
+    replacements also retain the destination's existing permission restrictions.
     """
     destination = Path(output).expanduser().resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        destination_mode = destination.stat().st_mode & 0o777
+    except FileNotFoundError:
+        destination_mode = 0o777
     with TemporaryDirectory(dir=destination.parent, prefix=f".{destination.name}.") as staging:
         temporary = Path(staging) / "document"
         # Ordinary exclusive creation applies the process umask without changing it.
         with temporary.open("xb") as stream:
             stream.write(content)
             stream.flush()
+            os.chmod(temporary, temporary.stat().st_mode & destination_mode & 0o777)
             os.fsync(stream.fileno())
         os.replace(temporary, destination)
     return destination
