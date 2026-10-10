@@ -92,8 +92,40 @@ Log registration returns the fixed server-owned object URL and required PUT
 headers. Checksum, size, media type and exact VersionId must match before custody.
 An identical pending, unbound registration can renew its URL after a refused
 close. A close retry must preserve the original producer claim. Registration
-identity and close recovery do not provide exactly-once batch/job creation:
-those POSTs have no client nonce or idempotency key.
+identity and close recovery do not deduplicate batch/job creation for the
+unchanged SDK: it supplies no per-creation key. Own clients can use the optional
+header below.
+
+## Retry batch and job creation
+
+Own clients may send `Idempotency-Key: "CLIENT_GENERATED_UUID"` with either
+creation POST. Use a new key for each intended batch or job and preserve it
+across retries, including a lost HTTP response. The value is one quoted ASCII
+Structured Fields string of 1–256 characters, without parameters; malformed
+headers return 400 before creation. Parsing uses
+[structured-headers](https://github.com/evert/structured-headers). The header
+name follows the [HTTPAPI draft](https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/),
+not a published RFC; the behavior below is this service's contract.
+
+A committed identical request returns the original 201 creation response.
+The batch key is scoped to tenant, project and authenticated principal; the
+job key also includes its batch. Reusing a key with different creation fields
+returns 409. Batch fingerprints include branch, optional name and version;
+an omitted `metricsSetName` and `null` have the same meaning. JSON member order
+does not change identity. A retry preserves the first batch's configuration
+snapshot even after the branch changes.
+
+Concurrent requests settle through PostgreSQL transactions and unique indexes.
+A matching request waits for the competing transaction and returns its
+committed creation. If the bounded lock wait fails, retry the same key.
+Failed or rolled-back transactions do not claim a key. Keys are retained for
+the lifetime of their rows; there is no time-based expiry. A service/database
+restart preserves them. Authorization is checked again on every request.
+
+The response describes the original creation, including after the batch or
+job closes. It is not a current-state query or a native verdict. Requests
+without a key retain the existing behavior and can create duplicates. The
+unchanged SDK does not add keys automatically.
 
 ## Configuration snapshots
 
@@ -128,7 +160,8 @@ same host. A deployment using `api.example` must route the derived
 The [entry point](../api/src/main.ts) configures a separate Fastify process.
 The [base migration](../api/sql/001-external-tests.sql) and
 [configuration migration](../api/sql/002-metrics-config.sql) use forced tenant/project
-RLS; the application role must not own tables or reach privileged roles.
+RLS. Apply the [creation-key migration](../api/sql/003-creation-idempotency.sql)
+before running this service; the application role must not own tables or reach privileged roles.
 JWT verification fixes issuer, audience, RS256, subject, expiry and the
 `sdk-write` role. Each SQL transaction sets the verified issuer/subject on the
 same client.
