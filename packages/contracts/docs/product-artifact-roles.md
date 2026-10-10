@@ -116,7 +116,6 @@ when admitting the manifest; the qualification raw-artifact boundary does not
 parse its contents. Referenced XML and mesh files still require the product
 admission checks above. Infrastructure spawning remains a later integration step.
 
-
 ## Native acceptance documents
 
 The canonical defaults for acceptance_scenario, runtime_manifest,

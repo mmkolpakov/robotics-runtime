@@ -48,3 +48,10 @@ Native v2 scenario/runtime/observation/result versions are explicit opt-ins.
 One original run and its assessment chain reuse acceptance-run.v1,
 acceptance-aggregate.v1 and qualification-bundle.v1. Independent archive
 re-evaluation and v2 physical qualification are outside this path.
+
+Nanosecond values in the document files are exact JSON integers on the Python
+path. JavaScript consumers preserve the files or payload text and pass window
+arguments as decimal strings or bigint. They must not parse and re-emit those
+documents through JSON.parse with JavaScript Number: Unix nanoseconds exceed its
+safe integer range. The host rejects numeric window arguments; the six read-only
+MCP tools forward exact files and return worker payloads as text.

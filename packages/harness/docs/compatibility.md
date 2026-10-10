@@ -59,6 +59,11 @@ profiles are refused.
 V2 results separate original run/source/evidence hashes from method configuration,
 actual software environment and UTC assessment time. Captured source measurement
 windows and assessment windows use explicit clock identities and integer bounds.
+Nanosecond document integers are exact on the Python file path. JavaScript
+bridges must preserve exact files/text, and pass CLI window arguments as decimal
+strings or bigint. JSON.parse/re-emission through JavaScript Number is outside
+that exact-byte path. The host rejects numeric window arguments; read-only MCP
+operations forward file snapshots and keep worker payloads as text.
 The built-in OTLP method accepts unix_ns; selected product assessments may use
 native_ns without an inferred UTC conversion. Empty criteria or entirely absent
 measurement coverage cannot produce a passed verdict. Existing v1 run, aggregate
