@@ -225,3 +225,41 @@ def test_missing_cli_inputs_and_alias_output_are_rejected(tmp_path: Path) -> Non
         == 1
     )
     assert template.read_bytes() == original
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits; Windows uses inherited file ACLs")
+@pytest.mark.parametrize("mask,expected_mode", [(0o077, 0o600), (0o022, 0o644)])
+def test_document_writer_honors_umask(tmp_path: Path, mask: int, expected_mode: int) -> None:
+    document = create_runtime_manifest(load_mapping(EXAMPLE / "runtime-manifest.yaml"))
+    previous = os.umask(mask)
+    try:
+        output = write_document(document, tmp_path / "runtime.json")
+        probe = tmp_path / "probe"
+        probe.write_bytes(b"probe")
+    finally:
+        os.umask(previous)
+    assert output.stat().st_mode & 0o777 == expected_mode
+    assert probe.stat().st_mode & 0o777 == expected_mode
+    assert output.read_bytes() == dumps_canonical(document)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits; Windows uses inherited file ACLs")
+@pytest.mark.parametrize("destination_mode", [0o600, 0o400, 0o640])
+def test_document_writer_restricts_replacement_permissions(
+    tmp_path: Path, destination_mode: int
+) -> None:
+    document = create_runtime_manifest(load_mapping(EXAMPLE / "runtime-manifest.yaml"))
+    output = tmp_path / "runtime.json"
+    output.write_bytes(b"previous")
+    output.chmod(destination_mode)
+    retained = tmp_path / "previous.json"
+    os.link(output, retained)
+    previous = os.umask(0o022)
+    try:
+        write_document(document, output)
+    finally:
+        os.umask(previous)
+    assert output.stat().st_mode & 0o777 == destination_mode
+    assert output.read_bytes() == dumps_canonical(document)
+    assert retained.read_bytes() == b"previous"
+    assert output.stat().st_ino != retained.stat().st_ino

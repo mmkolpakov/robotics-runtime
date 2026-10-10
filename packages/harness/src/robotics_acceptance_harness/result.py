@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
-from tempfile import mkstemp
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from junitparser import Error, Failure, JUnitXml, Skipped, TestCase, TestSuite
@@ -296,15 +297,15 @@ def build_acceptance_result(
     return result
 
 
-def _temporary_path(path: Path) -> Path:
+@contextmanager
+def _temporary_path(path: Path) -> Iterator[tuple[Path, int]]:
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, name = mkstemp(
-        dir=path.parent,
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-    )
-    os.close(descriptor)
-    return Path(name)
+    try:
+        destination_mode = path.stat().st_mode & 0o777
+    except FileNotFoundError:
+        destination_mode = 0o777
+    with TemporaryDirectory(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp") as staging:
+        yield Path(staging) / "result", destination_mode
 
 
 def write_contract_json(
@@ -317,23 +318,18 @@ def write_contract_json(
 
     validate_document(document)
     destination = Path(path).expanduser().resolve()
-    temporary_path = _temporary_path(destination)
-    try:
-        with temporary_path.open("w", encoding="utf-8", newline="\n") as temporary:
+    with _temporary_path(destination) as (temporary_path, destination_mode):
+        with temporary_path.open("x", encoding="utf-8", newline="\n") as temporary:
             json.dump(document, temporary, indent=2, sort_keys=True, allow_nan=False)
             temporary.write("\n")
             temporary.flush()
-            os.chmod(temporary_path, 0o644)
+            os.chmod(temporary_path, temporary_path.stat().st_mode & destination_mode & 0o777)
             os.fsync(temporary.fileno())
         if replace:
             os.replace(temporary_path, destination)
         else:
             # A hard link publishes the complete file but never replaces one.
             os.link(temporary_path, destination)
-            temporary_path.unlink()
-    except Exception:
-        temporary_path.unlink(missing_ok=True)
-        raise
     return destination
 
 
@@ -405,14 +401,10 @@ def write_junit_xml(result: Mapping[str, Any], path: str | Path) -> Path:
         suite.add_testcase(case)
 
     destination = Path(path).expanduser().resolve()
-    temporary_path = _temporary_path(destination)
-    try:
+    with _temporary_path(destination) as (temporary_path, destination_mode):
         xml = JUnitXml()
         xml.add_testsuite(suite)
         xml.write(str(temporary_path), pretty=True)
-        os.chmod(temporary_path, 0o644)
+        os.chmod(temporary_path, temporary_path.stat().st_mode & destination_mode & 0o777)
         os.replace(temporary_path, destination)
-    except Exception:
-        temporary_path.unlink(missing_ok=True)
-        raise
     return destination

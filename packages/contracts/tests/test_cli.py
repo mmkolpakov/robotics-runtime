@@ -409,9 +409,11 @@ def test_cli_document_output_is_replaced_atomically(
     capsys.readouterr()
 
 
-def test_cli_outputs_follow_symlinks_and_get_regular_modes(
+@pytest.mark.parametrize("destination_mode", [0o644, 0o600])
+def test_cli_outputs_follow_symlinks_and_retain_permissions(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
+    destination_mode: int,
 ) -> None:
     source = tmp_path / "source.json"
     target = tmp_path / "target.json"
@@ -421,6 +423,7 @@ def test_cli_outputs_follow_symlinks_and_get_regular_modes(
     shared.mkdir()
     real = shared / "patch.json"
     real.write_text("{}\n", encoding="utf-8")
+    real.chmod(destination_mode)
     link = tmp_path / "patch.json"
     link.symlink_to(real)
     previous = os.umask(0o022)
@@ -431,7 +434,7 @@ def test_cli_outputs_follow_symlinks_and_get_regular_modes(
 
     assert link.is_symlink()
     assert json.loads(real.read_text(encoding="utf-8")) == {"value": 2}
-    assert real.stat().st_mode & 0o777 == (0o666 if os.name == "nt" else 0o644)
+    assert real.stat().st_mode & 0o777 == (0o666 if os.name == "nt" else destination_mode)
     capsys.readouterr()
 
 

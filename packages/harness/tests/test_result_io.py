@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -65,16 +67,108 @@ def test_observed_type_selection_is_independent_of_discovery_order(tmp_path: Pat
     assert results[0] == results[1]
 
 
-def test_atomic_outputs_are_readable_under_a_private_umask(tmp_path: Path) -> None:
-    if os.name == "nt":
-        pytest.skip("POSIX mode bits; Windows uses inherited file ACLs")
+ResultWriter = Callable[[Mapping[str, Any], Path], Path]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits; Windows uses inherited file ACLs")
+@pytest.mark.parametrize("writer", [write_contract_json, write_junit_xml])
+@pytest.mark.parametrize("mask,expected_mode", [(0o077, 0o600), (0o022, 0o644)])
+def test_atomic_outputs_honor_umask(
+    tmp_path: Path, writer: ResultWriter, mask: int, expected_mode: int
+) -> None:
     result = build_acceptance_result(**result_inputs(tmp_path))
-    previous = os.umask(0o077)
+    previous = os.umask(mask)
     try:
-        outputs = (
-            write_contract_json(result, tmp_path / "result.json"),
-            write_junit_xml(result, tmp_path / "junit.xml"),
-        )
+        output = writer(result, tmp_path / "result")
+        # The writer does not change the process mask for subsequent files.
+        probe = tmp_path / "probe"
+        probe.write_bytes(b"probe")
     finally:
         os.umask(previous)
-    assert all(path.stat().st_mode & 0o777 == 0o644 for path in outputs)
+    assert output.stat().st_mode & 0o777 == expected_mode
+    assert probe.stat().st_mode & 0o777 == expected_mode
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits; Windows uses inherited file ACLs")
+@pytest.mark.parametrize("writer", [write_contract_json, write_junit_xml])
+@pytest.mark.parametrize("destination_mode", [0o600, 0o400, 0o640])
+def test_atomic_outputs_retain_destination_restrictions(
+    tmp_path: Path, writer: ResultWriter, destination_mode: int
+) -> None:
+    result = build_acceptance_result(**result_inputs(tmp_path))
+    output = tmp_path / "result"
+    output.write_bytes(b"previous result")
+    output.chmod(destination_mode)
+    retained = tmp_path / "previous"
+    os.link(output, retained)
+    previous = os.umask(0o022)
+    try:
+        assert writer(result, output) == output
+    finally:
+        os.umask(previous)
+    assert output.stat().st_mode & 0o777 == destination_mode
+    assert output.read_bytes() != b"previous result"
+    assert retained.read_bytes() == b"previous result"
+    assert output.stat().st_ino != retained.stat().st_ino
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits; Windows uses inherited file ACLs")
+@pytest.mark.parametrize("writer", [write_contract_json, write_junit_xml])
+def test_atomic_outputs_keep_private_symlink_targets(tmp_path: Path, writer: ResultWriter) -> None:
+    result = build_acceptance_result(**result_inputs(tmp_path))
+    destination = tmp_path / "target"
+    destination.write_bytes(b"previous result")
+    destination.chmod(0o600)
+    link = tmp_path / "result"
+    link.symlink_to(destination)
+    previous = os.umask(0o022)
+    try:
+        assert writer(result, link) == destination
+    finally:
+        os.umask(previous)
+    assert link.is_symlink()
+    assert destination.stat().st_mode & 0o777 == 0o600
+    assert destination.read_bytes() != b"previous result"
+
+
+@pytest.mark.parametrize("writer", [write_contract_json, write_junit_xml])
+def test_atomic_outputs_preserve_previous_file_on_publication_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, writer: ResultWriter
+) -> None:
+    result = build_acceptance_result(**result_inputs(tmp_path))
+    output = tmp_path / "result"
+    output.write_bytes(b"previous result")
+    original_names = {path.name for path in tmp_path.iterdir()}
+
+    def fail_replace(_source: object, _destination: object) -> None:
+        raise OSError("replacement failed")
+
+    monkeypatch.setattr(os, "replace", fail_replace)
+    with pytest.raises(OSError, match="replacement failed"):
+        writer(result, output)
+    assert output.read_bytes() == b"previous result"
+    assert {path.name for path in tmp_path.iterdir()} == original_names
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits; Windows uses inherited file ACLs")
+def test_exclusive_json_output_is_private_and_does_not_replace_an_existing_file(
+    tmp_path: Path,
+) -> None:
+    result = build_acceptance_result(**result_inputs(tmp_path))
+    output = tmp_path / "result.json"
+    previous = os.umask(0o077)
+    try:
+        write_contract_json(result, output, replace=False)
+    finally:
+        os.umask(previous)
+    original = output.read_bytes()
+    original_names = {path.name for path in tmp_path.iterdir()}
+    previous = os.umask(0o022)
+    try:
+        with pytest.raises(FileExistsError):
+            write_contract_json(result, output, replace=False)
+    finally:
+        os.umask(previous)
+    assert output.read_bytes() == original
+    assert output.stat().st_mode & 0o777 == 0o600
+    assert {path.name for path in tmp_path.iterdir()} == original_names
