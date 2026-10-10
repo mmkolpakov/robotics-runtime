@@ -39,7 +39,14 @@ docker build -f packages/harness/tests/admission/Dockerfile -t evaluator-admissi
 bash packages/harness/tests/admission/run.sh artifacts/evaluator-admission
 ```
 
-For rootless Podman, set `CONTAINER_RUNTIME=podman`. The fixture uses a 512 MiB
+For rootless Podman, set `CONTAINER_RUNTIME=podman` and
+`CONTAINER_INIT=/absolute/path/to/catatonit`. The fixture uses stock
+`--userns keep-id` to preserve output ownership without changing input permissions,
+and `--init-path` with the existing API fixture's reviewed stock Ubuntu catatonit
+SHA-256 `43e9b836ca7631672f12d0610cd574875b62d236dfd62e3b86751f35862e5eba`.
+Supply that project-local tool; the fixture does not install system packages.
+
+The fixture uses a 512 MiB
 memory bound, one CPU, 32 PIDs, a 256 MiB temporary filesystem and an outer
 180-second deadline. The temporary filesystem has exec for the copied pinned
 verifier and retains nosuid/nodev. It checks read-only input/profile failures, an authenticated
