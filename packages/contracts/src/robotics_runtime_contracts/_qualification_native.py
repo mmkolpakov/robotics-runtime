@@ -94,7 +94,7 @@ def _resolved_observations(
 def _domain(context: _Context, domain: str, observation_artifact: QualificationArtifact) -> None:
     controls = _method_controls(context, domain)
     _domain_bindings(context, domain, observation_artifact, controls)
-    _domain_window(context, domain, observation_artifact)
+    _domain_window(context, domain, observation_artifact, controls)
     _domain_assertion_registry(context, domain, controls)
     _domain_coverage(context, domain, observation_artifact, controls)
     _domain_observation_evidence(context, domain, observation_artifact)
@@ -117,9 +117,9 @@ def _method_controls(context: _Context, domain: str) -> Mapping[str, Any]:
     validate_assessment_controls(controls)
     expected = controls.get("calibration")
     supplied = assessment.get("calibration")
-    if expected is not None:
+    if expected is not None and supplied is not None:
         rules._require_equal(f"domain {domain} selected calibration", expected, supplied)
-    elif supplied is not None and supplied["state"] != "unobserved":
+    elif expected is None and supplied is not None and supplied["state"] != "unobserved":
         rules._fail(f"domain {domain} original method makes no calibration declaration")
     return controls
 
@@ -227,14 +227,17 @@ def _require_native_time_order(label: str, *values: str) -> None:
 
 
 def _domain_window(
-    context: _Context, domain: str, observation_artifact: QualificationArtifact
+    context: _Context,
+    domain: str,
+    observation_artifact: QualificationArtifact,
+    controls: Mapping[str, Any],
 ) -> None:
     window = rules._document(context.results[domain])["evaluation"].get("window")
     if window is None:
-        if context.scenario["metric_definitions"]:
+        if controls["metric_definitions"]:
             rules._fail(f"domain {domain} metric assessment has no captured measurement window")
         return
-    if context.scenario["metric_definitions"] and window["timestamp_encoding"] != "unix_ns":
+    if controls["metric_definitions"] and window["timestamp_encoding"] != "unix_ns":
         rules._fail(f"domain {domain} OTLP metric assessment requires unix_ns timestamps")
     observation = rules._document(observation_artifact)
     source_window = observation.get("measurement_window")

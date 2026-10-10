@@ -900,3 +900,83 @@ def test_native_qualification_detects_one_nanosecond_provenance_boundary_violati
     _refresh_domain(tmp_path)
     with pytest.raises(QualificationError, match="runtime manifest primary before execution"):
         validate_qualification_artifacts(specs)
+
+
+def test_selected_method_added_metrics_require_a_captured_window(tmp_path: Path) -> None:
+    specs = _archive(tmp_path)
+    method_path = tmp_path / "method.json"
+    method = _document(method_path)
+    method["metric_definitions"] = [
+        {
+            "metric_name": "org.example.count",
+            "unit": "1",
+            "instrument_kind": "gauge",
+            "temporality": "instantaneous",
+        }
+    ]
+    _write(method_path, method)
+    result_path = tmp_path / "result-primary.json"
+    result = _document(result_path)
+    result["evaluation"]["method"]["configuration"] = _reference(method_path)
+    _write(result_path, result)
+    _refresh_domain(tmp_path)
+    with pytest.raises(
+        QualificationError, match="metric assessment has no captured measurement window"
+    ):
+        validate_qualification_artifacts(specs)
+
+
+def test_selected_method_removed_metrics_can_use_the_original_native_window(tmp_path: Path) -> None:
+    specs = _archive(tmp_path)
+    scenario_path = tmp_path / "scenario.json"
+    scenario = _document(scenario_path)
+    scenario["metric_definitions"] = [
+        {
+            "metric_name": "org.example.count",
+            "unit": "1",
+            "instrument_kind": "gauge",
+            "temporality": "instantaneous",
+        }
+    ]
+    _write(scenario_path, scenario)
+    _set_measurement_window(
+        tmp_path,
+        start_ns=0,
+        end_ns=10,
+        clock={"kind": "external", "source_id": "native-zero"},
+    )
+    assert not _document(tmp_path / "method.json")["metric_definitions"]
+    assert validate_qualification_artifacts(specs)["run_id"] == RUN_ID
+    source_path = tmp_path / "observation-primary.json"
+    source = _document(source_path)
+    del source["measurement_window"]
+    _write(source_path, source)
+    _refresh_domain(tmp_path)
+    with pytest.raises(
+        QualificationError, match="assessment window has no captured measurement window"
+    ):
+        validate_qualification_artifacts(specs)
+
+
+def test_historical_calibration_absence_remains_absent_but_present_labels_must_match(
+    tmp_path: Path,
+) -> None:
+    specs = _archive(tmp_path)
+    method_path = tmp_path / "method.json"
+    method = _document(method_path)
+    method["calibration"] = {"state": "not_applicable", "reason": "software counter"}
+    _write(method_path, method)
+    result_path = tmp_path / "result-primary.json"
+    result = _document(result_path)
+    result["evaluation"]["method"]["configuration"] = _reference(method_path)
+    assert "calibration" not in result["evaluation"]
+    _write(result_path, result)
+    _refresh_domain(tmp_path)
+    assert validate_qualification_artifacts(specs)["run_id"] == RUN_ID
+    assert "calibration" not in _document(result_path)["evaluation"]
+    result = _document(result_path)
+    result["evaluation"]["calibration"] = {"state": "not_applicable", "reason": "forged reason"}
+    _write(result_path, result)
+    _refresh_domain(tmp_path)
+    with pytest.raises(QualificationError, match="selected calibration"):
+        validate_qualification_artifacts(specs)
