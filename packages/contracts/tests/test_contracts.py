@@ -186,3 +186,16 @@ def test_public_outcome_status_matches_the_canonical_schema() -> None:
     common = load_schema("common.v1")
 
     assert common["$defs"]["status"]["enum"] == [status.value for status in OutcomeStatus]
+
+
+def test_qualification_bundle_v2_is_explicit_and_v1_remains_canonical() -> None:
+    assert schema_for_role("qualification_bundle") == "qualification-bundle.v1"
+    assert schema_for_role("qualification_bundle", version=2) == "qualification-bundle.v2"
+    assert schema_versions_for_role("qualification_bundle") == (
+        "qualification-bundle.v1",
+        "qualification-bundle.v2",
+    )
+    assert (
+        resolve_schema_name("urn:robotics-runtime-contracts:v2:qualification-bundle")
+        == "qualification-bundle.v2"
+    )
