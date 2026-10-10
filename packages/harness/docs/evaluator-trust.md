@@ -209,7 +209,8 @@ private captured wheel copy.
 The installed CLI then runs in a non-root OCI process using the existing
 Docker/Podman fixture mechanism: read-only root and original evidence mounts,
 no network or capabilities, no new privileges, 512 MiB memory, one CPU, 32 PIDs,
-a 256 MiB temporary filesystem and a 180-second outer deadline. Assessment
+a 256 MiB temporary filesystem and a 180-second outer deadline. The temporary
+filesystem permits execution of the pinned verifier snapshot and sets nosuid/nodev. Assessment
 outputs use a separate writable mount. The witness checks the author byte
 assertion, refused evidence/profile writes, receipt-only and wrong-publisher
 failures, and unchanged original input bytes. Its input counter records are

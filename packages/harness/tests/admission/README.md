@@ -41,7 +41,8 @@ bash packages/harness/tests/admission/run.sh artifacts/evaluator-admission
 
 For rootless Podman, set `CONTAINER_RUNTIME=podman`. The fixture uses a 512 MiB
 memory bound, one CPU, 32 PIDs, a 256 MiB temporary filesystem and an outer
-180-second deadline. It checks read-only input/profile failures, an authenticated
+180-second deadline. The temporary filesystem has exec for the copied pinned
+verifier and retains nosuid/nodev. It checks read-only input/profile failures, an authenticated
 byte assertion, refusal without cryptographic admission or with a wrong
 publisher, and exact unchanged input bytes. Results and captured audit records
 are retained as CI artifacts.

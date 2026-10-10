@@ -231,6 +231,10 @@ jobs:
             artifacts/evaluator-admission/expectations.json
             artifacts/evaluator-admission/receipts/
             artifacts/evaluator-admission/bundle.json
+            artifacts/evaluator-admission/wheels/
+            artifacts/evaluator-admission/profile.json
+            artifacts/evaluator-admission/inputs.json
+            artifacts/evaluator-admission/archive/
           if-no-files-found: warn
           retention-days: 7
 
