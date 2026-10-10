@@ -25,6 +25,7 @@ from robotics_acceptance_harness.archive import (
     AssessmentControls,
     assess_archive,
     load_assessment_controls,
+    load_original_result,
 )
 from robotics_acceptance_harness.campaign import aggregate_campaign
 from robotics_acceptance_harness.diagnostics import (
@@ -222,6 +223,12 @@ def _parser() -> argparse.ArgumentParser:
         "--assessment-controls",
         metavar="PATH",
         help="Explicit native method controls; original scenario remains unchanged.",
+    )
+
+    evaluate.add_argument(
+        "--original-result",
+        metavar="PATH",
+        help="Original result for a distinct assessment; requires --assessment-controls.",
     )
 
     aggregate = subparsers.add_parser(
@@ -457,6 +464,11 @@ def _archive_evaluation(
         arguments.window_end_ns,
         max_raw_evidence_bytes=arguments.max_raw_evidence_bytes,
         assessment_controls=controls,
+        original_result=(
+            load_original_result(arguments.original_result)
+            if arguments.original_result is not None
+            else None
+        ),
     )
     if context.window_end_ns <= context.window_start_ns:
         raise HarnessInputError("offline evaluation window must have positive duration")
@@ -482,6 +494,12 @@ def _evaluation_admission(
     VerifiedReceiptSet,
     Mapping[str, AuthenticatedInstallation],
 ]:
+    if (
+        arguments.command == "evaluate"
+        and arguments.original_result is not None
+        and arguments.assessment_controls is None
+    ):
+        raise HarnessInputError("--original-result requires --assessment-controls")
     controls = (
         load_assessment_controls(arguments.assessment_controls)
         if arguments.command == "evaluate" and arguments.assessment_controls is not None

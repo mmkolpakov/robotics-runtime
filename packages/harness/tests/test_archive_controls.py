@@ -148,13 +148,22 @@ def test_explicit_new_method_executes_changed_criteria_without_rewriting_trial(
     method_bytes = (json.dumps(selected_controls, indent=4) + "\n").encode()
     method_path.write_bytes(method_bytes)
     assessed_output = tmp_path / "new-method"
-    completed = evaluate({**inputs, "assessment_controls": method_path}, assessed_output)
+    baseline_path = initial_output / "acceptance-result.json"
+    baseline_raw = baseline_path.read_bytes()
+    completed = evaluate(
+        {**inputs, "assessment_controls": method_path, "original_result": baseline_path},
+        assessed_output,
+    )
     assert completed.returncode == 0, completed.stderr
     result = json.loads((assessed_output / "acceptance-result.json").read_bytes())
     assert result["status"] == "passed"
     assert result["result_id"] != original_result["result_id"]
     assert result["scenario_sha256"] == original_result["scenario_sha256"]
-    assert result["original_execution"] == original_result["original_execution"]
+    assert result["original_execution"] == {
+        **original_result["original_execution"],
+        "original_result_sha256": hashlib.sha256(baseline_raw).hexdigest(),
+    }
+    assert baseline_path.read_bytes() == baseline_raw
     criterion = next(
         item for item in result["assertion_results"] if item["assertion_id"] == "counter-error"
     )
@@ -179,6 +188,21 @@ def test_explicit_new_method_executes_changed_criteria_without_rewriting_trial(
     metrics_digest = hashlib.sha256(Path(inputs["otel_metrics"]).read_bytes()).hexdigest()
     assert all(item["evidence_sha256"] == [metrics_digest] for item in coverage)
     assert {path: path.read_bytes() for path in original_bytes} == original_bytes
+
+    forged = json.loads(baseline_raw)
+    forged["original_execution"]["observation_sha256"] = "a" * 64
+    forged_path = tmp_path / "foreign-original.json"
+    forged_path.write_text(json.dumps(forged))
+    refused = tmp_path / "refused-source"
+    failure = evaluate(
+        {**inputs, "assessment_controls": method_path, "original_result": forged_path},
+        refused,
+    )
+    assert failure.returncode == 2
+    assert "differs from original execution" in failure.stderr
+    assert not (refused / "acceptance-result.json").exists()
+    failure = evaluate({**inputs, "original_result": baseline_path}, tmp_path / "no-controls")
+    assert failure.returncode == 2 and "requires --assessment-controls" in failure.stderr
 
 
 @pytest.mark.parametrize("mutable", [bytearray, memoryview])

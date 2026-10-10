@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from packaging.utils import canonicalize_name
 from robotics_runtime_contracts import dumps_canonical, validate_document, worst_status
+from robotics_runtime_contracts._timestamps import parse_timestamp_ns
 from robotics_runtime_contracts.writers import protect_inputs, write_bytes_atomically
 
 from robotics_acceptance_harness import __version__
@@ -230,7 +231,7 @@ def _protect_source_inputs(
 
         for reference in context.method_controls["calibration"].get("artifacts", ()):
             inputs.append(Path(url2pathname(urlsplit(reference["uri"]).path)))
-    for document in (context.bundle.permit, context.bundle.verification):
+    for document in (context.bundle.permit, context.bundle.verification, context.original_result):
         if document is not None:
             inputs.append(document.path)
     for name in (
@@ -281,6 +282,56 @@ def _criterion_coverage(
     return {"covered_assertions": covered, "uncovered_assertions": uncovered}
 
 
+def _original_execution(
+    context: EvaluationContext,
+    run_context: LoadedDocument,
+    source: LoadedDocument,
+    started_at: datetime,
+) -> dict[str, Any]:
+    original = {
+        "acceptance_run_sha256": run_context.sha256,
+        "observation_sha256": source.sha256,
+        "evidence_index_sha256": context.evidence.index.sha256,
+        "started_at": source.data["started_at"],
+        "finished_at": source.data["finished_at"],
+    }
+    baseline = context.original_result
+    if baseline is None:
+        return original
+    if context.assessment_controls is None or baseline.schema_version != "acceptance-result.v2":
+        raise BundleValidationError(
+            "$.original_result", "requires selected native v2 controls and result"
+        )
+    expected = {
+        "run_id": context.run_id,
+        "domain_id": context.domain_id,
+        "scenario_id": context.scenario["scenario_id"],
+        "scenario_sha256": context.bundle.scenario.sha256,
+        "runtime_manifest_sha256": context.bundle.runtime.sha256,
+        "execution": context.runtime["execution"],
+        "profile": context.scenario["profile"],
+        "native_model": source.data.get("native_model"),
+    }
+    for key, value in expected.items():
+        if baseline.data.get(key) != value:
+            raise BundleValidationError(
+                f"$.original_result.{key}", "differs from original execution"
+            )
+    for key, value in original.items():
+        if baseline.data["original_execution"].get(key) != value:
+            raise BundleValidationError(
+                f"$.original_result.original_execution.{key}", "differs from original execution"
+            )
+    if parse_timestamp_ns(baseline.data["evaluation"]["finished_at"]) > parse_timestamp_ns(
+        format_utc_datetime(started_at)
+    ):
+        raise BundleValidationError(
+            "$.original_result.evaluation",
+            "original assessment finishes after new assessment starts",
+        )
+    return {**original, "original_result_sha256": baseline.sha256}
+
+
 def evaluate_native(
     context: EvaluationContext,
     run_context: LoadedDocument,
@@ -303,6 +354,8 @@ def evaluate_native(
             )
     destination = Path(output_dir).expanduser().resolve()
     _protect_source_inputs(context, run_context, destination)
+    started_at = datetime.now(UTC)
+    original = _original_execution(context, run_context, source, started_at)
     method = context.method_controls
     selected = context.assessment_controls
     configuration = _artifact(
@@ -322,7 +375,6 @@ def evaluate_native(
         media_type="application/octet-stream" if selected is not None else "application/json",
     )
     environment = _evaluation_environment(destination / "evaluation-environment.json")
-    started_at = datetime.now(UTC)
     assertions = evaluate_acceptance(
         context,
         evaluator_receipts=evaluator_receipts,
@@ -361,13 +413,7 @@ def evaluate_native(
         "runtime_manifest_sha256": context.bundle.runtime.sha256,
         "execution": context.bundle.runtime.as_dict()["execution"],
         "profile": context.bundle.scenario.as_dict()["profile"],
-        "original_execution": {
-            "acceptance_run_sha256": run_context.sha256,
-            "observation_sha256": source.sha256,
-            "evidence_index_sha256": context.evidence.index.sha256,
-            "started_at": source.data["started_at"],
-            "finished_at": source.data["finished_at"],
-        },
+        "original_execution": original,
         "evaluation": {
             "method": {
                 "implementation": "robotics_acceptance_harness.evaluate_acceptance",

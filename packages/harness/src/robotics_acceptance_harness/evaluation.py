@@ -16,7 +16,7 @@ from typing import Any, cast
 from packaging.utils import canonicalize_name
 
 from robotics_acceptance_harness.archive import AssessmentControls
-from robotics_acceptance_harness.documents import DocumentBundle
+from robotics_acceptance_harness.documents import DocumentBundle, LoadedDocument
 from robotics_acceptance_harness.errors import HarnessError
 from robotics_acceptance_harness.evaluator_trust import (
     AuthenticatedInstallation,
@@ -59,6 +59,7 @@ class EvaluationContext:
     max_raw_evidence_bytes: int | None = None
     assessment_controls: AssessmentControls | None = None
     metric_evidence_sha256: str | None = None
+    original_result: LoadedDocument | None = None
 
     @property
     def method_controls(self) -> Mapping[str, Any]:

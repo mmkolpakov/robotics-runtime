@@ -15,13 +15,17 @@ from robotics_runtime_contracts import loads_mapping
 from robotics_runtime_contracts.assessments import validate_assessment_controls
 from robotics_runtime_contracts.serialization import MAX_DOCUMENT_BYTES
 
-from robotics_acceptance_harness.documents import BundleValidationError, _freeze
+from robotics_acceptance_harness.documents import (
+    BundleValidationError,
+    LoadedDocument,
+    _freeze,
+    load_document_bytes,
+)
 from robotics_acceptance_harness.evaluator_trust import EvaluatorTrustError, read_once
 from robotics_acceptance_harness.evidence import _read_local
 
 if TYPE_CHECKING:
     from robotics_acceptance_harness.application import VerificationOutputs
-    from robotics_acceptance_harness.documents import LoadedDocument
     from robotics_acceptance_harness.evaluation import EvaluationContext
     from robotics_acceptance_harness.evaluator_trust import AuthenticatedInstallation
     from robotics_acceptance_harness.receipts import VerifiedReceiptSet
@@ -130,6 +134,18 @@ def load_assessment_controls(path: str | Path) -> AssessmentControls:
             )
             inputs[digest] = payload
     return AssessmentControls(source, raw, MappingProxyType(inputs))
+
+
+def load_original_result(path: str | Path) -> LoadedDocument:
+    """Validate and retain the identity of the exact bounded original result bytes."""
+    source = Path(path).expanduser().absolute()
+    try:
+        raw = read_once(source, MAX_DOCUMENT_BYTES)
+    except (EvaluatorTrustError, OSError) as failure:
+        raise BundleValidationError(
+            "$.original_execution.original_result_sha256", str(failure)
+        ) from failure
+    return load_document_bytes(raw, source=source, expected_role="acceptance_result")
 
 
 def assess_archive(
