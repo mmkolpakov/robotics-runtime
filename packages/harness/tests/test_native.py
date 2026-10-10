@@ -6,12 +6,14 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 from xml.etree import ElementTree
 
 import pytest
 from robotics_runtime_contracts import schema_for_role, schema_versions_for_role, validate_role
 
+from robotics_acceptance_harness import native
 from robotics_acceptance_harness.documents import BundleValidationError, load_bundle
 from robotics_acceptance_harness.evidence import EvidenceValidationError, load_evidence_index
 from tests.support import local_evidence_artifact, write_evidence_index
@@ -285,3 +287,32 @@ def test_public_scenario_resolve_dispatches_the_declared_native_version(
     assert resolved["evidence_policy"]["max_upload_lag_sec"] == 5
     assert scenario_path.read_bytes() == original
     validate_role(resolved, "acceptance_scenario")
+
+
+def test_environment_inventory_changes_with_protobuf_drift_and_is_order_independent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = SimpleNamespace(metadata={"Name": "protobuf"}, version="7.36.1")
+    second = SimpleNamespace(metadata={"Name": "Example_Plugin"}, version="1")
+    monkeypatch.setattr(native, "distributions", lambda: [first, second])
+    original = native._evaluation_environment(tmp_path / "first.json")
+    monkeypatch.setattr(native, "distributions", lambda: [second, first])
+    reordered = native._evaluation_environment(tmp_path / "reordered.json")
+    assert reordered["sha256"] == original["sha256"]
+    first.version = "7.36.2"
+    changed = native._evaluation_environment(tmp_path / "changed.json")
+    assert changed["sha256"] != original["sha256"]
+    metadata = json.loads((tmp_path / "changed.json").read_bytes())
+    assert metadata["packages"] == {"example-plugin": "1", "protobuf": "7.36.2"}
+
+
+def test_environment_inventory_refuses_ambiguous_distribution_versions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    distributions = [
+        SimpleNamespace(metadata={"Name": "Example_Plugin"}, version="1"),
+        SimpleNamespace(metadata={"Name": "example-plugin"}, version="2"),
+    ]
+    monkeypatch.setattr(native, "distributions", lambda: distributions)
+    with pytest.raises(BundleValidationError, match="ambiguous versions"):
+        native._evaluation_environment(tmp_path / "environment.json")

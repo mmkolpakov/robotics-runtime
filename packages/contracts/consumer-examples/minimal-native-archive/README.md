@@ -32,7 +32,10 @@ The statement is unsigned; matching it checks the listed bytes and links.
 
 Each assessment writes evaluation-method.json and evaluation-environment.json.
 These identify actual configuration and software inventory without random
-process IDs, local paths or assessment timestamps. UTC provenance dates remain
+process IDs, local paths or assessment timestamps. Installed distributions are
+reported in a canonical sorted inventory; this is environment context, not
+cryptographic interpreter, image or installed-code authentication. Those proofs
+belong to the release composition and evaluator trust checks. UTC provenance dates remain
 separate from a captured clock-qualified integer measurement window. The built-in
 OTLP metric method requires unix_ns. Native-clock product assessments use
 native_ns without an invented UTC conversion.

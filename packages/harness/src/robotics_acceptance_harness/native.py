@@ -4,11 +4,12 @@ import platform
 from collections.abc import Iterator, Mapping
 from datetime import UTC, datetime
 from hashlib import sha256
-from importlib.metadata import version
+from importlib.metadata import distributions
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from packaging.utils import canonicalize_name
 from robotics_runtime_contracts import dumps_canonical, validate_document, worst_status
 from robotics_runtime_contracts.writers import protect_inputs, write_bytes_atomically
 
@@ -142,6 +143,26 @@ def _artifact(content: Mapping[str, Any], path: Path) -> dict[str, Any]:
     }
 
 
+def _installed_distribution_inventory() -> dict[str, str]:
+    inventory: dict[str, str] = {}
+    for distribution in distributions():
+        declared_name = distribution.metadata.get("Name")
+        if not declared_name:
+            raise BundleValidationError(
+                "$.evaluation.environment", "installed distribution has no name"
+            )
+        name = canonicalize_name(declared_name)
+        installed_version = distribution.version
+        previous = inventory.get(name)
+        if previous is not None and previous != installed_version:
+            raise BundleValidationError(
+                "$.evaluation.environment",
+                f"installed distribution {name} has ambiguous versions",
+            )
+        inventory[name] = installed_version
+    return dict(sorted(inventory.items()))
+
+
 def _evaluation_environment(path: Path) -> dict[str, Any]:
     return _artifact(
         {
@@ -150,17 +171,7 @@ def _evaluation_environment(path: Path) -> dict[str, Any]:
                 "version": platform.python_version(),
             },
             "platform": {"system": platform.system(), "machine": platform.machine()},
-            "packages": {
-                name: version(name)
-                for name in (
-                    "robotics-acceptance-harness",
-                    "robotics-runtime-contracts",
-                    "junitparser",
-                    "opentelemetry-proto",
-                    "jsonschema",
-                    "referencing",
-                )
-            },
+            "packages": _installed_distribution_inventory(),
         },
         path,
     )
