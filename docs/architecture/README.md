@@ -1,26 +1,39 @@
 # Architecture diagrams
 
-[workspace.dsl](workspace.dsl) is the shared C4 model for `robotics-runtime` and
-`robotics-runtime-infra`. A C4 container is a running application or data store,
-not a Python package or Docker image.
+[workspace.dsl](workspace.dsl) models consumer-owned usage examples. It does not
+treat repositories or SDK libraries as standalone deployed systems. A C4
+container is an application or data store, not a Python package or Docker image.
 
-- [Context](generated/Context.svg): users, product ownership and external systems.
-- [Container](generated/Container.svg): execution, retained evidence, offline MCP
-  and the optional Test API.
-- [Native interfaces](generated/NativeInterfaces.svg): selected SDK, simulator and media paths.
-- [Consumer interfaces](generated/ConsumerInterfaces.svg): host,
-  document/evaluation workers and offline MCP.
-- [External Test API](generated/ExternalTestAPI.svg): identity, metadata, uploads and custody.
-- [Complete graph](generated/ContainerDetail.svg): all declared interfaces.
-- [Local execution](generated/ExecutionDeployment.svg): admitted files and owned Engine/Compose jobs.
-- [Development example](generated/DevelopmentDeployment.svg): one Linux/WSL CPU deployment.
+- [Published document workflow](generated/Container.svg): terminal/CI, the
+  published Python tools and retained files. This is the README starting view.
+- [Context](generated/Context.svg): the consumer-owned verification application
+  and the systems it can use.
+- [Native consumer application](generated/NativeInterfaces.svg): a consumer
+  embeds the host library and selects native SDK, simulator and media processes.
+- [Embedded host and public tools](generated/ConsumerInterfaces.svg): callbacks,
+  the Python tools and retained evidence.
+- [External Test API](generated/ExternalTestAPI.svg): optional identity,
+  metadata, uploads and custody. The SDK runs inside its client application.
+- [Complete graph](generated/ContainerDetail.svg): the declared usage paths.
+- [Local execution](generated/ExecutionDeployment.svg): mounted inputs,
+  consumer-owned Engine/Compose jobs and retained files.
+- [Development example](generated/DevelopmentDeployment.svg): one Linux/WSL
+  CPU topology; it does not qualify native GPU or sensor rendering.
 
-The README starts with Container; detailed views are linked separately. Colors
-identify responsibilities, not qualification verdicts. Deployment examples do not
-establish every provider combination or GPU capability. Ansible, Terraform and
-Kubernetes responsibilities are defined in the
-[infra architecture](https://github.com/mmkolpakov/robotics-runtime-infra/blob/main/docs/architecture.md).
-A Windows diagnostic does not establish a Compose-controlled Windows worker.
+The document workflow needs neither a host service nor the optional API/MCP.
+Native recipes have their own dependencies. Python evaluation reads supplied local
+files; remote retention is represented by references and verified receipts.
+The PX4 control edge names the MAVSDK server peer, not a gRPC server in firmware.
+The host is a library inside the
+consumer coordinator; it is not a separate daemon. Its callbacks also write
+observations. Process, GPU-memory and IPC boundaries follow the selected SDK
+profile rather than a universal process-per-module rule.
+
+Colors identify responsibilities. Deployment diagrams show instances and
+resources. Provisioning with Ansible, Terraform and Helm is described separately
+in the [infra architecture](https://github.com/mmkolpakov/robotics-runtime-infra/blob/main/docs/architecture.md).
+An execution diagram does not establish qualification for every provider
+combination or safe physical-device behavior.
 
 [Sequence](run-sequence.mmd) shows `RunOwner`, consumer callbacks and the separate
 evaluator. `beginMeasurement()` changes phase; the consumer starts its workload
@@ -30,12 +43,15 @@ tracked cleanup until it settles. Explicit recovery resumes unattempted stages
 and preserves earlier errors. Reservations are process-local; terminal cleanup
 retry and crash recovery are not supported.
 
-Callbacks must persist and verify payloads before returning references. The host
-checks returned descriptors; public contracts and qualification checks validate
-the referenced documents and bytes. Storage does not sign or verify evidence.
-An ephemeral fixture signature proves integrity, not trusted publisher identity
+Cancellation requests, native-operation completion, resource cleanup and
+physical stopping are distinct. The current host observes its callbacks and
+owned resources; it does not turn a process exit into a robot-stop guarantee.
+Callbacks must persist and verify payloads before returning references. The
+host checks returned descriptors; public contracts and qualification checks
+validate the referenced documents and bytes. Storage does not sign or verify
+evidence. A fixture signature proves integrity, not trusted publisher identity
 or safety certification. See the [architecture reference](../architecture.md)
-and [host API](../../host/README.md) for these boundaries.
+and [host API](../../host/README.md).
 
 ## Rendering
 
@@ -48,6 +64,6 @@ CONTAINER_ENGINE=podman docs/architecture/render.sh
 python3 docs/architecture/publish_readme.py --check
 ```
 
-The default engine is Docker. Rendering embeds the generated Container and
-Context views into README and checks source synchronization. Review each changed
-view for readable labels, arrow directions and qualification boundaries.
+The default engine is Docker. Rendering embeds the document workflow and Context
+views into README and checks source synchronization. Review changed views for
+readable labels, arrow directions and agreement with the actual interfaces.

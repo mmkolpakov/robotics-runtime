@@ -1,7 +1,7 @@
 graph LR
   linkStyle default fill:#ffffff
 
-  subgraph diagram ["Platform context"]
+  subgraph diagram ["Verification workflow context"]
     style diagram fill:#ffffff,stroke:#ffffff
 
     subgraph group1 ["Native dependencies"]
@@ -9,7 +9,7 @@ graph LR
 
       3("<div style='font-weight: bold'>Simulators</div><div style='font-size: 80%; margin-top:10px'>Gazebo / Webots / Isaac;<br />scoped.</div>")
       style 3 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-      4("<div style='font-weight: bold'>Control endpoint</div><div style='font-size: 80%; margin-top:10px'>Selected SDK; transport, peer<br />and effects differ.</div>")
+      4("<div style='font-weight: bold'>Selected SDK peer</div><div style='font-size: 80%; margin-top:10px'>MAVSDK server in the PX4<br />example; native peers belong<br />to their selected profiles.</div>")
       style 4 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
       5("<div style='font-weight: bold'>Media source</div><div style='font-size: 80%; margin-top:10px'>Native camera / RTSP /<br />fixture.</div>")
       style 5 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
@@ -18,19 +18,19 @@ graph LR
     subgraph group2 ["SDK interfaces"]
       style group2 fill:#ffffff,stroke:#0f172a,color:#0f172a,stroke-dasharray:5
 
-      18("<div style='font-weight: bold'>SDK client</div><div style='font-size: 80%; margin-top:10px'>SignalFlag 1.8.0; project +<br />JWT.</div>")
-      style 18 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+      19("<div style='font-weight: bold'>External client application</div><div style='font-size: 80%; margin-top:10px'>Embeds the selected<br />SignalFlag SDK; project +<br />JWT.</div>")
+      style 19 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
     end
 
     1["<div style='font-weight: bold'>Integrator</div><div style='font-size: 80%; margin-top:10px'>Selects profiles and verifies<br />evidence.</div>"]
     style 1 fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
-    2("<div style='font-weight: bold'>Product</div><div style='font-size: 80%; margin-top:10px'>Robot / ground station /<br />control / vision.</div>")
+    2("<div style='font-weight: bold'>System under test</div><div style='font-size: 80%; margin-top:10px'>Robot / control / vision<br />application.</div>")
     style 2 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    21("<div style='font-weight: bold'>MCP client</div><div style='font-size: 80%; margin-top:10px'>Local trusted operator.</div>")
-    style 21 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+    22("<div style='font-weight: bold'>MCP client</div><div style='font-size: 80%; margin-top:10px'>Local trusted operator.</div>")
+    style 22 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
     6("<div style='font-weight: bold'>Registries</div><div style='font-size: 80%; margin-top:10px'>Immutable packages / images /<br />attestations.</div>")
     style 6 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-    7("<div style='font-weight: bold'>Runtime platform</div><div style='font-size: 80%; margin-top:10px'>Host / Python tools; scoped<br />providers.</div>")
+    7("<div style='font-weight: bold'>Verification application</div><div style='font-size: 80%; margin-top:10px'>Consumer-owned tools and<br />native profiles.</div>")
     style 7 fill:#dbeafe,stroke:#2563eb,color:#0f172a
 
     1-- "<div>Run / verify</div><div style='font-size: 70%'></div>" -->7
@@ -40,8 +40,8 @@ graph LR
     7-- "<div>Native control SDK</div><div style='font-size: 70%'></div>" -->4
     7-- "<div>Selected media</div><div style='font-size: 70%'></div>" -->5
     7-- "<div>Install / verify</div><div style='font-size: 70%'></div>" -->6
-    1-- "<div>Configure client</div><div style='font-size: 70%'>[Project / JWT]</div>" -->18
-    18-- "<div>REST ×6 + config</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->7
-    21-- "<div>Artifact IDs</div><div style='font-size: 70%'>[MCP / stdio]</div>" -->7
+    1-- "<div>Configure client</div><div style='font-size: 70%'>[Project / JWT]</div>" -->19
+    19-- "<div>REST ×6 + config</div><div style='font-size: 70%'>[JWT / HTTP]</div>" -->7
+    22-- "<div>Artifact IDs</div><div style='font-size: 70%'>[MCP / stdio]</div>" -->7
 
   end

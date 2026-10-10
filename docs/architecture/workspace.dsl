@@ -1,15 +1,15 @@
-workspace "Robotics execution and qualification" "Joint platform from robotics-runtime and robotics-runtime-infra; compiled host and Python packages have separate releases; provider qualification is profile-scoped." {
+workspace "Robotics verification workflows" "Consumer-owned usage examples for published Python tools, the embedded host and optional services; native coverage belongs to each selected profile." {
     !identifiers hierarchical
     model {
         integrator = person "Integrator" "Selects profiles and verifies evidence."
-        product = softwareSystem "Product" "Robot / ground station / control / vision." {
+        product = softwareSystem "System under test" "Robot / control / vision application." {
             tags "External"
         }
         group "Native dependencies" {
         simulators = softwareSystem "Simulators" "Gazebo / Webots / Isaac; scoped." {
             tags "External"
         }
-        autopilot = softwareSystem "Control endpoint" "Selected SDK; transport, peer and effects differ." {
+        autopilot = softwareSystem "Selected SDK peer" "MAVSDK server in the PX4 example; native peers belong to their selected profiles." {
             tags "External"
         }
         mediaSource = softwareSystem "Media source" "Native camera / RTSP / fixture." {
@@ -19,8 +19,11 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         registries = softwareSystem "Registries" "Immutable packages / images / attestations." {
             tags "External"
         }
-        platform = softwareSystem "Runtime platform" "Host / Python tools; scoped providers." {
-            host = container "Run host" "Lifecycle and owned jobs." "Node 24 / Cordis / Execa" {
+        platform = softwareSystem "Verification application" "Consumer-owned tools and native profiles." {
+            runner = container "Consumer CLI / CI" "Invokes published Python tools." "Shell / Python / CI" {
+                tags "Consumer"
+            }
+            host = container "Consumer coordinator" "Embeds the host library; callbacks own workload and payloads." "Consumer Node app / Cordis / Execa" {
                 tags "Host"
             }
             group "Python tools" {
@@ -39,7 +42,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
                 tags "Media"
             }
             }
-            evidence = container "Evidence store" "Retained bytes." "Files / object storage" {
+            evidence = container "Evidence store" "Local bytes and retained references." "Local files / retained references" {
                 tags "Database"
             }
             externalApi = container "External Test API" "Producer metadata and upload custody." "Fastify / jose / public core Jobs"
@@ -50,7 +53,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             mcp = container "Offline MCP" "Six read tools; source package." "Standard MCP SDK / public host workers"
         }
         group "SDK interfaces" {
-        externalSdk = softwareSystem "SDK client" "SignalFlag 1.8.0; project + JWT." {
+        externalSdk = softwareSystem "External client application" "Embeds the selected SignalFlag SDK; project + JWT." {
             tags "External"
         }
         identity = softwareSystem "OIDC issuer" "JWT and JWKS." {
@@ -70,12 +73,16 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         platform -> autopilot "Native control SDK"
         platform -> mediaSource "Selected media"
         platform -> registries "Install / verify"
-        integrator -> platform.host "Trusted profile" "Consumer CLI/API"
+        integrator -> platform.runner "Check documents" "CLI / CI"
+        platform.runner -> platform.documents "Validate documents" "argv / files"
+        platform.runner -> platform.evaluation "Evaluate retained evidence" "argv / files"
+        platform.runner -> platform.evidence "Preserve inputs / reports" "Files"
+        integrator -> platform.host "Run selected native profile" "Consumer CLI/API"
         product -> platform.host "Trusted coordinator" "Host API / files"
         platform.host -> platform.documents "Validate documents" "argv / files"
         platform.host -> platform.evaluation "Evaluate evidence" "argv / files"
         platform.host -> platform.native "Lifecycle jobs" "Compose / argv"
-        platform.host -> autopilot "SDK clients / consumer policy" "MAVSDK / gRPC"
+        platform.host -> autopilot "Selected PX4 control profile" "MAVSDK / gRPC"
         platform.host -> platform.media "Media jobs" "argv / files"
         platform.media -> mediaSource "Declared input" "GStreamer / RTSP / fixture"
         platform.media -> platform.evidence "Frames / reports" "Exact files"
@@ -101,7 +108,7 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         deploymentEnvironment "Development" {
             deploymentNode "Development host" "Example CPU topology; qualification is profile-scoped." "Windows / WSL2" {
                 deploymentNode "Linux environment" "Source components; native and media coverage is profile-scoped." "Ubuntu 24.04 / WSL2" {
-                    infrastructureNode "Rootless engine" "Owned socket; namespace mapping." "Podman 4.9.3 / Compose 5.3.1"
+                    infrastructureNode "Rootless engine" "Owned socket; namespace mapping." "Podman / Compose"
                     containerInstance platform.host
                     containerInstance platform.documents
                     containerInstance platform.evaluation
@@ -129,14 +136,14 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
         }
     }
     views {
-        systemContext platform "Context" "Actors and system boundary." {
-            title "Platform context"
+        systemContext platform "Context" "Consumer-owned verification workflow and external systems; this is a usage example, not a repository boundary." {
+            title "Verification workflow context"
             include integrator product platform simulators autopilot mediaSource registries externalSdk mcpClient
             autoLayout lr 20 25
         }
-        container platform "Container" "Execution/evidence and optional external Test boundaries; complete worker/tool interfaces are in ContainerDetail." {
-            title "Execution and external Test boundaries"
-            include platform.host platform.native platform.evidence platform.externalApi externalSdk platform.mcp mcpClient
+        container platform "Container" "Published Python tools consumed from a terminal or CI; no host service, Node runtime or optional API is required for this document workflow." {
+            title "Published document workflow"
+            include integrator platform.runner platform.documents platform.evaluation platform.evidence
             autoLayout lr 20 25
         }
         container platform "ContainerDetail" "Complete consumer, controller, simulator and media interface graph." {
@@ -149,14 +156,14 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             include externalSdk identity objectStorage platform.externalApi platform.apiMetadata platform.custody
             autoLayout tb 20 25
         }
-        container platform "NativeInterfaces" "Selected simulator, media and SDK dependencies; no common frame or control bus." {
-            title "Native interfaces"
-            include platform.host platform.native platform.media simulators mediaSource autopilot
+        container platform "NativeInterfaces" "Native usage example: consumer application embeds the host library; selected SDK and media dependencies remain native." {
+            title "Native consumer application"
+            include platform.host platform.documents platform.evaluation platform.native platform.media platform.evidence simulators mediaSource autopilot
             autoLayout lr 60 70
         }
-        container platform "ConsumerInterfaces" "Product ownership, published document/evaluation tools and retained evidence." {
-            title "Consumer interfaces"
-            include integrator product platform.host platform.documents platform.evaluation platform.evidence autopilot platform.mcp mcpClient
+        container platform "ConsumerInterfaces" "Embedded coordinator, product callbacks, public Python tools and retained evidence; optional services have their own view." {
+            title "Embedded host and public tools"
+            include integrator product platform.host platform.documents platform.evaluation platform.evidence
             autoLayout lr 60 70
         }
         deployment platform "Development" "DevelopmentDeployment" "Example CPU development profile; qualification remains profile-scoped." {
@@ -214,6 +221,9 @@ workspace "Robotics execution and qualification" "Joint platform from robotics-r
             element "Host" {
                 background "#dbeafe"
                 stroke "#2563eb"
+            }
+            element "Consumer" {
+                background "#f1f5f9"
             }
             element "Published" {
                 background "#ecfdf5"

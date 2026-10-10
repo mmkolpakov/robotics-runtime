@@ -11,7 +11,10 @@ VIEWS = ("Container", "Context")
 
 def render_readme() -> str:
     readme = (ROOT / "README.md").read_text()
-    labels = {"Container": "Execution and external Test boundaries", "Context": "Platform context"}
+    labels = {
+        "Container": "Published document workflow",
+        "Context": "Verification workflow context",
+    }
     for view in VIEWS:
         start = f"<!-- architecture:{view}:start -->"
         end = f"<!-- architecture:{view}:end -->"
