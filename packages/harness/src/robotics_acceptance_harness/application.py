@@ -266,9 +266,8 @@ def run_verification(
 ) -> VerificationOutputs:
     """Attach to a running execution and produce canonical acceptance outputs."""
 
-    _require_ros_observer_profile(bundle)
-
     _validate_raw_evidence_budget(max_raw_evidence_bytes)
+    _require_ros_observer_profile(bundle)
     scenario = bundle.scenario_data
     execution = scenario["execution"]
     physical = execution["target_environment"] in {"hil", "real_robot"}
