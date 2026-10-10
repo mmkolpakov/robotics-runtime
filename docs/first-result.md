@@ -134,7 +134,7 @@ To see a refusal after retaining the first result, append one blank line to the
 indexed metrics without rebuilding the index:
 
 ```bash
-python -c 'from pathlib import Path; p = Path("inputs/metrics.otlp.jsonl"); p.write_bytes(p.read_bytes() + b"\\n")'
+python -c 'from pathlib import Path; p = Path("inputs/metrics.otlp.jsonl"); p.write_bytes(p.read_bytes() + b"\n")'
 ```
 
 Repeat `evaluate` with `--output rejected-results` and
