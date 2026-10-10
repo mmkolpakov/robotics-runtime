@@ -20,11 +20,17 @@ original run. V1 formats retain their ROS-oriented fields and semantics.
 The [compatibility reference](../packages/harness/docs/compatibility.md) defines
 this support boundary.
 
-Authenticated installed evaluator bytes, independent archive re-evaluation,
-distributed recovery and new deployment profiles still require their own
-implementation and acceptance. Physical v2 qualification and cross-clock
-conversion are outside the native archive path. No future design described here
-changes the meaning of historical signed documents or recorded run outcomes.
+The source [evaluator trust SDK](../packages/harness/docs/evaluator-trust.md)
+authenticates wheel provenance and binds installed source bytes to the
+authenticated wheel. These helpers are not part of the published harness 0.21.0
+wheel. Standard CLI evaluator admission and execution from authenticated
+snapshots still require integration and acceptance.
+
+Independent archive re-evaluation, distributed recovery and new deployment
+profiles remain outside the current implementation. Physical v2 qualification
+and cross-clock conversion are outside the native archive path. No future design
+described here changes the meaning of historical signed documents or recorded
+run outcomes.
 
 For implemented interfaces, use the [current guide](../README.md),
 [architecture reference](architecture.md) and
