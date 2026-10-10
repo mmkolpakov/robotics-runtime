@@ -33,6 +33,21 @@
     "acceptance-result-core.v1",
     "acceptance-scenario-core.v1",
     "runtime-manifest-core.v1",
-    "transport-qualification-result-core.v1"
-  ]
+    "transport-qualification-result-core.v1",
+    "native-execution.v2"
+  ],
+  "supported_versions": {
+    "acceptance_observation": [
+      "acceptance-observation.v2"
+    ],
+    "acceptance_result": [
+      "acceptance-result.v2"
+    ],
+    "acceptance_scenario": [
+      "acceptance-scenario.v2"
+    ],
+    "runtime_manifest": [
+      "runtime-manifest.v2"
+    ]
+  }
 }

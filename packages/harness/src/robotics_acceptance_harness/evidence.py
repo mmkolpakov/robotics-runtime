@@ -51,6 +51,31 @@ class VerifiedEvidence:
     recording_summaries: tuple[LoadedDocument, ...] = ()
     receipts: tuple[LoadedDocument, ...] = ()
 
+    def read_local(self, path: str | Path, *, max_raw_evidence_bytes: int | None = None) -> bytes:
+        """Capture an indexed local artifact from the same read that verifies its bytes."""
+        if max_raw_evidence_bytes is not None and (
+            isinstance(max_raw_evidence_bytes, bool)
+            or not isinstance(max_raw_evidence_bytes, int)
+            or max_raw_evidence_bytes <= 0
+        ):
+            raise EvidenceValidationError(
+                "$.artifacts", "raw evidence byte budget must be a positive integer"
+            )
+        source = Path(path).expanduser().resolve()
+        reference = self.local_files.get(source)
+        if reference is None:
+            raise EvidenceValidationError(
+                "$.artifacts", f"source is not verified local evidence: {source}"
+            )
+        if (
+            max_raw_evidence_bytes is not None
+            and int(reference["size_bytes"]) > max_raw_evidence_bytes
+        ):
+            raise EvidenceValidationError(
+                "$.artifacts.size_bytes", "source exceeds the raw evidence byte budget"
+            )
+        return _read_local(source, reference, self.index.path.parent, "$.artifacts", capture=True)
+
 
 def _verified_payload(
     path: Path,
@@ -62,7 +87,7 @@ def _verified_payload(
     expected_size = int(reference["size_bytes"])
     if capture and expected_size > MAX_DOCUMENT_BYTES:
         raise EvidenceReadError(
-            "summary exceeds the contract document byte limit", field="size_bytes"
+            "captured evidence exceeds the contract document byte limit", field="size_bytes"
         )
     payload = bytearray()
     digest, size = sha256(), 0

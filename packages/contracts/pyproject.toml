@@ -17,6 +17,7 @@ classifiers = [
 dependencies = [
   "jsonschema[format-nongpl]>=4.26,<5",
   "PyYAML>=6.0.3,<7",
+  "protobuf>=5,<8",
   "referencing>=0.37,<1",
 ]
 

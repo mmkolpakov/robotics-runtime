@@ -368,6 +368,22 @@ def _inspect_domains(context: _Context, diagnostics: list[QualificationDiagnosti
     return execution_valid
 
 
+def _legacy_versions(context: _Context) -> None:
+    for label, artifacts, schema in (
+        ("runtime", context.runtimes, "runtime-manifest.v1"),
+        ("result", context.results, "acceptance-result.v1"),
+    ):
+        if any(
+            rules._document(artifact)["schema_version"] != schema for artifact in artifacts.values()
+        ):
+            rules._fail(f"legacy qualification requires one v1 {label} registry")
+    if any(
+        rules._document(artifact)["schema_version"] == "acceptance-observation.v2"
+        for artifact in context.grouped.get("acceptance_observation", ())
+    ):
+        rules._fail("legacy qualification cannot include native v2 source observations")
+
+
 def inspect_links(artifacts: Sequence[QualificationArtifact]) -> QualificationReport:
     diagnostics: list[QualificationDiagnostic] = []
     names = [item.subject_name for item in artifacts]
@@ -381,6 +397,12 @@ def inspect_links(artifacts: Sequence[QualificationArtifact]) -> QualificationRe
         )
     context = _context(artifacts, diagnostics)
     if context is None:
+        return QualificationReport(tuple(artifacts), tuple(diagnostics), blocked_checks=("links",))
+    if context.scenario["schema_version"] == "acceptance-scenario.v2":
+        from robotics_runtime_contracts._qualification_native import inspect_native_links
+
+        return inspect_native_links(artifacts, context, diagnostics)
+    if not _run_check(_Check("versions", partial(_legacy_versions, context)), diagnostics):
         return QualificationReport(tuple(artifacts), tuple(diagnostics), blocked_checks=("links",))
     for check in _identity_checks(context):
         _run_check(check, diagnostics)

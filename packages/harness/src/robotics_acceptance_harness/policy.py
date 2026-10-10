@@ -327,3 +327,29 @@ def evaluate_evidence_policy(
     return tuple(
         _boolean_evaluation(f"policy-{name}", passed, message) for name, passed, message in checks
     )
+
+
+def evaluate_native_evidence_policy(
+    policy: Mapping[str, Any], evidence: VerifiedEvidence
+) -> tuple[AssertionEvaluation, ...]:
+    """Check retained native artifacts without imposing MCAP or ROS recording rules."""
+    observation = evidence.index.data["policy_observation"]
+    artifacts = evidence.index.data["artifacts"]
+    sizes = [int(item["size_bytes"]) for item in evidence.links]
+    retained = any(item["storage_state"] == "retained" for item in artifacts)
+    checks = (
+        ("native-artifact-size", max(sizes, default=0) <= policy["max_artifact_size_bytes"]),
+        ("native-archive-size", sum(sizes) <= policy["max_archive_size_bytes"]),
+        ("native-upload-lag", observation["upload_lag_max_sec"] <= policy["max_upload_lag_sec"]),
+        ("native-upload-mode", observation["upload_mode"] == policy["upload_mode"]),
+        (
+            "native-retention",
+            all(item["retention_class"] == policy["retention_class"] for item in evidence.links),
+        ),
+        ("native-remote-sink", not retained or policy["remote_sink_allowed"]),
+        ("native-required-sink", policy["upload_mode"] != "remote_required" or retained),
+    )
+    return tuple(
+        _boolean_evaluation(f"policy-{name}", bool(passed), f"native evidence policy {name} failed")
+        for name, passed in checks
+    )

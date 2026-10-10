@@ -141,6 +141,22 @@ def why_report(path: str | Path) -> dict[str, Any]:
     ]
     unevaluated = set(result.data["unevaluated"])
     observations: list[dict[str, str]] = []
+    if result.schema_version == "acceptance-result.v2":
+        return {
+            "result_id": result.data["result_id"],
+            "status": result.data["status"],
+            "unevaluated": list(result.data["unevaluated"]),
+            "assertions": assertions,
+            "runtime_observations": [
+                {
+                    "observation_id": name,
+                    "status": "incomplete",
+                    "message": observation["reason"],
+                }
+                for name, observation in result.data["observations"].items()
+                if observation["state"] in {"unobserved", "invalid"}
+            ],
+        }
     time_authority = result.data["time_authority_observation"]
     if "$.time_authority_observation" not in unevaluated and not time_authority["within_policy"]:
         observations.append(

@@ -1,7 +1,8 @@
 # Product artifact roles
 
-These two additive roles are registered in the working `v1` catalog for the next
-release. Existing roles retain their schemas. They use the usual offline
+Execution trust policy and robot description are registered public roles.
+Existing v1 roles retain their schemas; native scenario, runtime, observation
+and result roles additionally admit explicit v2 versions in the same catalog. They use the usual offline
 `validate_document`, `validate_role`, `schema_path`, `schema_registry`, and CLI
 `validate`/`describe` interfaces; no separate CLI writer is required.
 
@@ -114,3 +115,28 @@ or a reserialized JSON value. Validate the `robot_description` role separately
 when admitting the manifest; the qualification raw-artifact boundary does not
 parse its contents. Referenced XML and mesh files still require the product
 admission checks above. Infrastructure spawning remains a later integration step.
+
+## Native acceptance documents
+
+The canonical defaults for acceptance_scenario, runtime_manifest,
+acceptance_observation and acceptance_result remain v1. The same roles also
+support acceptance-scenario.v2, runtime-manifest.v2, acceptance-observation.v2
+and acceptance-result.v2 through explicit version selection.
+
+A native runtime manifest contains pre-run configuration and actually loaded
+bindings. Completed observations are a separate retained document. Native model
+bindings connect the declared model, runtime binding, actual bytes consumed by
+the producer and retained evidence; they do not mandate a robot-description
+format. Results preserve original run/source/evidence identities separately from
+assessment method, environment and time.
+
+Profile-defined observation names have measured, not_applicable, unobserved or
+invalid states. Inapplicability preserves the declared reason. Required missing
+or invalid observations produce incomplete coverage; zero remains a valid
+measured value. A captured measurement window carries its clock and integer
+bounds. The assessment uses that same clock; UTC provenance is not a clock
+conversion.
+
+The [native archive example](../consumer-examples/minimal-native-archive/README.md)
+shows the bounded software/simulation path. Physical native qualification and
+independent archive re-evaluation are outside that path.

@@ -10,15 +10,22 @@ are published under `harness-v0.21.0` and `contracts-v0.20.0`.
 Independent installs outside the workspace checked the exact pair, public API,
 CLI and archive contents against their tagged sources.
 
-Each role has one canonical schema. Datasets use v2 for one or multiple
-MCAP members; other current roles use v1. Historical datasets require the
-matching archived package. Current readers do not convert old dataset forms.
+Each role retains its canonical default. Datasets use v2 for one or multiple
+MCAP members. The native document path adds explicitly supported v2 versions for
+scenario, runtime, observation and result roles. The published 0.20.0/0.21.0
+pair predates that native path; use a package build containing those roles for
+the [native archive example](../../contracts/consumer-examples/minimal-native-archive/README.md).
+Historical datasets require their matching archived package. Readers do not
+convert old dataset forms.
 
 ## Document Set
 
 The authoritative role-to-schema mapping is the contracts package catalog. The
-harness calls its public `schema_for_role()` and `validate_role()` APIs and does
-not maintain a second compatibility table.
+harness calls its public `schema_for_role()`, `schema_versions_for_role()` and
+`validate_role()` APIs and maintains no second compatibility table.
+`schema_for_role(role)` preserves the canonical default;
+`schema_for_role(role, version=2)` selects an explicit supported version.
+Declared supported versions are validated without converting input bytes.
 
 Unknown schema versions, wrong document roles, and contradictory bundle facts
 fail before observation or evaluation begins. Scenario extensions remain
@@ -42,10 +49,29 @@ conformance suite.
 original package versions, source identities and native profile outcomes.
 A current package install or source fixture does not qualify those compositions.
 
-The Python-only commands work without ROS. Live observation requires the ROS 2
-packages and message interfaces declared by the runtime. Exact provider and
-hardware support is stated by the qualified runtime artifact, not inferred from
-installing this package.
+The Python commands install without ROS. V1 document formats retain required
+ROS graph, lifecycle and timing fields; live observation uses the ROS 2 packages
+and interfaces declared by the runtime. V2 evaluates captured native software
+or simulation observations without constructing ROS fields. It does not launch
+SDK operations. V2 physical qualification and v1 transport evaluation of v2
+profiles are refused.
+
+V2 results separate original run/source/evidence hashes from method configuration,
+actual software environment and UTC assessment time. Captured source measurement
+windows and assessment windows use explicit clock identities and integer bounds.
+Nanosecond document integers are exact on the Python file path. JavaScript
+bridges must preserve exact files/text, and pass CLI window arguments as decimal
+strings or bigint. JSON.parse/re-emission through JavaScript Number is outside
+that exact-byte path. The host rejects numeric window arguments; read-only MCP
+operations forward file snapshots and keep worker payloads as text.
+The built-in OTLP method accepts unix_ns; selected product assessments may use
+native_ns without an inferred UTC conversion. Empty criteria or entirely absent
+measurement coverage cannot produce a passed verdict. Existing v1 run, aggregate
+and qualification wrappers cover one original run and its assessment chain; they
+do not implement independent archive re-evaluation.
+
+Exact provider and hardware support belongs to a qualified runtime artifact;
+installing the package or selecting an SDK binding does not establish it.
 
 ## Dependency Reproducibility
 

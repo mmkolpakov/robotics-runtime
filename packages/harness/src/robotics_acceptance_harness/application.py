@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from itertools import pairwise
 from math import isfinite
@@ -33,6 +33,7 @@ from robotics_acceptance_harness.metrics import (
     MetricPoint,
     MetricSample,
 )
+from robotics_acceptance_harness.native import evaluate_native
 from robotics_acceptance_harness.otel import (
     OTLP_JSON_LINES_MEDIA_TYPE,
     _validate_raw_evidence_budget,
@@ -94,6 +95,17 @@ def _utc_now() -> datetime:
 def explain_bundle(bundle: DocumentBundle) -> dict[str, Any]:
     """Return the validated execution facts without starting an observation."""
 
+    if bundle.scenario.schema_version == "acceptance-scenario.v2":
+        return {
+            "schema_version": bundle.scenario.schema_version,
+            "scenario_id": bundle.scenario.data["scenario_id"],
+            "scenario_sha256": bundle.scenario.sha256,
+            "runtime_manifest_sha256": bundle.runtime.sha256,
+            "execution": bundle.scenario.as_dict()["execution"],
+            "profile": bundle.scenario.as_dict()["profile"],
+            "native_model": bundle.runtime.as_dict().get("native_model"),
+            "evidence": dict(bundle.scenario.data["evidence_policy"]),
+        }
     scenario = bundle.scenario_data
     workload_kind = bundle.runtime_data["workload"]["kind"]
     return {
@@ -223,6 +235,13 @@ def _wait_for_evidence(
             sleep_fn(min(poll_interval_sec, remaining_sec))
 
 
+def _require_ros_observer_profile(bundle: DocumentBundle) -> None:
+    if bundle.scenario.schema_version == "acceptance-scenario.v2":
+        raise HarnessInputError(
+            "native profiles execute through their SDK consumer; evaluate captured evidence"
+        )
+
+
 def run_verification(
     *,
     run_id: str,
@@ -248,6 +267,7 @@ def run_verification(
     """Attach to a running execution and produce canonical acceptance outputs."""
 
     _validate_raw_evidence_budget(max_raw_evidence_bytes)
+    _require_ros_observer_profile(bundle)
     scenario = bundle.scenario_data
     execution = scenario["execution"]
     physical = execution["target_environment"] in {"hil", "real_robot"}
@@ -493,6 +513,39 @@ def run_verification(
     return VerificationOutputs(result, result_path, junit_path)
 
 
+def _offline_metric_samples(
+    context: EvaluationContext, otel_metrics_path: str | Path | None
+) -> tuple[tuple[MetricPoint, ...], Mapping[str, Any] | None]:
+    if otel_metrics_path is None:
+        if (
+            context.bundle.scenario.schema_version == "acceptance-scenario.v1"
+            or context.scenario["metric_definitions"]
+        ):
+            raise VerificationError("this scenario requires --otel-metrics evidence")
+        return (), None
+    metrics_path = Path(otel_metrics_path).expanduser().resolve()
+    metric_link = context.evidence.local_files.get(metrics_path)
+    if metric_link is None or metric_link["media_type"] != OTLP_JSON_LINES_MEDIA_TYPE:
+        raise VerificationError(
+            f"OTLP metrics must be verified local {OTLP_JSON_LINES_MEDIA_TYPE} evidence"
+        )
+    samples = _measurement_metrics(
+        select_metric_points(
+            load_otlp_json_metrics(
+                metrics_path,
+                expected_sha256=str(metric_link["sha256"]),
+                evidence_root=context.evidence.index.path.parent,
+                max_raw_evidence_bytes=context.max_raw_evidence_bytes,
+            ),
+            run_id=context.run_id,
+            domain_id=context.domain_id,
+        ),
+        window_start_ns=context.window_start_ns,
+        window_end_ns=context.window_end_ns,
+    )
+    return samples, metric_link
+
+
 def evaluate_from_evidence(
     *,
     run_id: str,
@@ -504,7 +557,7 @@ def evaluate_from_evidence(
     artifact_verification_paths: Sequence[str | Path] = (),
     receipt_dependency_paths: Sequence[str | Path] = (),
     evaluator_receipts: VerifiedReceiptSet | None = None,
-    otel_metrics_path: str | Path,
+    otel_metrics_path: str | Path | None,
     window_start_ns: int,
     window_end_ns: int,
     output_dir: str | Path,
@@ -529,38 +582,26 @@ def evaluate_from_evidence(
         verification_paths=artifact_verification_paths,
         receipt_dependency_paths=receipt_dependency_paths,
     )
-    metrics_path = Path(otel_metrics_path).expanduser().resolve()
-    metric_link = evidence.local_files.get(metrics_path)
-    if metric_link is None or metric_link["media_type"] != OTLP_JSON_LINES_MEDIA_TYPE:
-        raise VerificationError(
-            f"OTLP metrics must be verified local {OTLP_JSON_LINES_MEDIA_TYPE} evidence"
-        )
-    metric_samples = _measurement_metrics(
-        select_metric_points(
-            load_otlp_json_metrics(
-                metrics_path,
-                expected_sha256=str(metric_link["sha256"]),
-                evidence_root=evidence.index.path.parent,
-                max_raw_evidence_bytes=max_raw_evidence_bytes,
-            ),
-            run_id=run_id,
-            domain_id=domain_id,
-        ),
+    context = EvaluationContext(
+        run_id=run_id,
+        domain_id=domain_id,
+        bundle=bundle,
+        evidence=evidence,
+        metric_samples=(),
         window_start_ns=window_start_ns,
         window_end_ns=window_end_ns,
+        max_raw_evidence_bytes=max_raw_evidence_bytes,
     )
-    assertions = evaluate_acceptance(
-        EvaluationContext(
-            run_id=run_id,
-            domain_id=domain_id,
-            bundle=bundle,
-            evidence=evidence,
-            metric_samples=metric_samples,
-            window_start_ns=window_start_ns,
-            window_end_ns=window_end_ns,
-        ),
-        evaluator_receipts=evaluator_receipts,
-    )
+    metric_samples, metric_link = _offline_metric_samples(context, otel_metrics_path)
+    context = replace(context, metric_samples=metric_samples)
+    if bundle.scenario.schema_version == "acceptance-scenario.v2":
+        result = evaluate_native(context, run_context, output_dir, evaluator_receipts)
+        destination = Path(output_dir).expanduser().resolve()
+        result_path = write_contract_json(result, destination / "acceptance-result.json")
+        junit_path = write_junit_xml(result, destination / "junit.xml")
+        return VerificationOutputs(result, result_path, junit_path)
+    assert metric_link is not None
+    assertions = evaluate_acceptance(context, evaluator_receipts=evaluator_receipts)
     time_authority = evaluate_time_authority(
         bundle.scenario_data["time_policy"],
         metric_samples,

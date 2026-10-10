@@ -248,12 +248,31 @@ def _properties(old: Schema, new: Schema, parent: Node, context: Context) -> Non
 
 
 def check_catalog(catalog: Schema, schemas: dict[str, Schema]) -> None:
-    if set(catalog) != {"contract_set", "roles", "internal_resources"}:
+    required = {"contract_set", "roles", "internal_resources"}
+    if not required <= set(catalog) or set(catalog) - required - {"supported_versions"}:
         raise ReviewRequired("Unsupported catalog structure")
     roles, internal = catalog["roles"], catalog["internal_resources"]
     if not isinstance(roles, dict) or not isinstance(internal, list):
         raise ReviewRequired("Invalid catalog role/internal inventory")
-    names = list(roles.values()) + internal
+    versions = catalog.get("supported_versions", {})
+    if not isinstance(versions, dict) or set(versions) - roles.keys():
+        raise ReviewRequired("Versioned catalog roles must name canonical public roles")
+    additional: list[str] = []
+    for role, names_for_role in versions.items():
+        if not isinstance(names_for_role, list) or not names_for_role:
+            raise ReviewRequired("Supported versions must be nonempty schema-name lists")
+        canonical = roles[role]
+        for name in names_for_role:
+            if (
+                not isinstance(name, str)
+                or not isinstance(canonical, str)
+                or name.rsplit(".v", 1)[0] != canonical.rsplit(".v", 1)[0]
+                or not name.rsplit(".v", 1)[-1].isdigit()
+                or name == canonical
+            ):
+                raise ReviewRequired("Supported version must retain the canonical role name")
+            additional.append(name)
+    names = list(roles.values()) + additional + internal
     if any(not isinstance(name, str) for name in names):
         raise ReviewRequired("Catalog schema names must be strings")
     if len(set(names)) != len(names) or {f"{name}.schema.json" for name in names} != schemas.keys():
@@ -270,6 +289,9 @@ def _check_retained_catalog(
             continue
         if new_catalog["roles"].get(role) != name:
             raise ReviewRequired(f"Removed or renamed published role: {role}")
+    for role, versions in old_catalog.get("supported_versions", {}).items():
+        if set(versions) - set(new_catalog.get("supported_versions", {}).get(role, ())):
+            raise ReviewRequired(f"Removed supported schema version for role: {role}")
     if set(old_catalog["internal_resources"]) - set(new_catalog["internal_resources"]):
         raise ReviewRequired("Removed published internal resources")
 

@@ -100,7 +100,7 @@ def test_reference_lookup_uses_escaped_pointers_and_preserves_siblings() -> None
 
 
 def test_import_siblings_are_rejected_instead_of_overwritten() -> None:
-    core = next(iter(bundler.read_schemas(bundler.SOURCES).values()))
+    core = bundler.read_schemas(bundler.SOURCES)["acceptance-scenario-core.v1.schema.json"]
     definition = next(iter(core["$defs"].values()))
     definition["maxLength"] = 1
     with pytest.raises(ValueError, match="only .ref"):

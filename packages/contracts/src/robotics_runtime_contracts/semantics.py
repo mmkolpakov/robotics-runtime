@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from typing import Any, NoReturn
 
-from robotics_runtime_contracts._timestamps import parse_timestamp
+from robotics_runtime_contracts._timestamps import parse_timestamp, parse_timestamp_ns
 from robotics_runtime_contracts.errors import ContractError
 from robotics_runtime_contracts.qualification_policy import (
     RESERVED_ASSERTION_IDS,
@@ -62,6 +62,67 @@ def _validate_scenario_stability(schema_name: str, document: Mapping[str, Any]) 
             )
 
 
+def _validate_metric_definition(
+    schema_name: str, index: int, definition: Mapping[str, Any]
+) -> None:
+    metric_name = definition["metric_name"]
+    path = f"$.metric_definitions[{index}]"
+    if metric_name.startswith("robotics.") and metric_name not in RESERVED_METRIC_NAMES:
+        _fail(schema_name, f"{path}.metric_name", "uses the reserved robotics.* namespace")
+    if not metric_name.startswith("robotics.") and metric_name.count(".") < 2:
+        _fail(
+            schema_name, f"{path}.metric_name", "product metrics require a reverse-domain namespace"
+        )
+    kind = definition["instrument_kind"]
+    temporality = definition["temporality"]
+    if kind == "gauge" and temporality != "instantaneous":
+        _fail(
+            schema_name,
+            f"{path}.temporality",
+            "gauge instruments require instantaneous temporality",
+        )
+    if kind != "gauge" and temporality == "instantaneous":
+        _fail(
+            schema_name,
+            f"{path}.temporality",
+            "sum and histogram instruments require OTLP aggregation temporality",
+        )
+    if definition.get("monotonic", False) and kind != "sum":
+        _fail(schema_name, f"{path}.monotonic", "only sum instruments can be monotonic")
+
+
+def _validate_declared_metric_assertion(
+    schema_name: str, index: int, assertion: Mapping[str, Any], definition: Mapping[str, Any] | None
+) -> None:
+    path = f"$.assertions[{index}]"
+    if definition is None:
+        _fail(schema_name, f"{path}.metric_name", "has no metric_definitions entry")
+    if assertion["unit"] != definition["unit"]:
+        _fail(schema_name, f"{path}.unit", "must match the declared metric unit")
+    if assertion["kind"] != "metric_duration":
+        return
+    if definition["instrument_kind"] != "gauge":
+        _fail(schema_name, f"{path}.metric_name", "duration predicates require a gauge instrument")
+    if assertion["duration_requirement"]["duration_sec"] > assertion["window_sec"]:
+        _fail(
+            schema_name, f"{path}.duration_requirement.duration_sec", "must not exceed window_sec"
+        )
+    if assertion["max_sample_gap_sec"] > assertion["window_sec"]:
+        _fail(schema_name, f"{path}.max_sample_gap_sec", "must not exceed window_sec")
+
+
+def _validate_metric_declarations(schema_name: str, document: Mapping[str, Any]) -> None:
+    definitions = document["metric_definitions"]
+    _require_unique(schema_name, definitions, "metric_name", "$.metric_definitions")
+    definition_by_name = {item["metric_name"]: item for item in definitions}
+    for index, definition in enumerate(definitions):
+        _validate_metric_definition(schema_name, index, definition)
+    for index, assertion in enumerate(document["assertions"]):
+        _validate_declared_metric_assertion(
+            schema_name, index, assertion, definition_by_name.get(assertion["metric_name"])
+        )
+
+
 def _validate_acceptance_scenario(document: Mapping[str, Any]) -> None:
     schema_name = document["schema_version"]
     _validate_scenario_stability(schema_name, document)
@@ -87,77 +148,7 @@ def _validate_acceptance_scenario(document: Mapping[str, Any]) -> None:
             )
 
     if schema_name == "acceptance-scenario.v1":
-        definitions = document["metric_definitions"]
-        _require_unique(schema_name, definitions, "metric_name", "$.metric_definitions")
-        definition_by_name = {item["metric_name"]: item for item in definitions}
-        for index, definition in enumerate(definitions):
-            metric_name = definition["metric_name"]
-            if metric_name.startswith("robotics.") and metric_name not in RESERVED_METRIC_NAMES:
-                _fail(
-                    schema_name,
-                    f"$.metric_definitions[{index}].metric_name",
-                    "uses the reserved robotics.* namespace",
-                )
-            if not metric_name.startswith("robotics.") and metric_name.count(".") < 2:
-                _fail(
-                    schema_name,
-                    f"$.metric_definitions[{index}].metric_name",
-                    "product metrics require a reverse-domain namespace",
-                )
-            kind = definition["instrument_kind"]
-            temporality = definition["temporality"]
-            if kind == "gauge" and temporality != "instantaneous":
-                _fail(
-                    schema_name,
-                    f"$.metric_definitions[{index}].temporality",
-                    "gauge instruments require instantaneous temporality",
-                )
-            if kind != "gauge" and temporality == "instantaneous":
-                _fail(
-                    schema_name,
-                    f"$.metric_definitions[{index}].temporality",
-                    "sum and histogram instruments require OTLP aggregation temporality",
-                )
-            if definition.get("monotonic", False) and kind != "sum":
-                _fail(
-                    schema_name,
-                    f"$.metric_definitions[{index}].monotonic",
-                    "only sum instruments can be monotonic",
-                )
-        for index, assertion in enumerate(assertions):
-            definition = definition_by_name.get(assertion["metric_name"])
-            if definition is None:
-                _fail(
-                    schema_name,
-                    f"$.assertions[{index}].metric_name",
-                    "has no metric_definitions entry",
-                )
-            if assertion["unit"] != definition["unit"]:
-                _fail(
-                    schema_name,
-                    f"$.assertions[{index}].unit",
-                    "must match the declared metric unit",
-                )
-            if assertion["kind"] == "metric_duration":
-                if definition["instrument_kind"] != "gauge":
-                    _fail(
-                        schema_name,
-                        f"$.assertions[{index}].metric_name",
-                        "duration predicates require a gauge instrument",
-                    )
-                duration = assertion["duration_requirement"]["duration_sec"]
-                if duration > assertion["window_sec"]:
-                    _fail(
-                        schema_name,
-                        f"$.assertions[{index}].duration_requirement.duration_sec",
-                        "must not exceed window_sec",
-                    )
-                if assertion["max_sample_gap_sec"] > assertion["window_sec"]:
-                    _fail(
-                        schema_name,
-                        f"$.assertions[{index}].max_sample_gap_sec",
-                        "must not exceed window_sec",
-                    )
+        _validate_metric_declarations(schema_name, document)
 
     evidence = document["evidence_policy"]
     if evidence["max_segment_size_bytes"] > evidence["max_spool_size_bytes"]:
@@ -1248,7 +1239,207 @@ def _validate_acceptance_run(document: Mapping[str, Any]) -> None:
     )
 
 
+def _validate_native_profile(document: Mapping[str, Any]) -> None:
+    schema_name = str(document["schema_version"])
+    _require_unique(schema_name, document["profile"]["channels"], "name", "$.profile.channels")
+
+
+def _validate_native_scenario(document: Mapping[str, Any]) -> None:
+    schema_name = str(document["schema_version"])
+    _validate_native_profile(document)
+    _require_unique(schema_name, document["assertions"], "assertion_id", "$.assertions")
+    _require_unique(
+        schema_name, document["evaluator_requirements"], "namespace", "$.evaluator_requirements"
+    )
+    _validate_metric_declarations(schema_name, document)
+    for assertion in document["assertions"]:
+        if assertion["assertion_id"] in RESERVED_ASSERTION_IDS or assertion[
+            "assertion_id"
+        ].startswith(("observation-", "policy-native-")):
+            _fail(schema_name, "$.assertions", "uses a reserved core assertion identifier")
+    evidence = document["evidence_policy"]
+    if evidence["max_artifact_size_bytes"] > evidence["max_archive_size_bytes"]:
+        _fail(schema_name, "$.evidence_policy", "artifact size must not exceed archive size")
+
+
+def _validate_native_runtime(document: Mapping[str, Any]) -> None:
+    _validate_native_profile(document)
+    _require_unique(
+        str(document["schema_version"]),
+        document["evaluator_bindings"],
+        "namespace",
+        "$.evaluator_bindings",
+    )
+
+
+def _native_timestamp(schema_name: str, path: str, value: str) -> int:
+    try:
+        return parse_timestamp_ns(value, json_path=path)
+    except ContractError as error:
+        _fail(schema_name, path, f"must be an exact UTC date-time: {error}")
+
+
+def _native_time_order(schema_name: str, values: Mapping[str, Any], path: str) -> None:
+    start = _native_timestamp(schema_name, f"{path}.started_at", values["started_at"])
+    finish = _native_timestamp(schema_name, f"{path}.finished_at", values["finished_at"])
+    if finish < start:
+        _fail(schema_name, f"{path}.finished_at", "must not be earlier than started_at")
+
+
+def _native_reference_key(reference: Mapping[str, Any]) -> tuple[str, str, int]:
+    return str(reference["uri"]), str(reference["sha256"]), int(reference["size_bytes"])
+
+
+def _validate_native_observation_evidence(document: Mapping[str, Any]) -> None:
+    schema_name = str(document["schema_version"])
+    evidence = {_native_reference_key(item) for item in document["evidence"]}
+    for name, observation in document["observations"].items():
+        reference = observation.get("evidence")
+        if reference is not None and _native_reference_key(reference) not in evidence:
+            _fail(
+                schema_name,
+                f"$.observations.{name}.evidence",
+                "must identify retained evidence listed in this document",
+            )
+
+
+def _validate_native_observation(document: Mapping[str, Any]) -> None:
+    _native_time_order(str(document["schema_version"]), document, "$")
+    window = document.get("measurement_window")
+    if window is not None and window["end_ns"] <= window["start_ns"]:
+        _fail(
+            str(document["schema_version"]), "$.measurement_window", "must have positive duration"
+        )
+    _validate_native_observation_evidence(document)
+
+
+def _native_missing_observations(document: Mapping[str, Any]) -> set[str]:
+    schema_name = str(document["schema_version"])
+    requirements = document["profile"]["observations"]
+    observations = document["observations"]
+    if set(observations) != set(requirements):
+        _fail(
+            schema_name,
+            "$.observations",
+            "must account for exactly the profile's declared observations",
+        )
+    missing = set()
+    for name, requirement in requirements.items():
+        observation = observations[name]
+        if requirement["requirement"] == "not_applicable":
+            if (
+                observation["state"] != "not_applicable"
+                or observation["reason"] != requirement["reason"]
+            ):
+                _fail(
+                    schema_name,
+                    f"$.observations.{name}",
+                    "must preserve the profile's declared inapplicability and reason",
+                )
+        elif observation["state"] == "not_applicable":
+            _fail(
+                schema_name,
+                f"$.observations.{name}",
+                "profile has not declared this observation inapplicable",
+            )
+        if requirement["requirement"] == "required" and observation["state"] in {
+            "unobserved",
+            "invalid",
+        }:
+            missing.add(f"$.observations.{name}")
+    return missing
+
+
+def _validate_native_assertion_sources(document: Mapping[str, Any]) -> None:
+    schema_name = str(document["schema_version"])
+    assertions = document["assertion_results"]
+    evidence_digests = {item["sha256"] for item in document["evidence"]}
+    namespaces = {item["namespace"] for item in document["evaluators"]}
+    for index, assertion in enumerate(assertions):
+        if assertion["source"] == "core":
+            if "namespace" in assertion:
+                _fail(
+                    schema_name,
+                    f"$.assertion_results[{index}].namespace",
+                    "core assertions must not claim a product namespace",
+                )
+        else:
+            namespace = assertion["namespace"]
+            if namespace not in namespaces or not assertion["assertion_id"].startswith(
+                f"{namespace}."
+            ):
+                _fail(
+                    schema_name,
+                    f"$.assertion_results[{index}].namespace",
+                    "must belong to a declared evaluator namespace",
+                )
+            if set(assertion["evidence_sha256"]) - evidence_digests:
+                _fail(
+                    schema_name,
+                    f"$.assertion_results[{index}].evidence_sha256",
+                    "must reference the retained evidence listed in the result",
+                )
+
+
+def _validate_native_result(document: Mapping[str, Any]) -> None:
+    schema_name = str(document["schema_version"])
+    _validate_native_profile(document)
+    _native_time_order(schema_name, document["original_execution"], "$.original_execution")
+    _native_time_order(schema_name, document["evaluation"], "$.evaluation")
+    window = document["evaluation"].get("window")
+    if window is not None and window["end_ns"] <= window["start_ns"]:
+        _fail(schema_name, "$.evaluation.window", "must have positive duration")
+    original_finish = _native_timestamp(
+        schema_name,
+        "$.original_execution.finished_at",
+        document["original_execution"]["finished_at"],
+    )
+    evaluated_at = _native_timestamp(
+        schema_name, "$.evaluation.started_at", document["evaluation"]["started_at"]
+    )
+    if evaluated_at < original_finish:
+        _fail(
+            schema_name,
+            "$.evaluation.started_at",
+            "assessment must not precede the completed original execution",
+        )
+    missing = _native_missing_observations(document)
+    if not any(item["state"] == "measured" for item in document["observations"].values()):
+        missing.add("$.observations")
+    assertions = document["assertion_results"]
+    _require_unique(schema_name, assertions, "assertion_id", "$.assertion_results")
+    _require_unique(schema_name, document["evaluators"], "namespace", "$.evaluators")
+    if not any(
+        item["source"] == "product" or not item["assertion_id"].startswith("policy-native-")
+        for item in assertions
+    ):
+        missing.add("$.assertions")
+    missing.update(
+        f"$.assertions.{item['assertion_id']}" for item in assertions if item["status"] == "skipped"
+    )
+    if set(document["unevaluated"]) != missing:
+        _fail(
+            schema_name,
+            "$.unevaluated",
+            "must describe exactly the missing required observations and assertions",
+        )
+    statuses = [
+        "incomplete" if item["status"] == "skipped" else item["status"] for item in assertions
+    ]
+    if missing:
+        statuses.append("incomplete")
+    expected = worst_status(statuses)
+    if document["status"] != expected:
+        _fail(schema_name, "$.status", f"must equal assessment and coverage status {expected!r}")
+    _validate_native_observation_evidence(document)
+    _validate_native_assertion_sources(document)
+
+
 _VALIDATORS: dict[str, Callable[[Mapping[str, Any]], None]] = {
+    "acceptance-scenario.v2": _validate_native_scenario,
+    "runtime-manifest.v2": _validate_native_runtime,
+    "acceptance-observation.v2": _validate_native_observation,
+    "acceptance-result.v2": _validate_native_result,
     "acceptance-observation.v1": _validate_acceptance_observation,
     "acceptance-scenario.v1": _validate_acceptance_scenario,
     "model-artifact-manifest.v1": _validate_model_artifact,

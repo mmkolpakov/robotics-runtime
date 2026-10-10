@@ -337,6 +337,26 @@ def _result_assertions(result: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     """Share assertion and observation outcomes between the verdict and JUnit."""
 
     assertion_results = list(result["assertion_results"])
+    if result["schema_version"] == "acceptance-result.v2":
+        for name, observation in result["observations"].items():
+            assertion_results.append(
+                {
+                    "assertion_id": f"observation-{name}",
+                    "classname": "robotics.acceptance.observation",
+                    "status": "passed" if observation["state"] == "measured" else "skipped",
+                    "message": observation.get("reason", ""),
+                }
+            )
+        if result["unevaluated"]:
+            assertion_results.append(
+                {
+                    "assertion_id": "evaluation-coverage",
+                    "classname": "robotics.acceptance.coverage",
+                    "status": "skipped",
+                    "message": f"unevaluated declarations: {', '.join(result['unevaluated'])}",
+                }
+            )
+        return assertion_results
     unevaluated = result.get("unevaluated", [])
     checks = (
         (
@@ -389,8 +409,18 @@ def write_junit_xml(result: Mapping[str, Any], path: str | Path) -> Path:
     suite = TestSuite("robotics-acceptance")
     suite.add_property("scenario_sha256", result["scenario_sha256"])
     suite.add_property("runtime_manifest_sha256", result["runtime_manifest_sha256"])
+    if result["schema_version"] == "acceptance-result.v2":
+        suite.add_property("status", result["status"])
+        suite.add_property("profile_id", result["profile"]["profile_id"])
+        suite.add_property("observation_sha256", result["original_execution"]["observation_sha256"])
+        suite.add_property(
+            "evaluation_environment_sha256", result["evaluation"]["environment"]["sha256"]
+        )
     for assertion in _result_assertions(result):
-        case = TestCase(assertion["assertion_id"], classname="robotics.acceptance")
+        case = TestCase(
+            assertion["assertion_id"],
+            classname=assertion.get("classname", "robotics.acceptance"),
+        )
         message = assertion.get("message", "")
         if assertion["status"] == "failed":
             case.result = [Failure(message or "acceptance assertion failed")]

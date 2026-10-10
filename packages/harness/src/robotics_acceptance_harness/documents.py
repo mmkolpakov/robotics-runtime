@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -13,6 +14,7 @@ from robotics_runtime_contracts import (
     RobotDescriptionBindingError,
     loads_mapping,
     schema_for_role,
+    schema_versions_for_role,
     validate_document,
     validate_provider_requirements,
     validate_robot_description_binding,
@@ -122,6 +124,12 @@ class LoadedDocument:
     data: Mapping[str, Any]
     sha256: str
 
+    def as_dict(self) -> dict[str, Any]:
+        """Return a mutable JSON view without replacing or rehashing the captured bytes."""
+        return cast(
+            dict[str, Any], json.loads(json.dumps(self.data, default=dict, allow_nan=False))
+        )
+
     @property
     def schema_version(self) -> str:
         return str(self.data["schema_version"])
@@ -182,7 +190,7 @@ def load_document_bytes(
     except ValueError as error:
         raise BundleValidationError("$", f"cannot parse {source}: {error}") from error
     schema_version = value.get("schema_version")
-    if expected_role is not None and schema_version != schema_for_role(expected_role):
+    if expected_role is not None and schema_version not in schema_versions_for_role(expected_role):
         raise BundleValidationError(
             "$.schema_version",
             f"expected {schema_for_role(expected_role)}; received {schema_version!r}",
@@ -317,6 +325,21 @@ def _validate_dataset_alignment(
     _require_equal("$.dataset.sha256", declared_digest, dataset.sha256)
 
 
+def _validate_native_bundle(scenario: LoadedDocument, runtime: LoadedDocument) -> None:
+    if runtime.schema_version != "runtime-manifest.v2":
+        raise BundleValidationError(
+            "$.runtime.schema_version", "v2 scenarios require v2 runtime bindings"
+        )
+    _require_equal("$.runtime.scenario_sha256", scenario.sha256, runtime.data["scenario_sha256"])
+    for key in ("execution", "profile", "native_model"):
+        _require_equal(f"$.runtime.{key}", scenario.data.get(key), runtime.data.get(key))
+    _require_equal(
+        "$.runtime.evaluator_bindings",
+        scenario.data["evaluator_requirements"],
+        runtime.data["evaluator_bindings"],
+    )
+
+
 def load_bundle(
     scenario_path: str | Path,
     *,
@@ -382,6 +405,31 @@ def load_bundle(
         else None
     )
 
+    if scenario.schema_version == "acceptance-scenario.v2":
+        _validate_native_bundle(scenario, runtime)
+        if model is not None or dataset is not None:
+            raise BundleValidationError(
+                "$", "native model and data bindings use declared ArtifactRef inputs"
+            )
+        issues = evaluate_physical_authorization(
+            scenario=scenario.data,
+            scenario_sha256=scenario.sha256,
+            runtime=runtime.data,
+            permit=permit.data if permit is not None else None,
+            permit_sha256=permit.sha256 if permit is not None else None,
+            permit_path=permit.path if permit is not None else None,
+            verification=verification.data if verification is not None else None,
+            verification_sha256=verification.sha256 if verification is not None else None,
+            verification_path=verification.path if verification is not None else None,
+            now=now or datetime.now(UTC),
+        )
+        if issues:
+            raise BundleValidationError.from_authorization_issues(issues)
+        return DocumentBundle(scenario, runtime, permit=permit, verification=verification)
+    if runtime.schema_version != "runtime-manifest.v1":
+        raise BundleValidationError(
+            "$.runtime.schema_version", "v1 scenarios require v1 runtime bindings"
+        )
     scenario_data = cast(ScenarioDocument, scenario.data)
     runtime_data = cast(RuntimeDocument, runtime.data)
     _validate_execution_alignment(scenario_data, runtime_data)

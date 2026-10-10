@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:robotics-runtime-contracts:v2:acceptance-result",
+  "title": "Independent native acceptance assessment v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "result_id",
+    "run_id",
+    "scenario_id",
+    "domain_id",
+    "verdict_scope",
+    "evaluation_mode",
+    "scenario_sha256",
+    "runtime_manifest_sha256",
+    "execution",
+    "profile",
+    "original_execution",
+    "evaluation",
+    "observations",
+    "unevaluated",
+    "assertion_results",
+    "status",
+    "evaluators",
+    "evidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "acceptance-result.v2"
+    },
+    "result_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:acceptance-result-core#/properties/result_id"
+    },
+    "run_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/runId"
+    },
+    "scenario_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+    },
+    "domain_id": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+    },
+    "verdict_scope": {
+      "const": "domain"
+    },
+    "evaluation_mode": {
+      "const": "offline"
+    },
+    "scenario_sha256": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
+    },
+    "runtime_manifest_sha256": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
+    },
+    "execution": {
+      "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/execution"
+    },
+    "profile": {
+      "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/profile"
+    },
+    "native_model": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/artifactRef"
+    },
+    "original_execution": {
+      "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/originalExecution"
+    },
+    "evaluation": {
+      "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/evaluation"
+    },
+    "observations": {
+      "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/observations"
+    },
+    "unevaluated": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "assertion_results": {
+      "$ref": "urn:robotics-runtime-contracts:v1:acceptance-result#/properties/assertion_results"
+    },
+    "status": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/status"
+    },
+    "evaluators": {
+      "$ref": "urn:robotics-runtime-contracts:v1:acceptance-result#/properties/evaluators"
+    },
+    "evidence": {
+      "$ref": "urn:robotics-runtime-contracts:v1:acceptance-result#/properties/evidence"
+    },
+    "extension_schemas": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensionSchemas"
+    },
+    "extensions": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/extensions"
+    }
+  }
+}

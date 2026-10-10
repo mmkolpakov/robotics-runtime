@@ -13,6 +13,7 @@ from robotics_runtime_contracts import (
     loads_mapping,
     resolve_schema_name,
     schema_for_role,
+    schema_versions_for_role,
     validate_document,
 )
 from robotics_runtime_contracts._writer_cli import add_writer_commands, run_writer
@@ -239,7 +240,9 @@ def _scenario_resolve(arguments: argparse.Namespace) -> None:
     base, base_source = _read_document_source(arguments.base)
     declared = base.get("schema_version")
     scenario_schema = schema_for_role("acceptance_scenario")
-    if not isinstance(declared, str) or resolve_schema_name(declared) != scenario_schema:
+    if not isinstance(declared, str) or resolve_schema_name(
+        declared
+    ) not in schema_versions_for_role("acceptance_scenario"):
         raise ContractError(
             f"scenario resolve requires a {scenario_schema} base document",
             error_id="schema.role_mismatch",
