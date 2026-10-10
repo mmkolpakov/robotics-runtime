@@ -190,8 +190,7 @@ def main() -> None:
                 text = (
                     title + "\n\n"
                     '<a href="../consumer-inputs.zip">Download consumer inputs</a> · '
-                    '<a href="../source-manifest.json">Documentation source manifest</a>\n'
-                    + rest
+                    '<a href="../source-manifest.json">Documentation source manifest</a>\n' + rest
                 )
             destination.write_text(text)
         else:
