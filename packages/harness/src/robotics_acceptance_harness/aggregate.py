@@ -262,9 +262,26 @@ def _validate_native_declarations(
         raise BundleValidationError("$.profile.clock", "profile identifies another time authority")
 
 
+def _calibration_identity(assessment: Mapping[str, Any]) -> tuple[str, tuple[tuple[str, int], ...]]:
+    calibration = assessment.get("calibration", {})
+    return (
+        str(calibration.get("state", "unobserved")),
+        tuple(
+            sorted(
+                (str(item["sha256"]), int(item["size_bytes"]))
+                for item in calibration.get("artifacts", ())
+            )
+        ),
+    )
+
+
 def _validate_native_assessment(result: Mapping[str, Any], first: Mapping[str, Any]) -> None:
     assessment = result["evaluation"]
     baseline = first["evaluation"]
+    if _calibration_identity(assessment) != _calibration_identity(baseline):
+        raise BundleValidationError(
+            "$.evaluation.calibration", "assessment calibrations cannot be mixed"
+        )
     for field in ("implementation", "version"):
         if assessment["method"][field] != baseline["method"][field]:
             raise BundleValidationError("$.evaluation.method", "assessment methods cannot be mixed")
