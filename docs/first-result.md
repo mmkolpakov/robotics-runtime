@@ -1,6 +1,6 @@
 # First result with the published Python tools
 
-This path installs contracts 0.21.1 and harness 0.22.1 from PyPI, creates explicit
+This path installs contracts 0.21.1 and harness 0.22.2 from PyPI, creates explicit
 inputs, and evaluates them offline. It uses Python 3.12–3.14, pip and an ordinary
 POSIX shell. It requires neither ROS nor Node. The MCAP extra is required by this example's
 recording producer; ordinary document validation does not require that extra. MCAP 1.4.0 is pinned
@@ -22,7 +22,7 @@ cd robotics-first-result
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install "robotics-runtime-contracts[mcap]==0.21.1" \
-  robotics-acceptance-harness==0.22.1 mcap==1.4.0
+  robotics-acceptance-harness==0.22.2 mcap==1.4.0
 robotics-contracts --help
 robotics-acceptance --version
 ```

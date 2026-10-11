@@ -132,9 +132,9 @@ rfc3986-validator==0.1.1 \
 rfc3987-syntax==1.1.0 \
     --hash=sha256:6c3d97604e4c5ce9f714898e05401a0445a641cfa276432b0a648c80856f6a3f \
     --hash=sha256:717a62cbf33cffdd16dfa3a497d81ce48a660ea691b1ddd7be710c22f00b4a0d
-robotics-acceptance-harness==0.22.1 \
-    --hash=sha256:792421d08917dc5c5eef0cf01bc80bb0f71a6049af23b71e3c12bedafe4a974e \
-    --hash=sha256:b92c1fe0f289baacf515716873db04d3581e9642e97fbe6a11c5fdcc45754c12
+robotics-acceptance-harness==0.22.2 \
+    --hash=sha256:91d76073ec915972908b4ea4df44af78d2da3f94c6c55c85eb82c03d059e5a48 \
+    --hash=sha256:e7ef8bb5c87956db10904d8acc2b045b2fbc37ef2d63823b4fc59582366709e3
 robotics-runtime-contracts==0.21.1 \
     --hash=sha256:34a476046ce3326384780224b4e40cad72f41ce756f627d63a6503e01349e015 \
     --hash=sha256:f1d9b926798e1c57d5d9336a0116782f91ddca3992e283568852e6595e5cfab8
