@@ -355,9 +355,11 @@ This release pairs contracts 0.21.1 with harness 0.22.0, which requires
 contracts `>=0.21,<0.22`. Consumers bind exact distribution and source identities
 separately from native profile qualification. See [COMPATIBILITY.md](COMPATIBILITY.md).
 Published schema names now permit only additive changes; breaking changes
-require a new schema major and migration notes. The structural compatibility
-gate checks bounded structural rules and public semantic regressions against
-published sources; it does not prove universal compatibility. Released tags
+require a new schema major and migration notes.
+The release gate verifies stable GitHub release metadata before comparing
+structural rules and public semantic regressions. Offline contributor hooks use
+available local tag history. These bounded checks do not prove universal
+compatibility. Released tags
 and artifacts remain immutable. See [CHANGELOG.md](CHANGELOG.md).
 
 HIL and real-target contracts are observation-only. A valid document is not an

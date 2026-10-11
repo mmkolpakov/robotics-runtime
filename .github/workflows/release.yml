@@ -63,7 +63,9 @@ jobs:
           "$RELEASE_PYTHON" -m mypy --explicit-package-bases scripts/release tests/release
           "$RELEASE_PYTHON" -m pytest tests/release --junitxml=artifacts/release/tests.xml
       - name: Require published schema and semantic compatibility
-        run: '"$RELEASE_PYTHON" -m scripts.check_schema_compatibility'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$RELEASE_PYTHON" -m scripts.check_schema_compatibility --published-repository "$GITHUB_REPOSITORY"'
       - name: Validate exact candidate and released contracts source
         id: plan
         env:
