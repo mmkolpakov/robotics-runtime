@@ -29,7 +29,6 @@ Requires contracts 0.21 (`>=0.21,<0.22`), with exact release prerequisite
   measurement-clock identity separately from UTC provenance. V2 physical
   qualification and automatic native playback remain outside this release.
 
-
 ## 0.21.0
 
 Requires contracts 0.20 (`>=0.20,<0.21`), with release prerequisite

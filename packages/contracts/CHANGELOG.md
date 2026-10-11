@@ -20,7 +20,6 @@
 - Use protobuf Timestamp for exact v2 UTC precision checks; reject more than
   nanosecond precision without changing v1 time semantics.
 
-
 ## 0.20.0
 
 - Add the `transient_local` named topic QoS profile to scenario and dataset

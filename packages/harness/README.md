@@ -359,8 +359,11 @@ Product packages register standard PyPA entry points:
 ```
 
 The scenario and runtime must declare the same namespace, target, distribution,
-version, wheel SHA-256, and receipt SHA-256. Before importing a declared target,
-the harness requires actual wheel authentication using an external operator profile, binds installed files and
+version, wheel SHA-256, and receipt SHA-256 for the original execution. Distinct
+archive assessments select requirements through captured method controls while
+the original runtime bindings remain unchanged. Before importing a declared
+target, the harness authenticates its wheel using an external operator profile,
+binds installed files and
 original entry-point metadata to that wheel, and compiles captured source
 through its verified import guard. Receipt JSON alone cannot allow execution.
 Derived bytecode caches are ignored; source-less/native/extra namespace code is

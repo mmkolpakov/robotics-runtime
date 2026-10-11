@@ -209,7 +209,9 @@ directory. An explicit verifier kind is required. Version 1 has exactly `profile
 ```
 
 These placeholders require reviewed values. Every namespace must correspond
-exactly to a scenario requirement; its wheel digest must match that requirement.
+exactly to the active scenario or selected assessment-control requirement; its
+wheel digest must match that requirement. Original runtime bindings remain
+unchanged when an archive assessment selects another evaluator.
 The operator profile is external policy, so a verification JSON in the archive
 cannot choose the verifier, trust roots or expected signer. Audit receipt and
 dependency inputs remain required for document consistency. They cannot issue

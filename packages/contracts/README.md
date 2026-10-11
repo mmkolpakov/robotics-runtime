@@ -24,7 +24,8 @@ flowchart LR
 ```
 
 The contracts are independent of a particular robot or product. They describe
-ROS graph, lifecycle, security and timing concepts in the v1 formats. This release additionally supports explicit native v2 software/simulation observations
+ROS graph, lifecycle, security and timing concepts in the v1 formats. This
+release additionally supports explicit native v2 software/simulation observations
 and distinct archive assessments. Provider identities are recorded as data or namespaced extensions;
 they do not select a schema.
 
