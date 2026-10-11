@@ -73,7 +73,8 @@ the original outcome, new assessment and actual covered criteria.
 
 `exact_assertion_outcome` compares only a nonempty covered intersection with
 the same declared method/configuration, environment, known calibration and
-captured-window presence/value. A data-only method does not invent a window. It compares source, namespace, status, typed observed
+captured-window presence/value. A data-only method does not invent a window.
+It compares source, namespace, status, typed observed
 value, unit and evidence digests. Changed method/environment/calibration or
 unknown coverage produces `not_comparable`; it does not compare whole verdicts.
 Missing original required facts remain incomplete.
