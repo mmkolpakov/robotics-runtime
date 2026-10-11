@@ -6,9 +6,9 @@
   "description": "Cordis composition host for robotics runtime workers",
   "engines": {
     "node": "24.21.0",
-    "npm": "11.21.0"
+    "npm": "11.19.0"
   },
-  "packageManager": "npm@11.21.0",
+  "packageManager": "npm@11.19.0",
   "exports": {
     ".": {
       "types": "./dist/src/index.d.ts",
