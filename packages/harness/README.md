@@ -68,7 +68,7 @@ The harness installs the contracts dependency declared in its package metadata.
 Check the metadata on [harness PyPI](https://pypi.org/project/robotics-acceptance-harness/)
 and [contracts PyPI](https://pypi.org/project/robotics-runtime-contracts/).
 For an exact reproducible published pair, follow the
-[first-result guide](../../docs/first-result.md).
+[first-result guide](https://mmkolpakov.github.io/robotics-runtime/docs/first-result.html).
 
 ```bash
 python3 -m venv .venv
@@ -95,7 +95,8 @@ packages does not qualify an infra image, simulator, accelerator or physical tar
 
 ## Quick Start
 
-Follow [the published first-result path](../../docs/first-result.md) to install the
+Follow [the published first-result
+path](https://mmkolpakov.github.io/robotics-runtime/docs/first-result.html) to install the
 exact pair, obtain all inputs, validate documents, evaluate synthetic evidence and
 read the resulting JSON/JUnit. Offline evaluation exits `1` with `incomplete`
 because live graph, clock and shutdown coverage is absent.
