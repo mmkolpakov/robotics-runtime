@@ -19,8 +19,11 @@ from scripts.release.verify_install import clean_environment, clean_install, dis
 INFRA_REPOSITORY = "https://github.com/mmkolpakov/robotics-runtime-infra"
 INFRA_COMMIT = "dfbf26e99d3d569f9d25bdc260510220d4dd2872"
 FIXTURE_DIRECTORY = "test/qualification/fixtures"
-PUBLISHED_COMMIT = "a6fd70f73b6c7c4f2b70b449e5dedeefb96d46fa"
-PUBLISHED_VERSIONS = {"contracts": "0.21.1", "harness": "0.22.0"}
+PUBLISHED_COMMITS = {
+    "contracts": "a6fd70f73b6c7c4f2b70b449e5dedeefb96d46fa",
+    "harness": "c50215ee23e0e57ada671205ae70df7496c71855",
+}
+PUBLISHED_VERSIONS = {"contracts": "0.21.1", "harness": "0.22.1"}
 
 
 def extract_infra_fixtures(infra: Path, destination: Path) -> tuple[Path, dict[str, Any]]:
@@ -64,8 +67,9 @@ def consumer_plan(workspace: Path, mode: str) -> ReleasePlan:
         if mode == "published"
         else {key: str(project(workspace, key)["version"]) for key in PACKAGES}
     )
-    ref = PUBLISHED_COMMIT if mode == "published" else None
-    commit = ref or git(workspace, "rev-parse", "HEAD")
+    refs = PUBLISHED_COMMITS if mode == "published" else {}
+    commit = refs.get("harness") or git(workspace, "rev-parse", "HEAD")
+    contracts_commit = refs.get("contracts")
     return ReleasePlan(
         candidate=f"harness-v{versions['harness']}",
         key="harness",
@@ -76,8 +80,15 @@ def consumer_plan(workspace: Path, mode: str) -> ReleasePlan:
         source_date_epoch=git(workspace, "show", "-s", "--format=%ct", commit),
         dry_run=True,
         contracts_version=versions["contracts"],
+        contracts_tag=f"contracts-v{versions['contracts']}" if contracts_commit else None,
+        contracts_commit=contracts_commit,
+        contracts_tree=(
+            git(workspace, "rev-parse", f"{contracts_commit}:packages/contracts/src")
+            if contracts_commit
+            else None
+        ),
         source_files={
-            name: source_files(workspace, key, ref=ref) for key, name in PACKAGES.items()
+            name: source_files(workspace, key, ref=refs.get(key)) for key, name in PACKAGES.items()
         },
     )
 

@@ -71,3 +71,49 @@ def test_release_source_comparison_uses_original_bytes(producer: Path) -> None:
         == sha256(b"released source\n").hexdigest()
     )
     assert source_files(producer, "contracts")[name] == sha256(source.read_bytes()).hexdigest()
+
+
+def test_published_consumer_keeps_each_package_source_origin(
+    producer: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    contracts_commit = git(producer, "rev-parse", "HEAD")
+    contract = producer / "packages/contracts/src/robotics_runtime_contracts/__init__.py"
+    harness = producer / "packages/harness/src/robotics_acceptance_harness/__init__.py"
+    harness.parent.mkdir(parents=True)
+    harness.write_bytes(b"published harness patch\n")
+    contract.write_bytes(b"other workspace contracts source\n")
+    subprocess.run(["git", "-C", str(producer), "add", "."], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(producer),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.org",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "Independent package source",
+        ],
+        check=True,
+    )
+    harness_commit = git(producer, "rev-parse", "HEAD")
+    monkeypatch.setattr(
+        verify_consumers,
+        "PUBLISHED_COMMITS",
+        {"contracts": contracts_commit, "harness": harness_commit},
+    )
+    plan = verify_consumers.consumer_plan(producer, "published")
+    assert plan.commit == harness_commit
+    assert plan.contracts_commit == contracts_commit
+    assert (
+        plan.source_files["robotics-runtime-contracts"]["robotics_runtime_contracts/__init__.py"]
+        == sha256(b"released source\n").hexdigest()
+    )
+    assert (
+        plan.source_files["robotics-acceptance-harness"]["robotics_acceptance_harness/__init__.py"]
+        == sha256(b"published harness patch\n").hexdigest()
+    )

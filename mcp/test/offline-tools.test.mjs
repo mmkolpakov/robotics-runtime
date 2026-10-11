@@ -83,8 +83,10 @@ test('official stdio client initializes, lists exactly six read tools and calls 
   const ready = await f.call('inspect_offline_readiness');
   assert.equal(ready.value.exitCode, 0, ready.value.stderr);
   const doctor = JSON.parse(ready.value.stdout);
-  assert.equal(doctor.mode, 'offline'); assert.equal(doctor.robotics_acceptance_harness, '0.22.0');
-  assert.equal(doctor.robotics_runtime_contracts, '0.21.1');
+  const pins = (await readFile(new URL('../public-cli.in', import.meta.url), 'utf8')).split(/\r?\n/);
+  assert.equal(doctor.mode, 'offline');
+  assert.ok(pins.includes('robotics-acceptance-harness==' + doctor.robotics_acceptance_harness));
+  assert.ok(pins.includes('robotics-runtime-contracts==' + doctor.robotics_runtime_contracts));
   assert.deepEqual(await readdir(f.scratch), []);
   assert.equal(f.errors.join(''), '');
 });
