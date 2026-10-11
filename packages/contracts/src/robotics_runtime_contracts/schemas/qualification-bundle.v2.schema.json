@@ -129,9 +129,7 @@
   },
   "$defs": {
     "subjectName": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 1024
+      "$ref": "urn:robotics-runtime-contracts:v1:qualification-bundle#/$defs/subject/properties/name"
     },
     "originalDomain": {
       "type": "object",

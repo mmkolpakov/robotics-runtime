@@ -25,7 +25,7 @@
   "model-artifact-manifest.v1.schema.json": "b8a0680515492f419799f6d6e1af1344e7f47c18986d9bea1ee870f3cd41a72a",
   "native-execution.v2.schema.json": "d79314ab3c8c4e276cb8b97d4bbc4ee7b7063294cbedc29179280ad1f4273331",
   "qualification-bundle.v1.schema.json": "a41df59948a643181087981f3d1a1def22b71e7441d6b78b5f642f3f34ad1b35",
-  "qualification-bundle.v2.schema.json": "3cb60bbb3178dba7d18b7c84da8cd648689e861bc5e40840dc34a1e2957140a6",
+  "qualification-bundle.v2.schema.json": "5a59ba6563f38379ffe58103505c6a27cede262b46e223f45d893a1d940614e4",
   "qualification-policy.v1.schema.json": "fcff387003c3b0caa6b855837c0cfeb0e32d41aa7b5819e1cbb809dc1e5fdc46",
   "qualification-profile.v1.schema.json": "77e2f3b2ab65ba089942a84c068597dbdb7b07b1d6bb919e224bb5f25e1bd695",
   "recording-summary.v1.schema.json": "c46e33902c624017a9fb29c8c48cf9ea46521ca7412dc9621ee2f141b078842b",
