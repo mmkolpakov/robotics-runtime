@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.22.1
+
+Requires contracts 0.21 (`>=0.21,<0.22`), with exact release prerequisite
+`contracts-v0.21.1`. Package and execution-profile qualification remain separate.
+
+- Check operator profile write permissions on the same open descriptor used to
+  capture its bounded bytes. Reject group/other writable captured profiles even
+  if a later path lookup would observe a restrictive mode or replacement file.
+- Preserve ordinary evidence and wheel read defaults. Regular 0600 and 0644
+  operator profiles remain supported.
+
 ## 0.22.0
 
 Requires contracts 0.21 (`>=0.21,<0.22`), with exact release prerequisite
