@@ -329,6 +329,13 @@ jobs:
           MCP_TEST_REPORT_DIR="$PWD/../artifacts/mcp-cli-integration" \
             npm test > ../artifacts/mcp-cli-integration-test.log 2>&1
           cat ../artifacts/mcp-cli-integration-test.log
+      - name: Exercise native documents with the pinned published workers
+        run: |
+          MCP_TEST_CONTRACTS_CLI="$PWD/.public-workers/bin/robotics-contracts" \
+          MCP_TEST_HARNESS_CLI="$PWD/.public-workers/bin/robotics-acceptance" \
+          MCP_TEST_REPORT_DIR="$PWD/../artifacts/mcp-cli-integration/published-native" \
+            npm run test:native > ../artifacts/mcp-published-native-integration-test.log 2>&1
+          cat ../artifacts/mcp-published-native-integration-test.log
       - name: Build and install the current candidate workers independently
         working-directory: .
         run: |
@@ -361,6 +368,7 @@ jobs:
             artifacts/mcp-cli-integration/
             artifacts/mcp-cli-integration-test.log
             artifacts/mcp-native-integration-test.log
+            artifacts/mcp-published-native-integration-test.log
           if-no-files-found: error
           retention-days: 7
 

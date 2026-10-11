@@ -81,5 +81,5 @@ test('installed native CLI documents cross the six readonly MCP tools without nu
  for(const [id,path]of Object.entries(sources))assert.equal(digest(await readFile(path)),digest(original.get(id)));
  assert.deepEqual(await readdir(scratch),[]);assert.equal(errors.join(''),'');
  const report=process.env.MCP_TEST_REPORT_DIR;
- if(report){await mkdir(report,{recursive:true});await writeFile(join(report,'native-document-tools.json'),JSON.stringify({source_ns:sourceNs,original_inputs_unchanged:true,scope:'installed candidate CLI and readonly MCP documents; no native execution through MCP',transcript},null,2)+'\n')}
+ if(report){await mkdir(report,{recursive:true});await writeFile(join(report,'native-document-tools.json'),JSON.stringify({source_ns:sourceNs,original_inputs_unchanged:true,scope:'selected installed CLI and readonly MCP documents; no native execution through MCP',transcript},null,2)+'\n')}
 });
