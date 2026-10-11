@@ -1147,7 +1147,7 @@ def _validate_causal_chain(document: Mapping[str, Any]) -> None:
 
 
 def _validate_qualification_bundle(document: Mapping[str, Any]) -> None:
-    schema_name = "qualification-bundle.v1"
+    schema_name = document["predicate"]["schema_version"]
     subjects = document["subject"]
     _require_unique(schema_name, subjects, "name", "$.subject")
     subject_names = {item["name"] for item in subjects}
@@ -1495,6 +1495,7 @@ _VALIDATORS: dict[str, Callable[[Mapping[str, Any]], None]] = {
     "acceptance-aggregate.v1": _validate_acceptance_aggregate,
     "recording-summary.v1": _validate_recording_summary,
     "qualification-bundle.v1": _validate_qualification_bundle,
+    "qualification-bundle.v2": _validate_qualification_bundle,
     "transport-channel.v1": _validate_transport_channel,
     "transport-channel-observation.v1": _validate_transport_channel_observation,
     "causal-chain.v1": _validate_causal_chain,

@@ -9,6 +9,7 @@ import pytest
 
 from robotics_runtime_contracts import ContractError, dumps_canonical, statements, validate_document
 from robotics_runtime_contracts.writers import WriterError
+from tests.extension_support import NAMESPACE, SCHEMAS, with_extension
 
 V2 = "qualification-bundle.v2"
 RULE = "exact_assertion_outcome"
@@ -339,3 +340,37 @@ def test_archive_writer_is_deterministic_and_cannot_overwrite_an_input_alias(
     before = output.read_bytes()
     statements.write_qualification_statement([], output, schema_version=V2, comparison_rule=RULE)
     assert before == output.read_bytes() == dumps_canonical(_statement())
+
+
+@pytest.mark.parametrize("change", ["duplicate-subject", "duplicate-classification", "missing"])
+def test_archive_document_reuses_subject_inventory_semantics(
+    change: str, archive_loader: list[dict[str, Any]]
+) -> None:
+    document = _statement()
+    if change == "duplicate-subject":
+        document["subject"].append(deepcopy(document["subject"][0]))
+    elif change == "duplicate-classification":
+        document["predicate"]["artifacts"].append(deepcopy(document["predicate"]["artifacts"][0]))
+    else:
+        document["predicate"]["artifacts"].pop()
+    with pytest.raises(ContractError):
+        validate_document(document, schema=V2)
+
+
+def test_archive_extensions_are_validated_inside_predicate_before_subject_reads(
+    tmp_path: Path, archive_loader: list[dict[str, Any]]
+) -> None:
+    document = _statement()
+    document["predicate"] = with_extension(document["predicate"])
+    source = tmp_path / "statement.json"
+    source.write_bytes(dumps_canonical(document))
+    metadata = statements.validate_qualification_statement(source, [], extension_schemas=SCHEMAS)
+    assert metadata == _metadata()
+    archive_loader.clear()
+    document["predicate"]["extensions"][NAMESPACE]["mission_id"] = ""
+    source.write_bytes(dumps_canonical(document))
+    with pytest.raises(ContractError):
+        statements.validate_qualification_statement(source, [], extension_schemas=SCHEMAS)
+    assert not archive_loader
+    with pytest.raises(ContractError, match="extension"):
+        validate_document(document, schema=V2)
