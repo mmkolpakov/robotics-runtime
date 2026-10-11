@@ -1,7 +1,7 @@
 # Published CLI consumer inputs
 
 Use these exact files with [the first-result guide](../../../../docs/first-result.md)
-and the published contracts 0.21.1 / harness 0.22.0 pair. The documentation reader
+and the published contracts 0.21.1 / harness 0.22.1 pair. The documentation reader
 exports them as `consumer-inputs.zip`, with source revision and per-file SHA-256
 in `manifest.json`. PyPI installation alone does not install the examples.
 
@@ -13,7 +13,7 @@ evidence index. It has no repository or test support imports.
 
 ```bash
 python -m pip install "robotics-runtime-contracts[mcap]==0.21.1" \
-  robotics-acceptance-harness==0.22.0 mcap==1.4.0
+  robotics-acceptance-harness==0.22.1 mcap==1.4.0
 python produce.py --output inputs
 ```
 
