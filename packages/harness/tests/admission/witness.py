@@ -7,6 +7,8 @@ import hashlib
 import json
 import subprocess
 from pathlib import Path
+from urllib.parse import urlsplit
+from urllib.request import url2pathname
 
 from robotics_runtime_contracts import validate_role
 
@@ -99,13 +101,137 @@ def archived_assessments(expected: dict[str, object]) -> dict[str, object]:
         }
     assert len({item["result_id"] for item in outcomes.values()}) == len(outcomes)
     assert {path: path.read_bytes() for path in originals} == originals
+    statement = qualified_archive(inputs, OUTPUT / "applied")
     return {
+        "qualification_bundle": statement,
         "original_status": expected["original_status"],
         "original_error": expected["original_error"],
         "original_result_sha256": expected["original_result_sha256"],
         "outcomes": outcomes,
         "immutable_inputs": True,
         "scope": "captured synthetic integer error and offset; no physical calibration claim",
+    }
+
+
+def qualified_archive(inputs: dict[str, object], output: Path) -> dict[str, object]:
+    trial = Path(str(inputs["evidence_index"])).parent
+    new_aggregate = output / "aggregate.json"
+    aggregated = subprocess.run(
+        [
+            "robotics-acceptance",
+            "aggregate",
+            "--scenario",
+            str(inputs["scenario"]),
+            "--run-context",
+            str(inputs["run_context"]),
+            "--result",
+            str(output / "acceptance-result.json"),
+            "--output",
+            str(new_aggregate),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=90,
+        check=False,
+    )
+    assert aggregated.returncode == 0, aggregated.stderr
+    specifications = [
+        f"scenario:scenario.json={inputs['scenario']}",
+        f"runtime_manifest:runtime-manifests/primary.json={inputs['runtime']}",
+        f"acceptance_run:run.json={inputs['run_context']}",
+        f"evidence_index:evidence-indexes/primary.json={inputs['evidence_index']}",
+        f"acceptance_observation:observations/primary.json={trial / 'observation.json'}",
+        f"domain_result:original-results/primary.json={inputs['original_result']}",
+        f"domain_result:results/primary.json={output / 'acceptance-result.json'}",
+        f"acceptance_aggregate:original-aggregate.json={trial / 'original-aggregate.json'}",
+        f"acceptance_aggregate:acceptance-aggregate.json={new_aggregate}",
+        f"junit:original-junit.xml={trial / 'original-assessment/junit.xml'}",
+        f"junit:assessment-junit.xml={output / 'junit.xml'}",
+    ]
+    index = json.loads(Path(str(inputs["evidence_index"])).read_bytes())
+    for item in index["artifacts"]:
+        if item["kind"] == "acceptance_observation":
+            continue
+        kind = "metrics" if item["kind"] == "metrics" else "other_evidence"
+        specifications.append(f"{kind}:source/{item['artifact_id']}={item['local_path']}")
+    original = json.loads(Path(str(inputs["original_result"])).read_bytes())
+    assessment = json.loads((output / "acceptance-result.json").read_bytes())
+    for name, result in (("original", original), ("assessment", assessment)):
+        evaluation = result["evaluation"]
+        for label, reference in (
+            ("method", evaluation["method"]["configuration"]),
+            ("environment", evaluation["environment"]),
+        ):
+            path = Path(url2pathname(urlsplit(reference["uri"]).path))
+            specifications.append(f"other_evidence:contexts/{name}-{label}.json={path}")
+    for item in assessment["evaluation"]["calibration"]["artifacts"]:
+        path = Path(url2pathname(urlsplit(item["uri"]).path))
+        specifications.append(f"other_evidence:calibration/{item['sha256']}.json={path}")
+    receipts = Path("/opt/admission/receipts")
+    for kind, name in (
+        ("artifact_receipt", "receipt.json"),
+        ("artifact_verification", "verification.json"),
+        ("attestation", "statement.json"),
+        ("policy", "publisher.json"),
+        ("verification", "verified-report.txt"),
+    ):
+        specifications.append(f"{kind}:evaluator/{name}={receipts / name}")
+    profile = json.loads(Path("/opt/admission/profile.json").read_bytes())
+    specifications.append(f"package:evaluator/wheel.whl={profile['evaluators'][0]['wheel']}")
+    artifact_args = [argument for spec in specifications for argument in ("--artifact", spec)]
+    statement = output / "qualification-statement.json"
+    written = subprocess.run(
+        [
+            "robotics-contracts",
+            "qualification",
+            "statement",
+            "--schema-version",
+            "qualification-bundle.v2",
+            "--comparison-rule",
+            "exact_assertion_outcome",
+            "--output",
+            str(statement),
+            *artifact_args,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=90,
+        check=False,
+    )
+    assert written.returncode == 0, written.stderr
+    metadata = output / "qualification-metadata.json"
+    matched = subprocess.run(
+        [
+            "robotics-contracts",
+            "validate-qualification",
+            "--statement",
+            str(statement),
+            "--output",
+            str(metadata),
+            *artifact_args,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=90,
+        check=False,
+    )
+    assert matched.returncode == 0, matched.stderr
+    document = json.loads(statement.read_bytes())
+    actual = json.loads(metadata.read_bytes())
+    assert document["_type"] == "https://in-toto.io/Statement/v1"
+    assert document["predicate"]["schema_version"] == "qualification-bundle.v2"
+    assert actual["original_execution"]["domains"][0]["status"] == "failed"
+    assert actual["assessments"][0]["status"] == "passed"
+    comparison = actual["comparison"]["per_domain"][0]
+    assert comparison["status"] == "not_comparable"
+    assert "method_changed" in comparison["reasons"]
+    return {
+        "schema_version": "qualification-bundle.v2",
+        "statement_matching": True,
+        "original_status": "failed",
+        "assessment_status": "passed",
+        "comparison_status": comparison["status"],
+        "comparison_reasons": comparison["reasons"],
     }
 
 

@@ -179,6 +179,28 @@ def _archive_assessment_inputs(destination: Path, binding: Path) -> dict[str, An
     baseline = original_output / "acceptance-result.json"
     if json.loads(baseline.read_bytes())["status"] != "failed":
         raise ValueError("fixture has no failed original outcome")
+    original_aggregate = trial / "original-aggregate.json"
+    aggregated = subprocess.run(
+        [
+            "robotics-acceptance",
+            "aggregate",
+            "--scenario",
+            original_inputs["scenario"],
+            "--run-context",
+            original_inputs["run_context"],
+            "--result",
+            str(baseline),
+            "--output",
+            str(original_aggregate),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=90,
+    )
+    if aggregated.returncode != 1 or not original_aggregate.is_file():
+        raise ValueError("failed original trial must retain its actual public aggregate")
     method_root = destination / "archive" / "assessment-inputs"
     method_root.mkdir()
     scenario = json.loads(Path(original_inputs["scenario"]).read_bytes())
