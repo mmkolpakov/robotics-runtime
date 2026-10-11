@@ -64,7 +64,7 @@ unrelated published schemas and historical byte identities remain strict.
 
 ## Install
 
-This release pairs harness 0.22.0 with contracts 0.21.0. Check their package
+This release pairs harness 0.22.0 with contracts 0.21.1. Check their package
 metadata on [harness PyPI](https://pypi.org/project/robotics-acceptance-harness/)
 and [contracts PyPI](https://pypi.org/project/robotics-runtime-contracts/). Exact
 source and distribution identities belong to the tagged release metadata:
@@ -72,7 +72,7 @@ source and distribution identities belong to the tagged release metadata:
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install robotics-acceptance-harness==0.22.0 robotics-runtime-contracts==0.21.0
+python -m pip install robotics-acceptance-harness==0.22.0 robotics-runtime-contracts==0.21.1
 ```
 
 Development uses both packages and the dependency graph in the root `uv.lock`:

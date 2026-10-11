@@ -3,7 +3,7 @@
 ## 0.22.0
 
 Requires contracts 0.21 (`>=0.21,<0.22`), with exact release prerequisite
-`contracts-v0.21.0`. Package and execution-profile qualification remain separate.
+`contracts-v0.21.1`. Package and execution-profile qualification remain separate.
 
 - Evaluate captured native v2 software/simulation inputs through public
   JSON/JUnit, aggregation and qualification interfaces without creating ROS

@@ -1,7 +1,7 @@
 # Archive assessment
 
 This release assesses captured native v2 software or simulation inputs through
-the SDK and CLI without starting a workload. Use the matching contracts 0.21.0/
+the SDK and CLI without starting a workload. Use the matching contracts 0.21.1/
 harness 0.22.0 cohort and an admitted execution composition.
 [Compatibility](compatibility.md) defines its package and profile boundaries.
 

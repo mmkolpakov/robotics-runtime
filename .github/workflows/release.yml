@@ -55,7 +55,7 @@ jobs:
           export UV_PROJECT_ENVIRONMENT="$RUNNER_TEMP/release-tools"
           printf 'UV_PROJECT_ENVIRONMENT=%s\n' "$UV_PROJECT_ENVIRONMENT" >> "$GITHUB_ENV"
           printf 'RELEASE_PYTHON=%s/bin/python\n' "$UV_PROJECT_ENVIRONMENT" >> "$GITHUB_ENV"
-          uv sync --locked --only-group dev --no-install-workspace --python 3.12
+          uv sync --locked --group dev --no-install-workspace --python 3.12
       - name: Test release guards
         run: |
           "$RELEASE_PYTHON" -m ruff check scripts/release tests/release
@@ -63,7 +63,9 @@ jobs:
           "$RELEASE_PYTHON" -m mypy --explicit-package-bases scripts/release tests/release
           "$RELEASE_PYTHON" -m pytest tests/release --junitxml=artifacts/release/tests.xml
       - name: Require published schema and semantic compatibility
-        run: '"$RELEASE_PYTHON" -m scripts.check_schema_compatibility'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$RELEASE_PYTHON" -m scripts.check_schema_compatibility --published-repository "$GITHUB_REPOSITORY"'
       - name: Validate exact candidate and released contracts source
         id: plan
         env:

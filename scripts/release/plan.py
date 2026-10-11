@@ -144,28 +144,36 @@ def verify_contracts_tree(repo: Path, tag: str) -> tuple[str, str]:
 def verify_published_release(repository: str, tag: str) -> None:
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
         raise ReleaseError("a GitHub owner/repository is required to verify the contracts release")
-    result = subprocess.run(
-        [
-            "gh",
-            "release",
-            "view",
-            tag,
-            "--repo",
-            repository,
-            "--json",
-            "tagName,isDraft,isPrerelease",
-        ],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            [
+                "gh",
+                "release",
+                "view",
+                tag,
+                "--repo",
+                repository,
+                "--json",
+                "tagName,isDraft,isPrerelease",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ReleaseError(f"cannot verify published contracts release {tag}: {error}") from error
     if result.returncode:
         raise ReleaseError(
             f"cannot verify published contracts release {tag}: {result.stderr.strip()}"
         )
-    release = json.loads(result.stdout)
+    try:
+        release = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise ReleaseError(f"invalid published release metadata: {tag}") from error
     if (
-        release.get("tagName") != tag
+        not isinstance(release, dict)
+        or release.get("tagName") != tag
         or release.get("isDraft") is not False
         or release.get("isPrerelease") is not False
     ):
