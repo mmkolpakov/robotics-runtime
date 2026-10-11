@@ -15,7 +15,7 @@ the baseline outcome is never replaced by the new outcome.
 
 `evaluate --assessment-controls PATH --original-result PATH` selects captured
 method controls and a baseline result. Keep the existing scenario/runtime/run/
-evidence arguments and the original clock-qualified window. Include
+evidence arguments and any captured clock-qualified window used by the method. Include
 `--otel-metrics` when the selected method declares metrics. The CLI writes the
 normal JSON/JUnit outputs to a separate output directory. A baseline requires
 explicit controls; initial evaluation may use controls without a baseline.
@@ -73,7 +73,7 @@ the original outcome, new assessment and actual covered criteria.
 
 `exact_assertion_outcome` compares only a nonempty covered intersection with
 the same declared method/configuration, environment, known calibration and
-clock-qualified window. It compares source, namespace, status, typed observed
+captured-window presence/value. A data-only method does not invent a window. It compares source, namespace, status, typed observed
 value, unit and evidence digests. Changed method/environment/calibration or
 unknown coverage produces `not_comparable`; it does not compare whole verdicts.
 Missing original required facts remain incomplete.

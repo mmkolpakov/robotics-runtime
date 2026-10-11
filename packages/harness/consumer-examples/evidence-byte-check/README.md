@@ -27,7 +27,8 @@ of the captured wheel bytes with ordinary pip. It then calls
 the existing verified-source loader. See
 [the SDK trust reference](../../docs/evaluator-trust.md).
 
-The original scenario/runtime or selected assessment controls bind namespace `org.example.evidence-bytes`, target
+The original scenario/runtime or selected assessment controls bind namespace
+`org.example.evidence-bytes`, target
 `evidence_byte_check:evaluate`, distribution `example-evidence-byte-check`,
 version `0.1.0`, and the exact released wheel/receipt digests. Synthetic or
 locally invented verification JSON is not publisher evidence.
@@ -41,7 +42,6 @@ Run third-party code in the reviewed limited process/image profile. This example
 does not install a sandbox, launch a workload, mutate evidence, import private
 SDK helpers or modify the runtime core. Its source and byte-count result are
 separate from a published, qualified execution composition.
-
 
 For the offset method, explicit assessment controls declare calibration as
 `selected` with one local JSON ArtifactRef containing an integer `offset`.

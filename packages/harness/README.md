@@ -25,6 +25,8 @@ containment, finalized-file reads and the distinction between Unix and monotonic
 
 ## Architecture
 
+The live ROS observation path is:
+
 ```text
 product workload -> runtime infrastructure -> running ROS 2 graph
                                                    |
@@ -41,9 +43,9 @@ runtime contracts -> acceptance harness -----------+
 - Product repositories own scenes, robots, models, behavior, and business
   evaluators.
 
-The harness consumes provider-neutral runtime facts. Adding a simulator,
-middleware, recorder, or accelerator does not require a new scenario or result
-version.
+Native v2 consumes declared provider-neutral bindings and retained raw bytes.
+A provider composition uses the supported document version and its own accepted
+profile; selecting middleware or a simulator does not establish a native verdict.
 
 ## Requirements
 

@@ -48,7 +48,8 @@ is a pre-run input; completed observations are separate evidence. Results bind
 the original execution separately from the assessment method, environment and
 time. Explicit assessment controls select a method without replacing the original
 scenario or runtime. Qualification-bundle.v2 retains the original outcome and the
-new assessment, with an explicit covered-assertion comparison rule. A measured zero, inapplicability, an absent observation and an invalid
+new assessment, with an explicit covered-assertion comparison rule. A measured
+zero, inapplicability, an absent observation and an invalid
 measurement have distinct states. Missing required coverage is incomplete.
 
 Native command acceptance, final state and postcondition observations remain

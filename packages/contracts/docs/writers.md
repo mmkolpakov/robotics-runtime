@@ -183,7 +183,6 @@ cross-document links only; it does not authenticate a signature, identity, trust
 root, transparency log, or receipt. The verifier must pass the same payload bytes
 it authenticated, rather than rereading a mutable external bundle afterwards.
 
-
 Source archive statements explicitly select
 `schema_version="qualification-bundle.v2"` and
 `comparison_rule="exact_assertion_outcome"` in the same create/write APIs.

@@ -79,7 +79,6 @@ documents before checking links. They have no file paths and cannot verify that 
 supplied digest describes a file. Use file-based qualification for statement
 production or when claiming that metadata binds retained bytes.
 
-
 ## Archive assessments
 
 Current source `validate_qualification_artifacts(...,
@@ -106,7 +105,7 @@ Missing required original observations cannot become a passed assessment.
 
 The explicit rule compares the nonempty intersection of genuinely covered
 assertions only, after method/configuration, environment, known calibration and
-clock-qualified window identity match. Source, namespace, status, typed observed
+matching captured-window presence/value agree. Source, namespace, status, typed observed
 value, unit and evidence digests define assertion outcomes. Changed context or
 unknown historical calibration/coverage gives `not_comparable`; original and
 new whole verdicts remain separate. Ambiguous assertion IDs are refused.
