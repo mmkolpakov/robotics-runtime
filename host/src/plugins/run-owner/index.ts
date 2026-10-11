@@ -211,16 +211,18 @@ export class OwnedRun {
     this.phase = 'verifying-cleanup';
     const resourceOutcomes = this.resources ? await this.resources.verify(deadline) : [];
     this.evidenceRefs.push(...resourceOutcomes.flatMap(outcome => outcome.evidenceRefs));
-    const cleanupPassed = resourceOutcomes.every(outcome => outcome.attempted && outcome.released && outcome.evidenceRefs.length > 0 && !outcome.cleanupError);
-    if (!cleanupPassed) this.errors.push('independent resource cleanup verification failed');
+    const cleanupObserved = resourceOutcomes.length > 0;
+    const cleanupPassed = cleanupObserved && resourceOutcomes.every(outcome => outcome.attempted && outcome.released && outcome.evidenceRefs.length > 0 && !outcome.cleanupError);
+    if (cleanupObserved && !cleanupPassed) this.errors.push('independent resource cleanup verification failed');
     this.errors.push(...resourceOutcomes.flatMap(outcome => outcome.cleanupError ? [outcome.cleanupError] : []));
     this.errors.push(...this.capturedErrors.map(message => `Cordis: ${message}`));
-    this.phases.push({ phase: 'verifying-cleanup', status: cleanupPassed && !this.capturedErrors.length ? 'passed' : 'error' });
+    this.phases.push({ phase: 'verifying-cleanup', status: cleanupPassed && !this.capturedErrors.length ? 'passed' : 'error',
+      ...(!cleanupObserved ? { diagnostic: 'no resource cleanup observations are available' } : {}) });
     await this.stopLogging();
     const status = this.errors.length ? 'error' : resourceOutcomes.length ? 'passed' : 'incomplete';
     this.phase = status === 'passed' ? 'completed' : 'error';
     this.phases.push({ phase: this.phase, status: status === 'passed' ? 'passed' : 'error' });
-    if (disposalComplete && resourceOutcomes.every(outcome => outcome.attempted && outcome.released && outcome.evidenceRefs.length > 0)) this.releaseOwner();
+    if (disposalComplete && cleanupObserved && resourceOutcomes.every(outcome => outcome.attempted && outcome.released && outcome.evidenceRefs.length > 0)) this.releaseOwner();
     return { runId: this.runId, status, phases: [...this.phases], resourceOutcomes,
       evidenceRefs: [...this.evidenceRefs], errors: [...this.errors] };
   }

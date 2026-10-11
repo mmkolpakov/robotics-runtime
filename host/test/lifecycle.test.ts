@@ -495,3 +495,52 @@ test('enclosing disposal cannot bypass a settled failed export and erase retaine
     assert.ok(run.errors.some(error => /cleanup refused before/.test(error)));
   } finally { await ctx.fiber.dispose(); await rm(value.directory, { recursive: true, force: true }); }
 });
+
+
+test('late producer rejection preserves retained recovery after the deadline', async () => {
+  const { setImmediate: nextTurn } = await import('node:timers/promises');
+  const value = await fixture();
+  const ctx = await host([{ ...value.descriptor, deadlineMs: 100 }]);
+  const pending = Promise.withResolvers<Awaited<ReturnType<CompletionHooks['closeMeasurement']>>>();
+  try {
+    const run = await ctx.runOwner.start(value.runId, value.runId);
+    run.beginMeasurement();
+    const stages = hooks(run, value.directory, []);
+    const incomplete = await run.finish({ ...stages, closeMeasurement: () => pending.promise });
+    assert.equal(incomplete.status, 'incomplete');
+    assert.equal(run.phase, 'retained');
+    await assert.rejects(ctx.runOwner.start(value.runId, value.runId), /already owned/);
+    pending.reject(new Error('late native close rejection'));
+    await nextTurn();
+    assert.ok(run.errors.some(error => /settled after interruption: late native close rejection/.test(error)));
+    const recovered = await run.retryExport(stages.exportEvidence);
+    assert.equal(recovered.status, 'error');
+    assert.ok(recovered.resourceOutcomes.every(outcome => outcome.attempted && outcome.released));
+    await access(join(value.directory, 'retained-resource.bin'));
+    await assert.rejects(access(value.resourcePath));
+  } finally {
+    await ctx.fiber.dispose();
+    await rm(value.directory, { recursive: true, force: true });
+  }
+});
+
+test('missing resource observations cannot verify cleanup or release the run ID', async () => {
+  const value = await fixture('untracked');
+  const ctx = await host([value.descriptor]);
+  try {
+    const run = await ctx.runOwner.start(value.runId, value.runId);
+    run.beginMeasurement();
+    const completion = await run.finish(hooks(run, value.directory, []));
+    assert.equal(completion.status, 'incomplete');
+    assert.deepEqual(completion.resourceOutcomes, []);
+    const cleanup = completion.phases.find(item => item.phase === 'verifying-cleanup');
+    assert.equal(cleanup?.status, 'error');
+    assert.match(cleanup?.diagnostic ?? '', /no resource cleanup observations/);
+    await access(value.resourcePath);
+    await access(join(value.directory, 'retained-resource.bin'));
+    await assert.rejects(ctx.runOwner.start(value.runId, value.runId), /already owned/);
+  } finally {
+    await ctx.fiber.dispose();
+    await rm(value.directory, { recursive: true, force: true });
+  }
+});
