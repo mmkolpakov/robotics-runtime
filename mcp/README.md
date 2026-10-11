@@ -2,7 +2,7 @@
 
 This optional source package exposes six read tools through the maintained MCP
 SDK's stdio transport. It uses the published host RC0 package and installed
-contracts 0.20.0/harness 0.21.0 CLIs. It has no published MCP release artifact.
+contracts 0.21.1/harness 0.22.0 CLIs. It has no published MCP release artifact.
 
 - `describe_contract`: describe a schema ID from the operator's catalog.
 - `validate_documents`: validate registered immutable document IDs.
@@ -17,9 +17,9 @@ may supply domain extension schemas as registered immutable artifact IDs.
 Bundle-specific evaluator receipts and live readiness remain outside this interface.
 
 Supported document versions come from the selected installed workers and the
-operator's schema catalog. The `public-cli.lock` installation below supports v1
-roles; native v2 documents require a worker build supporting those versions.
-The adapter forwards either version as exact files without adding ROS fields.
+operator's schema catalog. The locked published workers support canonical role
+defaults and explicit native v2 documents. The adapter forwards both versions
+as exact files without adding ROS fields.
 A native incomplete verdict remains incomplete through `explain_result`.
 
 ## Install and configure
@@ -120,11 +120,11 @@ Tests use the official MCP client and the installed public CLIs. Controlled
 worker probes separately exercise raw 64-bit output, timeout, output overflow
 and request cancellation. These probes are subprocess-boundary checks.
 
-With installed workers supporting native v2, run the explicit integration check:
+With the locked published workers, run the native v2 document integration check:
 
 ```bash
-MCP_TEST_CONTRACTS_CLI="/absolute/environment/bin/robotics-contracts" \
-MCP_TEST_HARNESS_CLI="/absolute/environment/bin/robotics-acceptance" \
+MCP_TEST_CONTRACTS_CLI="$PWD/.public-workers/bin/robotics-contracts" \
+MCP_TEST_HARNESS_CLI="$PWD/.public-workers/bin/robotics-acceptance" \
   npm run test:native
 ```
 
