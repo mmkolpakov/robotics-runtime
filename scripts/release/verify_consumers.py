@@ -69,7 +69,7 @@ def consumer_plan(workspace: Path, mode: str) -> ReleasePlan:
     )
     refs = PUBLISHED_COMMITS if mode == "published" else {}
     commit = refs.get("harness") or git(workspace, "rev-parse", "HEAD")
-    contracts_commit = refs.get("contracts")
+    contracts_commit = refs.get("contracts", "")
     return ReleasePlan(
         candidate=f"harness-v{versions['harness']}",
         key="harness",
@@ -80,12 +80,12 @@ def consumer_plan(workspace: Path, mode: str) -> ReleasePlan:
         source_date_epoch=git(workspace, "show", "-s", "--format=%ct", commit),
         dry_run=True,
         contracts_version=versions["contracts"],
-        contracts_tag=f"contracts-v{versions['contracts']}" if contracts_commit else None,
+        contracts_tag=f"contracts-v{versions['contracts']}" if contracts_commit else "",
         contracts_commit=contracts_commit,
         contracts_tree=(
             git(workspace, "rev-parse", f"{contracts_commit}:packages/contracts/src")
             if contracts_commit
-            else None
+            else ""
         ),
         source_files={
             name: source_files(workspace, key, ref=refs.get(key)) for key, name in PACKAGES.items()
