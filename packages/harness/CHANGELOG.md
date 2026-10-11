@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.22.2
+
+Requires contracts 0.21 (`>=0.21,<0.22`), with exact release prerequisite
+`contracts-v0.21.1`. Package and execution-profile qualification remain separate.
+
+- Preserve excluded lower edges of explicit histogram buckets when proving
+  threshold outcomes. Keep upper edges inclusive and tightened minima closed.
+- Reject recorded extrema that contradict the first or last occupied bucket
+  before returning statistics. Counts and recorded means remain exact for valid
+  histograms.
+
 ## 0.22.1
 
 Requires contracts 0.21 (`>=0.21,<0.22`), with exact release prerequisite
