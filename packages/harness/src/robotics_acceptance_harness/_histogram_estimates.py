@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from bisect import bisect_left
 from dataclasses import dataclass
 from fractions import Fraction
 from typing import TYPE_CHECKING, Literal
@@ -17,30 +18,34 @@ type Comparison = Literal["passed", "failed", "skipped"]
 
 @dataclass(frozen=True, slots=True)
 class Estimate:
-    """A closed interval containing a statistic, possibly with infinite bounds."""
+    """An interval containing a statistic, possibly with an exclusive lower bound."""
 
     lower: float | int
     upper: float | int
+    lower_exclusive: bool = False
 
     def __post_init__(self) -> None:
         if any(
             isinstance(value, float) and math.isnan(value) for value in (self.lower, self.upper)
         ):
             raise HarnessInputError("histogram statistic bounds cannot be NaN")
-        if self.lower > self.upper:
+        if self.lower > self.upper or (self.lower_exclusive and self.lower == self.upper):
             raise HarnessInputError("histogram statistic bounds are inconsistent")
 
     def compare(self, operator: str, threshold: float) -> Comparison:
         if not math.isfinite(threshold):
             raise HarnessInputError("histogram threshold must be finite")
+        strictly_above = self.lower > threshold or (
+            self.lower_exclusive and self.lower == threshold
+        )
         outcomes = {
             "lt": (self.upper < threshold, self.lower >= threshold),
-            "lte": (self.upper <= threshold, self.lower > threshold),
-            "gt": (self.lower > threshold, self.upper <= threshold),
+            "lte": (self.upper <= threshold, strictly_above),
+            "gt": (strictly_above, self.upper <= threshold),
             "gte": (self.lower >= threshold, self.upper < threshold),
             "eq": (
                 self.lower == self.upper == threshold,
-                threshold < self.lower or threshold > self.upper,
+                strictly_above or threshold > self.upper,
             ),
         }
         passed, failed = outcomes[operator]
@@ -49,11 +54,13 @@ class Estimate:
         return "failed" if failed else "skipped"
 
     def describe(self) -> str:
-        return f"[{self.lower}, {self.upper}]"
+        bracket = "(" if self.lower_exclusive else "["
+        return f"{bracket}{self.lower}, {self.upper}]"
 
 
 def _bucket_estimate(histogram: HistogramSample, index: int, *, nonnegative: bool) -> Estimate:
-    lower = histogram.explicit_bounds[index - 1] if index else -math.inf
+    bucket_lower = histogram.explicit_bounds[index - 1] if index else -math.inf
+    lower = bucket_lower
     upper = histogram.explicit_bounds[index] if index < len(histogram.explicit_bounds) else math.inf
     if nonnegative:
         lower = max(0.0, lower)
@@ -61,7 +68,19 @@ def _bucket_estimate(histogram: HistogramSample, index: int, *, nonnegative: boo
         lower = max(histogram.min, lower)
     if histogram.max is not None:
         upper = min(histogram.max, upper)
-    return Estimate(lower, upper)
+    return Estimate(lower, upper, lower_exclusive=bool(index) and lower == bucket_lower)
+
+
+def _validate_extrema(histogram: HistogramSample) -> None:
+    if histogram.min is None and histogram.max is None:
+        return
+    occupied = [index for index, count in enumerate(histogram.bucket_counts) if count]
+    for name, value, bucket in (
+        ("min", histogram.min, occupied[0]),
+        ("max", histogram.max, occupied[-1]),
+    ):
+        if value is not None and bisect_left(histogram.explicit_bounds, value) != bucket:
+            raise HarnessInputError(f"histogram {name} contradicts occupied buckets")
 
 
 def _rank_bucket(histogram: HistogramSample, rank: int) -> int:
@@ -95,6 +114,8 @@ def estimate_statistic(
     leave the first/overflow buckets unbounded; a nonnegative domain must be declared
     by the caller rather than inferred from a time unit alone.
     """
+    if histogram.count:
+        _validate_extrema(histogram)
     if aggregation == "count":
         return Estimate(histogram.count, histogram.count)
     if histogram.count == 0:

@@ -205,7 +205,7 @@ def test_duplicate_cumulative_timestamp_is_malformed() -> None:
         )
 
 
-@pytest.mark.parametrize(("threshold", "status"), [(2, "passed"), (1, "skipped"), (0.4, "failed")])
+@pytest.mark.parametrize(("threshold", "status"), [(2, "passed"), (1, "failed"), (0.4, "failed")])
 def test_missing_maximum_uses_a_bound_for_both_threshold_directions(
     threshold: float, status: str
 ) -> None:
@@ -223,7 +223,7 @@ def test_missing_maximum_uses_a_bound_for_both_threshold_directions(
         0
     ]
     assert result.status == status
-    assert "bound [1.0, 2.0]" in result.message
+    assert "bound (1.0, 2.0]" in result.message
 
 
 def time_observation(events: list[float]) -> TimeAuthorityObservation:
@@ -252,7 +252,7 @@ def test_overflow_uncertainty_keeps_count_and_builds_incomplete_result(tmp_path:
     observation = time_observation([0.4] * 29 + [3.0])
     assert observation.sample_count == 30
     assert observation.evaluation is not None and observation.evaluation.status == "skipped"
-    assert "[2.0, inf]" in observation.evaluation.message
+    assert "(2.0, inf]" in observation.evaluation.message
     assert all(
         math.isfinite(value)
         for value in (observation.p50_ms, observation.p95_ms, observation.max_ms)
