@@ -1,9 +1,8 @@
 # Native archive example
 
 This example records a software counter transition, then evaluates its retained
-observations through the installed public CLIs. It requires a package build with
-the native v2 roles; the published contracts 0.20.0 / harness 0.21.0 pair predates
-those roles. The two Python files use standard Python and the public command-line
+observations through the installed public CLIs. Use this release's contracts
+0.21.0 / harness 0.22.0 cohort with explicit native v2 roles. The two Python files use standard Python and the public command-line
 interfaces, with no internal package imports or test fixtures.
 
 The producer creates scenario and pre-run runtime inputs, an immutable run
@@ -50,7 +49,8 @@ V1 canonical role defaults and signed document bytes retain their meanings.
 Native v2 scenario/runtime/observation/result versions are explicit opt-ins.
 One original run and its assessment chain reuse acceptance-run.v1,
 acceptance-aggregate.v1 and qualification-bundle.v1. Independent archive
-re-evaluation and v2 physical qualification are outside this path.
+re-evaluation uses the separate [archive assessment API](../../../harness/docs/archive-assessment.md);
+v2 physical qualification remains unsupported.
 
 Nanosecond values in the document files are exact JSON integers on the Python
 path. JavaScript consumers preserve the files or payload text and pass window

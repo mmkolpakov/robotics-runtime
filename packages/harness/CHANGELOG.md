@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.22.0
+
+Requires contracts 0.21 (`>=0.21,<0.22`), with exact release prerequisite
+`contracts-v0.21.0`. Package and execution-profile qualification remain separate.
+
+- Evaluate captured native v2 software/simulation inputs through public
+  JSON/JUnit, aggregation and qualification interfaces without creating ROS
+  graph, DDS or clock observations.
+- Add immutable assessment controls and bounded captured calibration inputs.
+  Execute selected metric assertions or authenticated product code without
+  changing the original scenario/runtime. Bind each new assessment to the exact
+  original result bytes and retain distinct result IDs, outcomes and coverage.
+- Authenticate evaluator wheels through operator-owned GitHub or explicit
+  private Cosign key-only policies; bind installed source and original entry
+  points to captured wheel bytes before guarded execution. Audit receipts alone
+  do not grant executable admission.
+- Add public verified evidence-byte access and an installed author example that
+  genuinely computes counter minus captured offset. Check numerical failures,
+  unavailable/invalid calibration and read-only archive transplantation.
+- Retain restrictive existing JSON/JUnit modes and apply OS umask to new files.
+  Separate synthetic JUnit observation/coverage identities from assertion cases.
+- Forward the caller's pinned extension registry to every loaded bundle role.
+  The preceding 0.21.0 wheel forwarded it only to the scenario; current loading
+  uses the complete registry on runtime/model/dataset/permit/verification inputs.
+- Record actual installed distribution inventory in assessment environments,
+  without process IDs, local paths or incidental timestamps. Preserve native
+  measurement-clock identity separately from UTC provenance. V2 physical
+  qualification and automatic native playback remain outside this release.
+
+
 ## 0.21.0
 
 Requires contracts 0.20 (`>=0.20,<0.21`), with release prerequisite

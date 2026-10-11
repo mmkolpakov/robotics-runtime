@@ -6,11 +6,9 @@ indexed JSON artifact named `native-state` has nonempty verified bytes. An expli
 assessment can additionally check a captured integer offset against the raw counter.
 Neither method is a robotics, performance, physics or safety qualification.
 
-The execution profile supplies the matching SDK, including the public
-`VerifiedEvidence.read_local` capture API. Published harness 0.21.0 does not supply
-that API or the wheel-authentication module. It cannot execute this author path.
-Package publication and profile qualification must identify an SDK artifact that
-implements both interfaces.
+The execution profile supplies this release's matching SDK, including
+`VerifiedEvidence.read_local` and wheel authentication. Pin the exact installed
+SDK artifact and independently qualify the interpreter/image/dependency profile.
 
 Build with the normal project backend:
 
@@ -62,4 +60,4 @@ recorded paths. The fixture checks write refusal and unchanged bytes.
 The core metric method has no calibration implementation and rejects selected
 calibration. This example does not establish sensor calibration accuracy, native
 hardware timing or physical acceptance. Its SDK/control APIs belong to the
-selected source composition and are absent from published harness 0.21.0.
+selected admitted composition.

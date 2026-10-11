@@ -2,47 +2,27 @@
 
 This policy covers the Python distribution and its JSON Schema contracts.
 
-## Known Consumers
+## Package Cohort
 
-The published package pair and infrastructure evidence have distinct scopes:
+This release pairs contracts 0.21.0 with harness 0.22.0. Harness metadata requires
+`robotics-runtime-contracts>=0.21,<0.22`; release checks select the exact
+`contracts-v0.21.0` prerequisite. See [package release notes](CHANGELOG.md) and
+[harness compatibility](../harness/docs/compatibility.md).
 
-| Consumer | Contracts pin | Scope of evidence |
-| --- | --- | --- |
-| [Acceptance harness 0.21.0](https://pypi.org/project/robotics-acceptance-harness/0.21.0/) | `>=0.20,<0.21`; release checks pin 0.20.0 | Independent PyPI installs, public API/CLI checks and verified archive identities |
-| [Acceptance harness 0.20.0](https://pypi.org/project/robotics-acceptance-harness/0.20.0/) | `>=0.19,<0.20`; release checks pin 0.19.0 | Independent PyPI installs, public API/CLI checks and verified archive identities |
-| [Infra R9 v0.9.0-rc.1](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.9.0-rc.1) | contracts 0.18.1 / harness 0.19.0 | Accepted B2 stock profile: one ROS domain, UInt64 and one finalized MCAP recording |
-| [Infra R10 v0.10.0-rc.1](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.10.0-rc.1) | contracts 0.18.2 / harness 0.19.1 | Published image and archive identities verified; released B3 execution is not accepted |
-| [Infra OCI v0.8.0-rc.1](https://github.com/mmkolpakov/robotics-runtime-infra/releases/tag/v0.8.0-rc.1) | contracts 0.15.4 / harness 0.17.1 | Historical release only; it does not establish support for the current pair |
-
-Contracts 0.20.0 and harness 0.21.0 were published from workspace source
-`b241633181f030b23ce0639e83277a7d37b8e7ef`. Their publication does not expand
-previous infrastructure qualification scopes.
-
-Historical contracts 0.19.0 was published from source
-`6c8bc47d1bc416e1b40cdaebf04983e172e78c21`; harness 0.20.0 from
-`efeac712ea512b19523ce41be40752f703fa782b`. Released archives and their
-source identities remain immutable. Infra R10's image source is
-`d6dc8a1c6b976faacab7b371821e9af54b9883c2`. Its
-[released B3 run](https://github.com/mmkolpakov/robotics-runtime-infra/actions/runs/37157837270)
-passed entity checks, then failed with a 107 ms exact-step overshoot and a
-JointState timeout. Source tests and release provenance do not turn that
-execution into a passed qualification. The infrastructure
-[compatibility policy](https://github.com/mmkolpakov/robotics-runtime-infra/blob/main/docs/compatibility.md)
-records its caller and tooling identities separately.
-
-Library requirements permit a minor line; execution and release evidence must
-identify the exact installed pair. The 0.15 and 0.16 generations are incompatible. See the
-[migration guide](docs/migrations/0.15-to-0.16.md) and [changelog](CHANGELOG.md).
+Package/API support does not qualify an infrastructure image or native profile.
+[Preserved run and release records](../../docs/run-history.md) retain historical
+versions, source identities and actual outcomes; this release does not rewrite
+those records. Consumers must bind their exact installed distributions and
+profile evidence when adopting this cohort.
 
 ## Current Catalog
 
 The role-to-schema mapping is maintained in
 [`catalog.v1.json`](src/robotics_runtime_contracts/schemas/catalog.v1.json).
 Canonical defaults are retained; `supported_versions` in that same catalog
-adds opt-in native v2 scenario, runtime, observation and result schemas.
+adds opt-in v2 scenario, runtime, observation, result and qualification schemas.
 `schema_versions_for_role()` lists those supported versions, while
 `schema_for_role(role, version=2)` selects an explicit version.
-The published 0.20.0/0.21.0 package pair predates this native path.
 
 Superseded experimental readers and writers are removed rather than carried as
 parallel APIs. Historical releases remain reproducible from immutable Git tags
@@ -130,7 +110,7 @@ and URDF are not universal requirements. Observations belong to the selected
 profile and distinguish measured, not_applicable, unobserved and invalid states.
 V2 physical qualification remains unsupported. Concrete provider identities and
 capabilities are observed data. All public roles support digest-pinned, reverse-domain extension
-schemas. Seven existing roles retain unpinned legacy extensions only when
+schemas. Six existing v1 roles retain unpinned legacy extensions only when
 `extension_schemas` is absent; the [README](README.md#extensions) lists that boundary.
 
 Moving an extension into the common contract requires reusable semantics,

@@ -1,10 +1,9 @@
 # Evaluator wheel authentication
 
-The source SDK provides `authenticate_wheel`, `authenticate_wheel_with_cosign_key`,
+This release provides `authenticate_wheel`, `authenticate_wheel_with_cosign_key`,
 `validate_evaluator_wheel` and
 `verify_installed_wheel` in `robotics_acceptance_harness.evaluator_trust`.
-These APIs are not part of the published harness 0.21.0 wheel. They verify
-artifact origin and installed bytes. The source loader and CLI require these
+These APIs verify artifact origin and installed bytes. The loader and CLI require these
 captured bindings before importing a declared evaluator, and retain the existing
 verified-source import guard.
 
@@ -56,7 +55,7 @@ stable Cosign version at least 3.1.3; version alone is not tool approval.
 public-key SHA-256 and explicit `trust_mode="key_only_no_tlog"`.
 The signature bundle's embedded key information is never a trust anchor.
 
-The [source fixture](../tests/admission/README.md) records the independently
+The [integration fixture](../tests/admission/README.md) records the independently
 admitted vendor tool/index/architecture/SBOM pins and exact reported build version.
 Tool provenance and execution composition admission remain separate records.
 
@@ -176,7 +175,7 @@ unsupported members are refused.
 
 ## CLI and SDK execution admission
 
-The source CLI accepts `--evaluator-trust-profile PATH` on `evaluate`, `verify`
+The CLI accepts `--evaluator-trust-profile PATH` on `evaluate`, `verify`
 and `doctor`. The JSON file belongs to the operator, outside the indexed evidence
 root, and must not be group/other writable. Relative paths resolve from its
 directory. An explicit verifier kind is required. Version 1 has exactly `profile_version`,
@@ -256,7 +255,7 @@ verification and a native profile's acceptance remain separate records.
 shows public imports, a PyPA entry point and one captured-evidence assertion.
 Its README identifies the matching SDK and execution-profile requirements.
 
-## Source integration witness
+## Installed integration witness
 
 The `evaluator-admission` CI job builds the minimal author wheel, attests it with
 the pinned official `actions/attest`, and supplies exact workflow SAN, source
@@ -275,9 +274,9 @@ assertion, refused evidence/profile writes, receipt-only and wrong-publisher
 failures, and unchanged original input bytes. Its input counter records are
 synthetic method inputs; the byte count is not observed robot performance.
 
-This source/CI witness is not a published SDK, infra image admission, dependency
-publisher proof or native hardware qualification. Full composition provenance
-and subsequent package publication have separate gates.
+This installed witness establishes the documented author-method path. It does
+not establish infra image admission, dependency publisher proof or native
+hardware qualification. Full composition provenance remains a separate gate.
 
 The local-key witness additionally creates a temporary local publisher with the
 admitted stock tool, retains only public verification material, installs the

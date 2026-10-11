@@ -11,14 +11,14 @@ contract-valid JSON/JUnit results. The live ROS observer is attach-only. The
 harness does not launch workloads, control simulators, change node lifecycle
 states or publish commands to equipment.
 
-Current source supports native v2 software/simulation assessment, explicit
+This release supports native v2 software/simulation assessment, explicit
 method controls and qualification-bundle.v2 archive comparison. Selected
 evaluator admission uses an operator-pinned stock signature verifier and executes
 captured authenticated source through the existing import guard. Physical
 execution authorization retains the external permit/verification workflow.
 The [archive guide](docs/archive-assessment.md), [trust guide](docs/evaluator-trust.md)
-and [compatibility reference](docs/compatibility.md) define these source APIs;
-they are absent from published harness 0.21.0/contracts 0.20.0.
+and [compatibility reference](docs/compatibility.md) define the supported APIs
+and execution-profile limits.
 
 See [local evidence and timestamps](docs/evidence-files.md) for filesystem
 containment, finalized-file reads and the distinction between Unix and monotonic time.
@@ -52,27 +52,27 @@ profile; selecting middleware or a simulator does not establish a native verdict
 | Component | Baseline |
 | --- | --- |
 | Python | 3.12 through 3.14 |
-| Contracts source | `robotics-runtime-contracts>=0.21,<0.22` |
+| Contracts | `robotics-runtime-contracts>=0.21,<0.22` |
 | ROS observation | ROS 2 Jazzy packages in the observer environment |
 | Metrics | OTLP JSON Lines exported by OpenTelemetry Collector |
 
 Each role retains one canonical default. Datasets use v2 for one complete bag;
-source scenario/runtime/observation/result/qualification roles additionally
-support explicit v2 selection. The published pair uses the existing v1 execution
-formats.
+scenario/runtime/observation/result/qualification roles additionally support
+explicit v2 selection. Existing v1 formats retain their schema identities.
 The dataset transition is an explicit pre-1.0 breaking release. Checks for
 unrelated published schemas and historical byte identities remain strict.
 
 ## Install
 
-The published v1 pair is
-[harness 0.21.0](https://pypi.org/project/robotics-acceptance-harness/0.21.0/) with
-[contracts 0.20.0](https://pypi.org/project/robotics-runtime-contracts/0.20.0/):
+This release pairs harness 0.22.0 with contracts 0.21.0. Check their package
+metadata on [harness PyPI](https://pypi.org/project/robotics-acceptance-harness/)
+and [contracts PyPI](https://pypi.org/project/robotics-runtime-contracts/). Exact
+source and distribution identities belong to the tagged release metadata:
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install robotics-acceptance-harness==0.21.0 robotics-runtime-contracts==0.20.0
+python -m pip install robotics-acceptance-harness==0.22.0 robotics-runtime-contracts==0.21.0
 ```
 
 Development uses both packages and the dependency graph in the root `uv.lock`:
@@ -345,10 +345,8 @@ matching archived package, rather than converted inside the current evaluator.
 
 Scenario extensions are explicit and digest-pinned. Pass the same
 `--extension-schema URI=PATH` mapping to every command that reads the scenario.
-Harness 0.21.0 does not forward that registry to additional bundle documents
-(runtime, model, dataset, permit or verification); the fix in development source
-is separate from this published wheel. See
-[published extension limits](../../docs/first-result.md#published-boundaries).
+The loader forwards that registry to every bundle document, including runtime,
+model, dataset, permit and verification roles.
 Extensions cannot replace common safety, timing, transport, or evidence rules.
 
 ## Product Evaluators
@@ -362,16 +360,15 @@ Product packages register standard PyPA entry points:
 
 The scenario and runtime must declare the same namespace, target, distribution,
 version, wheel SHA-256, and receipt SHA-256. Before importing a declared target,
-the source harness requires actual wheel
-authentication using an external operator profile, binds installed files and
+the harness requires actual wheel authentication using an external operator profile, binds installed files and
 original entry-point metadata to that wheel, and compiles captured source
 through its verified import guard. Receipt JSON alone cannot allow execution.
 Derived bytecode caches are ignored; source-less/native/extra namespace code is
 refused. Use ordinary pip on the authenticated captured wheel copy.
 
 See [evaluator authentication and operator profile](docs/evaluator-trust.md).
-These APIs and the CLI trust-profile option are absent from published harness
-0.21.0; current source integration does not qualify a published composition.
+The APIs and CLI trust-profile option establish evaluator-code admission;
+execution-composition and native-method qualification remain separate.
 
 The harness compiles captured authenticated Python source bytes using an
 explicit source loader, without reading or writing bytecode caches. This covers

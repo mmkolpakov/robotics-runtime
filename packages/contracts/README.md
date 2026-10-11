@@ -24,22 +24,21 @@ flowchart LR
 ```
 
 The contracts are independent of a particular robot or product. They describe
-ROS graph, lifecycle, security and timing concepts in the v1 formats. Current
-source additionally supports explicit native v2 software/simulation observations
+ROS graph, lifecycle, security and timing concepts in the v1 formats. This release additionally supports explicit native v2 software/simulation observations
 and distinct archive assessments. Provider identities are recorded as data or namespaced extensions;
 they do not select a schema.
 
 ## Install
 
-Python 3.12 through 3.14 is supported. The current published version is
-[0.20.0 on PyPI](https://pypi.org/project/robotics-runtime-contracts/0.20.0/), with
-archives in the root workspace's
-[tagged release](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.20.0):
+Python 3.12 through 3.14 is supported. This release is contracts 0.21.0.
+Consult [PyPI](https://pypi.org/project/robotics-runtime-contracts/) for package metadata;
+the workspace [release archives](https://github.com/mmkolpakov/robotics-runtime/releases)
+identify exact source and distribution digests.
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install robotics-runtime-contracts==0.20.0
+python -m pip install robotics-runtime-contracts==0.21.0
 ```
 
 Release assets include build-provenance attestations. See
@@ -87,9 +86,9 @@ physical-execution permit for an external signing workflow.
 
 ## Python API
 
-The current source API supports explicit version selection while preserving
-canonical defaults. The opt-in native/archive v2 APIs are absent from published
-0.20.0; its [published guide](../../docs/first-result.md) uses the v1 path.
+This release supports explicit version selection while preserving canonical
+defaults. Native/archive v2 is an opt-in path; existing v1 documents keep their
+original schema and semantics.
 
 ```python
 from robotics_runtime_contracts import (
@@ -126,11 +125,11 @@ evidence or process memory; existing MCAP record/chunk limits still apply.
 
 ## Contract Set
 
-Release 0.20.0 publishes one canonical schema per role. Datasets use
-`dataset-manifest.v2` for a complete bag of one or multiple MCAP members;
-other published roles use v1. Current source adds supported v2 versions for
-scenario, runtime, observation, result and qualification bundle while retaining
-those canonical defaults. Historical dataset-v1 documents require their
+The catalog retains one canonical default per role. Datasets use
+`dataset-manifest.v2` for a complete bag of one or multiple MCAP members.
+This release additionally supports explicit v2 scenario, runtime, observation,
+result and qualification-bundle versions while retaining the v1 execution-role
+defaults. Historical dataset-v1 documents require their
 matching archived package. The machine-readable source of truth is
 [`catalog.v1.json`](src/robotics_runtime_contracts/schemas/catalog.v1.json).
 
@@ -158,9 +157,9 @@ The published catalog includes `execution_trust_policy` and `robot_description`.
 path conventions and [consumer examples](consumer-examples/README.md) for
 complete documents with real artifact byte digests.
 
-Native source v2 keeps runtime configuration before execution and captured
+Native v2 keeps runtime configuration before execution and captured
 observations after it. Result contexts distinguish original execution from the
-assessment method, environment, time, calibration and coverage. The source
+assessment method, environment, time, calibration and coverage. The
 [archive assessment guide](../harness/docs/archive-assessment.md) and
 [qualification reference](docs/qualification.md) describe explicit bundle2
 selection. Physical v2 qualification is unsupported; v1 signed documents are

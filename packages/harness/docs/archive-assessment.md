@@ -1,9 +1,9 @@
 # Archive assessment
 
-The source SDK and CLI assess captured native v2 software or simulation inputs
-without starting a workload. This path is absent from published harness 0.21.0
-and contracts 0.20.0. Install a matching source composition that supplies these
-APIs; [compatibility](compatibility.md) distinguishes source and published paths.
+This release assesses captured native v2 software or simulation inputs through
+the SDK and CLI without starting a workload. Use the matching contracts 0.21.0/
+harness 0.22.0 cohort and an admitted execution composition.
+[Compatibility](compatibility.md) defines its package and profile boundaries.
 
 The original scenario, pre-run runtime, run context, observation and evidence
 index remain immutable. A new acceptance-result.v2 has its own existing
