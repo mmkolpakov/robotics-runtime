@@ -3,6 +3,8 @@
 This fixture uses the installed public CLI and the standalone
 [evidence-byte author example](../../consumer-examples/evidence-byte-check/README.md).
 It verifies source integration, not a released SDK or robot performance.
+The GitHub and explicitly selected Cosign key-only cases share the public writer
+and installed source guard, while retaining distinct publisher proof scopes.
 
 The `evaluator-admission` job in [CI](../../../../.github/workflows/ci.yml) builds
 the candidate SDK wheels and author wheel, then attests only the author wheel
@@ -57,3 +59,24 @@ are retained as CI artifacts.
 Actual author authentication requires the matching genuine signed bundle.
 Unit tests mock the crypto call only for independent binder/loader regressions;
 they never claim those probe wheels prove publisher identity.
+
+The local-key case uses the same admitted Cosign binary as the infra signature
+boundary. The Chainguard signed index/architecture/SBOM and extracted binary pins
+are recorded in [the trust reference](../../docs/evaluator-trust.md#private-local-key-signing).
+Its exact vendor version remains `v3.1.3+dirty`. The temporary signing key lives
+outside the workspace in a private temporary directory; only public keys and the
+signed bundle enter artifacts. Verification uses an external key pin and explicit
+`key_only_no_tlog` policy, with no OIDC/log/timestamp/build-origin claim. The OCI
+worker has no network and the same read-only/resource bounds. Public artifact
+receipts are audit records; they cannot issue admission.
+
+The source fixture uses the publisher-signed Chainguard Cosign index
+`sha256:3fad8be83b93869051c08bb98f36612afe81dabe06c288e70e41ce09a037ba18`,
+with independently admitted amd64 architecture/SBOM subject
+`sha256:70b49cd62302297b3e6a92eb63f86d699bc545c1231fe823147784c5fd742768`.
+The extracted executable SHA-256 is
+`9deba5b08d25e35d107abd491f8f6c774a880d986ecfddc6761c1f9593bdaa81`.
+Its exact version is `v3.1.3+dirty`, commit
+`11926fa5bbbbde47e88fc006b625a17769b743b2`, built with Go 1.27.2.
+This vendor-signed build is recorded as supplied; it is not relabeled clean
+upstream. This tool admission does not qualify the entire production composition.

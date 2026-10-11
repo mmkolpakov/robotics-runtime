@@ -25,7 +25,7 @@ def run(
     for name in ("receipt", "verification"):
         option = "--evaluator-receipt" if name == "receipt" else "--evaluator-verification"
         arguments.extend((option, f"/opt/admission/receipts/{name}.json"))
-    for name in ("statement.json", "publisher.json", "verified-report.json"):
+    for name in ("statement.json", "publisher.json", "verified-report.txt"):
         arguments.extend(("--evaluator-receipt-dependency", f"/opt/admission/receipts/{name}"))
     if profile is not None:
         arguments.extend(("--evaluator-trust-profile", str(profile)))
@@ -67,7 +67,12 @@ def main() -> None:
     assert "authenticated wheel/source admission" in refused.stderr
     assert not (OUTPUT / "receipt-only/acceptance-result.json").exists()
     wrong = json.loads(Path("/opt/admission/profile.json").read_bytes())
-    wrong["evaluators"][0]["publisher"]["certificate_identity"] += "-wrong-publisher"
+    if wrong["verifier"]["kind"] == "github":
+        wrong["evaluators"][0]["publisher"]["certificate_identity"] += "-wrong-publisher"
+    else:
+        wrong["verifier"]["public_key"] = "/opt/admission/auxiliary/other.pub"
+        wrong["verifier"]["public_key_sha256"] = expectations["other_key_sha256"]
+        wrong["evaluators"][0]["publisher"]["public_key_sha256"] = expectations["other_key_sha256"]
     wrong_path = Path("/tmp/wrong-profile.json")
     wrong_path.write_text(json.dumps(wrong))
     wrong_path.chmod(0o600)

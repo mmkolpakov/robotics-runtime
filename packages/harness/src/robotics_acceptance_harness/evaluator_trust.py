@@ -1,4 +1,4 @@
-"""Authenticate evaluator wheels with an operator-pinned GitHub verifier.
+"""Authenticate evaluator wheels with operator-pinned official verifiers.
 
 Trust profiles belong to the integrator's reviewed composition, outside evidence.
 An artifact-verification JSON or a saved verifier report is not an admission.
@@ -12,13 +12,14 @@ import os
 import re
 import stat
 
-# Only the pinned read-only verifier is spawned; argv/path regressions test this boundary.
+# Pinned official verifiers only; argv/path regressions test this boundary.
 import subprocess  # nosemgrep: attach-only-no-process-control
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from importlib.metadata import Distribution
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Literal
 
 from packaging.utils import InvalidWheelFilename, parse_wheel_filename
 from packaging.version import Version
@@ -107,6 +108,44 @@ class GitHubWheelPolicy:
             raise EvaluatorTrustError("deny_self_hosted_runners must be a boolean")
 
 
+@dataclass(frozen=True, slots=True)
+class CosignKeyVerifierProfile:
+    """Operator-admitted Cosign, external public key and explicit offline root."""
+
+    executable: Path
+    executable_sha256: str
+    version: str
+    public_key: Path
+    public_key_sha256: str
+    trusted_root: Path
+    trusted_root_sha256: str
+
+    def __post_init__(self) -> None:
+        for digest in (self.executable_sha256, self.public_key_sha256, self.trusted_root_sha256):
+            _sha256(digest)
+        parsed = Version(self.version)
+        if parsed < Version("3.1.3") or parsed.is_prerelease:
+            raise EvaluatorTrustError("Cosign key profile requires stable Cosign >=3.1.3")
+
+
+@dataclass(frozen=True, slots=True)
+class CosignKeyWheelPolicy:
+    """Signature-by-key-holder policy; no OIDC, log, timestamp or build-origin claim."""
+
+    wheel_sha256: str
+    predicate_type: str
+    public_key_sha256: str
+    trust_mode: Literal["key_only_no_tlog"]
+
+    def __post_init__(self) -> None:
+        _sha256(self.wheel_sha256)
+        _sha256(self.public_key_sha256)
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9+.-]*:[^\s]+", self.predicate_type):
+            raise EvaluatorTrustError("expected an exact attestation predicate URI")
+        if self.trust_mode != "key_only_no_tlog":
+            raise EvaluatorTrustError("Cosign key-only/no-tlog policy must be an explicit choice")
+
+
 _WHEEL_ADMISSION = object()
 _INSTALLATION_ADMISSION = object()
 
@@ -119,7 +158,7 @@ class AuthenticatedWheel:
     wheel_bytes: bytes
     sha256: str
     bundle_sha256: str
-    policy: GitHubWheelPolicy
+    policy: GitHubWheelPolicy | CosignKeyWheelPolicy
     verifier_sha256: str
     trusted_root_sha256: str
     verification_report: bytes
@@ -175,13 +214,24 @@ def _pinned_snapshot(path: Path, digest: str, limit: int) -> bytes:
     return payload
 
 
-def _run_tool(command: list[str], directory: Path, limits: TrustLimits) -> bytes:
-    expected = str(directory / ("gh.exe" if os.name == "nt" else "gh"))
-    if (
-        not command
-        or command[0] != expected
-        or not (command[1:] == ["--version"] or command[1:3] == ["attestation", "verify"])
-    ):
+def _run_tool(
+    command: list[str],
+    directory: Path,
+    limits: TrustLimits,
+    *,
+    tool_name: Literal["gh", "cosign"] = "gh",
+) -> bytes:
+    if tool_name not in {"gh", "cosign"}:
+        raise EvaluatorTrustError("unsupported snapshot verifier")
+    label = "GitHub" if tool_name == "gh" else "Cosign"
+    filename = tool_name + (".exe" if os.name == "nt" else "")
+    expected = str(directory / filename)
+    admitted = (
+        command[1:] == ["--version"] or command[1:3] == ["attestation", "verify"]
+        if tool_name == "gh"
+        else command[1:] == ["version", "--json"] or command[1:2] == ["verify-blob-attestation"]
+    )
+    if not command or command[0] != expected or not admitted:
         raise EvaluatorTrustError("only the pinned snapshot verifier commands are admitted")
     output = directory / "verifier-output"
     error = directory / "verifier-error"
@@ -200,13 +250,17 @@ def _run_tool(command: list[str], directory: Path, limits: TrustLimits) -> bytes
             )
         except subprocess.TimeoutExpired as failure:
             raise EvaluatorTrustError(
-                "GitHub attestation verifier exceeded its deadline"
+                f"{label} attestation verifier exceeded its deadline"
             ) from failure
     report = read_once(output, limits.max_report_bytes)
     diagnostic = read_once(error, limits.max_report_bytes)
     if process.returncode != 0:
         message = diagnostic.decode(errors="replace").strip()
-        raise EvaluatorTrustError(f"GitHub attestation verification refused: {message}")
+        raise EvaluatorTrustError(f"{label} attestation verification refused: {message}")
+    if tool_name == "cosign" and command[1] != "version":
+        if len(report) + len(diagnostic) > limits.max_report_bytes:
+            raise EvaluatorTrustError("combined verifier audit exceeds its byte limit")
+        return report + diagnostic
     return report
 
 
@@ -306,24 +360,40 @@ def authenticate_wheel(
     only wheel payload the installation binder should subsequently consume.
     """
 
+    filename, artifact, bundle = _wheel_inputs(wheel_path, bundle_path, policy.wheel_sha256, limits)
+    report = _verify_snapshot((filename, artifact), bundle, policy, profile, limits)
+    verified = json.loads(report)
+    if not isinstance(verified, list) or not verified:
+        raise EvaluatorTrustError("official verifier returned no verified attestations")
+    return _wheel_admission((filename, artifact, bundle), policy, profile, report, limits)
+
+
+def _wheel_inputs(
+    wheel_path: str | Path, bundle_path: str | Path, expected_digest: str, limits: TrustLimits
+) -> tuple[str, bytes, bytes]:
     wheel_path = Path(wheel_path)
     try:
         parse_wheel_filename(wheel_path.name)
     except InvalidWheelFilename as failure:
         raise EvaluatorTrustError("expected a PyPA wheel filename") from failure
     artifact = read_once(wheel_path, limits.max_wheel_bytes)
-    digest = hashlib.sha256(artifact).hexdigest()
-    if digest != policy.wheel_sha256:
+    if hashlib.sha256(artifact).hexdigest() != expected_digest:
         raise EvaluatorTrustError("wheel differs from the externally expected subject digest")
-    bundle = read_once(Path(bundle_path), limits.max_bundle_bytes)
-    report = _verify_snapshot((wheel_path.name, artifact), bundle, policy, profile, limits)
-    verified = json.loads(report)
-    if not isinstance(verified, list) or not verified:
-        raise EvaluatorTrustError("official verifier returned no verified attestations")
+    return wheel_path.name, artifact, read_once(Path(bundle_path), limits.max_bundle_bytes)
+
+
+def _wheel_admission(
+    inputs: tuple[str, bytes, bytes],
+    policy: GitHubWheelPolicy | CosignKeyWheelPolicy,
+    profile: GitHubVerifierProfile | CosignKeyVerifierProfile,
+    report: bytes,
+    limits: TrustLimits,
+) -> AuthenticatedWheel:
+    filename, artifact, bundle = inputs
     authenticated = AuthenticatedWheel(
-        filename=wheel_path.name,
+        filename=filename,
         wheel_bytes=artifact,
-        sha256=digest,
+        sha256=hashlib.sha256(artifact).hexdigest(),
         bundle_sha256=hashlib.sha256(bundle).hexdigest(),
         policy=policy,
         verifier_sha256=profile.executable_sha256,
@@ -331,9 +401,26 @@ def authenticate_wheel(
         verification_report=report,
         limits=limits,
     )
-
     object.__setattr__(authenticated, "_admission", _WHEEL_ADMISSION)
     return authenticated
+
+
+def authenticate_wheel_with_cosign_key(
+    wheel_path: str | Path,
+    bundle_path: str | Path,
+    *,
+    policy: CosignKeyWheelPolicy,
+    profile: CosignKeyVerifierProfile,
+    limits: TrustLimits = DEFAULT_TRUST_LIMITS,
+) -> AuthenticatedWheel:
+    """Authenticate private wheel bytes against the operator's explicit key policy."""
+    if policy.public_key_sha256 != profile.public_key_sha256:
+        raise EvaluatorTrustError("publisher key differs from the external verifier profile")
+    inputs = _wheel_inputs(wheel_path, bundle_path, policy.wheel_sha256, limits)
+    from robotics_acceptance_harness._cosign_key_verifier import verify_snapshot
+
+    report = verify_snapshot(inputs[:2], inputs[2], policy, profile, limits)
+    return _wheel_admission(inputs, policy, profile, report, limits)
 
 
 def verify_installed_wheel(

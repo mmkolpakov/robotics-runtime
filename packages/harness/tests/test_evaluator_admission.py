@@ -191,6 +191,7 @@ def profile_json(
     return {
         "profile_version": 1,
         "verifier": {
+            "kind": "github",
             "executable": str(profile.executable),
             "executable_sha256": profile.executable_sha256,
             "version": profile.version,
@@ -323,3 +324,18 @@ def test_malformed_publisher_policy_has_a_modeled_error(field: str, value: objec
     }
     with pytest.raises(EvaluatorTrustError):
         operator_trust._publisher(publisher)
+
+
+@pytest.mark.parametrize("kind", [None, "legacy", "cosign", "github-fallback"])
+def test_operator_verifier_kind_never_defaults_or_downgrades(
+    installation: tuple[Any, ...],
+    kind: str | None,
+) -> None:
+    *_, requirement, profile, wheel = installation
+    value = profile_json(profile, wheel, requirement)["verifier"]
+    if kind is None:
+        value.pop("kind")
+    else:
+        value["kind"] = kind
+    with pytest.raises(EvaluatorTrustError, match="explicitly select"):
+        operator_trust._verifier(value, wheel.parent)
