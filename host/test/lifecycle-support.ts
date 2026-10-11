@@ -12,7 +12,7 @@ import type { OwnedRun } from '../src/plugins/run-owner/index.js';
 import { referenceFile } from '../src/plugins/application-lifecycle/index.js';
 import type { CompletionHooks } from '../src/plugins/application-lifecycle/index.js';
 
-export async function fixture(mode: 'good' | 'pending' | 'missing' | 'not-ready' | 'bad-cleanup' | 'logged-cleanup' | 'probe-error' | 'probe-timeout' | 'probe-cancel' = 'good') {
+export async function fixture(mode: 'good' | 'pending' | 'missing' | 'not-ready' | 'bad-cleanup' | 'logged-cleanup' | 'probe-error' | 'probe-timeout' | 'probe-cancel' | 'untracked' = 'good') {
   const directory = await mkdtemp(join(tmpdir(), 'rr-owned-'));
   const runId = randomUUID();
   const modulePath = join(directory, 'provider.mjs');
@@ -28,7 +28,7 @@ async function exists(path){try{await access(path);return true;}catch{return fal
 export const probe={entered:Promise.withResolvers(),release:Promise.withResolvers(),written:Promise.withResolvers()};
 async function provider(ctx,config) {
  await writeFile(config.resourcePath,'owned finite resource');
- ctx.runResources.track({id:'file',ownerId:config.ownerId,
+ if(config.mode!=='untracked')ctx.runResources.track({id:'file',ownerId:config.ownerId,
   cleanup:async()=>{ if(config.mode==='bad-cleanup')throw new Error('deliberate resource cleanup failure'); await rm(config.resourcePath);},
   verifyCleanup:async(signal)=>{signal.throwIfAborted(); const released=!(await exists(config.resourcePath)); await writeFile(config.cleanupPath,JSON.stringify({released,ownerId:config.ownerId})); return {released,evidenceRefs:[await ref(config.cleanupPath)]};}
  });
