@@ -213,19 +213,53 @@ def profile_json(
     }
 
 
+@pytest.mark.parametrize("mode", [0o600, 0o644])
 def test_operator_profile_binds_declared_original_wheel(
-    installation: tuple[Any, ...], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    installation: tuple[Any, ...], tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: int
 ) -> None:
     _, _, _, installed, requirement, profile, wheel = installation
     path = tmp_path / "operator.json"
     path.write_text(json.dumps(profile_json(profile, wheel, requirement)))
-    path.chmod(0o600)
+    path.chmod(mode)
     monkeypatch.setattr(
         operator_trust, "distribution", lambda name: Distribution.at(installed / DIST_INFO)
     )
     admitted = operator_trust.load_evaluator_authentications(path, [requirement])
     trust.require_authenticated_installation(admitted["org.example"])
     assert admitted["org.example"].sources[installed / "example_evaluator/__init__.py"] == SOURCE
+
+
+@pytest.mark.parametrize("transition", ["chmod", "replace"])
+def test_operator_profile_rejects_writable_captured_file_after_path_becomes_restrictive(
+    installation: tuple[Any, ...],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    transition: str,
+) -> None:
+    _, _, _, installed, requirement, profile, wheel = installation
+    path = tmp_path / "operator.json"
+    content = json.dumps(profile_json(profile, wheel, requirement))
+    path.write_text(content)
+    path.chmod(0o666)
+    original_read = trust.read_once
+
+    def capture_then_restrict(input_path: Path, limit: int, **options: Any) -> bytes:
+        raw = original_read(input_path, limit, **options)
+        if transition == "chmod":
+            input_path.chmod(0o600)
+        else:
+            replacement = tmp_path / "replacement.json"
+            replacement.write_text(content)
+            replacement.chmod(0o600)
+            replacement.replace(input_path)
+        return raw
+
+    monkeypatch.setattr(operator_trust, "read_once", capture_then_restrict)
+    monkeypatch.setattr(
+        operator_trust, "distribution", lambda name: Distribution.at(installed / DIST_INFO)
+    )
+    with pytest.raises(EvaluatorTrustError, match="group/other writable"):
+        operator_trust.load_evaluator_authentications(path, [requirement])
 
 
 @pytest.mark.parametrize(

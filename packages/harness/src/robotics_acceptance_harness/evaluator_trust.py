@@ -178,8 +178,8 @@ class AuthenticatedInstallation:
     _admission: object | None = field(default=None, init=False, repr=False, compare=False)
 
 
-def read_once(path: Path, limit: int) -> bytes:
-    """Capture bounded regular-file bytes once; never parse a later reread."""
+def read_once(path: Path, limit: int, *, forbid_group_other_write: bool = False) -> bytes:
+    """Capture bounded regular-file bytes and optional mode policy on one descriptor."""
 
     absolute = Path(os.path.abspath(path.expanduser()))
     if absolute.resolve(strict=True) != absolute:
@@ -192,12 +192,14 @@ def read_once(path: Path, limit: int) -> bytes:
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode) or before.st_size > limit:
             raise EvaluatorTrustError(f"input is not a bounded regular file: {path}")
+        if forbid_group_other_write and before.st_mode & 0o022:
+            raise EvaluatorTrustError(f"input must not be group/other writable: {path}")
         with os.fdopen(descriptor, "rb", closefd=False) as stream:
             payload = stream.read(limit + 1)
         after = os.fstat(descriptor)
     finally:
         os.close(descriptor)
-    identity = ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")
+    identity = ("st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns", "st_ctime_ns")
     if (
         len(payload) > limit
         or len(payload) != before.st_size
