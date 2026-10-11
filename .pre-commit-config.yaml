@@ -20,7 +20,7 @@ repos:
         files: ^packages/contracts/(src/robotics_runtime_contracts/schemas|schemas/src)/.*\.schema\.json$
       - id: check-github-workflows
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.9
+    rev: v0.17.0
     hooks:
       - id: ruff-check
         args: [--fix]

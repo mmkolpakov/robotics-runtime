@@ -22,7 +22,7 @@ The host uses native Cordis logging and the console exporter. js-yaml 4.3.2 sati
 upstream `^4.1.0` range and includes the published YAML CPU denial-of-service fixes.
 Native Include/CLI tests exercise this package.
 
-Jobs is a Cordis service that invokes Execa 10.0.1 with literal argv, bounded wall timeout and
+Jobs is a Cordis service that invokes Execa 10.1.0 with literal argv, bounded wall timeout and
 output buffers, cancellation, exit status and retained diagnostics. Each owner cancels and reaps its
 own outstanding subprocesses. No shell command string is accepted. The environment can pin the
 selected execution endpoint explicitly.
