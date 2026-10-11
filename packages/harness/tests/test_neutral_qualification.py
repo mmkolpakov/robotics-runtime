@@ -82,7 +82,7 @@ def _archive(
     tmp_path: Path, domains: tuple[str, ...] = ("primary",), *, native_model: bool = False
 ) -> list[str]:
     state = _write(tmp_path / "native-state.json", {"native_final_state": "completed", "error": 0})
-    method = _write(tmp_path / "method.json", {"method": "comparison", "calibration": "fixed"})
+    method = tmp_path / "method.json"
     environment = _write(tmp_path / "environment.json", {"python": "3.12", "platform": "test"})
     profile: dict[str, Any] = {
         "profile_id": "org.example.native",
@@ -115,6 +115,18 @@ def _archive(
                 "retention_class": "pull-request-7d",
                 "remote_sink_allowed": False,
             },
+        },
+    )
+    _write(
+        method,
+        {
+            key: _document(scenario)[key]
+            for key in (
+                "metric_definitions",
+                "assertions",
+                "evaluator_requirements",
+                "evidence_policy",
+            )
         },
     )
     model = _write(tmp_path / "model.json", {"model": "native-counter"})
@@ -714,7 +726,11 @@ def test_native_link_coverage_independently_refuses_forged_pass(
     tmp_path: Path, all_not_applicable: bool
 ) -> None:
     from robotics_runtime_contracts._qualification_checks import _context
-    from robotics_runtime_contracts._qualification_native import _domain_coverage, _observations
+    from robotics_runtime_contracts._qualification_native import (
+        _domain_coverage,
+        _method_controls,
+        _observations,
+    )
     from robotics_runtime_contracts.qualification import inspect_qualification_artifacts
 
     report = inspect_qualification_artifacts(_archive(tmp_path))
@@ -741,7 +757,12 @@ def test_native_link_coverage_independently_refuses_forged_pass(
     with pytest.raises(
         QualificationError, match="passing despite missing source or criterion coverage"
     ):
-        _domain_coverage(context, "primary", _observations(context)["primary"])
+        _domain_coverage(
+            context,
+            "primary",
+            _observations(context)["primary"],
+            _method_controls(context, "primary"),
+        )
 
 
 def _set_measurement_window(
@@ -879,3 +900,171 @@ def test_native_qualification_detects_one_nanosecond_provenance_boundary_violati
     _refresh_domain(tmp_path)
     with pytest.raises(QualificationError, match="runtime manifest primary before execution"):
         validate_qualification_artifacts(specs)
+
+
+def test_selected_method_added_metrics_require_a_captured_window(tmp_path: Path) -> None:
+    specs = _archive(tmp_path)
+    method_path = tmp_path / "method.json"
+    method = _document(method_path)
+    method["metric_definitions"] = [
+        {
+            "metric_name": "org.example.count",
+            "unit": "1",
+            "instrument_kind": "gauge",
+            "temporality": "instantaneous",
+        }
+    ]
+    _write(method_path, method)
+    result_path = tmp_path / "result-primary.json"
+    result = _document(result_path)
+    result["evaluation"]["method"]["configuration"] = _reference(method_path)
+    _write(result_path, result)
+    _refresh_domain(tmp_path)
+    with pytest.raises(
+        QualificationError, match="metric assessment has no captured measurement window"
+    ):
+        validate_qualification_artifacts(specs)
+
+
+def test_selected_method_removed_metrics_can_use_the_original_native_window(tmp_path: Path) -> None:
+    specs = _archive(tmp_path)
+    scenario_path = tmp_path / "scenario.json"
+    scenario = _document(scenario_path)
+    scenario["metric_definitions"] = [
+        {
+            "metric_name": "org.example.count",
+            "unit": "1",
+            "instrument_kind": "gauge",
+            "temporality": "instantaneous",
+        }
+    ]
+    _write(scenario_path, scenario)
+    _set_measurement_window(
+        tmp_path,
+        start_ns=0,
+        end_ns=10,
+        clock={"kind": "external", "source_id": "native-zero"},
+    )
+    assert not _document(tmp_path / "method.json")["metric_definitions"]
+    assert validate_qualification_artifacts(specs)["run_id"] == RUN_ID
+    source_path = tmp_path / "observation-primary.json"
+    source = _document(source_path)
+    del source["measurement_window"]
+    _write(source_path, source)
+    _refresh_domain(tmp_path)
+    with pytest.raises(
+        QualificationError, match="assessment window has no captured measurement window"
+    ):
+        validate_qualification_artifacts(specs)
+
+
+def test_historical_calibration_absence_remains_absent_but_present_labels_must_match(
+    tmp_path: Path,
+) -> None:
+    specs = _archive(tmp_path)
+    method_path = tmp_path / "method.json"
+    method = _document(method_path)
+    method["calibration"] = {"state": "not_applicable", "reason": "software counter"}
+    _write(method_path, method)
+    result_path = tmp_path / "result-primary.json"
+    result = _document(result_path)
+    result["evaluation"]["method"]["configuration"] = _reference(method_path)
+    assert "calibration" not in result["evaluation"]
+    _write(result_path, result)
+    _refresh_domain(tmp_path)
+    assert validate_qualification_artifacts(specs)["run_id"] == RUN_ID
+    assert "calibration" not in _document(result_path)["evaluation"]
+    result = _document(result_path)
+    result["evaluation"]["calibration"] = {"state": "not_applicable", "reason": "forged reason"}
+    _write(result_path, result)
+    _refresh_domain(tmp_path)
+    with pytest.raises(QualificationError, match="selected calibration"):
+        validate_qualification_artifacts(specs)
+
+
+@pytest.mark.parametrize("change", ["state", "sha256", "size"])
+def test_native_aggregate_refuses_mixed_calibration_identity(tmp_path: Path, change: str) -> None:
+    _archive(tmp_path, ("first", "second"))
+    reference = _reference(tmp_path / "native-state.json")
+    for domain in ("first", "second"):
+        path = tmp_path / f"result-{domain}.json"
+        result = _document(path)
+        calibration: dict[str, Any] = {"state": "selected", "artifacts": [dict(reference)]}
+        if domain == "second":
+            if change == "state":
+                calibration = {"state": "not_applicable", "reason": "different selection"}
+            elif change == "sha256":
+                calibration["artifacts"][0]["sha256"] = "a" * 64
+            else:
+                calibration["artifacts"][0]["size_bytes"] += 1
+        result["evaluation"]["calibration"] = calibration
+        _write(path, result)
+    with pytest.raises(BundleValidationError, match="assessment calibrations cannot be mixed"):
+        aggregate_results(
+            scenario_path=tmp_path / "scenario.json",
+            run_context_path=tmp_path / "run.json",
+            result_paths=[tmp_path / "result-first.json", tmp_path / "result-second.json"],
+            output_path=tmp_path / "refused.json",
+            generated_at=datetime.fromisoformat(T6),
+        )
+    assert not (tmp_path / "refused.json").exists()
+
+
+def test_native_aggregate_uses_calibration_content_identity_without_authenticating_labels(
+    tmp_path: Path,
+) -> None:
+    specs = _archive(tmp_path, ("first", "second"))
+    reference = _reference(tmp_path / "native-state.json")
+    for domain in ("first", "second"):
+        path = tmp_path / f"result-{domain}.json"
+        result = _document(path)
+        result["evaluation"]["calibration"] = {
+            "state": "selected",
+            "artifacts": [
+                {
+                    **reference,
+                    "uri": f"file:///archive/{domain}/same-calibration.json",
+                }
+            ],
+        }
+        _write(path, result)
+        _refresh_domain(tmp_path, domain)
+    assert aggregate_results(
+        scenario_path=tmp_path / "scenario.json",
+        run_context_path=tmp_path / "run.json",
+        result_paths=[tmp_path / "result-first.json", tmp_path / "result-second.json"],
+        output_path=tmp_path / "same-context.json",
+        generated_at=datetime.fromisoformat(T6),
+    ).exists()
+    with pytest.raises(
+        QualificationError, match="original method makes no calibration declaration"
+    ):
+        validate_qualification_artifacts(specs)
+
+
+def test_native_aggregate_refuses_mixed_selected_evaluator_bindings(tmp_path: Path) -> None:
+    _archive(tmp_path, ("first", "second"))
+    requirement = {
+        "namespace": "org.example.method",
+        "entry_point": "example:evaluate",
+        "distribution": "method-example",
+        "version": "1",
+        "artifact_sha256": "a" * 64,
+        "receipt_sha256": "b" * 64,
+    }
+    for domain in ("first", "second"):
+        path = tmp_path / f"result-{domain}.json"
+        result = _document(path)
+        result["evaluators"] = [{**requirement, "version": "2" if domain == "second" else "1"}]
+        _write(path, result)
+    with pytest.raises(
+        BundleValidationError, match="assessment evaluator bindings cannot be mixed"
+    ):
+        aggregate_results(
+            scenario_path=tmp_path / "scenario.json",
+            run_context_path=tmp_path / "run.json",
+            result_paths=[tmp_path / "result-first.json", tmp_path / "result-second.json"],
+            output_path=tmp_path / "refused.json",
+            generated_at=datetime.fromisoformat(T6),
+        )
+    assert not (tmp_path / "refused.json").exists()

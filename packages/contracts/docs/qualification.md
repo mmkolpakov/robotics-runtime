@@ -78,3 +78,48 @@ or `validate_qualification_documents`. Those functions revalidate descriptors an
 documents before checking links. They have no file paths and cannot verify that a
 supplied digest describes a file. Use file-based qualification for statement
 production or when claiming that metadata binds retained bytes.
+
+## Archive assessments
+
+Current source `validate_qualification_artifacts(...,
+schema_version="qualification-bundle.v2",
+comparison_rule="exact_assertion_outcome")` returns archive metadata from the
+same one-capture loader. The default and the report/descriptor inspection APIs
+retain the existing v1 path. The opt-in APIs are absent from published 0.20.0.
+
+V2 includes one immutable native v2 original result and one new assessment per
+declared run domain, plus their separate acceptance-aggregate.v1 documents.
+The new result must bind the exact original-result SHA, share the original
+scenario/runtime/run/observation/index/profile/model bindings, use a distinct
+existing result_id and follow the original assessment in UTC provenance time.
+Selected evaluator requirements belong to captured method controls; original
+runtime evaluator bindings stay original. Both sides' exact receipt dependencies
+are retained and validated without rewriting the original scenario.
+
+Runtime, observation and evidence-index labels retain
+`runtime-manifests/<domain>.json`, `observations/<domain>.json` and
+`evidence-indexes/<domain>.json`. Original/new result and aggregate subject
+names are resolved from their exact digest links. Include both captured
+method/environment contexts, calibration inputs and every original raw source.
+Missing required original observations cannot become a passed assessment.
+
+The explicit rule compares the nonempty intersection of genuinely covered
+assertions only, after method/configuration, environment, known calibration and
+matching captured-window presence/value agree. Source, namespace, status, typed observed
+value, unit and evidence digests define assertion outcomes. Changed context or
+unknown historical calibration/coverage gives `not_comparable`; original and
+new whole verdicts remain separate. Ambiguous assertion IDs are refused.
+
+The same metadata drives an unsigned in-toto Statement v1 with product
+`qualification-bundle/v2` predicateType. It is not a Test Result or SLSA VSA
+predicate. Pinned namespace extensions are validated inside its predicate before
+artifact reads. External signature verification must authenticate the exact
+payload supplied to statement matching.
+
+CLI `validate-qualification` without `--statement` accepts the explicit v2/
+comparison-rule pair. With `--statement`, it derives them from the validated
+predicate and rejects separate version/rule flags. See the
+[harness archive guide](../../harness/docs/archive-assessment.md) for actual
+method selection, authenticated installed-code execution and read-only path
+transplantation. Physical v2 archive qualification is refused; active playback
+requires a new run and admission.

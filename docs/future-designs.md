@@ -29,7 +29,9 @@ in Docker and rootless Podman. These interfaces are absent from published harnes
 0.21.0. Production SDK/image/BOM composition admission, package publication and
 native evaluator-method qualification remain separate gates.
 
-Independent archive re-evaluation, distributed recovery and new deployment
+The source [archive assessment path](../packages/harness/docs/archive-assessment.md)
+creates distinct evaluations of captured native software or simulation observations
+and qualification-bundle.v2 statements. Distributed recovery and new deployment
 profiles remain outside the current implementation. Physical v2 qualification
 and cross-clock conversion are outside the native archive path. No future design
 described here changes the meaning of historical signed documents or recorded

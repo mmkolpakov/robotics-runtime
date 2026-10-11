@@ -3,19 +3,29 @@
 [![CI](https://github.com/mmkolpakov/robotics-runtime/actions/workflows/ci.yml/badge.svg)](https://github.com/mmkolpakov/robotics-runtime/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Attach-only acceptance testing for existing ROS 2 executions.
+Read-only acceptance evaluation for existing robotics executions and archives.
 
-The harness validates an execution bundle, observes the declared ROS graph and
-OpenTelemetry data, verifies retained evidence, and writes contract-valid JSON
-and JUnit results. It does not launch workloads, control simulators, change node
-lifecycle states, execute cryptographic signature tools, or publish commands to equipment.
-It verifies externally produced signature results and their digest chain; the
-signature tool itself remains an infrastructure responsibility.
+The harness validates an execution bundle, observes declared ROS/OpenTelemetry
+facts or captured native observations, verifies retained evidence, and writes
+contract-valid JSON/JUnit results. The live ROS observer is attach-only. The
+harness does not launch workloads, control simulators, change node lifecycle
+states or publish commands to equipment.
+
+Current source supports native v2 software/simulation assessment, explicit
+method controls and qualification-bundle.v2 archive comparison. Selected
+evaluator admission uses an operator-pinned stock signature verifier and executes
+captured authenticated source through the existing import guard. Physical
+execution authorization retains the external permit/verification workflow.
+The [archive guide](docs/archive-assessment.md), [trust guide](docs/evaluator-trust.md)
+and [compatibility reference](docs/compatibility.md) define these source APIs;
+they are absent from published harness 0.21.0/contracts 0.20.0.
 
 See [local evidence and timestamps](docs/evidence-files.md) for filesystem
 containment, finalized-file reads and the distinction between Unix and monotonic time.
 
 ## Architecture
+
+The live ROS observation path is:
 
 ```text
 product workload -> runtime infrastructure -> running ROS 2 graph
@@ -33,27 +43,29 @@ runtime contracts -> acceptance harness -----------+
 - Product repositories own scenes, robots, models, behavior, and business
   evaluators.
 
-The harness consumes provider-neutral runtime facts. Adding a simulator,
-middleware, recorder, or accelerator does not require a new scenario or result
-version.
+Native v2 consumes declared provider-neutral bindings and retained raw bytes.
+A provider composition uses the supported document version and its own accepted
+profile; selecting middleware or a simulator does not establish a native verdict.
 
 ## Requirements
 
 | Component | Baseline |
 | --- | --- |
 | Python | 3.12 through 3.14 |
-| Contracts | `robotics-runtime-contracts>=0.20,<0.21` |
+| Contracts source | `robotics-runtime-contracts>=0.21,<0.22` |
 | ROS observation | ROS 2 Jazzy packages in the observer environment |
 | Metrics | OTLP JSON Lines exported by OpenTelemetry Collector |
 
-Each role has one canonical schema. Datasets use v2 for one complete bag with
-one or multiple MCAP members; other existing roles keep their v1 schemas.
+Each role retains one canonical default. Datasets use v2 for one complete bag;
+source scenario/runtime/observation/result/qualification roles additionally
+support explicit v2 selection. The published pair uses the existing v1 execution
+formats.
 The dataset transition is an explicit pre-1.0 breaking release. Checks for
 unrelated published schemas and historical byte identities remain strict.
 
 ## Install
 
-The published pair is
+The published v1 pair is
 [harness 0.21.0](https://pypi.org/project/robotics-acceptance-harness/0.21.0/) with
 [contracts 0.20.0](https://pypi.org/project/robotics-runtime-contracts/0.20.0/):
 
@@ -136,12 +148,12 @@ non-passing verdict, including `failed`, `incomplete`, or `error`. An input,
 observation, or execution exception handled by the CLI returns `2` with a
 diagnostic. A result whose status is `error` is distinct from such an exception.
 
-A domain result takes the most severe outcome of its assertions and of the
+A v1 domain result takes the most severe outcome of its assertions and of the
 forbidden-graph, hardware-clock and time-authority observations. Skipped
 assertions and declared `unevaluated` paths make an otherwise passing result
 `incomplete`; they appear in JUnit as skipped cases, not failures.
 
-`clock_observation.real_time_factor` and `deadline_miss_ratio` are measured only
+V1 `clock_observation.real_time_factor` and `deadline_miss_ratio` are measured only
 in `simulation_realtime`; other time modes report `0`.
 
 `campaign` reports `incomplete` when fewer runs passed than the required

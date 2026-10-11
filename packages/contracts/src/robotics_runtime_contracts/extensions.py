@@ -312,7 +312,7 @@ def validate_extensions(
         return
     if schema_name in _LEGACY_UNPINNED_SCHEMAS and "extension_schemas" not in document:
         return
-    if schema_name == "qualification-bundle.v1":
+    if schema_name in {"qualification-bundle.v1", "qualification-bundle.v2"}:
         _validate_payload(schema_name, document["predicate"], "$.predicate", schema_documents)
     else:
         _validate_payload(schema_name, document, "$", schema_documents)

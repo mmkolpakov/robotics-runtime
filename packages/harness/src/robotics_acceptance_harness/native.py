@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from packaging.utils import canonicalize_name
 from robotics_runtime_contracts import dumps_canonical, validate_document, worst_status
+from robotics_runtime_contracts._timestamps import parse_timestamp_ns
 from robotics_runtime_contracts.writers import protect_inputs, write_bytes_atomically
 
 from robotics_acceptance_harness import __version__
@@ -21,6 +22,7 @@ from robotics_acceptance_harness.documents import (
 )
 from robotics_acceptance_harness.evaluation import EvaluationContext, evaluate_acceptance
 from robotics_acceptance_harness.evaluator_trust import AuthenticatedInstallation
+from robotics_acceptance_harness.metrics import AssertionEvaluation
 from robotics_acceptance_harness.receipts import VerifiedReceiptSet
 from robotics_acceptance_harness.result import format_utc_datetime
 
@@ -104,7 +106,7 @@ def _measurement_window(
 ) -> dict[str, Any] | None:
     window = source.as_dict().get("measurement_window")
     if window is None:
-        if context.scenario["metric_definitions"]:
+        if context.method_controls["metric_definitions"]:
             raise BundleValidationError(
                 "$.measurement_window", "metric assessment requires a captured source window"
             )
@@ -113,7 +115,7 @@ def _measurement_window(
         raise BundleValidationError(
             "$.measurement_window.clock", "differs from the run's declared measurement clock"
         )
-    if context.scenario["metric_definitions"] and window["timestamp_encoding"] != "unix_ns":
+    if context.method_controls["metric_definitions"] and window["timestamp_encoding"] != "unix_ns":
         raise BundleValidationError(
             "$.measurement_window", "OTLP metric assessment requires unix_ns source timestamps"
         )
@@ -133,14 +135,20 @@ def _measurement_window(
     }
 
 
-def _artifact(content: Mapping[str, Any], path: Path) -> dict[str, Any]:
-    raw = dumps_canonical(dict(content))
+def _artifact(
+    content: Mapping[str, Any],
+    path: Path,
+    *,
+    raw: bytes | None = None,
+    media_type: str = "application/json",
+) -> dict[str, Any]:
+    raw = dumps_canonical(dict(content)) if raw is None else raw
     destination = write_bytes_atomically(raw, path)
     return {
         "uri": destination.as_uri(),
         "sha256": sha256(raw).hexdigest(),
         "size_bytes": len(raw),
-        "media_type": "application/json",
+        "media_type": media_type,
     }
 
 
@@ -216,7 +224,14 @@ def _protect_source_inputs(
         context.evidence.index.path,
         *context.evidence.local_files,
     ]
-    for document in (context.bundle.permit, context.bundle.verification):
+    if context.assessment_controls is not None:
+        inputs.append(context.assessment_controls.path)
+        from urllib.parse import urlsplit
+        from urllib.request import url2pathname
+
+        for reference in context.method_controls["calibration"].get("artifacts", ()):
+            inputs.append(Path(url2pathname(urlsplit(reference["uri"]).path)))
+    for document in (context.bundle.permit, context.bundle.verification, context.original_result):
         if document is not None:
             inputs.append(document.path)
     for name in (
@@ -226,6 +241,95 @@ def _protect_source_inputs(
         "junit.xml",
     ):
         protect_inputs(destination / name, inputs)
+
+
+def _criterion_evidence(context: EvaluationContext, item: AssertionEvaluation) -> tuple[str, ...]:
+    if item.status not in {"passed", "failed"}:
+        return ()
+    if item.source == "product":
+        return tuple(sorted(set(item.evidence_sha256) & context.original_evidence_sha256))
+    if item.observed_value is None or context.metric_evidence_sha256 is None:
+        return ()
+    return (context.metric_evidence_sha256,)
+
+
+def _criterion_coverage(
+    context: EvaluationContext, assertions: tuple[AssertionEvaluation, ...]
+) -> dict[str, Any]:
+    declared = {item["assertion_id"] for item in context.method_controls["assertions"]}
+    criteria = {
+        item.assertion_id: item
+        for item in assertions
+        if item.source == "product" or item.assertion_id in declared
+    }
+    covered, uncovered = [], []
+    for identifier in sorted(set(criteria) | declared):
+        item = criteria.get(identifier)
+        evidence = _criterion_evidence(context, item) if item is not None else ()
+        if evidence:
+            covered.append({"assertion_id": identifier, "evidence_sha256": list(evidence)})
+        else:
+            uncovered.append(
+                {
+                    "assertion_id": identifier,
+                    "reason": (
+                        item.message or "method has no observed source-bound outcome"
+                        if item is not None
+                        else "method returned no outcome"
+                    ),
+                }
+            )
+    return {"covered_assertions": covered, "uncovered_assertions": uncovered}
+
+
+def _original_execution(
+    context: EvaluationContext,
+    run_context: LoadedDocument,
+    source: LoadedDocument,
+    started_at: datetime,
+) -> dict[str, Any]:
+    original = {
+        "acceptance_run_sha256": run_context.sha256,
+        "observation_sha256": source.sha256,
+        "evidence_index_sha256": context.evidence.index.sha256,
+        "started_at": source.data["started_at"],
+        "finished_at": source.data["finished_at"],
+    }
+    baseline = context.original_result
+    if baseline is None:
+        return original
+    if context.assessment_controls is None or baseline.schema_version != "acceptance-result.v2":
+        raise BundleValidationError(
+            "$.original_result", "requires selected native v2 controls and result"
+        )
+    expected = {
+        "run_id": context.run_id,
+        "domain_id": context.domain_id,
+        "scenario_id": context.scenario["scenario_id"],
+        "scenario_sha256": context.bundle.scenario.sha256,
+        "runtime_manifest_sha256": context.bundle.runtime.sha256,
+        "execution": context.runtime["execution"],
+        "profile": context.scenario["profile"],
+        "native_model": source.data.get("native_model"),
+    }
+    for key, value in expected.items():
+        if baseline.data.get(key) != value:
+            raise BundleValidationError(
+                f"$.original_result.{key}", "differs from original execution"
+            )
+    for key, value in original.items():
+        if baseline.data["original_execution"].get(key) != value:
+            raise BundleValidationError(
+                f"$.original_result.original_execution.{key}", "differs from original execution"
+            )
+    if parse_timestamp_ns(baseline.data["evaluation"]["finished_at"]) > parse_timestamp_ns(
+        format_utc_datetime(started_at)
+    ):
+        raise BundleValidationError(
+            "$.original_result.evaluation",
+            "original assessment finishes after new assessment starts",
+        )
+    return {**original, "original_result_sha256": baseline.sha256}
 
 
 def evaluate_native(
@@ -250,8 +354,14 @@ def evaluate_native(
             )
     destination = Path(output_dir).expanduser().resolve()
     _protect_source_inputs(context, run_context, destination)
+    started_at = datetime.now(UTC)
+    original = _original_execution(context, run_context, source, started_at)
+    method = context.method_controls
+    selected = context.assessment_controls
     configuration = _artifact(
-        {
+        selected.as_dict()
+        if selected is not None
+        else {
             key: context.bundle.scenario.as_dict()[key]
             for key in (
                 "metric_definitions",
@@ -261,9 +371,10 @@ def evaluate_native(
             )
         },
         destination / "evaluation-method.json",
+        raw=selected.raw if selected is not None else None,
+        media_type="application/octet-stream" if selected is not None else "application/json",
     )
     environment = _evaluation_environment(destination / "evaluation-environment.json")
-    started_at = datetime.now(UTC)
     assertions = evaluate_acceptance(
         context,
         evaluator_receipts=evaluator_receipts,
@@ -278,8 +389,12 @@ def evaluate_native(
     }
     if not any(item["state"] == "measured" for item in observations.values()):
         unevaluated.add("$.observations")
-    if not context.scenario["assertions"] and not context.scenario["evaluator_requirements"]:
+    if not method["assertions"] and not any(item.source == "product" for item in assertions):
         unevaluated.add("$.assertions")
+    coverage = _criterion_coverage(context, assertions)
+    unevaluated.update(
+        f"$.assertions.{item['assertion_id']}" for item in coverage["uncovered_assertions"]
+    )
     unevaluated.update(
         f"$.assertions.{item.assertion_id}" for item in assertions if item.status == "skipped"
     )
@@ -298,13 +413,7 @@ def evaluate_native(
         "runtime_manifest_sha256": context.bundle.runtime.sha256,
         "execution": context.bundle.runtime.as_dict()["execution"],
         "profile": context.bundle.scenario.as_dict()["profile"],
-        "original_execution": {
-            "acceptance_run_sha256": run_context.sha256,
-            "observation_sha256": source.sha256,
-            "evidence_index_sha256": context.evidence.index.sha256,
-            "started_at": source.data["started_at"],
-            "finished_at": source.data["finished_at"],
-        },
+        "original_execution": original,
         "evaluation": {
             "method": {
                 "implementation": "robotics_acceptance_harness.evaluate_acceptance",
@@ -312,6 +421,15 @@ def evaluate_native(
                 "configuration": configuration,
             },
             "environment": environment,
+            "calibration": (
+                selected.as_dict()["calibration"]
+                if selected is not None
+                else {
+                    "state": "unobserved",
+                    "reason": "original method has no explicit calibration selection",
+                }
+            ),
+            "coverage": coverage,
             **({"window": measurement_window} if measurement_window is not None else {}),
             "started_at": format_utc_datetime(started_at),
             "finished_at": format_utc_datetime(finished_at),
@@ -332,7 +450,7 @@ def evaluate_native(
             }
             for item in assertions
         ],
-        "evaluators": [dict(item) for item in context.scenario["evaluator_requirements"]],
+        "evaluators": [dict(item) for item in method["evaluator_requirements"]],
         "evidence": [dict(item) for item in context.evidence.links],
     }
     if "native_model" in context.runtime:

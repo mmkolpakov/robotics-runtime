@@ -253,8 +253,6 @@ def _validate_native_declarations(
         scenario.get("native_model")
     ):
         raise BundleValidationError("$.native_model", "result identifies another native model")
-    if result["evaluators"] != scenario["evaluator_requirements"]:
-        raise BundleValidationError("$.evaluators", "result evaluator bindings differ")
     clock = scenario["profile"].get("clock")
     if clock is not None and any(
         clock[field] != context.data["time_authority"][field] for field in ("kind", "source_id")
@@ -262,9 +260,28 @@ def _validate_native_declarations(
         raise BundleValidationError("$.profile.clock", "profile identifies another time authority")
 
 
+def _calibration_identity(assessment: Mapping[str, Any]) -> tuple[str, tuple[tuple[str, int], ...]]:
+    calibration = assessment.get("calibration", {})
+    return (
+        str(calibration.get("state", "unobserved")),
+        tuple(
+            sorted(
+                (str(item["sha256"]), int(item["size_bytes"]))
+                for item in calibration.get("artifacts", ())
+            )
+        ),
+    )
+
+
 def _validate_native_assessment(result: Mapping[str, Any], first: Mapping[str, Any]) -> None:
     assessment = result["evaluation"]
     baseline = first["evaluation"]
+    if result["evaluators"] != first["evaluators"]:
+        raise BundleValidationError("$.evaluators", "assessment evaluator bindings cannot be mixed")
+    if _calibration_identity(assessment) != _calibration_identity(baseline):
+        raise BundleValidationError(
+            "$.evaluation.calibration", "assessment calibrations cannot be mixed"
+        )
     for field in ("implementation", "version"):
         if assessment["method"][field] != baseline["method"][field]:
             raise BundleValidationError("$.evaluation.method", "assessment methods cannot be mixed")

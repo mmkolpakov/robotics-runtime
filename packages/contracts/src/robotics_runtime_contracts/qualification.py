@@ -85,29 +85,46 @@ def _load_diagnostic(error: ContractError) -> QualificationDiagnostic:
     )
 
 
-def inspect_qualification_artifacts(
+def _control_references(artifact: QualificationArtifact) -> tuple[Mapping[str, Any], ...]:
+    document = artifact.document
+    assert document is not None
+    if artifact.kind == "dataset_manifest":
+        return (document["bag"]["metadata"],)
+    if document["schema_version"] != "acceptance-result.v2":
+        return ()
+    assessment = document["evaluation"]
+    return (
+        assessment["method"]["configuration"],
+        assessment["environment"],
+        *assessment.get("calibration", {}).get("artifacts", ()),
+    )
+
+
+def _capture_artifacts(
     specifications: Sequence[str],
     extension_schemas: Mapping[str, bytes] | None = None,
-) -> QualificationReport:
-    """Read every supplied file once, then inspect links if all files are valid."""
+) -> tuple[tuple[QualificationArtifact, ...], tuple[QualificationDiagnostic, ...]]:
+    """Capture each supplied file once before any version-specific link checks."""
     loaded: dict[int, QualificationArtifact] = {}
     diagnostics: list[QualificationDiagnostic] = []
     references: dict[str, int] = {}
     # Capture dataset controls first; raw MCAP remains streamed. All returned
     # descriptors retain caller order, and each supplied file is opened once.
     for index, specification in enumerate(specifications):
-        if specification.partition(":")[0] != "dataset_manifest":
+        if specification.partition(":")[0] not in {"dataset_manifest", "domain_result"}:
             continue
         try:
-            dataset = load_artifact(specification, extension_schemas)
-            loaded[index] = dataset
-            assert dataset.document is not None
-            reference = dataset.document["bag"]["metadata"]
-            references[reference["sha256"]] = reference["size_bytes"]
+            artifact = load_artifact(specification, extension_schemas)
+            loaded[index] = artifact
+            for reference in _control_references(artifact):
+                references[reference["sha256"]] = reference["size_bytes"]
         except ContractError as error:
             diagnostics.append(_load_diagnostic(error))
     for index, specification in enumerate(specifications):
-        if specification.partition(":")[0] == "dataset_manifest":
+        if index in loaded or specification.partition(":")[0] in {
+            "dataset_manifest",
+            "domain_result",
+        }:
             continue
         try:
             loaded[index] = load_artifact(
@@ -117,18 +134,46 @@ def inspect_qualification_artifacts(
             )
         except ContractError as error:
             diagnostics.append(_load_diagnostic(error))
-    artifacts = tuple(loaded[index] for index in sorted(loaded))
+    return tuple(loaded[index] for index in sorted(loaded)), tuple(diagnostics)
+
+
+def inspect_qualification_artifacts(
+    specifications: Sequence[str],
+    extension_schemas: Mapping[str, bytes] | None = None,
+) -> QualificationReport:
+    """Read every supplied file once, then inspect links if all files are valid."""
+    artifacts, diagnostics = _capture_artifacts(specifications, extension_schemas)
     if diagnostics:
-        return QualificationReport(artifacts, tuple(diagnostics), blocked_checks=("links",))
+        return QualificationReport(artifacts, diagnostics, blocked_checks=("links",))
     return inspect_links(artifacts)
 
 
 def validate_qualification_artifacts(
     specifications: Sequence[str],
     extension_schemas: Mapping[str, bytes] | None = None,
+    *,
+    schema_version: str = "qualification-bundle.v1",
+    comparison_rule: str | None = None,
 ) -> dict[str, Any]:
     """Validate a complete artifact set and return metadata for the exact bytes read."""
-    return inspect_qualification_artifacts(specifications, extension_schemas).metadata()
+    if schema_version not in ("qualification-bundle.v1", "qualification-bundle.v2"):
+        raise QualificationError(
+            "unsupported qualification bundle version",
+            error_id="qualification.schema_unsupported",
+        )
+    if schema_version == "qualification-bundle.v1" and comparison_rule is None:
+        return inspect_qualification_artifacts(specifications, extension_schemas).metadata()
+    if schema_version != "qualification-bundle.v2" or comparison_rule != "exact_assertion_outcome":
+        raise QualificationError(
+            "v1 accepts no comparison rule; v2 requires exact_assertion_outcome",
+            error_id="qualification.comparison_rule_invalid",
+        )
+    from robotics_runtime_contracts._qualification_archive import validate_archive_documents
+
+    artifacts, diagnostics = _capture_artifacts(specifications, extension_schemas)
+    if diagnostics:
+        QualificationReport(artifacts, diagnostics, blocked_checks=("links",)).raise_for_errors()
+    return validate_archive_documents(artifacts, extension_schemas)
 
 
 __all__ = [

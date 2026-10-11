@@ -19,8 +19,9 @@ caller's declared observation or retained-storage claim.
 robotics-contracts runtime-manifest init --template observed-runtime.yaml --output runtime.json
 ```
 
-The template supplies every `runtime-manifest.v1` field except the optional
-`schema_version`, which the producer sets when absent. No clock offsets, platform
+The template supplies every field of its declared runtime version. Omitted
+`schema_version` retains the canonical runtime-manifest.v1 default; explicit
+runtime-manifest.v2 is supported by current source. No clock offsets, platform
 versions, security settings, provider bindings, identifiers or timestamps are
 guessed. `create_runtime_manifest(template, extension_schemas=...)` is the Python
 equivalent. Templates with extensions may supply repeatable
@@ -181,3 +182,11 @@ The original statement and subjects remain untouched. This checks content and
 cross-document links only; it does not authenticate a signature, identity, trust
 root, transparency log, or receipt. The verifier must pass the same payload bytes
 it authenticated, rather than rereading a mutable external bundle afterwards.
+
+Source archive statements explicitly select
+`schema_version="qualification-bundle.v2"` and
+`comparison_rule="exact_assertion_outcome"` in the same create/write APIs.
+The CLI uses `--schema-version` and `--comparison-rule`; v1 defaults remain
+unchanged and accept no archive rule. V2 matching takes its version/rule from
+the validated predicate. See [archive qualification](qualification.md#archive-assessments)
+for the required original/new artifact set and comparison boundaries.

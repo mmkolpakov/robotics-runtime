@@ -1,5 +1,6 @@
 """A minimal byte-access example, not a robotics performance evaluator."""
 
+import json
 from collections.abc import Iterable
 
 from robotics_acceptance_harness.evaluation import EvaluationContext
@@ -28,4 +29,63 @@ def evaluate(context: EvaluationContext) -> Iterable[AssertionEvaluation]:
         source="product",
         namespace="org.example.evidence-bytes",
         evidence_sha256=(str(link["sha256"]),),
+    )
+    calibrated = _calibrated_error(context, raw, str(link["sha256"]))
+    if calibrated is not None:
+        yield calibrated
+
+
+def _calibrated_error(
+    context: EvaluationContext, raw: bytes, raw_sha256: str
+) -> AssertionEvaluation | None:
+    controls = context.assessment_controls
+    if controls is None or controls.data["calibration"]["state"] == "not_applicable":
+        return None
+    calibration = controls.data["calibration"]
+    if calibration["state"] == "unobserved":
+        return AssertionEvaluation(
+            assertion_id="org.example.evidence-bytes.calibrated-error",
+            unit="1",
+            source="product",
+            namespace="org.example.evidence-bytes",
+            status="skipped",
+            observed_value=None,
+            message="this selected method has no observed offset calibration",
+            evidence_sha256=(raw_sha256,),
+        )
+    references = calibration["artifacts"]
+    if len(references) != 1:
+        raise ValueError("this example method requires exactly one offset calibration")
+    reference = references[0]
+    # Use the captured public input; its URI is never reopened by the evaluator.
+    captured = controls.read_input(reference)
+    original = json.loads(raw)
+    selected = json.loads(captured)
+    evidence = (raw_sha256, str(reference["sha256"]))
+    if (
+        not isinstance(original, dict)
+        or not isinstance(selected, dict)
+        or type(original.get("counter")) is not int
+        or type(selected.get("offset")) is not int
+    ):
+        return AssertionEvaluation(
+            assertion_id="org.example.evidence-bytes.calibrated-error",
+            unit="1",
+            source="product",
+            namespace="org.example.evidence-bytes",
+            status="error",
+            observed_value=None,
+            message="raw counter and captured offset must be JSON integers",
+            evidence_sha256=evidence,
+        )
+    corrected = original["counter"] - selected["offset"]
+    return AssertionEvaluation(
+        assertion_id="org.example.evidence-bytes.calibrated-error",
+        unit="1",
+        source="product",
+        namespace="org.example.evidence-bytes",
+        status="passed" if corrected == 0 else "failed",
+        observed_value=corrected,
+        message="captured raw counter minus captured calibration offset must equal zero",
+        evidence_sha256=evidence,
     )

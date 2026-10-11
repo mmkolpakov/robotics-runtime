@@ -66,9 +66,13 @@ that exact-byte path. The host rejects numeric window arguments; read-only MCP
 operations forward file snapshots and keep worker payloads as text.
 The built-in OTLP method accepts unix_ns; selected product assessments may use
 native_ns without an inferred UTC conversion. Empty criteria or entirely absent
-measurement coverage cannot produce a passed verdict. Existing v1 run, aggregate
-and qualification wrappers cover one original run and its assessment chain; they
-do not implement independent archive re-evaluation.
+measurement coverage cannot produce a passed verdict. Acceptance-run.v1 and
+acceptance-aggregate.v1 retain their existing document semantics; separate
+assessment cohorts use separate aggregates. Explicit source assessment controls
+and qualification-bundle.v2 add the [archive assessment path](archive-assessment.md),
+retaining the original result separately from each new assessment. Canonical
+qualification-bundle.v1 defaults and historical signed readers are unchanged.
+These source interfaces are absent from published harness 0.21.0/contracts 0.20.0.
 
 Exact provider and hardware support belongs to a qualified runtime artifact;
 installing the package or selecting an SDK binding does not establish it.

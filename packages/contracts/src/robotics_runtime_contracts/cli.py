@@ -90,6 +90,10 @@ def _parser() -> argparse.ArgumentParser:
     qualification.add_argument("--quiet", action="store_true")
     qualification.add_argument("--output", metavar="PATH")
     qualification.add_argument(
+        "--schema-version", choices=("qualification-bundle.v1", "qualification-bundle.v2")
+    )
+    qualification.add_argument("--comparison-rule", choices=("exact_assertion_outcome",))
+    qualification.add_argument(
         "--statement",
         metavar="PATH",
         help="also match a decoded qualification statement; does not verify signatures",
@@ -383,11 +387,18 @@ def _validate_documents(arguments: argparse.Namespace) -> list[tuple[str, str]]:
 def _validate_qualification(arguments: argparse.Namespace) -> None:
     extensions = _read_extension_schemas(arguments.extension_schema)
     if arguments.statement:
+        if arguments.schema_version is not None or arguments.comparison_rule is not None:
+            raise CLIArgumentError("--statement selects its own version and comparison rule")
         result = validate_qualification_statement(
             arguments.statement, arguments.artifact, extension_schemas=extensions
         )
     else:
-        result = validate_qualification_artifacts(arguments.artifact, extensions)
+        result = validate_qualification_artifacts(
+            arguments.artifact,
+            extensions,
+            schema_version=arguments.schema_version or "qualification-bundle.v1",
+            comparison_rule=arguments.comparison_rule,
+        )
     if arguments.output:
         inputs = [
             item.partition("=")[2] for item in (*arguments.artifact, *arguments.extension_schema)

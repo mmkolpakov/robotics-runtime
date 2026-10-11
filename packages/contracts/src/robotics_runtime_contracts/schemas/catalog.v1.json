@@ -46,6 +46,9 @@
     "acceptance_scenario": [
       "acceptance-scenario.v2"
     ],
+    "qualification_bundle": [
+      "qualification-bundle.v2"
+    ],
     "runtime_manifest": [
       "runtime-manifest.v2"
     ]

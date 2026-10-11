@@ -330,6 +330,12 @@ def test_native_junit_keeps_user_assertions_distinct_from_synthetic_cases(tmp_pa
             assertion["assertion_id"] = "observation-condition"
         elif assertion["assertion_id"] == "counter-finished":
             assertion["assertion_id"] = "evaluation-coverage"
+    renamed = {
+        "counter-error": "observation-condition",
+        "counter-finished": "evaluation-coverage",
+    }
+    for item in result["evaluation"]["coverage"]["covered_assertions"]:
+        item["assertion_id"] = renamed.get(item["assertion_id"], item["assertion_id"])
     original = json.dumps(result, sort_keys=True)
     xml = ElementTree.parse(write_junit_xml(result, tmp_path / "collision.xml"))
     cases = xml.findall(".//testcase")

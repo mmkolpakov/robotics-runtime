@@ -138,5 +138,114 @@ def bound_inputs(
         "wheel_sha256": authenticated.sha256,
         "bundle_sha256": authenticated.bundle_sha256,
         "publisher_kind": "github" if github else "cosign_key_no_tlog",
-        "scope": "synthetic native input records; byte-access method only",
+        "scope": "synthetic native input records; byte-access and captured offset method only",
+        "archive_assessment": _archive_assessment_inputs(destination, binding),
+    }
+
+
+def _archive_assessment_inputs(destination: Path, binding: Path) -> dict[str, Any]:
+    trial = destination / "archive" / "archived-trial"
+    producer = (
+        Path(__file__).parents[3] / "contracts/consumer-examples/minimal-native-archive/producer.py"
+    )
+    environment = os.environ.copy()
+    environment["PATH"] = str(Path(sys.executable).parent) + os.pathsep + environment["PATH"]
+    recorded = subprocess.run(
+        [sys.executable, str(producer), "--output", str(trial), "--error", "7"],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=60,
+    )
+    original_inputs = json.loads(recorded.stdout)
+    original_output = trial / "original-assessment"
+    arguments = ["robotics-acceptance", "evaluate"]
+    for name, value in original_inputs.items():
+        arguments.extend(("--" + name.replace("_", "-"), str(value)))
+    arguments.extend(("--output", str(original_output)))
+    original = subprocess.run(
+        arguments,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=90,
+    )
+    if original.returncode != 1:
+        raise ValueError(
+            "uncalibrated error=7 trial must produce the actual failed original result"
+        )
+    baseline = original_output / "acceptance-result.json"
+    if json.loads(baseline.read_bytes())["status"] != "failed":
+        raise ValueError("fixture has no failed original outcome")
+    original_aggregate = trial / "original-aggregate.json"
+    aggregated = subprocess.run(
+        [
+            "robotics-acceptance",
+            "aggregate",
+            "--scenario",
+            original_inputs["scenario"],
+            "--run-context",
+            original_inputs["run_context"],
+            "--result",
+            str(baseline),
+            "--output",
+            str(original_aggregate),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=90,
+    )
+    if aggregated.returncode != 1 or not original_aggregate.is_file():
+        raise ValueError("failed original trial must retain its actual public aggregate")
+    method_root = destination / "archive" / "assessment-inputs"
+    method_root.mkdir()
+    scenario = json.loads(Path(original_inputs["scenario"]).read_bytes())
+    controls = {
+        "metric_definitions": [],
+        "assertions": [],
+        "evaluator_requirements": [json.loads(binding.read_bytes())],
+        "evidence_policy": scenario["evidence_policy"],
+    }
+    paths = {}
+    for name, offset in (("applied", 7), ("wrong-offset", 6), ("invalid-offset", "invalid")):
+        calibration = write_json(method_root / f"{name}-offset.json", {"offset": offset})
+        reference = {
+            "uri": calibration.as_uri(),
+            "sha256": digest(calibration),
+            "size_bytes": calibration.stat().st_size,
+            "media_type": "application/json",
+        }
+        path = write_json(
+            method_root / f"{name}-controls.json",
+            {
+                **controls,
+                "calibration": {"state": "selected", "artifacts": [reference]},
+            },
+        )
+        paths[name] = str(path)
+    path = write_json(
+        method_root / "unobserved-controls.json",
+        {
+            **controls,
+            "calibration": {
+                "state": "unobserved",
+                "reason": "no selected offset was captured for this assessment",
+            },
+        },
+    )
+    paths["unobserved"] = str(path)
+    inputs = {name: value for name, value in original_inputs.items() if name != "otel_metrics"}
+    inputs["original_result"] = str(baseline)
+    return {
+        "inputs": inputs,
+        "controls": paths,
+        "original_result_sha256": digest(baseline),
+        "raw_sha256": digest(trial / "native-state.json"),
+        "assertion_id": "org.example.evidence-bytes.calibrated-error",
+        "original_error": 7,
+        "original_status": "failed",
     }
