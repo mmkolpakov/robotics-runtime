@@ -21,7 +21,7 @@ robotics-contracts runtime-manifest init --template observed-runtime.yaml --outp
 
 The template supplies every field of its declared runtime version. Omitted
 `schema_version` retains the canonical runtime-manifest.v1 default; explicit
-runtime-manifest.v2 is supported by current source. No clock offsets, platform
+runtime-manifest.v2 is supported by this release. No clock offsets, platform
 versions, security settings, provider bindings, identifiers or timestamps are
 guessed. `create_runtime_manifest(template, extension_schemas=...)` is the Python
 equivalent. Templates with extensions may supply repeatable
@@ -183,7 +183,7 @@ cross-document links only; it does not authenticate a signature, identity, trust
 root, transparency log, or receipt. The verifier must pass the same payload bytes
 it authenticated, rather than rereading a mutable external bundle afterwards.
 
-Source archive statements explicitly select
+Archive statements explicitly select
 `schema_version="qualification-bundle.v2"` and
 `comparison_rule="exact_assertion_outcome"` in the same create/write APIs.
 The CLI uses `--schema-version` and `--comparison-rule`; v1 defaults remain

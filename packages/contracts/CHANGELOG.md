@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.21.0
+
+- Add opt-in acceptance-scenario.v2, runtime-manifest.v2,
+  acceptance-observation.v2 and acceptance-result.v2 for captured native software
+  and simulation observations. Preserve v1 canonical defaults, schema bytes and
+  historical signed-document semantics.
+- Separate pre-run configuration, original execution and assessment method,
+  environment, UTC provenance, calibration selection and genuine source coverage.
+  Preserve measured zero, non-applicability, unavailable and invalid facts.
+- Add qualification-bundle.v2 with the retained in-toto Statement v1 wrapper and
+  a distinct product predicate. Bind the immutable original outcome and new
+  result, compare covered assertions under explicit exact_assertion_outcome,
+  and keep changed/unknown context distinct from a matched comparison. Refuse
+  physical v2 qualification. Keep default v1 statement creation and matching unchanged.
+- Validate digest-pinned extensions for both bundle versions inside the
+  predicate. Reuse the offline schema registry, generated source workflow and
+  existing exact-byte loader.
+- Use protobuf Timestamp for exact v2 UTC precision checks; reject more than
+  nanosecond precision without changing v1 time semantics.
+
 ## 0.20.0
 
 - Add the `transient_local` named topic QoS profile to scenario and dataset

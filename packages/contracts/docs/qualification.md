@@ -81,11 +81,11 @@ production or when claiming that metadata binds retained bytes.
 
 ## Archive assessments
 
-Current source `validate_qualification_artifacts(...,
+This release's `validate_qualification_artifacts(...,
 schema_version="qualification-bundle.v2",
 comparison_rule="exact_assertion_outcome")` returns archive metadata from the
 same one-capture loader. The default and the report/descriptor inspection APIs
-retain the existing v1 path. The opt-in APIs are absent from published 0.20.0.
+retain the existing v1 path.
 
 V2 includes one immutable native v2 original result and one new assessment per
 declared run domain, plus their separate acceptance-aggregate.v1 documents.

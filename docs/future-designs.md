@@ -20,16 +20,15 @@ original run. V1 formats retain their ROS-oriented fields and semantics.
 The [compatibility reference](../packages/harness/docs/compatibility.md) defines
 this support boundary.
 
-The source [evaluator trust SDK](../packages/harness/docs/evaluator-trust.md)
+The [evaluator trust SDK](../packages/harness/docs/evaluator-trust.md)
 authenticates wheel provenance and binds installed source bytes to the
-authenticated wheel. The source CLI requires an external operator profile and
+authenticated wheel. The CLI requires an external operator profile and
 executes captured authenticated source through the retained import guard.
 The limited author fixture exercises the installed CLI with read-only inputs
-in Docker and rootless Podman. These interfaces are absent from published harness
-0.21.0. Production SDK/image/BOM composition admission, package publication and
-native evaluator-method qualification remain separate gates.
+in Docker and rootless Podman. This release's APIs do not establish production
+SDK/image/BOM composition admission or native evaluator-method qualification.
 
-The source [archive assessment path](../packages/harness/docs/archive-assessment.md)
+The [archive assessment path](../packages/harness/docs/archive-assessment.md)
 creates distinct evaluations of captured native software or simulation observations
 and qualification-bundle.v2 statements. Distributed recovery and new deployment
 profiles remain outside the current implementation. Physical v2 qualification

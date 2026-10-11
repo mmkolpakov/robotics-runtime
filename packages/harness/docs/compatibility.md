@@ -2,21 +2,17 @@
 
 ## Package Line
 
-The `0.21.x` harness line requires Python `>=3.12,<3.15` and
-`robotics-runtime-contracts>=0.20,<0.21`.
-[Harness 0.21.0](https://pypi.org/project/robotics-acceptance-harness/0.21.0/) and
-[contracts 0.20.0](https://pypi.org/project/robotics-runtime-contracts/0.20.0/)
-are published under `harness-v0.21.0` and `contracts-v0.20.0`.
-Independent installs outside the workspace checked the exact pair, public API,
-CLI and archive contents against their tagged sources.
+The `0.22.x` harness line requires Python `>=3.12,<3.15` and
+`robotics-runtime-contracts>=0.21,<0.22`. This release selects contracts 0.21.0
+and harness 0.22.0, with exact prerequisite `contracts-v0.21.0`.
+Package metadata, tagged source and distribution digests identify the installed
+pair; package support and native-profile qualification remain separate.
 
 Each role retains its canonical default. Datasets use v2 for one or multiple
-MCAP members. The native document path adds explicitly supported v2 versions for
-scenario, runtime, observation and result roles. The published 0.20.0/0.21.0
-pair predates that native path; use a package build containing those roles for
-the [native archive example](../../contracts/consumer-examples/minimal-native-archive/README.md).
-Historical datasets require their matching archived package. Readers do not
-convert old dataset forms.
+MCAP members. Explicit v2 scenario/runtime/observation/result/qualification roles
+support the [native archive example](../../contracts/consumer-examples/minimal-native-archive/README.md)
+and [distinct archive assessments](archive-assessment.md). Historical datasets
+require their matching archived package; readers do not convert old forms.
 
 ## Document Set
 
@@ -31,11 +27,9 @@ Unknown schema versions, wrong document roles, and contradictory bundle facts
 fail before observation or evaluation begins. Scenario extensions remain
 separately versioned and digest-pinned by their canonical URI.
 
-The 0.21.0 wheel forwards the caller's extension registry to the scenario only
-when loading a bundle. Extension-bearing runtime, model, dataset, permit or
-verification documents do not receive it on that path. Current development
-source fixes the forwarding; that fix is not a published 0.21.0 capability.
-The [first-result path](../../../docs/first-result.md) uses no custom extensions.
+The caller's pinned extension registry is forwarded to every loaded bundle
+document, including scenario, runtime, model, dataset, permit and verification.
+Unknown namespaces, wrong schema digests and invalid payloads fail validation.
 
 ## Provider Compatibility
 
@@ -68,11 +62,10 @@ The built-in OTLP method accepts unix_ns; selected product assessments may use
 native_ns without an inferred UTC conversion. Empty criteria or entirely absent
 measurement coverage cannot produce a passed verdict. Acceptance-run.v1 and
 acceptance-aggregate.v1 retain their existing document semantics; separate
-assessment cohorts use separate aggregates. Explicit source assessment controls
+assessment cohorts use separate aggregates. Explicit assessment controls
 and qualification-bundle.v2 add the [archive assessment path](archive-assessment.md),
 retaining the original result separately from each new assessment. Canonical
 qualification-bundle.v1 defaults and historical signed readers are unchanged.
-These source interfaces are absent from published harness 0.21.0/contracts 0.20.0.
 
 Exact provider and hardware support belongs to a qualified runtime artifact;
 installing the package or selecting an SDK binding does not establish it.
