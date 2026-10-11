@@ -88,9 +88,7 @@ def _profile(
     path = Path(os.path.abspath(path.expanduser()))
     if evidence_root is not None and path.is_relative_to(evidence_root.resolve()):
         raise EvaluatorTrustError("operator trust profile must be outside the evidence root")
-    raw = read_once(path, 4 * 1024 * 1024)
-    if path.stat().st_mode & 0o022:
-        raise EvaluatorTrustError("operator trust profile must not be group/other writable")
+    raw = read_once(path, 4 * 1024 * 1024, forbid_group_other_write=True)
     data = _object(
         loads_mapping(raw, source_name=str(path)), {"profile_version", "verifier", "evaluators"}
     )

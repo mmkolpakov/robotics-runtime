@@ -464,3 +464,12 @@ def test_fifo_is_refused_without_waiting_for_a_writer(tmp_path: Path) -> None:
         capture_output=True,
     )
     assert completed.returncode == 0, completed.stderr.decode()
+
+
+def test_read_once_does_not_apply_operator_mode_policy_to_evidence(tmp_path: Path) -> None:
+    path = tmp_path / "evidence.json"
+    path.write_bytes(b"captured evidence")
+    path.chmod(0o666)
+    assert trust.read_once(path, 1024) == b"captured evidence"
+    with pytest.raises(EvaluatorTrustError, match="group/other writable"):
+        trust.read_once(path, 1024, forbid_group_other_write=True)
