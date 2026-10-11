@@ -457,6 +457,8 @@ def test_delta_histogram_accepts_adjacent_intervals() -> None:
                 count=1,
                 bucket_counts=(1, 0, 0, 0),
                 sum_value=5,
+                minimum=5,
+                maximum=5,
             ),
             histogram(
                 observed_at_ns=2,
@@ -464,6 +466,8 @@ def test_delta_histogram_accepts_adjacent_intervals() -> None:
                 count=1,
                 bucket_counts=(1, 0, 0, 0),
                 sum_value=5,
+                minimum=5,
+                maximum=5,
             ),
         ],
         window_start_ns=0,
