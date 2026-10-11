@@ -15,7 +15,7 @@ launch ROS 2, choose a simulator, collect telemetry, or contain product logic.
 ```mermaid
 flowchart LR
     product["Product repository"] --> infra["Runtime infrastructure"]
-    infra --> execution["ROS 2 execution"]
+    infra --> execution["Existing execution"]
     execution --> harness["Acceptance harness"]
     harness --> evidence["Evidence and verdict"]
     contracts["Runtime contracts"] -. validates .-> product
@@ -24,8 +24,9 @@ flowchart LR
 ```
 
 The contracts are independent of a particular robot or product. They describe
-ROS 2 execution, security and timing concepts, including implementation-specific
-constraints. Provider identities are recorded as data or namespaced extensions;
+ROS graph, lifecycle, security and timing concepts in the v1 formats. Current
+source additionally supports explicit native v2 software/simulation observations
+and distinct archive assessments. Provider identities are recorded as data or namespaced extensions;
 they do not select a schema.
 
 ## Install
@@ -86,17 +87,24 @@ physical-execution permit for an external signing workflow.
 
 ## Python API
 
+The current source API supports explicit version selection while preserving
+canonical defaults. The opt-in native/archive v2 APIs are absent from published
+0.20.0; its [published guide](../../docs/first-result.md) uses the v1 path.
+
 ```python
 from robotics_runtime_contracts import (
     schema_for_role,
     schema_registry,
+    schema_versions_for_role,
     validate_document,
     validate_role,
 )
 
 validate_document(document)
 validate_role(document, "acceptance_scenario")
-print(schema_for_role("runtime_manifest"))
+print(schema_for_role("runtime_manifest"))  # canonical runtime-manifest.v1
+print(schema_for_role("runtime_manifest", version=2))
+print(schema_versions_for_role("qualification_bundle"))
 registry = schema_registry()
 ```
 
@@ -120,7 +128,9 @@ evidence or process memory; existing MCAP record/chunk limits still apply.
 
 Release 0.20.0 publishes one canonical schema per role. Datasets use
 `dataset-manifest.v2` for a complete bag of one or multiple MCAP members;
-other existing roles use v1. Historical dataset-v1 documents require their
+other published roles use v1. Current source adds supported v2 versions for
+scenario, runtime, observation, result and qualification bundle while retaining
+those canonical defaults. Historical dataset-v1 documents require their
 matching archived package. The machine-readable source of truth is
 [`catalog.v1.json`](src/robotics_runtime_contracts/schemas/catalog.v1.json).
 
@@ -136,9 +146,10 @@ The public role names are `acceptance_scenario`, `acceptance_run`,
 keys. For example `schema_for_role("acceptance_scenario")` returns
 `acceptance-scenario.v1`; CLI `validate` selects that schema from the document.
 
-Every public document uses JSON Schema Draft 2020-12, declares
-`schema_version`, and rejects unknown root fields. Dataset IDs use the
-`urn:robotics-runtime-contracts:v2:*` namespace; other current role IDs use
+Every public contract uses JSON Schema Draft 2020-12 and identifies its version;
+qualification statements put `schema_version` inside the in-toto predicate.
+Unknown contract fields are rejected. Dataset and opt-in native/archive v2 IDs
+use `urn:robotics-runtime-contracts:v2:*`; retained v1 role IDs use
 `urn:robotics-runtime-contracts:v1:*`. Internal schema resources
 exist only to remove duplication and are not document roles.
 
@@ -146,6 +157,14 @@ The published catalog includes `execution_trust_policy` and `robot_description`.
 [product artifact roles](docs/product-artifact-roles.md) for their field and
 path conventions and [consumer examples](consumer-examples/README.md) for
 complete documents with real artifact byte digests.
+
+Native source v2 keeps runtime configuration before execution and captured
+observations after it. Result contexts distinguish original execution from the
+assessment method, environment, time, calibration and coverage. The source
+[archive assessment guide](../harness/docs/archive-assessment.md) and
+[qualification reference](docs/qualification.md) describe explicit bundle2
+selection. Physical v2 qualification is unsupported; v1 signed documents are
+read under their original semantics.
 
 ## Extensions
 

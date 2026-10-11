@@ -46,7 +46,9 @@ The opt-in v2 formats describe native software and recorded observations through
 explicit profile bindings and retained ArtifactRef bytes. Runtime configuration
 is a pre-run input; completed observations are separate evidence. Results bind
 the original execution separately from the assessment method, environment and
-time. A measured zero, inapplicability, an absent observation and an invalid
+time. Explicit assessment controls select a method without replacing the original
+scenario or runtime. Qualification-bundle.v2 retains the original outcome and the
+new assessment, with an explicit covered-assertion comparison rule. A measured zero, inapplicability, an absent observation and an invalid
 measurement have distinct states. Missing required coverage is incomplete.
 
 Native command acceptance, final state and postcondition observations remain
@@ -178,7 +180,10 @@ The [native archive example](../packages/contracts/consumer-examples/minimal-nat
 covers a software counter and a discrete counter simulation through installed
 public CLIs. It preserves original bytes and checks JSON/JUnit, aggregation and
 qualification links. This scope does not qualify physical execution, a simulator
-SDK, camera rendering or archive re-evaluation by a new method.
+SDK or camera rendering. The source [archive assessment path](../packages/harness/docs/archive-assessment.md)
+adds a distinct method and bundle2 comparison. Its authenticated author fixture
+checks captured counter/offset arithmetic through public CLIs with read-only
+inputs; it does not qualify physical calibration.
 
 The initial flight reference is stock PX4/Gazebo. General Webots/Isaac provider
 support does not qualify drone dynamics, a vision model, physical actuation,
