@@ -21,9 +21,9 @@ INFRA_COMMIT = "dfbf26e99d3d569f9d25bdc260510220d4dd2872"
 FIXTURE_DIRECTORY = "test/qualification/fixtures"
 PUBLISHED_COMMITS = {
     "contracts": "a6fd70f73b6c7c4f2b70b449e5dedeefb96d46fa",
-    "harness": "c50215ee23e0e57ada671205ae70df7496c71855",
+    "harness": "4e8b008e36b84aafcc64edbc928c77bd02d62b4d",
 }
-PUBLISHED_VERSIONS = {"contracts": "0.21.1", "harness": "0.22.1"}
+PUBLISHED_VERSIONS = {"contracts": "0.21.1", "harness": "0.22.2"}
 
 
 def extract_infra_fixtures(infra: Path, destination: Path) -> tuple[Path, dict[str, Any]]:

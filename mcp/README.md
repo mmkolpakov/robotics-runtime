@@ -2,7 +2,7 @@
 
 This optional source package exposes six read tools through the maintained MCP
 SDK's stdio transport. It uses the published host RC0 package and installed
-contracts 0.21.1/harness 0.22.1 CLIs. It has no published MCP release artifact.
+contracts 0.21.1/harness 0.22.2 CLIs. It has no published MCP release artifact.
 
 - `describe_contract`: describe a schema ID from the operator's catalog.
 - `validate_documents`: validate registered immutable document IDs.
