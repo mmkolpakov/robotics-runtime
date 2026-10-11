@@ -55,7 +55,7 @@ jobs:
           export UV_PROJECT_ENVIRONMENT="$RUNNER_TEMP/release-tools"
           printf 'UV_PROJECT_ENVIRONMENT=%s\n' "$UV_PROJECT_ENVIRONMENT" >> "$GITHUB_ENV"
           printf 'RELEASE_PYTHON=%s/bin/python\n' "$UV_PROJECT_ENVIRONMENT" >> "$GITHUB_ENV"
-          uv sync --locked --only-group dev --no-install-workspace --python 3.12
+          uv sync --locked --group dev --no-install-workspace --python 3.12
       - name: Test release guards
         run: |
           "$RELEASE_PYTHON" -m ruff check scripts/release tests/release

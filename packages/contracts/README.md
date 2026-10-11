@@ -31,7 +31,7 @@ they do not select a schema.
 
 ## Install
 
-Python 3.12 through 3.14 is supported. This release is contracts 0.21.0.
+Python 3.12 through 3.14 is supported. This release is contracts 0.21.1.
 Consult [PyPI](https://pypi.org/project/robotics-runtime-contracts/) for package metadata;
 the workspace [release archives](https://github.com/mmkolpakov/robotics-runtime/releases)
 identify exact source and distribution digests.
@@ -39,7 +39,7 @@ identify exact source and distribution digests.
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install robotics-runtime-contracts==0.21.0
+python -m pip install robotics-runtime-contracts==0.21.1
 ```
 
 Release assets include build-provenance attestations. See
@@ -351,10 +351,9 @@ adopting a context-manager API. Paths must not be persisted for another process.
 
 ## Version Policy
 
-The published harness 0.21.0 requires contracts `>=0.20,<0.21`. The current
-pair is contracts 0.20.0 and harness 0.21.0; their tagged package sources and
-installed inventories are verified separately. Package publication and native
-infra profiles have separate evidence scopes. See [COMPATIBILITY.md](COMPATIBILITY.md).
+This release pairs contracts 0.21.1 with harness 0.22.0, which requires
+contracts `>=0.21,<0.22`. Consumers bind exact distribution and source identities
+separately from native profile qualification. See [COMPATIBILITY.md](COMPATIBILITY.md).
 Published schema names now permit only additive changes; breaking changes
 require a new schema major and migration notes. The structural compatibility
 gate checks bounded structural rules and public semantic regressions against

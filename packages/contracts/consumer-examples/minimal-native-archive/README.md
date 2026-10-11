@@ -2,7 +2,7 @@
 
 This example records a software counter transition, then evaluates its retained
 observations through the installed public CLIs. Use this release's contracts
-0.21.0 / harness 0.22.0 cohort with explicit native v2 roles. The two Python files
+0.21.1 / harness 0.22.0 cohort with explicit native v2 roles. The two Python files
 use standard Python and the public command-line
 interfaces, with no internal package imports or test fixtures.
 

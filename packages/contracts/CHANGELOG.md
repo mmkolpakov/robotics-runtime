@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.21.0
+## 0.21.1
 
 - Add opt-in acceptance-scenario.v2, runtime-manifest.v2,
   acceptance-observation.v2 and acceptance-result.v2 for captured native software

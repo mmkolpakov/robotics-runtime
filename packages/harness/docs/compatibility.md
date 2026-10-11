@@ -3,8 +3,8 @@
 ## Package Line
 
 The `0.22.x` harness line requires Python `>=3.12,<3.15` and
-`robotics-runtime-contracts>=0.21,<0.22`. This release selects contracts 0.21.0
-and harness 0.22.0, with exact prerequisite `contracts-v0.21.0`.
+`robotics-runtime-contracts>=0.21,<0.22`. This release selects contracts 0.21.1
+and harness 0.22.0, with exact prerequisite `contracts-v0.21.1`.
 Package metadata, tagged source and distribution digests identify the installed
 pair; package support and native-profile qualification remain separate.
 
