@@ -37,7 +37,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
-          version: "0.13.0"
+          version: "0.13.1"
           python-version: ${{ matrix.python }}
           enable-cache: true
           prune-cache: true
@@ -83,7 +83,7 @@ jobs:
           refs/tags/v0.16.0:refs/tags/contracts-legacy/v0.16.0
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
-          version: "0.13.0"
+          version: "0.13.1"
           python-version: "3.12"
           enable-cache: true
           prune-cache: true
@@ -129,7 +129,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
-          version: "0.13.0"
+          version: "0.13.1"
           python-version: "3.12"
           enable-cache: true
           prune-cache: true
@@ -169,7 +169,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
-          version: "0.13.0"
+          version: "0.13.1"
           python-version: "3.12"
           enable-cache: true
           prune-cache: true
@@ -297,7 +297,7 @@ jobs:
     timeout-minutes: 10
     container:
       options: --init
-      image: node:24.21.0-trixie-slim@sha256:c83040f7e24bacea68e58a0b96a484ba430bf24abb2973eab7ba4701144b7b63
+      image: node:24.22.0-trixie-slim@sha256:27526714fd6b7dc938f8cb1665bf1fe749efadadf0145d5bcc07f0fbd0370b60
     defaults:
       run:
         shell: sh
@@ -311,7 +311,7 @@ jobs:
       - run: npm audit --audit-level=high
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
-          version: "0.13.0"
+          version: "0.13.1"
           python-version: "3.12"
           enable-cache: true
           prune-cache: true
