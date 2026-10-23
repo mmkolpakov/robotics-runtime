@@ -43,9 +43,9 @@ jobs:
       - name: Fetch main for tag ancestry verification
         if: github.event_name == 'push'
         run: git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e  # v10.3.2
         with:
-          version: "0.13.0"
+          version: "0.13.5"
           python-version: "3.12"
           enable-cache: true
           prune-cache: true
@@ -133,7 +133,7 @@ jobs:
           name: python-distributions-${{ needs.build.outputs.candidate }}
           path: dist/
       - name: Publish verified artifacts through Trusted Publishing
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # v1.14.3
         with:
           packages-dir: dist/
           attestations: true
