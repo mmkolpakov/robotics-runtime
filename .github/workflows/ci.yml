@@ -35,9 +35,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
-          version: "0.13.0"
+          version: "0.13.6"
           python-version: ${{ matrix.python }}
           enable-cache: true
           prune-cache: true
@@ -81,9 +81,9 @@ jobs:
         run: >-
           git fetch --no-tags https://github.com/mmkolpakov/robotics-runtime-contracts.git
           refs/tags/v0.16.0:refs/tags/contracts-legacy/v0.16.0
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
-          version: "0.13.0"
+          version: "0.13.6"
           python-version: "3.12"
           enable-cache: true
           prune-cache: true
@@ -127,9 +127,9 @@ jobs:
           ref: dfbf26e99d3d569f9d25bdc260510220d4dd2872
           path: .consumer-infra
           persist-credentials: false
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
-          version: "0.13.0"
+          version: "0.13.6"
           python-version: "3.12"
           enable-cache: true
           prune-cache: true
@@ -167,9 +167,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
-          version: "0.13.0"
+          version: "0.13.6"
           python-version: "3.12"
           enable-cache: true
           prune-cache: true
@@ -297,7 +297,7 @@ jobs:
     timeout-minutes: 10
     container:
       options: --init
-      image: node:24.21.0-trixie-slim@sha256:c83040f7e24bacea68e58a0b96a484ba430bf24abb2973eab7ba4701144b7b63
+      image: node:24.22.2-trixie-slim@sha256:e053394f15519046270b637f0655c284d2fc844e013451fcb36e02dcfba29280
     defaults:
       run:
         shell: sh
@@ -309,9 +309,9 @@ jobs:
       - run: node --version && npm --version
       - run: npm ci --ignore-scripts
       - run: npm audit --audit-level=high
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
-          version: "0.13.0"
+          version: "0.13.6"
           python-version: "3.12"
           enable-cache: true
           prune-cache: true
