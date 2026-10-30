@@ -14,13 +14,13 @@ repos:
       - id: mixed-line-ending
         args: [--fix=lf]
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.38.2
+    rev: 0.39.0
     hooks:
       - id: check-metaschema
         files: ^packages/contracts/(src/robotics_runtime_contracts/schemas|schemas/src)/.*\.schema\.json$
       - id: check-github-workflows
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.17.0
+    rev: v0.17.3
     hooks:
       - id: ruff-check
         args: [--fix]
@@ -30,7 +30,7 @@ repos:
     hooks:
       - id: yamllint
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.23.3
+    rev: v0.24.0
     hooks:
       - id: markdownlint-cli2
   - repo: https://github.com/rhysd/actionlint.git
@@ -39,7 +39,7 @@ repos:
       - id: actionlint
         files: ^\.github/workflows/.*\.ya?ml$
   - repo: https://github.com/semgrep/semgrep
-    rev: v1.180.0
+    rev: v1.183.0
     hooks:
       - id: semgrep
         name: Enforce attach-only API boundary

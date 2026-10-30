@@ -1,12 +1,12 @@
 [build-system]
-requires = ["hatchling==1.32.4"]
+requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "example-evidence-byte-check"
 version = "0.1.0"
 description = "Minimal example evaluator using captured verified evidence bytes."
-requires-python = ">=3.12,<3.15"
+requires-python = ">=3.15,<3.16"
 license = "MIT"
 
 [project.entry-points."robotics_acceptance.evaluators"]
