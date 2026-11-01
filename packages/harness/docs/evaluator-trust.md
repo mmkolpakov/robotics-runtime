@@ -7,6 +7,38 @@ These APIs verify artifact origin and installed bytes. The loader and CLI requir
 captured bindings before importing a declared evaluator, and retain the existing
 verified-source import guard.
 
+## Bounded file capture
+
+`robotics_acceptance_harness.evaluator_trust.read_once` captures bytes once
+from a caller-supplied trusted path:
+
+```python
+def read_once(
+    path: Path, limit: int, *, forbid_group_other_write: bool = False
+) -> bytes: ...
+```
+
+Pass a `pathlib.Path` and a positive integer byte limit. The returned bytes
+are not parsed or normalized. The helper expands the home path, checks for
+symlinks by resolving the absolute path, and opens one read-only descriptor
+with POSIX no-follow and nonblocking flags. It rejects non-regular files,
+inputs over the limit and changes to device, inode, mode, size, modification
+time or change time observed on that descriptor during capture. It reads at
+most the limit plus one byte and closes the descriptor on success or failure.
+
+`forbid_group_other_write=True` also refuses group- or other-writable mode
+bits. It does not check ownership or authenticate the content. Profile refusals
+raise `EvaluatorTrustError`, a `HarnessError` and `ValueError` with
+`error_id = "evaluator_trust.invalid"`. Filesystem errors may propagate as
+`OSError`. The helper requires the POSIX flags; it does not promise a timeout
+or general validation of unsupported argument types.
+
+The returned bytes are the snapshot to hash and validate. A later path reopen
+is a different read. The pre-open path resolution is not a directory-descriptor
+traversal sandbox: the caller must provide stable trusted ancestors and a sealed
+or private read-only input root for the required lifetime. Capture does not
+prove producer settlement, provenance, signatures or qualification.
+
 ## Operator profile and publisher policy
 
 The GitHub and local-key profiles are explicit alternatives. There is no automatic

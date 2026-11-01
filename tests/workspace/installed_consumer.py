@@ -55,6 +55,95 @@ def cli(module: str, arguments: list[str]) -> subprocess.CompletedProcess[str]:
     )
 
 
+def verify_public_observer_interfaces() -> dict[str, str]:
+    from robotics_acceptance_harness.evaluator_trust import EvaluatorTrustError, read_once
+    from robotics_acceptance_harness.readiness import (
+        GraphReadinessTimeout,
+        GraphSnapshot,
+        wait_for_readiness,
+    )
+    from robotics_acceptance_harness.ros import RosGraphObserver, RosObserverError
+
+    for module_name in (
+        "robotics_acceptance_harness.evaluator_trust",
+        "robotics_acceptance_harness.readiness",
+        "robotics_acceptance_harness.ros",
+    ):
+        module = import_module(module_name)
+        assert module.__file__ is not None
+        module_file = Path(module.__file__).resolve()
+        assert module_file.is_relative_to(Path(sys.prefix).resolve()), module_file
+
+    capture_status = "skipped: POSIX capture required"
+    if os.name == "posix":
+        path = Path("capture-input.bin")
+        path.write_bytes(b"sample\n")
+        captured = read_once(path, 7)
+        assert captured == b"sample\n"
+        path.write_bytes(b"changed")
+        assert captured == b"sample\n"
+        try:
+            read_once(path, 6)
+        except EvaluatorTrustError as error:
+            assert error.error_id == "evaluator_trust.invalid"
+        else:
+            raise AssertionError("oversized input was accepted")
+        link = Path("capture-link.bin")
+        link.symlink_to(path)
+        try:
+            read_once(link, 7)
+        except EvaluatorTrustError:
+            pass
+        else:
+            raise AssertionError("symlink input was accepted")
+        capture_status = "verified"
+
+    class Observer:
+        closed = False
+
+        def snapshot(self) -> GraphSnapshot:
+            return GraphSnapshot(observed_at_ns=10)
+
+        def close(self) -> None:
+            self.closed = True
+
+    observer = Observer()
+    graph: dict[str, Any] = {"topics": [], "services": [], "actions": [], "lifecycle_nodes": []}
+    readiness = wait_for_readiness(
+        graph, observer, timeout_sec=1.0, stable_for_sec=0.0, now_ns=lambda: 10
+    )
+    assert readiness.snapshot.observed_at_ns == 10 and readiness.first_ready_at_ns == 10
+    assert not observer.closed
+
+    clock = iter((0, 2_000_000_000))
+    missing_graph = {**graph, "services": [{"name": "/missing", "type": "example/Service"}]}
+    try:
+        wait_for_readiness(
+            missing_graph,
+            observer,
+            timeout_sec=1.0,
+            stable_for_sec=0.0,
+            now_ns=lambda: next(clock),
+        )
+    except GraphReadinessTimeout as error:
+        assert error.error_id == "GraphReadinessTimeout.failed" and error.issues
+    else:
+        raise AssertionError("missing service reached readiness")
+    assert not observer.closed
+
+    def missing_module(name: str) -> Any:
+        raise ModuleNotFoundError(name)
+
+    try:
+        RosGraphObserver(graph, observe_clock=False, module_loader=missing_module)
+    except RosObserverError as error:
+        assert error.error_id == "RosObserverError.failed"
+    else:
+        raise AssertionError("observer accepted missing ROS modules")
+    observer.close()
+    return {"capture": capture_status, "readiness": "verified", "ros_failure": "verified"}
+
+
 def verify_negative_inputs(fixtures: Path, specifications: list[str]) -> list[str]:
     # Keep the complete inventory so missing links cannot explain this refusal.
     wrong_role = specifications.copy()
@@ -234,6 +323,7 @@ def verify_consumers(plan: dict[str, Any]) -> dict[str, Any]:
         "isolated_interpreter": bool(sys.flags.isolated),
         "fixture_source": provenance,
         "qualifications": qualifications,
+        "public_observer_interfaces": verify_public_observer_interfaces(),
         "negative_checks": verify_negative_inputs(
             fixtures, artifact_specifications(fixtures, "single")
         ),

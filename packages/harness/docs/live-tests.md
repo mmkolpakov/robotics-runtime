@@ -57,6 +57,88 @@ This gate checks real ROS observation, Collector export, and CLI orchestration.
 The runtime manifest retains fixture provenance. Physical qualification and real
 exporter performance measurement are later E2E work.
 
+## Read-only graph API
+
+The following submodule interfaces support observation of an already running
+ROS domain. They do not start workloads, issue commands or establish native
+postconditions.
+
+```python
+from robotics_acceptance_harness.readiness import wait_for_readiness
+from robotics_acceptance_harness.ros import RosGraphObserver
+
+with RosGraphObserver(expected_graph, observe_clock=True) as observer:
+    readiness = wait_for_readiness(
+        expected_graph, observer, timeout_sec=30.0, stable_for_sec=1.0
+    )
+    observer.start_clock_observation()
+    # The caller owns the measurement interval.
+    samples = observer.stop_clock_observation()
+```
+
+`RosGraphObserver(expected_graph, *, observe_clock, forbidden_graph=None,
+node_name="robotics_acceptance_observer", module_loader=import_module,
+max_clock_samples=1_000_000)` owns a ROS context, node, executor and spin
+thread. Use the installed ROS modules in the selected runtime; `module_loader`
+is an injection seam for tests. `snapshot()` observes the configured graph;
+discovery is not an atomic snapshot of the distributed system. The observer's
+own subscriptions are excluded from subscriber counts. A declared `/clock`
+uses its configured QoS; otherwise `observe_clock=True` adds a best-effort,
+volatile subscription.
+
+`GraphSnapshot` contains `observed_at_ns`, topic, service, action and
+lifecycle mappings, and optional `node_names`. The mappings are copied into
+read-only views; `node_names=None` means node presence is unavailable.
+`TopicObservation` includes types, publisher and subscriber counts,
+`first_message_at_ns` and QoS compatibility. `EndpointObservation` includes
+types and server/client counts; `LifecycleObservation` includes state and
+observation time. Snapshot time is monotonic nanoseconds, while first-message
+and lifecycle observation times are Unix nanoseconds; do not compare their
+epochs as if they were the same clock. A ready snapshot is a sampled fact,
+not proof of uninterrupted graph state between samples.
+
+`wait_for_readiness(expected_graph, observer, *, timeout_sec, stable_for_sec,
+poll_interval_sec=0.1, now_ns=monotonic_ns, sleep_fn=sleep,
+on_snapshot=None)` samples the borrowed `GraphObserver` synchronously.
+Supply a contract-validated graph, positive finite timeout and poll interval,
+a nonnegative finite stability period, and a monotonic nanosecond clock. It
+requires one uninterrupted ready window at least as long as the requested and
+declared lifecycle stability periods. A sampled issue resets the window.
+`on_snapshot` runs synchronously after each snapshot; its exceptions propagate.
+
+The returned `ReadinessResult` contains the final snapshot,
+`first_ready_at_ns` and `stable_for_sec`. Missing first-message or lifecycle
+facts may trigger their declared deadlines before the overall deadline.
+`GraphReadinessTimeout` is a `HarnessError` and `TimeoutError` with
+`error_id = "GraphReadinessTimeout.failed"`; its `issues` carry JSON paths,
+messages and status. An otherwise ready graph with an insufficient stability
+window can time out with no issues.
+
+The timeout is cooperative: snapshot, callback and sleep calls cannot be
+interrupted by this function. The implementation checks readiness before its
+final deadline check, so a slow call can return ready after the deadline.
+Callers requiring a strict budget must enforce an outer process deadline and
+reject a late result with their own monotonic deadline check. The helper never
+closes the borrowed observer; the caller owns cleanup even on error.
+
+Clock capture starts disabled. `start_clock_observation()` clears prior
+samples and overflow state, including when called again.
+`stop_clock_observation()` disables capture and returns an immutable tuple of
+`ClockSample` values; repeated source times remain in the buffer. Each sample
+contains monotonic reception time and integer source nanoseconds. These facts
+do not establish UTC offset, delivery latency or physics ticks. Overflow raises
+`RosObserverError` rather than returning a truncated success.
+`clock_samples` returns a tuple copy without a health or overflow check and
+does not replace a successful stop.
+
+`RosObserverError` is a `HarnessError` and `RuntimeError` with
+`error_id = "RosObserverError.failed"`. Missing ROS modules and a stopped
+executor are among its failure cases; other ROS exceptions may propagate.
+`close()` shuts down the executor, removes and destroys the node, and shuts
+down the context. It is idempotent after successful closure and may raise if
+the executor does not stop. The context manager invokes `close()`; neither
+closure nor a readiness result proves that the workload or robot stopped.
+
 ## Running the same job locally
 
 From the workspace root, with Docker ready:
