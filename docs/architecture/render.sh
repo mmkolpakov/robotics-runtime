@@ -27,6 +27,9 @@ for view in Context Container ContainerDetail ExternalTestAPI NativeInterfaces C
     configuration="generated/mermaid-$view.json"
     python3 -c 'import json,sys; from pathlib import Path; c=json.loads(Path("mermaid-config.json").read_text()); c["themeVariables"]["fontSize"]="26px"; c["layout"]="elk"; c["flowchart"].update(nodeSpacing=16,rankSpacing=20,inheritDir=True); c["themeCSS"]="path.flowchart-link { fill: none !important; }"; c["flowchart"].update(wrappingWidth=240 if "-Context." in sys.argv[1] else 140) if "ExternalTestAPI" not in sys.argv[1] else c.update(themeCSS=c["themeCSS"]+" g.cluster:not([id$=-diagram]) > rect, g.cluster:not([id$=-diagram]) > g.cluster-label { visibility: hidden; }"); Path(sys.argv[1]).write_text(json.dumps(c,indent=2)+"\n")' "$configuration"
   fi
+  if [[ "$view" == DevelopmentDeployment || "$view" == ExecutionDeployment ]]; then
+    python3 -c 'import json,sys; from pathlib import Path; p=Path(sys.argv[1]); c=json.loads(p.read_text()); c["flowchart"]["subGraphTitleMargin"]={"top":30,"bottom":30}; c["themeCSS"]+=" g.cluster-label { translate: 0 -25px; }"; c.update(layout="elk") if "DevelopmentDeployment" in sys.argv[1] else None; c["flowchart"].update(inheritDir=True) if "DevelopmentDeployment" in sys.argv[1] else None; p.write_text(json.dumps(c,indent=2)+"\n")' "$configuration"
+  fi
   if [[ "$view" == ContainerDetail ]]; then
     configuration="generated/mermaid-ContainerDetail.json"
     python3 -c 'import json,sys; from pathlib import Path; c=json.loads(Path("mermaid-config.json").read_text()); c["layout"]="elk"; c["themeCSS"]="path.flowchart-link { fill: none !important; }"; Path(sys.argv[1]).write_text(json.dumps(c,indent=2)+"\n")' "$configuration"

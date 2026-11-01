@@ -23,6 +23,22 @@ For a compatible retained recording:
 rerun archive/recording.mcap
 ```
 
+Rerun 0.41.0 includes a
+[stock Viewer MCP server](https://github.com/rerun-io/rerun/blob/0.41.0/docs/content/reference/viewer/mcp.md).
+Configure a compatible stdio client to launch `rerun viewer-mcp`; it connects to
+an already running local Viewer over gRPC, without a hosted Hub. Its tools inspect
+viewer state and recording schemas, select the time cursor, change blueprints and
+save screenshots. These viewer controls have broader UI effects than the six
+offline domain tools; use the existing server directly without another adapter.
+
+Choose the recording's declared clock and timestamp field when navigating it.
+Rerun's [MCAP import](https://github.com/rerun-io/rerun/blob/0.41.0/docs/content/concepts/logging-and-ingestion/mcap/message-formats.md)
+keeps log, publish and payload-header timelines distinct; its timestamp heuristics
+do not establish an authoritative clock relation. Retain layouts, screenshots and
+converted RRD files as derived outputs with source identities. Open original
+evidence read-only and write derived outputs separately; viewing does not change
+the retained qualification verdict.
+
 [PlotJuggler](https://github.com/PlotJuggler/PlotJuggler) provides MCAP and PX4 ULog
 loaders for time-series inspection. Install the relevant loader and message parser
 from its supported plugin distribution; not every installation includes every
