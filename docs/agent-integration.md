@@ -262,23 +262,28 @@ A trace timestamp does not establish a cross-clock relation.
 
 ## Server operations through MCP
 
-A remote server integration exposes only the admitted domain operations its
-deployment supports. Separate read, author/change, execute, cancel and recovery
-permissions. Apply the server's authorization on every effectful operation;
-retain the acting principal, operation identity and admitted input identities.
-Use the standard
-[HTTP authorization contract](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)
-for a remote domain MCP service. The local stdio adapter keeps credentials and
-process permissions with its operator instead.
+Use Dagu's existing MCP run operations and run handles for local campaign
+effects. Use Argo's stock API and CLI for Kubernetes campaigns. The six-tool
+domain adapter remains offline and read-only. These profiles require neither a
+separate effectful domain MCP server nor a Tasks implementation.
 
-A long-running operation can project its existing handle into the optional
-[MCP Tasks extension](https://modelcontextprotocol.io/extensions/tasks/overview).
-Client and server must negotiate support. The durable task is created before
-its handle is returned; clients retain its ID and poll with `tasks/get`.
-Input requests use `tasks/update`; `tasks/cancel` is cooperative and does
-not prove native termination. Keep the task ID, admitted operation ID and domain
-attempt ID distinct and linked. A reconnect resumes observation of the same
-operation. The projection adds no second queue, retry or cleanup owner.
+Use the selected server's documented authentication and distinguish read,
+author/change, execute, cancel and recovery permissions. Retain the acting
+principal, operation identity and admitted input identities. The standard
+[HTTP authorization contract](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)
+applies where the chosen remote MCP service supports it. The local stdio adapter
+keeps credentials and process permissions with its operator.
+
+If a selected existing server supports the optional
+[MCP Tasks extension](https://modelcontextprotocol.io/extensions/tasks/overview),
+a long-running operation can use that server's durable task handle. Client and
+server must negotiate support. The server creates the task before returning its
+handle; clients retain its ID and poll with `tasks/get`. Input requests use
+`tasks/update`; `tasks/cancel` is cooperative and does not prove native
+termination. Keep the task ID, admitted operation ID and domain attempt ID
+distinct and linked. A reconnect resumes observation of the same operation.
+This adds no second queue, retry or cleanup owner. The Dagu 2.24.0 reference
+profile uses its ordinary run IDs; Tasks support is not assumed or required.
 
 [Elicitation](https://modelcontextprotocol.io/specification/2026-07-28/client/elicitation)
 collects input through the client. It does not itself authorize robot execution
