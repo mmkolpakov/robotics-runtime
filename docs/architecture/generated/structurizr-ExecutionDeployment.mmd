@@ -4,29 +4,34 @@ graph LR
   subgraph diagram ["Local campaign deployment"]
     style diagram fill:#ffffff,stroke:#ffffff
 
-    subgraph 85 ["Local Linux host"]
-      style 85 fill:#ffffff,stroke:#94a3b8,color:#0f172a
+    subgraph 86 ["Local Linux host"]
+      style 86 fill:#ffffff,stroke:#94a3b8,color:#0f172a
 
-      86("<div style='font-weight: bold'>Campaign system</div><div style='font-size: 80%; margin-top:10px'>Dagu or Argo.</div>")
-      style 86 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
-      87["<div style='font-weight: bold'>Read-only inputs</div><div style='font-size: 80%; margin-top:10px'>Admitted profile and assets.</div>"]
-      style 87 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-      88("<div style='font-weight: bold'>Container engine</div><div style='font-size: 80%; margin-top:10px'>Owned resources per attempt.</div>")
-      style 88 fill:#dbeafe,stroke:#2563eb,color:#0f172a
-      89("<div style='font-weight: bold'>Finite attempt owner</div><div style='font-size: 80%; margin-top:10px'>Owns attempt and export.</div>")
-      style 89 fill:#dbeafe,stroke:#2563eb,color:#0f172a
-      91("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Selected simulator SDK.</div>")
-      style 91 fill:#fffbeb,stroke:#b45309,color:#0f172a
-      93[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Original bytes and<br />references.</div>")]
-      style 93 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
+      subgraph 87 ["Dagu workbench"]
+        style 87 fill:#ffffff,stroke:#94a3b8,color:#0f172a
+
+        88("<div style='font-weight: bold'>Campaign system</div><div style='font-size: 80%; margin-top:10px'>Schedules finite attempts.</div>")
+        style 88 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
+      end
+
+      89["<div style='font-weight: bold'>Read-only inputs</div><div style='font-size: 80%; margin-top:10px'>Admitted profile and assets.</div>"]
+      style 89 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+      90("<div style='font-weight: bold'>Container engine</div><div style='font-size: 80%; margin-top:10px'>Owned resources per attempt.</div>")
+      style 90 fill:#dbeafe,stroke:#2563eb,color:#0f172a
+      91("<div style='font-weight: bold'>Finite attempt owner</div><div style='font-size: 80%; margin-top:10px'>Owns attempt and export.</div>")
+      style 91 fill:#dbeafe,stroke:#2563eb,color:#0f172a
+      93("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Selected simulator SDK.</div>")
+      style 93 fill:#fffbeb,stroke:#b45309,color:#0f172a
+      95[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Original bytes and<br />references.</div>")]
+      style 95 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
     end
 
-    86-- "<div>Start attempt</div><div style='font-size: 70%'>[CLI]</div>" -->89
-    89-- "<div>Manage owned workers</div><div style='font-size: 70%'>[Profile-native launcher]</div>" -->91
-    89-- "<div>Export and cleanup</div><div style='font-size: 70%'>[References]</div>" -->93
-    91-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->93
-    87-- "<div>Admit profile</div><div style='font-size: 70%'>[Files / hashes]</div>" -->89
-    87-- "<div>Native scene / config</div><div style='font-size: 70%'>[Read-only]</div>" -->91
-    89-- "<div>Manage owned resources</div><div style='font-size: 70%'>[Local API]</div>" -->88
+    91-- "<div>Manage owned resources</div><div style='font-size: 70%'>[Local API]</div>" -->90
+    88-- "<div>Start attempt</div><div style='font-size: 70%'>[CLI]</div>" -->91
+    91-- "<div>Manage owned workers</div><div style='font-size: 70%'>[Profile-native launcher]</div>" -->93
+    91-- "<div>Export and cleanup</div><div style='font-size: 70%'>[References]</div>" -->95
+    93-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->95
+    89-- "<div>Admit profile</div><div style='font-size: 70%'>[Files / hashes]</div>" -->91
+    89-- "<div>Native scene / config</div><div style='font-size: 70%'>[Read-only]</div>" -->93
 
   end

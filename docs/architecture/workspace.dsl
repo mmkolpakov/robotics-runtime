@@ -20,7 +20,7 @@ workspace "Robotics verification workflows" "Target responsibilities for finite 
             tags "External"
         }
         platform = softwareSystem "Verification platform" "Finite attempts, retained evidence and independent assessment." {
-            campaign = container "Campaign system" "Dagu or Argo." "External workflow system" {
+            campaign = container "Campaign system" "Schedules finite attempts." "External workflow system" {
                 tags "Consumer"
             }
             custom = container "Product evaluator" "Admitted finite method returns evidence-linked assertions." "Isolated OCI process" {
@@ -121,7 +121,9 @@ workspace "Robotics verification workflows" "Target responsibilities for finite 
 
         deploymentEnvironment "Development" {
             deploymentNode "Kubernetes cluster" "Argo Workflows and finite attempts." "Kubernetes" {
-                containerInstance platform.campaign
+                deploymentNode "Argo Workflows" "Campaign profile." "Argo" {
+                    containerInstance platform.campaign
+                }
                 deploymentNode "Attempt pod" "Profile-specific native execution." "Pod" {
                     containerInstance platform.host
                     containerInstance platform.native
@@ -133,7 +135,9 @@ workspace "Robotics verification workflows" "Target responsibilities for finite 
         }
         deploymentEnvironment "Local" {
             deploymentNode "Local Linux host" "Dagu campaign and finite attempts." "Linux / Docker or Podman" {
-                containerInstance platform.campaign
+                deploymentNode "Dagu workbench" "Campaign profile." "Dagu" {
+                    containerInstance platform.campaign
+                }
                 inputs = infrastructureNode "Read-only inputs" "Admitted profile and assets." "Mounted files" {
                     tags "Inputs"
                 }

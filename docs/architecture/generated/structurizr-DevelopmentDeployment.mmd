@@ -7,29 +7,34 @@ graph TB
     subgraph 74 ["Kubernetes cluster"]
       style 74 fill:#ffffff,stroke:#94a3b8,color:#0f172a
 
-      75("<div style='font-weight: bold'>Campaign system</div><div style='font-size: 80%; margin-top:10px'>Dagu or Argo.</div>")
-      style 75 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
-      subgraph 76 ["Attempt pod"]
-        style 76 fill:#ffffff,stroke:#94a3b8,color:#0f172a
+      subgraph 75 ["Argo Workflows"]
+        style 75 fill:#ffffff,stroke:#94a3b8,color:#0f172a
 
-        77("<div style='font-weight: bold'>Finite attempt owner</div><div style='font-size: 80%; margin-top:10px'>Owns attempt and export.</div>")
-        style 77 fill:#dbeafe,stroke:#2563eb,color:#0f172a
-        79("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Selected simulator SDK.</div>")
-        style 79 fill:#fffbeb,stroke:#b45309,color:#0f172a
+        76("<div style='font-weight: bold'>Campaign system</div><div style='font-size: 80%; margin-top:10px'>Schedules finite attempts.</div>")
+        style 76 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
       end
 
-      subgraph 81 ["Retained storage"]
-        style 81 fill:#ffffff,stroke:#94a3b8,color:#0f172a
+      subgraph 77 ["Attempt pod"]
+        style 77 fill:#ffffff,stroke:#94a3b8,color:#0f172a
 
-        82[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Original bytes and<br />references.</div>")]
-        style 82 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
+        78("<div style='font-weight: bold'>Finite attempt owner</div><div style='font-size: 80%; margin-top:10px'>Owns attempt and export.</div>")
+        style 78 fill:#dbeafe,stroke:#2563eb,color:#0f172a
+        80("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Selected simulator SDK.</div>")
+        style 80 fill:#fffbeb,stroke:#b45309,color:#0f172a
+      end
+
+      subgraph 82 ["Retained storage"]
+        style 82 fill:#ffffff,stroke:#94a3b8,color:#0f172a
+
+        83[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Original bytes and<br />references.</div>")]
+        style 83 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
       end
 
     end
 
-    75-- "<div>Start attempt</div><div style='font-size: 70%'>[CLI]</div>" -->77
-    77-- "<div>Manage owned workers</div><div style='font-size: 70%'>[Profile-native launcher]</div>" -->79
-    77-- "<div>Export and cleanup</div><div style='font-size: 70%'>[References]</div>" -->82
-    79-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->82
+    76-- "<div>Start attempt</div><div style='font-size: 70%'>[CLI]</div>" -->78
+    78-- "<div>Manage owned workers</div><div style='font-size: 70%'>[Profile-native launcher]</div>" -->80
+    78-- "<div>Export and cleanup</div><div style='font-size: 70%'>[References]</div>" -->83
+    80-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->83
 
   end
