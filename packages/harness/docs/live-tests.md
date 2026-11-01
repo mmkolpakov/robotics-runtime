@@ -68,9 +68,7 @@ from robotics_acceptance_harness.readiness import wait_for_readiness
 from robotics_acceptance_harness.ros import RosGraphObserver
 
 with RosGraphObserver(expected_graph, observe_clock=True) as observer:
-    readiness = wait_for_readiness(
-        expected_graph, observer, timeout_sec=30.0, stable_for_sec=1.0
-    )
+    readiness = wait_for_readiness(expected_graph, observer, timeout_sec=30.0, stable_for_sec=1.0)
     observer.start_clock_observation()
     # The caller owns the measurement interval.
     samples = observer.stop_clock_observation()

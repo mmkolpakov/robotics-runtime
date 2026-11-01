@@ -13,9 +13,7 @@ verified-source import guard.
 from a caller-supplied trusted path:
 
 ```python
-def read_once(
-    path: Path, limit: int, *, forbid_group_other_write: bool = False
-) -> bytes: ...
+def read_once(path: Path, limit: int, *, forbid_group_other_write: bool = False) -> bytes: ...
 ```
 
 Pass a `pathlib.Path` and a positive integer byte limit. The returned bytes
