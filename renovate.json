@@ -68,6 +68,19 @@
       "prBodyNotes": [
         "Qualify the changed hosted runner platform and its release/consumer paths before approving this migration in the Dependency Dashboard. Container image compatibility is reviewed separately."
       ]
+    },
+    {
+      "description": "Review supported Python versions as a release compatibility change",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchDepTypes": [
+        "requires-python"
+      ],
+      "matchPackageNames": [
+        "python"
+      ],
+      "enabled": false
     }
   ],
   "labels": [
