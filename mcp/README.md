@@ -2,7 +2,9 @@
 
 This optional source package exposes six read tools through the maintained MCP
 SDK's stdio transport. It uses the published host RC0 package and installed
-contracts 0.21.1/harness 0.22.2 CLIs. It has no published MCP release artifact.
+contracts 0.21.1/harness 0.22.2 CLIs. Install this adapter from source using the
+locked dependencies below. The [assistant integration guide](../docs/agent-integration.md)
+relates these tools to configuration, campaigns, execution and archive assessment.
 
 - `describe_contract`: describe a schema ID from the operator's catalog.
 - `validate_documents`: validate registered immutable document IDs.
@@ -71,7 +73,11 @@ JS
 Configure an MCP client to launch `node bin/server.mjs --config bootstrap.json`
 from this directory. Use the equivalent absolute executable/config paths when
 the client launches from another directory. The client owns the stdio process;
-standard SDK transport handles initialization, tool discovery and calls.
+the SDK handles discovery and tool calls for MCP 2026-07-28 and negotiated
+legacy clients. Current-protocol clients use `server/discover` and per-request
+capabilities; legacy clients use their negotiated initialization path.
+The [protocol specification](https://modelcontextprotocol.io/specification/2026-07-28)
+defines that distinction; client setup does not add domain operations.
 
 ## Results and limits
 
@@ -105,8 +111,13 @@ stdio server process, including startup and filesystem operations.
 Stdio trusts the local operator's bootstrap and installed worker code. Tool
 annotations are hints, not authorization or an OS sandbox. This package exposes
 no HTTP/OAuth listener, native run catalog, start/cancel command or cleanup API.
-Future effectful tools require actual admitted consumer/controller operations
-and the existing capture/drain/export/cleanup lifecycle.
+Execution integrations use actual admitted consumer/controller operations and
+the existing capture/drain/export/cleanup lifecycle. The
+[server integration contract](../docs/agent-integration.md#server-operations-through-mcp)
+keeps read, execute, cancel and recovery permissions distinct. An optional Tasks
+projection reports an existing operation handle; it adds no execution owner.
+Dagu's own MCP endpoint belongs to the selected local campaign workbench and has
+broader operator powers. It does not replace this document adapter.
 
 ## Test
 
