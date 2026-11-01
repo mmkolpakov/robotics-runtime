@@ -1,7 +1,7 @@
 workspace "Robotics verification workflows" "Target responsibilities for finite attempts, independent evaluation and external campaigns." {
     !identifiers hierarchical
     model {
-        integrator = person "Integrator" "Selects profiles and verifies evidence."
+        integrator = person "Integrator" "Runs and verifies."
         product = softwareSystem "System under test" "Robot / control / vision application." {
             tags "External"
         }
@@ -20,7 +20,7 @@ workspace "Robotics verification workflows" "Target responsibilities for finite 
             tags "External"
         }
         platform = softwareSystem "Verification platform" "Finite attempts, retained evidence and independent assessment." {
-            campaign = container "Campaign system" "Selects and orders attempts; local Dagu or Kubernetes Argo." "External workflow system" {
+            campaign = container "Campaign system" "Dagu or Argo." "External workflow system" {
                 tags "Consumer"
             }
             custom = container "Product evaluator" "Admitted finite method returns evidence-linked assertions." "Isolated OCI process" {
@@ -29,7 +29,7 @@ workspace "Robotics verification workflows" "Target responsibilities for finite 
             runner = container "Consumer CLI / CI" "Invokes published Python tools." "Shell / Python / CI" {
                 tags "Consumer"
             }
-            host = container "Finite attempt owner" "Admits inputs, owns lifecycle and exports before cleanup." "Consumer process / optional Cordis" {
+            host = container "Finite attempt owner" "Owns attempt and export." "Consumer process / optional Cordis" {
                 tags "Host"
             }
             group "Python tools" {
@@ -48,7 +48,7 @@ workspace "Robotics verification workflows" "Target responsibilities for finite 
                 tags "Media"
             }
             }
-            evidence = container "Evidence store" "Local bytes and retained references." "Local files / retained references" {
+            evidence = container "Evidence store" "Original bytes and references." "Local files / retained references" {
                 tags "Database"
             }
             externalApi = container "External Test API" "Producer metadata and upload custody." "Fastify / jose / public core Jobs"
@@ -73,6 +73,7 @@ workspace "Robotics verification workflows" "Target responsibilities for finite 
             tags "External"
         }
         integrator -> platform "Run / verify"
+        mcpClient -> platform "Inspect artifacts / manage local campaigns" "MCP"
         product -> platform "Configure / verdicts"
         product -> autopilot "Control / telemetry"
         platform -> simulators "Native runtimes"
@@ -81,8 +82,8 @@ workspace "Robotics verification workflows" "Target responsibilities for finite 
         platform -> registries "Install / verify"
         integrator -> platform.campaign "Manage campaigns" "UI / API"
         mcpClient -> platform.campaign "Manage local Dagu campaigns" "Dagu MCP"
-        platform.campaign -> platform.host "Request admitted attempt" "Finite CLI"
-        platform.campaign -> platform.evaluation "Request archive assessment" "CLI / files"
+        platform.campaign -> platform.host "Start attempt" "CLI"
+        platform.campaign -> platform.evaluation "Assess archive" "CLI"
         platform.evaluation -> platform.custom "Request product assertions" "Verified inputs / JSON"
         platform.custom -> platform.evaluation "Return assertions" "JSON"
         platform.custom -> platform.evidence "Read verified evidence" "Read-only files"
@@ -90,7 +91,7 @@ workspace "Robotics verification workflows" "Target responsibilities for finite 
         platform.runner -> platform.documents "Validate documents" "argv / files"
         platform.runner -> platform.evaluation "Evaluate retained evidence" "argv / files"
         platform.runner -> platform.evidence "Preserve inputs / reports" "Files"
-        integrator -> platform.host "Run selected native profile" "Finite attempt boundary"
+        integrator -> platform.host "Run attempt" "CLI"
         product -> platform.host "Supply workload" "Profile / files"
         platform.host -> platform.documents "Validate documents" "argv / files"
         platform.host -> platform.evaluation "Evaluate evidence" "argv / files"
@@ -103,7 +104,7 @@ workspace "Robotics verification workflows" "Target responsibilities for finite 
         platform.native -> platform.evidence "Before reset / dispose" "Exact payloads"
         platform.documents -> platform.evidence "Write documents" "Files"
         platform.evaluation -> platform.evidence "Read bytes / write verdicts" "JSON / JUnit"
-        platform.host -> platform.evidence "Export / cleanup facts" "Retained references"
+        platform.host -> platform.evidence "Export and cleanup" "References"
         integrator -> identity "Obtain JWT" "OIDC"
         integrator -> externalSdk "Configure client" "Project / JWT"
         externalSdk -> platform.externalApi "REST ×6 + config" "JWT / HTTP"
@@ -156,7 +157,7 @@ workspace "Robotics verification workflows" "Target responsibilities for finite 
         }
         container platform "Container" "Target composition across attempt ownership, evaluation, campaign and retained evidence." {
             title "Target platform composition"
-            include integrator mcpClient platform.campaign platform.host platform.native platform.documents platform.evaluation platform.custom platform.mcp platform.evidence
+            include integrator platform.campaign platform.host platform.documents platform.evaluation platform.evidence
             autoLayout lr 20 25
         }
         container platform "ContainerDetail" "Complete consumer, controller, simulator and media interface graph." {
@@ -176,7 +177,7 @@ workspace "Robotics verification workflows" "Target responsibilities for finite 
         }
         container platform "ConsumerInterfaces" "Campaign, finite attempt, public tools and retained evidence." {
             title "Attempt, campaign and evaluation"
-            include integrator product platform.campaign platform.host platform.documents platform.evaluation platform.custom platform.evidence
+            include integrator mcpClient product platform.campaign platform.host platform.documents platform.evaluation platform.custom platform.mcp platform.evidence
             autoLayout lr 60 70
         }
         deployment platform "Development" "DevelopmentDeployment" "Kubernetes campaign and finite attempt profile." {

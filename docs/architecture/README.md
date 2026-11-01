@@ -9,11 +9,11 @@ qualification claim. For available commands and SDK interfaces use the
 
 - [Context](generated/Context.svg) shows users, the platform and native systems.
 - [Composition](generated/Container.svg) shows campaign orchestration, a finite
-  attempt, document evaluation, offline MCP and retained evidence.
+  attempt, document evaluation and retained evidence.
 - [Native interfaces](generated/NativeInterfaces.svg) separates SDK control and
   media from the document path.
-- [Consumer interfaces](generated/ConsumerInterfaces.svg) shows the external
-  attempt boundary and independent evidence evaluation.
+- [Consumer interfaces](generated/ConsumerInterfaces.svg) shows offline MCP,
+  custom assessment and the external attempt boundary.
 - [External Test API](generated/ExternalTestAPI.svg) shows producer metadata and
   custody; it does not own native execution.
 - [Complete graph](generated/ContainerDetail.svg) includes the modeled paths.

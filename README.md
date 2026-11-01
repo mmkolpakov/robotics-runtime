@@ -186,7 +186,8 @@ when package versions or interfaces change. Preserve the exact version and commi
 pins in archived examples and qualification records.
 The LLM export includes current guidance and the C4 DSL and Mermaid sequence/state
 sources exactly once. Historical run records, ADRs and migration archives remain readable in HTML
-and the source download but are excluded from the LLM text. The source archive and manifest bind the exported bytes to the build.
+and the source download but are excluded from the LLM text. The source archive
+and manifest bind the exported bytes to the build.
 The consumer-inputs archive contains the first-result producer and templates.
 
 Build and check documentation in a separate Python 3.12 environment:

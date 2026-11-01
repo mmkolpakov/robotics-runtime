@@ -26,27 +26,33 @@ sequenceDiagram
             Native-->>Attempt: Readiness and native observations
         end
         Attempt->>Native: Close window, capture state and drain if applicable
-        Native-->>Attempt: Settled observations and diagnostics
-        Attempt->>Store: Export and verify original bytes
-        alt Export fails or producer remains active
+        alt Producer remains active at deadline
             Attempt->>Supervisor: Bound owned producers, escalate where supported
             Supervisor-->>Attempt: Settled or unknown native outcome
             Attempt->>Store: Preserve closed bytes and durable recovery record
             Attempt-->>Integrator: Incomplete / unknown, explicit recovery required
-            Note over Attempt,Store: Export resumes only after settlement, measurement is not repeated
-        else Export is verified
-            Attempt->>Native: Dispose owned resources and verify cleanup
-            Native-->>Attempt: Cleanup facts or unknown outcome
-            Attempt-->>Integrator: Lifecycle report and retained references
-            opt Campaign manages the attempt
-                Attempt-->>Campaign: Lifecycle report and retained references
+            Note over Attempt,Store: Do not export until producer settlement is observed
+        else Producer settled
+            Native-->>Attempt: Settled observations and diagnostics
+            Attempt->>Store: Export and verify original bytes
+            alt Export fails
+                Attempt->>Store: Preserve closed bytes and durable recovery record
+                Attempt-->>Integrator: Incomplete, explicit export recovery required
+                Note over Attempt,Store: Recovery does not repeat measurement
+            else Export is verified
+                Attempt->>Native: Dispose owned resources and verify cleanup
+                Native-->>Attempt: Cleanup facts or unknown outcome
+                Attempt-->>Integrator: Lifecycle report and retained references
+                opt Campaign manages the attempt
+                    Attempt-->>Campaign: Lifecycle report and retained references
+                end
+                Integrator->>Harness: Evaluate retained evidence
+                Harness->>Store: Validate documents, links and bytes
+                opt Custom assessment method
+                    Harness->>Method: Verified read-only inputs and method controls
+                    Method-->>Harness: Evidence-linked assertions
+                end
+                Harness-->>Integrator: JSON / JUnit and assessment status
             end
-            Integrator->>Harness: Evaluate retained evidence
-            Harness->>Store: Validate documents, links and bytes
-            opt Custom assessment method
-                Harness->>Method: Verified read-only inputs and method controls
-                Method-->>Harness: Evidence-linked assertions
-            end
-            Harness-->>Integrator: JSON / JUnit and assessment status
         end
     end

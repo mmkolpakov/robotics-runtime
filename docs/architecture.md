@@ -18,8 +18,9 @@ composition facilities. Operators choose deployment, trust roots and retention.
 Prefer configuring a maintained tool, then composing its standard CLI or
 runtime. Add a small domain adapter for uncovered semantics, contribute reusable
 improvements upstream where practical, and own an implementation only for a
-specific remaining need. A limited feature or avoided future maintenance does
-not by itself justify a second general-purpose tool.
+specific remaining need. A limitation of a ready tool does not automatically
+justify a second subsystem. Avoided future implementation and maintenance count
+when comparing the whole cost of a solution.
 
 A consumer can validate documents or inspect a retained archive without starting
 a simulator, Node host or container engine. An assessment of a custom method
