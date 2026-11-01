@@ -1,35 +1,63 @@
 graph LR
   linkStyle default fill:#ffffff
 
-  subgraph diagram ["Published document workflow"]
+  subgraph diagram ["Target platform composition"]
     style diagram fill:#ffffff,stroke:#ffffff
 
     1["<div style='font-weight: bold'>Integrator</div><div style='font-size: 80%; margin-top:10px'>Selects profiles and verifies<br />evidence.</div>"]
     style 1 fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
+    24("<div style='font-weight: bold'>MCP client</div><div style='font-size: 80%; margin-top:10px'>Local trusted operator.</div>")
+    style 24 fill:#f8fafc,stroke:#94a3b8,color:#0f172a
 
-    subgraph 7 ["Verification application"]
+    subgraph 7 ["Verification platform"]
       style 7 fill:#ffffff,stroke:#2563eb,color:#2563eb
 
-      subgraph group1 ["Python tools"]
+      subgraph group1 ["Native workers"]
         style group1 fill:#ffffff,stroke:#0f172a,color:#0f172a,stroke-dasharray:5
 
-        10("<div style='font-weight: bold'>Document CLI</div><div style='font-size: 80%; margin-top:10px'>Published contracts.</div>")
-        style 10 fill:#ecfdf5,stroke:#047857,color:#0f172a
-        11("<div style='font-weight: bold'>Evaluation CLI</div><div style='font-size: 80%; margin-top:10px'>Published evaluator.</div>")
-        style 11 fill:#ecfdf5,stroke:#047857,color:#0f172a
+        14("<div style='font-weight: bold'>Provider worker</div><div style='font-size: 80%; margin-top:10px'>Selected simulator SDK.</div>")
+        style 14 fill:#fffbeb,stroke:#b45309,color:#0f172a
       end
 
-      14[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Local bytes and retained<br />references.</div>")]
-      style 14 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
-      8("<div style='font-weight: bold'>Consumer CLI / CI</div><div style='font-size: 80%; margin-top:10px'>Invokes published Python<br />tools.</div>")
+      subgraph group2 ["Python tools"]
+        style group2 fill:#ffffff,stroke:#0f172a,color:#0f172a,stroke-dasharray:5
+
+        12("<div style='font-weight: bold'>Document CLI</div><div style='font-size: 80%; margin-top:10px'>Published contracts.</div>")
+        style 12 fill:#ecfdf5,stroke:#047857,color:#0f172a
+        13("<div style='font-weight: bold'>Evaluation CLI</div><div style='font-size: 80%; margin-top:10px'>Published evaluator.</div>")
+        style 13 fill:#ecfdf5,stroke:#047857,color:#0f172a
+      end
+
+      11("<div style='font-weight: bold'>Finite attempt owner</div><div style='font-size: 80%; margin-top:10px'>Admits inputs, owns lifecycle<br />and exports before cleanup.</div>")
+      style 11 fill:#dbeafe,stroke:#2563eb,color:#0f172a
+      16[("<div style='font-weight: bold'>Evidence store</div><div style='font-size: 80%; margin-top:10px'>Local bytes and retained<br />references.</div>")]
+      style 16 fill:#eef2ff,stroke:#6d28d9,color:#0f172a
+      20("<div style='font-weight: bold'>Offline MCP</div><div style='font-size: 80%; margin-top:10px'>Read-only access to<br />registered artifacts.</div>")
+      style 20 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
+      8("<div style='font-weight: bold'>Campaign system</div><div style='font-size: 80%; margin-top:10px'>Selects and orders attempts;<br />local Dagu or Kubernetes<br />Argo.</div>")
       style 8 fill:#f1f5f9,stroke:#cbd5e1,color:#0f172a
+      9("<div style='font-weight: bold'>Product evaluator</div><div style='font-size: 80%; margin-top:10px'>Admitted finite method<br />returns evidence-linked<br />assertions.</div>")
+      style 9 fill:#fffbeb,stroke:#b45309,color:#0f172a
     end
 
-    1-- "<div>Check documents</div><div style='font-size: 70%'>[CLI / CI]</div>" -->8
-    8-- "<div>Validate documents</div><div style='font-size: 70%'>[argv / files]</div>" -->10
-    8-- "<div>Evaluate retained evidence</div><div style='font-size: 70%'>[argv / files]</div>" -->11
-    8-- "<div>Preserve inputs / reports</div><div style='font-size: 70%'>[Files]</div>" -->14
-    10-- "<div>Write documents</div><div style='font-size: 70%'>[Files]</div>" -->14
-    11-- "<div>Read bytes / write verdicts</div><div style='font-size: 70%'>[JSON / JUnit]</div>" -->14
+    1-- "<div>Manage campaigns</div><div style='font-size: 70%'>[UI / API]</div>" -->8
+    24-- "<div>Manage local Dagu campaigns</div><div style='font-size: 70%'>[Dagu MCP]</div>" -->8
+    8-- "<div>Request admitted attempt</div><div style='font-size: 70%'>[Finite CLI]</div>" -->11
+    8-- "<div>Request archive assessment</div><div style='font-size: 70%'>[CLI / files]</div>" -->13
+    13-- "<div>Request product assertions</div><div style='font-size: 70%'>[Verified inputs / JSON]</div>" -->9
+    9-- "<div>Return assertions</div><div style='font-size: 70%'>[JSON]</div>" -->13
+    9-- "<div>Read verified evidence</div><div style='font-size: 70%'>[Read-only files]</div>" -->16
+    1-- "<div>Run selected native profile</div><div style='font-size: 70%'>[Finite attempt boundary]</div>" -->11
+    11-- "<div>Validate documents</div><div style='font-size: 70%'>[argv / files]</div>" -->12
+    11-- "<div>Evaluate evidence</div><div style='font-size: 70%'>[argv / files]</div>" -->13
+    11-- "<div>Manage owned workers</div><div style='font-size: 70%'>[Profile-native launcher]</div>" -->14
+    14-- "<div>Before reset / dispose</div><div style='font-size: 70%'>[Exact payloads]</div>" -->16
+    12-- "<div>Write documents</div><div style='font-size: 70%'>[Files]</div>" -->16
+    13-- "<div>Read bytes / write verdicts</div><div style='font-size: 70%'>[JSON / JUnit]</div>" -->16
+    11-- "<div>Export / cleanup facts</div><div style='font-size: 70%'>[Retained references]</div>" -->16
+    24-- "<div>Artifact IDs</div><div style='font-size: 70%'>[MCP / stdio]</div>" -->20
+    20-- "<div>Read contracts</div><div style='font-size: 70%'>[Public Jobs / argv]</div>" -->12
+    20-- "<div>Read explanations</div><div style='font-size: 70%'>[Public Jobs / argv]</div>" -->13
+    20-- "<div>Registered local files</div><div style='font-size: 70%'>[SHA-256 / size]</div>" -->16
 
   end

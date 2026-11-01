@@ -1,4 +1,4 @@
-workspace "Robotics verification workflows" "Consumer-owned usage examples for published Python tools, the embedded host and optional services; native coverage belongs to each selected profile." {
+workspace "Robotics verification workflows" "Target responsibilities for finite attempts, independent evaluation and external campaigns." {
     !identifiers hierarchical
     model {
         integrator = person "Integrator" "Selects profiles and verifies evidence."
@@ -9,7 +9,7 @@ workspace "Robotics verification workflows" "Consumer-owned usage examples for p
         simulators = softwareSystem "Simulators" "Gazebo / Webots / Isaac; scoped." {
             tags "External"
         }
-        autopilot = softwareSystem "Selected SDK peer" "MAVSDK server in the PX4 example; native peers belong to their selected profiles." {
+        autopilot = softwareSystem "Native SDK peer" "Autopilot or device selected by the execution profile." {
             tags "External"
         }
         mediaSource = softwareSystem "Media source" "Native camera / RTSP / fixture." {
@@ -19,11 +19,17 @@ workspace "Robotics verification workflows" "Consumer-owned usage examples for p
         registries = softwareSystem "Registries" "Immutable packages / images / attestations." {
             tags "External"
         }
-        platform = softwareSystem "Verification application" "Consumer-owned tools and native profiles." {
+        platform = softwareSystem "Verification platform" "Finite attempts, retained evidence and independent assessment." {
+            campaign = container "Campaign system" "Selects and orders attempts; local Dagu or Kubernetes Argo." "External workflow system" {
+                tags "Consumer"
+            }
+            custom = container "Product evaluator" "Admitted finite method returns evidence-linked assertions." "Isolated OCI process" {
+                tags "Provider"
+            }
             runner = container "Consumer CLI / CI" "Invokes published Python tools." "Shell / Python / CI" {
                 tags "Consumer"
             }
-            host = container "Consumer coordinator" "Embeds the host library; callbacks own workload and payloads." "Consumer Node app / Cordis / Execa" {
+            host = container "Finite attempt owner" "Admits inputs, owns lifecycle and exports before cleanup." "Consumer process / optional Cordis" {
                 tags "Host"
             }
             group "Python tools" {
@@ -50,7 +56,7 @@ workspace "Robotics verification workflows" "Consumer-owned usage examples for p
                 tags "Database"
             }
             custody = container "Custody CLI" "Bounded verify, sign and receipt." "AWS CLI / cosign / retained-artifact / contracts CLI"
-            mcp = container "Offline MCP" "Six read tools; source package." "Standard MCP SDK / public host workers"
+            mcp = container "Offline MCP" "Read-only access to registered artifacts." "MCP / public document tools"
         }
         group "SDK interfaces" {
         externalSdk = softwareSystem "External client application" "Embeds the selected SignalFlag SDK; project + JWT." {
@@ -73,16 +79,23 @@ workspace "Robotics verification workflows" "Consumer-owned usage examples for p
         platform -> autopilot "Native control SDK"
         platform -> mediaSource "Selected media"
         platform -> registries "Install / verify"
+        integrator -> platform.campaign "Manage campaigns" "UI / API"
+        mcpClient -> platform.campaign "Manage local Dagu campaigns" "Dagu MCP"
+        platform.campaign -> platform.host "Request admitted attempt" "Finite CLI"
+        platform.campaign -> platform.evaluation "Request archive assessment" "CLI / files"
+        platform.evaluation -> platform.custom "Request product assertions" "Verified inputs / JSON"
+        platform.custom -> platform.evaluation "Return assertions" "JSON"
+        platform.custom -> platform.evidence "Read verified evidence" "Read-only files"
         integrator -> platform.runner "Check documents" "CLI / CI"
         platform.runner -> platform.documents "Validate documents" "argv / files"
         platform.runner -> platform.evaluation "Evaluate retained evidence" "argv / files"
         platform.runner -> platform.evidence "Preserve inputs / reports" "Files"
-        integrator -> platform.host "Run selected native profile" "Consumer CLI/API"
-        product -> platform.host "Trusted coordinator" "Host API / files"
+        integrator -> platform.host "Run selected native profile" "Finite attempt boundary"
+        product -> platform.host "Supply workload" "Profile / files"
         platform.host -> platform.documents "Validate documents" "argv / files"
         platform.host -> platform.evaluation "Evaluate evidence" "argv / files"
-        platform.host -> platform.native "Lifecycle jobs" "Compose / argv"
-        platform.host -> autopilot "Selected PX4 control profile" "MAVSDK / gRPC"
+        platform.host -> platform.native "Manage owned workers" "Profile-native launcher"
+        platform.native -> autopilot "Control / telemetry" "Selected native SDK"
         platform.host -> platform.media "Media jobs" "argv / files"
         platform.media -> mediaSource "Declared input" "GStreamer / RTSP / fixture"
         platform.media -> platform.evidence "Frames / reports" "Exact files"
@@ -90,7 +103,7 @@ workspace "Robotics verification workflows" "Consumer-owned usage examples for p
         platform.native -> platform.evidence "Before reset / dispose" "Exact payloads"
         platform.documents -> platform.evidence "Write documents" "Files"
         platform.evaluation -> platform.evidence "Read bytes / write verdicts" "JSON / JUnit"
-        platform.host -> platform.evidence "Export / cleanup proof" "Callback refs"
+        platform.host -> platform.evidence "Export / cleanup facts" "Retained references"
         integrator -> identity "Obtain JWT" "OIDC"
         integrator -> externalSdk "Configure client" "Project / JWT"
         externalSdk -> platform.externalApi "REST ×6 + config" "JWT / HTTP"
@@ -106,32 +119,32 @@ workspace "Robotics verification workflows" "Consumer-owned usage examples for p
         platform.mcp -> platform.evidence "Registered local files" "SHA-256 / size"
 
         deploymentEnvironment "Development" {
-            deploymentNode "Development host" "Example CPU topology; qualification is profile-scoped." "Windows / WSL2" {
-                deploymentNode "Linux environment" "Source components; native and media coverage is profile-scoped." "Ubuntu 24.04 / WSL2" {
-                    infrastructureNode "Rootless engine" "Owned socket; namespace mapping." "Podman / Compose"
+            deploymentNode "Kubernetes cluster" "Argo Workflows and finite attempts." "Kubernetes" {
+                containerInstance platform.campaign
+                deploymentNode "Attempt pod" "Profile-specific native execution." "Pod" {
                     containerInstance platform.host
-                    containerInstance platform.documents
-                    containerInstance platform.evaluation
                     containerInstance platform.native
-                    containerInstance platform.media
+                }
+                deploymentNode "Retained storage" "Independent of workflow garbage collection." "Retained PVC" {
                     containerInstance platform.evidence
                 }
             }
         }
         deploymentEnvironment "Local" {
-            deploymentNode "Local execution profile" "Source topology, not a universal qualification." "Linux / Docker or rootless Podman" {
-                inputs = infrastructureNode "Read-only inputs" "Admitted profile and native assets." "Mounted files" {
+            deploymentNode "Local Linux host" "Dagu campaign and finite attempts." "Linux / Docker or Podman" {
+                containerInstance platform.campaign
+                inputs = infrastructureNode "Read-only inputs" "Admitted profile and assets." "Mounted files" {
                     tags "Inputs"
                 }
-                engine = infrastructureNode "Engine and Compose" "One owned project per attempt." "Native container API" {
+                engine = infrastructureNode "Container engine" "Owned resources per attempt." "Compose / native API" {
                     tags "Host"
                 }
                 coordinator = containerInstance platform.host
                 worker = containerInstance platform.native
                 retained = containerInstance platform.evidence
-                inputs -> coordinator "Admit closure" "Files / hashes"
+                inputs -> coordinator "Admit profile" "Files / hashes"
                 inputs -> worker "Native scene / config" "Read-only"
-                coordinator -> engine "Owned execution" "Local API"
+                coordinator -> engine "Manage owned resources" "Local API"
             }
         }
     }
@@ -141,9 +154,9 @@ workspace "Robotics verification workflows" "Consumer-owned usage examples for p
             include integrator product platform simulators autopilot mediaSource registries externalSdk mcpClient
             autoLayout lr 20 25
         }
-        container platform "Container" "Published Python tools consumed from a terminal or CI; no host service, Node runtime or optional API is required for this document workflow." {
-            title "Published document workflow"
-            include integrator platform.runner platform.documents platform.evaluation platform.evidence
+        container platform "Container" "Target composition across attempt ownership, evaluation, campaign and retained evidence." {
+            title "Target platform composition"
+            include integrator mcpClient platform.campaign platform.host platform.native platform.documents platform.evaluation platform.custom platform.mcp platform.evidence
             autoLayout lr 20 25
         }
         container platform "ContainerDetail" "Complete consumer, controller, simulator and media interface graph." {
@@ -156,23 +169,23 @@ workspace "Robotics verification workflows" "Consumer-owned usage examples for p
             include externalSdk identity objectStorage platform.externalApi platform.apiMetadata platform.custody
             autoLayout tb 20 25
         }
-        container platform "NativeInterfaces" "Native usage example: consumer application embeds the host library; selected SDK and media dependencies remain native." {
+        container platform "NativeInterfaces" "Finite attempt and selected SDK and media dependencies remain native." {
             title "Native consumer application"
-            include platform.host platform.documents platform.evaluation platform.native platform.media platform.evidence simulators mediaSource autopilot
+            include platform.host platform.documents platform.evaluation platform.custom platform.native platform.media platform.evidence simulators mediaSource autopilot
             autoLayout lr 60 70
         }
-        container platform "ConsumerInterfaces" "Embedded coordinator, product callbacks, public Python tools and retained evidence; optional services have their own view." {
-            title "Embedded host and public tools"
-            include integrator product platform.host platform.documents platform.evaluation platform.evidence
+        container platform "ConsumerInterfaces" "Campaign, finite attempt, public tools and retained evidence." {
+            title "Attempt, campaign and evaluation"
+            include integrator product platform.campaign platform.host platform.documents platform.evaluation platform.custom platform.evidence
             autoLayout lr 60 70
         }
-        deployment platform "Development" "DevelopmentDeployment" "Example CPU development profile; qualification remains profile-scoped." {
-            title "Example CPU development topology"
+        deployment platform "Development" "DevelopmentDeployment" "Kubernetes campaign and finite attempt profile." {
+            title "Kubernetes campaign deployment"
             include *
             autoLayout tb 100 40
         }
-        deployment platform "Local" "ExecutionDeployment" "Selected native-worker path; document and media jobs use their own profiles." {
-            title "Local execution / source topology"
+        deployment platform "Local" "ExecutionDeployment" "Local campaign and finite attempt profile." {
+            title "Local campaign deployment"
             include *
             autoLayout lr 60 60
         }

@@ -57,15 +57,16 @@ scopes; see the [host reference](host/README.md).
 
 ## Architecture
 
-These C4 views cover the joint platform in both repositories. The Python pair and
-compiled host have separate releases; candidate providers require their own
-execution qualification.
+These views describe the target architecture across both repositories. They are
+not a list of released commands or qualified profiles. Use the package and host
+references above for available interfaces, and the
+[architecture reference](docs/architecture.md) for the target boundaries.
 
 ### Process composition
 
 <!-- architecture:Container:start -->
 
-![Published document workflow](docs/architecture/generated/Container.svg)
+![Target platform composition](docs/architecture/generated/Container.svg)
 
 [Canonical C4 source](docs/architecture/workspace.dsl) · [Generated Mermaid](docs/architecture/generated/structurizr-Container.mmd)
 
@@ -97,12 +98,9 @@ available as a reference.
 
 [Diagram sources, sequence and deployment](docs/architecture/README.md).
 
-The selected host uses upstream [Cordis](https://github.com/cordiverse/cordis)
-for local plugin loading, service bindings and managed effects. Cluster scheduling
-belongs to the deployment backend.
-The host coordinates resources; commands and frames use native SDK and media
-connections. Its implementation and simulator providers are separate from the
-published Python pair.
+The host can coordinate resources through upstream
+[Cordis](https://github.com/cordiverse/cordis). Campaign orchestration is external;
+commands and frames use native SDK and media connections.
 
 [Composition framework and its limits](docs/architecture.md#composition-framework).
 Common document/evaluation code does not require Gazebo, Isaac Sim, Webots or
@@ -128,8 +126,8 @@ through stdio and published CLI workers. It has no published MCP artifact.
 
 [Preserved run and release records](docs/run-history.md) retain the versions,
 scope and outcomes of their original evidence.
-[Future design boundaries](docs/future-designs.md) are separate from this current
-guide and are not implemented capabilities.
+[Architecture and implementation references](docs/future-designs.md) connect the
+target design to the current package references.
 
 ## Host development
 
@@ -187,9 +185,8 @@ The reader uses the stock Sphinx, MyST and Furo toolchain; its source allowlist 
 when package versions or interfaces change. Preserve the exact version and commit
 pins in archived examples and qualification records.
 The LLM export includes current guidance and the C4 DSL and Mermaid sequence/state
-sources exactly once. Historical run records, future designs, ADRs and migration
-archives remain readable in HTML and the source download but are excluded from
-the LLM text. The source archive and manifest bind the exported bytes to the build.
+sources exactly once. Historical run records, ADRs and migration archives remain readable in HTML
+and the source download but are excluded from the LLM text. The source archive and manifest bind the exported bytes to the build.
 The consumer-inputs archive contains the first-result producer and templates.
 
 Build and check documentation in a separate Python 3.12 environment:
