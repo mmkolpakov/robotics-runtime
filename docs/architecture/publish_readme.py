@@ -12,7 +12,7 @@ VIEWS = ("Container", "Context")
 def render_readme() -> str:
     readme = (ROOT / "README.md").read_text()
     labels = {
-        "Container": "Published document workflow",
+        "Container": "Target platform composition",
         "Context": "Verification workflow context",
     }
     for view in VIEWS:

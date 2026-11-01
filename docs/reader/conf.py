@@ -24,10 +24,10 @@ html_extra_path = [
 
 llms_txt_title = project
 llms_txt_summary = (
-    "Development source documentation for robotics contracts, evidence evaluation, "
-    "and the composition host. Published packages and frozen qualification "
-    "examples retain their own release and commit identities."
+    "Self-hosted robotic software verification: target architecture, published "
+    "CLI and API references, native profiles, evidence and independent assessment."
 )
+
 llms_txt_exclude = [
     "packages/contracts/CHANGELOG",
     "packages/harness/CHANGELOG",

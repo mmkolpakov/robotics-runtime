@@ -170,11 +170,9 @@ def main() -> None:
                 text += navigation(name, documents)
             if name == "README.md":
                 notice = (
-                    "\n```{note}\nThis reader follows development source. "
-                    "Installable packages are on [contracts PyPI]"
-                    "(https://pypi.org/project/robotics-runtime-contracts/) "
-                    "and [harness PyPI](https://pypi.org/project/robotics-acceptance-harness/). "
-                    "Frozen examples retain their own release and commit pins.\n```\n\n"
+                    "\n[Contracts package](https://pypi.org/project/robotics-runtime-contracts/) "
+                    "· [Harness package](https://pypi.org/project/robotics-acceptance-harness/) "
+                    "· [Source manifest](source-manifest.json) · "
                     "[Infra documentation]"
                     "(https://github.com/mmkolpakov/robotics-runtime-infra) · "
                     "[Releases](https://github.com/mmkolpakov/robotics-runtime/releases) · "
