@@ -178,6 +178,9 @@ pairs through `diagnostic_issues`. `KeyboardInterrupt` and `SystemExit` propagat
 
 ## Live Observation
 
+The [read-only observer and readiness API](docs/live-tests.md#read-only-graph-api)
+can be used directly from the documented submodules.
+
 Runtime infrastructure starts the workload, recorder, and telemetry collector.
 The harness joins the existing ROS domain:
 

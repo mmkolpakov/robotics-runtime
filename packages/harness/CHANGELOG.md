@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.22.3
+
+Requires contracts 0.21 (`>=0.21,<0.22`), with exact release prerequisite
+`contracts-v0.21.1`. Package and execution-profile qualification remain separate.
+
+- Document the existing bounded file capture, read-only graph observer and
+  readiness submodule interfaces, including their caller-owned trust and
+  deadline boundaries. Their implementations and behavior are unchanged.
+- Exercise these interfaces from an isolated installed-wheel consumer.
+
 ## 0.22.2
 
 Requires contracts 0.21 (`>=0.21,<0.22`), with exact release prerequisite
