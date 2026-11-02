@@ -124,8 +124,6 @@ it has no published API image release.
 The [optional offline MCP source package](mcp/README.md) provides six read tools
 through stdio and published CLI workers. It has no published MCP artifact.
 
-[Preserved run and release records](docs/run-history.md) retain the versions,
-scope and outcomes of their original evidence.
 [Architecture and implementation references](docs/future-designs.md) connect the
 target design to the current package references.
 

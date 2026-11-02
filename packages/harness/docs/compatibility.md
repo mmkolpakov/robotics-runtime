@@ -39,9 +39,8 @@ Provider qualification belongs to runtime infrastructure. A new provider is
 compatible when it emits the existing canonical documents and passes the same
 conformance suite.
 
-[Preserved run and release records](../../../docs/run-history.md) hold the
-original package versions, source identities and native profile outcomes.
-A current package install or source fixture does not qualify those compositions.
+A current package install or source fixture does not qualify an infrastructure
+composition or native profile.
 
 The Python commands install without ROS. V1 document formats retain required
 ROS graph, lifecycle and timing fields; live observation uses the ROS 2 packages

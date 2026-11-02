@@ -153,5 +153,4 @@ An installed package, a diagram or a connected SDK alone does not establish
 the outcome of a native run.
 
 [Architecture diagrams](architecture/README.md) show the context, composition,
-deployment and lifecycle described here. The
-[run history](run-history.md) retains the scope of past evidence.
+deployment and lifecycle described here.
