@@ -959,6 +959,7 @@ name = "robotics-acceptance-harness"
 version = "0.22.3"
 source = { editable = "packages/harness" }
 dependencies = [
+    { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "junitparser" },
     { name = "opentelemetry-proto" },
     { name = "packaging" },
@@ -972,6 +973,7 @@ pytest = [
 
 [package.metadata]
 requires-dist = [
+    { name = "jsonschema", extras = ["format-nongpl"], specifier = ">=4.26,<5" },
     { name = "junitparser", specifier = ">=5.0.1,<6" },
     { name = "opentelemetry-proto", specifier = ">=1.43,<2" },
     { name = "packaging", specifier = ">=24" },

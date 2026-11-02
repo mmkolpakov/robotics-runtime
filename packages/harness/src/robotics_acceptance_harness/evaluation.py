@@ -361,6 +361,35 @@ def _evaluator_results(
             results.close()
 
 
+def _validate_product_evaluation(
+    namespace: str, evaluation: object, evidence_sha256: frozenset[str]
+) -> None:
+    if not isinstance(evaluation, AssertionEvaluation):
+        raise EvaluationError(
+            f"evaluator {namespace!r} returned {type(evaluation).__name__}; "
+            "expected AssertionEvaluation"
+        )
+    if evaluation.source != "product" or evaluation.namespace != namespace:
+        raise EvaluationError(
+            f"evaluator {namespace!r} must mark every result as its product namespace"
+        )
+    if not evaluation.assertion_id.startswith(f"{namespace}."):
+        raise EvaluationError(
+            f"assertion {evaluation.assertion_id!r} is outside namespace {namespace!r}"
+        )
+    if not evaluation.evidence_sha256:
+        raise EvaluationError(
+            f"product assertion {evaluation.assertion_id!r} has no evidence digest"
+        )
+    missing = set(evaluation.evidence_sha256) - evidence_sha256
+    if missing:
+        raise EvaluationError(
+            "product assertion "
+            f"{evaluation.assertion_id!r} references unknown evidence "
+            f"{sorted(missing)}"
+        )
+
+
 def _product_evaluations(
     context: EvaluationContext,
     evaluators: Sequence[tuple[str, ProductEvaluator]],
@@ -374,32 +403,7 @@ def _product_evaluations(
         try:
             with _evaluator_results(evaluator, context) as produced:
                 for evaluation in produced:
-                    if not isinstance(evaluation, AssertionEvaluation):
-                        raise EvaluationError(
-                            f"evaluator {namespace!r} returned {type(evaluation).__name__}; "
-                            "expected AssertionEvaluation"
-                        )
-                    if evaluation.source != "product" or evaluation.namespace != namespace:
-                        raise EvaluationError(
-                            f"evaluator {namespace!r} must mark every result "
-                            "as its product namespace"
-                        )
-                    if not evaluation.assertion_id.startswith(f"{namespace}."):
-                        raise EvaluationError(
-                            f"assertion {evaluation.assertion_id!r} "
-                            f"is outside namespace {namespace!r}"
-                        )
-                    if not evaluation.evidence_sha256:
-                        raise EvaluationError(
-                            f"product assertion {evaluation.assertion_id!r} has no evidence digest"
-                        )
-                    missing = set(evaluation.evidence_sha256) - context.evidence_sha256
-                    if missing:
-                        raise EvaluationError(
-                            "product assertion "
-                            f"{evaluation.assertion_id!r} references unknown evidence "
-                            f"{sorted(missing)}"
-                        )
+                    _validate_product_evaluation(namespace, evaluation, context.evidence_sha256)
                     evaluations.append(evaluation)
         except EvaluationError:
             raise

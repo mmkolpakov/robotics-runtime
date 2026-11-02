@@ -22,6 +22,7 @@ classifiers = [
   "Topic :: Software Development :: Testing",
 ]
 dependencies = [
+  "jsonschema[format-nongpl]>=4.26,<5",
   "junitparser>=5.0.1,<6",
   "opentelemetry-proto>=1.43,<2",
   "packaging>=24",
