@@ -308,3 +308,62 @@ def test_oci_documents_require_json_before_verifier(
             platform=PLATFORM,
             profile=fake_profile(tmp_path),
         )
+
+
+def test_docker_schema2_preserves_original_manifest_and_config_bytes(tmp_path: Path) -> None:
+    manifest, config, bundle, _ = inputs(tmp_path)
+    original_config = b" \r\n" + config.read_bytes() + b"\n "
+    config.write_bytes(original_config)
+    document = json.loads(manifest.read_bytes())
+    document["mediaType"] = "application/vnd.docker.distribution.manifest.v2+json"
+    document["config"] = {
+        "mediaType": "application/vnd.docker.container.image.v1+json",
+        "digest": "sha256:" + digest(original_config),
+        "size": len(original_config),
+    }
+    original_manifest = b"\r\n" + json.dumps(document, indent=2).encode() + b" \n"
+    manifest.write_bytes(original_manifest)
+    bundle.write_bytes(digest(original_manifest).encode())
+    observed = oci.authenticate_manifest(
+        (manifest, config, bundle),
+        expected_digest="sha256:" + digest(original_manifest),
+        platform=PLATFORM,
+        profile=fake_profile(tmp_path),
+    )
+    assert observed == (original_manifest, original_config, b"unit fixture verified")
+
+
+@pytest.mark.parametrize(
+    ("manifest_type", "config_type"),
+    [
+        (MANIFEST_TYPE, "application/vnd.docker.container.image.v1+json"),
+        ("application/vnd.docker.distribution.manifest.v2+json", CONFIG_TYPE),
+        ("application/vnd.docker.distribution.manifest.list.v2+json", CONFIG_TYPE),
+        ("application/vnd.oci.image.index.v1+json", CONFIG_TYPE),
+        ([MANIFEST_TYPE], CONFIG_TYPE),
+        ({"type": MANIFEST_TYPE}, CONFIG_TYPE),
+    ],
+)
+def test_media_pair_refusal_is_closed_and_type_safe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    manifest_type: object,
+    config_type: str,
+) -> None:
+    manifest, config, bundle, _ = inputs(tmp_path)
+    document = json.loads(manifest.read_bytes())
+    document["mediaType"] = manifest_type
+    document["config"]["mediaType"] = config_type
+    manifest.write_bytes(json.dumps(document).encode())
+
+    def forbidden(*args: Any, **kwargs: Any) -> bytes:
+        pytest.fail("unsupported image media pair reached verifier")
+
+    monkeypatch.setattr(oci, "verify_blob_snapshot", forbidden)
+    with pytest.raises(EvaluatorTrustError):
+        oci.authenticate_manifest(
+            (manifest, config, bundle),
+            expected_digest="sha256:" + digest(manifest.read_bytes()),
+            platform=PLATFORM,
+            profile=fake_profile(tmp_path),
+        )

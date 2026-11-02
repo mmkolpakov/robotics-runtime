@@ -19,8 +19,12 @@ from robotics_acceptance_harness.evaluator_trust import (
     read_once,
 )
 
-_MANIFEST_MEDIA_TYPE = "application/vnd.oci.image.manifest.v1+json"
-_CONFIG_MEDIA_TYPE = "application/vnd.oci.image.config.v1+json"
+_MANIFEST_CONFIG_TYPES = {
+    "application/vnd.oci.image.manifest.v1+json": "application/vnd.oci.image.config.v1+json",
+    "application/vnd.docker.distribution.manifest.v2+json": (
+        "application/vnd.docker.container.image.v1+json"
+    ),
+}
 
 
 def _platform(value: Mapping[str, str]) -> dict[str, str]:
@@ -50,16 +54,18 @@ def _validate_identity(
         raise EvaluatorTrustError("OCI manifest differs from its externally expected digest")
     expected_platform = _platform(platform)
     document = _mapping(manifest, "manifest")
+    media_type = document.get("mediaType")
     if (
         type(document.get("schemaVersion")) is not int
         or document["schemaVersion"] != 2
-        or document.get("mediaType") != _MANIFEST_MEDIA_TYPE
+        or not isinstance(media_type, str)
+        or media_type not in _MANIFEST_CONFIG_TYPES
     ):
         raise EvaluatorTrustError("OCI subject must be a platform image manifest, not an index")
     descriptor = document.get("config")
     if (
         not isinstance(descriptor, dict)
-        or descriptor.get("mediaType") != _CONFIG_MEDIA_TYPE
+        or descriptor.get("mediaType") != _MANIFEST_CONFIG_TYPES[media_type]
         or descriptor.get("digest") != "sha256:" + hashlib.sha256(config).hexdigest()
         or type(descriptor.get("size")) is not int
         or descriptor["size"] != len(config)
