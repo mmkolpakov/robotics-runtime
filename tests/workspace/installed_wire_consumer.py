@@ -218,9 +218,6 @@ def main() -> None:
             controls_source.read_bytes(),
             controls_source.resolve().as_uri(),
         )
-        selected = [*references.values(), config, evidence, controls]
-        if state == "selected":
-            selected += calibration["artifacts"]
         locations = {
             sha256(path.read_bytes()).hexdigest(): path.name
             for path in input_root.iterdir()
