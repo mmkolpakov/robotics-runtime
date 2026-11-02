@@ -375,13 +375,30 @@ def test_verifier_process_surface_is_closed_and_has_no_shell() -> None:
     assert keywords["shell"].value is False
     assert isinstance(keywords["cwd"], ast.Name)
     assert keywords["cwd"].id == "directory"
-    assert isinstance(keywords["env"], ast.Call)
+    assert isinstance(keywords["env"], ast.Name)
+    assert keywords["env"].id == "environment"
     runner = next(
         node
         for node in ast.walk(tree)
         if isinstance(node, ast.FunctionDef) and node.name == "_capture_tool"
     )
     assert calls[0] in list(ast.walk(runner))
+    wrapper = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "_run_tool"
+    )
+    capture = [
+        node
+        for node in ast.walk(wrapper)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_capture_tool"
+    ]
+    assert len(capture) == 1
+    environment = next(item.value for item in capture[0].keywords if item.arg == "environment")
+    assert isinstance(environment, ast.Call) and isinstance(environment.func, ast.Name)
+    assert environment.func.id == "_verifier_environment"
 
 
 def test_verifier_refuses_general_process_argv(tmp_path: Path) -> None:
