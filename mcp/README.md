@@ -202,7 +202,7 @@ Default limits are 30 seconds per worker, 1,048,576 UTF-16 code units per decode
 output stream and 16 MiB combined regular-file input. Bootstrap overrides are
 capped at 120 seconds, 4,194,304 code units per output stream and 64 MiB input.
 `limits.maxOutputBytes` measures JavaScript string `.length` before final-newline
-removal; it does not limit the encoded MCP JSON envelope's byte size.
+removal. It is not an encoded MCP JSON envelope byte limit.
 Four calls may execute concurrently. Inputs are captured into
 private verified read-only copies, removed after the worker settles. Symlinks,
 changed bytes, outside paths and unknown IDs refuse before worker startup.
