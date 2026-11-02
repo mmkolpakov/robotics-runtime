@@ -147,6 +147,16 @@ jobs:
           uv run --no-sync python -m scripts.release.verify_consumers
           --mode published --infra .consumer-infra --python 3.12
           --report artifacts/consumers/published.json
+      - name: Verify candidate harness and published contracts with the Node evaluator
+        run: |
+          set -euo pipefail
+          wheel="$RUNNER_TEMP/robotics_runtime_contracts-0.21.1-py3-none-any.whl"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            https://files.pythonhosted.org/packages/a2/2d/9f76d877237497c56d4eb8a0440e30f530778ad69d34d6a110230644f42e/robotics_runtime_contracts-0.21.1-py3-none-any.whl \
+            --output "$wheel"
+          uv run --no-sync python -m scripts.release.verify_consumers \
+            --mode candidate-published --infra .consumer-infra --python 3.12 \
+            --contracts-wheel "$wheel" --report artifacts/consumers/candidate-published-wire.json
       - name: Upload installed consumer verification evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
