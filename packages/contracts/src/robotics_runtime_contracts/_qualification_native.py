@@ -139,9 +139,7 @@ def _receipt_requirements(context: _Context) -> list[Mapping[str, Any]]:
         for requirement in _method_controls(context, domain)["evaluator_requirements"]:
             if requirement not in requirements:
                 requirements.append(requirement)
-    if any(requirement.get("kind") == "oci" for requirement in requirements):
-        rules._fail("OCI evaluator qualification is not supported")
-    return requirements
+    return [requirement for requirement in requirements if requirement.get("kind") != "oci"]
 
 
 def _native_receipts(context: _Context) -> None:

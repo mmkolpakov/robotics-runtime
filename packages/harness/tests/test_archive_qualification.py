@@ -413,3 +413,216 @@ def test_public_contract_cli_selects_archive_protocol_and_matches_statement(tmp_
         == 2
     )
     assert metadata.read_bytes() == before
+
+
+def _oci_archive_with_original_wheel(tmp_path: Path) -> list[str]:
+    from tests.test_oci_assessment_v3 import _pair
+
+    specs = _pair(tmp_path, oci=True, result_version="acceptance-result.v3", marked=True)
+    fixture = (
+        Path(__file__).resolve().parents[2] / "contracts/tests/fixtures/qualification/inference"
+    )
+    wheel = _document(fixture / "scenario.json")["evaluator_requirements"][0]
+    for kind, filename in (
+        ("package", "evaluator-package.whl"),
+        ("attestation", "evaluator-statement.json"),
+        ("verification", "evaluator-verification.bundle"),
+        ("policy", "evaluator-trust.json"),
+        ("artifact_verification", "evaluator-verification.json"),
+        ("artifact_receipt", "evaluator-receipt.json"),
+    ):
+        specs.append(f"{kind}:wheel/{filename}={fixture / filename}")
+
+    scenario_path = tmp_path / "scenario.json"
+    scenario = _document(scenario_path)
+    scenario["evaluator_requirements"] = [wheel]
+    _write(scenario_path, scenario)
+    run_path = tmp_path / "run.json"
+    run = _document(run_path)
+    run["scenario_sha256"] = _digest(scenario_path)
+    _write(run_path, run)
+    runtime_path = tmp_path / "runtime-primary.json"
+    runtime = _document(runtime_path)
+    runtime["scenario_sha256"] = _digest(scenario_path)
+    runtime["evaluator_bindings"] = [wheel]
+    _write(runtime_path, runtime)
+    observation_path = tmp_path / "observation-primary.json"
+    observation = _document(observation_path)
+    observation["scenario_sha256"] = _digest(scenario_path)
+    observation["runtime_manifest_sha256"] = _digest(runtime_path)
+    _write(observation_path, observation)
+    index_path = tmp_path / "index-primary.json"
+    index = _document(index_path)
+    for item in index["artifacts"]:
+        if item["kind"] == "acceptance_observation":
+            item.update(_reference(observation_path))
+    _write(index_path, index)
+    method_path = tmp_path / "method.json"
+    method = _document(method_path)
+    method["evaluator_requirements"] = [wheel]
+    _write(method_path, method)
+    original_path = tmp_path / "result-primary.json"
+    original = _document(original_path)
+    original["scenario_sha256"] = _digest(scenario_path)
+    original["runtime_manifest_sha256"] = _digest(runtime_path)
+    original["original_execution"].update(
+        acceptance_run_sha256=_digest(run_path),
+        observation_sha256=_digest(observation_path),
+        evidence_index_sha256=_digest(index_path),
+    )
+    original["evaluation"]["method"]["configuration"] = _reference(method_path)
+    original["evaluators"] = [wheel]
+    original["evidence"] = [
+        {k: v for k, v in item.items() if k not in {"storage_state", "local_path"}}
+        for item in index["artifacts"]
+    ]
+    _write(original_path, original)
+    aggregate_results(
+        scenario_path=scenario_path,
+        run_context_path=run_path,
+        result_paths=[original_path],
+        output_path=tmp_path / "aggregate.json",
+        generated_at=datetime.fromisoformat("2026-10-10T12:00:06+00:00"),
+    )
+    assessment_path = tmp_path / "new-result-primary.json"
+    assessment = _document(assessment_path)
+    assessment["scenario_sha256"] = _digest(scenario_path)
+    assessment["runtime_manifest_sha256"] = _digest(runtime_path)
+    assessment["original_execution"] = {
+        **original["original_execution"],
+        "original_result_sha256": _digest(original_path),
+    }
+    assessment["evidence"] = original["evidence"]
+    _write(assessment_path, assessment)
+    new_aggregate = _document(tmp_path / "new-aggregate.json")
+    new_aggregate["acceptance_run_sha256"] = _digest(run_path)
+    _write(tmp_path / "new-aggregate.json", new_aggregate)
+    _refresh(tmp_path)
+    return specs
+
+
+def test_oci_archive_keeps_original_wheel_receipt_chain(tmp_path: Path) -> None:
+    specs = _oci_archive_with_original_wheel(tmp_path)
+    metadata = _qualify(specs)
+    assert metadata["comparison"]["per_domain"][0]["status"] == "not_comparable"
+    for kind in (
+        "artifact_receipt",
+        "artifact_verification",
+        "package",
+        "attestation",
+        "verification",
+        "policy",
+    ):
+        shortened = [item for item in specs if not item.startswith(f"{kind}:wheel/")]
+        with pytest.raises(ContractError):
+            _qualify(shortened)
+
+
+def test_oci_archive_journal_is_in_signed_exact_inventory(tmp_path: Path) -> None:
+    specs = _oci_archive_with_original_wheel(tmp_path)
+    journal = _write(tmp_path / "journal.json", {"state": "settled", "cid": "fixture"})
+    specs.append(f"other_evidence:attempt/journal.json={journal}")
+    statement = create_qualification_statement(specs, schema_version=V2, comparison_rule=RULE)
+    statement_path = _write(tmp_path / "statement.json", statement)
+    validate_qualification_statement(statement_path, specs)
+    assert "attempt/journal.json" in {item["name"] for item in statement["subject"]}
+    with pytest.raises(ContractError):
+        validate_qualification_statement(statement_path, specs[:-1])
+    with pytest.raises(ContractError):
+        _qualify([*specs, specs[-1]])
+    _write(journal, {"state": "replaced"})
+    with pytest.raises(ContractError):
+        validate_qualification_statement(statement_path, specs)
+
+
+def test_oci_archive_rejects_extra_receipts(tmp_path: Path) -> None:
+    specs = _oci_archive_with_original_wheel(tmp_path)
+    fixture = (
+        Path(__file__).resolve().parents[2] / "contracts/tests/fixtures/qualification/inference"
+    )
+    specs.append(f"artifact_receipt:other/receipt.json={fixture / 'evidence-receipt.json'}")
+    with pytest.raises(ContractError, match="receipts and verifications must match"):
+        _qualify(specs)
+
+
+@pytest.mark.parametrize(
+    "fault", ["missing", "duplicate", "wrong-owner", "false-covered", "forged-pass"]
+)
+def test_oci_archive_refuses_invalid_coverage(tmp_path: Path, fault: str) -> None:
+    from tests.test_oci_assessment_v3 import OCI
+
+    specs = _oci_archive_with_original_wheel(tmp_path)
+    path = tmp_path / "new-result-primary.json"
+    result = _document(path)
+    coverage = result["evaluation"]["coverage"]
+    if fault == "missing":
+        coverage["uncovered_assertions"].clear()
+    elif fault == "duplicate":
+        coverage["uncovered_assertions"].append(coverage["uncovered_assertions"][0])
+    elif fault == "wrong-owner":
+        result["assertion_results"].append(
+            {
+                "assertion_id": OCI["expected_assertion_ids"][0],
+                "source": "product",
+                "namespace": "org.example.other",
+                "status": "passed",
+                "observed_value": 1,
+                "unit": "1",
+                "evidence_sha256": [result["evidence"][0]["sha256"]],
+            }
+        )
+    elif fault == "forged-pass":
+        result["status"] = "passed"
+    else:
+        coverage["uncovered_assertions"].clear()
+        coverage["covered_assertions"].append(
+            {
+                "assertion_id": OCI["expected_assertion_ids"][0],
+                "evidence_sha256": [result["evidence"][0]["sha256"]],
+            }
+        )
+    _write(path, result)
+    _refresh(tmp_path)
+    with pytest.raises(ContractError):
+        _qualify(specs)
+
+
+def test_oci_archive_accepts_covered_product_result_with_original_evidence(tmp_path: Path) -> None:
+    from tests.test_oci_assessment_v3 import OCI
+
+    specs = _oci_archive_with_original_wheel(tmp_path)
+    path = tmp_path / "new-result-primary.json"
+    result = _document(path)
+    identifier = OCI["expected_assertion_ids"][0]
+    evidence = result["evidence"][0]["sha256"]
+    result["assertion_results"].append(
+        {
+            "assertion_id": identifier,
+            "source": "product",
+            "namespace": OCI["namespace"],
+            "status": "passed",
+            "observed_value": 1,
+            "unit": "1",
+            "evidence_sha256": [evidence],
+        }
+    )
+    result["evaluation"]["coverage"] = {
+        "covered_assertions": [{"assertion_id": identifier, "evidence_sha256": [evidence]}],
+        "uncovered_assertions": [],
+    }
+    result["unevaluated"].remove("$.assertions." + identifier)
+    result["unevaluated"].remove("$.assertions")
+    result["status"] = "passed"
+    _write(path, result)
+    _refresh(tmp_path)
+    aggregate_path = tmp_path / "new-aggregate.json"
+    aggregate = _document(aggregate_path)
+    aggregate["per_domain_aggregate"] = "passed"
+    _write(aggregate_path, aggregate)
+    _qualify(specs)
+    method_path = tmp_path / "new-method.json"
+    method = _document(method_path)
+    method["evaluator_requirements"][0]["expected_assertion_ids"] = ["org.example.check.changed"]
+    _write(method_path, method)
+    with pytest.raises(ContractError):
+        _qualify(specs)

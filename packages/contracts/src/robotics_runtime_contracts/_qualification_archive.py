@@ -272,11 +272,19 @@ def _coverage(
         return set(), set(criteria), criteria
     covered = {item["assertion_id"]: item for item in coverage["covered_assertions"]}
     uncovered = {item["assertion_id"] for item in coverage["uncovered_assertions"]}
+    expected = set(criteria)
+    if result["schema_version"] == "acceptance-result.v3":
+        expected.update(
+            identifier
+            for evaluator in _method_controls(context, domain)["evaluator_requirements"]
+            for identifier in evaluator["expected_assertion_ids"]
+        )
     if (
         len(covered) != len(coverage["covered_assertions"])
         or len(uncovered) != len(coverage["uncovered_assertions"])
         or set(covered) & uncovered
-        or set(covered) | uncovered != set(criteria)
+        or set(covered) | uncovered != expected
+        or not set(covered) <= set(criteria)
     ):
         rules._fail("archive coverage must classify each actual criterion exactly once")
     indexed = rules._document(context.evidence_indexes[domain])["artifacts"]
@@ -296,7 +304,7 @@ def _coverage(
             actual = set(assertion["evidence_sha256"]) & raw_sources
         if not actual or declared != actual or assertion["status"] == "skipped":
             rules._fail("archive covered criterion lacks its original raw source binding")
-    return set(covered), set(criteria), criteria
+    return set(covered), expected, criteria
 
 
 def _calibration_identity(evaluation: Mapping[str, Any]) -> tuple[Any, ...] | None:
