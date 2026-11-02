@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Bound gh/Cosign stdout and stderr during verification, including direct-child
+  cleanup after output overflow or a command deadline.
+
 ## 0.22.3
 
 Requires contracts 0.21 (`>=0.21,<0.22`), with exact release prerequisite

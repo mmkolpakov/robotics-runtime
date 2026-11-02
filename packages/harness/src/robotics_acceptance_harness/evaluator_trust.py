@@ -10,11 +10,14 @@ import hashlib
 import json
 import os
 import re
+import selectors
 import stat
 
 # Pinned official verifiers only; argv/path regressions test this boundary.
 import subprocess  # nosemgrep: attach-only-no-process-control
+import time
 from collections.abc import Mapping
+from contextlib import suppress
 from dataclasses import dataclass, field
 from importlib.metadata import Distribution
 from pathlib import Path
@@ -216,6 +219,86 @@ def _pinned_snapshot(path: Path, digest: str, limit: int) -> bytes:
     return payload
 
 
+def _stop_tool(process: subprocess.Popen[bytes]) -> None:
+    for signal in (process.terminate, process.kill):
+        if process.poll() is not None:
+            return
+        with suppress(ProcessLookupError):
+            signal()
+        try:
+            process.wait(timeout=1)
+            return
+        except subprocess.TimeoutExpired:
+            continue
+    raise EvaluatorTrustError(f"verifier process {process.pid} cleanup did not settle")
+
+
+def _capture_streams(
+    process: subprocess.Popen[bytes],
+    selector: selectors.BaseSelector,
+    limits: TrustLimits,
+    deadline: float,
+    combined: bool,
+) -> tuple[bytes, bytes]:
+    buffers = (bytearray(), bytearray())
+    while selector.get_map():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(process.args, limits.timeout_sec)
+        for key, _ in selector.select(remaining):
+            buffer = buffers[key.data]
+            used = sum(map(len, buffers)) if combined else len(buffer)
+            try:
+                chunk = os.read(key.fd, min(64 * 1024, limits.max_report_bytes - used + 1))
+            except BlockingIOError:
+                continue
+            if not chunk:
+                selector.unregister(key.fileobj)
+                continue
+            if used + len(chunk) > limits.max_report_bytes:
+                label = "combined verifier audit" if combined else "verifier output"
+                raise EvaluatorTrustError(f"{label} exceeds its byte limit")
+            buffer.extend(chunk)
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise subprocess.TimeoutExpired(process.args, limits.timeout_sec)
+    process.wait(timeout=remaining)
+    return bytes(buffers[0]), bytes(buffers[1])
+
+
+def _capture_tool(
+    command: list[str], directory: Path, limits: TrustLimits, *, combined: bool
+) -> tuple[int, bytes, bytes]:
+    if os.name != "posix":
+        raise EvaluatorTrustError("verifier capture requires the POSIX input profile")
+    deadline = time.monotonic() + limits.timeout_sec
+    process = subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        bufsize=0,
+        close_fds=True,
+        shell=False,
+        cwd=directory,
+        env=_verifier_environment(directory),
+    )
+    assert process.stdout is not None and process.stderr is not None
+    try:
+        with selectors.DefaultSelector() as selector:
+            for index, stream in enumerate((process.stdout, process.stderr)):
+                os.set_blocking(stream.fileno(), False)
+                selector.register(stream, selectors.EVENT_READ, index)
+            report, diagnostic = _capture_streams(process, selector, limits, deadline, combined)
+        assert process.returncode is not None
+        return process.returncode, report, diagnostic
+    finally:
+        # Close our pipe ends before waiting; an inherited writer may outlive the CLI.
+        process.stdout.close()
+        process.stderr.close()
+        _stop_tool(process)
+
+
 def _run_tool(
     command: list[str],
     directory: Path,
@@ -235,33 +318,19 @@ def _run_tool(
     )
     if not command or command[0] != expected or not admitted:
         raise EvaluatorTrustError("only the pinned snapshot verifier commands are admitted")
-    output = directory / "verifier-output"
-    error = directory / "verifier-error"
-    with output.open("wb") as stdout, error.open("wb") as stderr:
-        try:
-            process = subprocess.run(
-                command,
-                stdin=subprocess.DEVNULL,
-                stdout=stdout,
-                stderr=stderr,
-                timeout=limits.timeout_sec,
-                check=False,
-                shell=False,
-                cwd=directory,
-                env=_verifier_environment(directory),
-            )
-        except subprocess.TimeoutExpired as failure:
-            raise EvaluatorTrustError(
-                f"{label} attestation verifier exceeded its deadline"
-            ) from failure
-    report = read_once(output, limits.max_report_bytes)
-    diagnostic = read_once(error, limits.max_report_bytes)
-    if process.returncode != 0:
+    combined = tool_name == "cosign" and command[1] != "version"
+    try:
+        returncode, report, diagnostic = _capture_tool(
+            command, directory, limits, combined=combined
+        )
+    except subprocess.TimeoutExpired as failure:
+        raise EvaluatorTrustError(
+            f"{label} attestation verifier exceeded its deadline"
+        ) from failure
+    if returncode != 0:
         message = diagnostic.decode(errors="replace").strip()
         raise EvaluatorTrustError(f"{label} attestation verification refused: {message}")
-    if tool_name == "cosign" and command[1] != "version":
-        if len(report) + len(diagnostic) > limits.max_report_bytes:
-            raise EvaluatorTrustError("combined verifier audit exceeds its byte limit")
+    if combined:
         return report + diagnostic
     return report
 
