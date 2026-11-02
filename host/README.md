@@ -1,7 +1,7 @@
 # Robotics runtime host
 
-The host composes finite workers with upstream Cordis 4.0.0-rc.10, Loader 1.0.0-rc.7 and Include
-1.1.0. Node 24.21.0, npm 11.19.0 and TypeScript 7.0.2 are pinned. Python packages remain in their
+The host composes finite workers with upstream Cordis 4.0.0-rc.12, Loader 1.0.0-rc.9 and Include
+1.2.0. Node 24.21.0, npm 11.19.0 and TypeScript 7.0.2 are pinned. Python packages remain in their
 existing uv workspace. Simulator libraries belong to selected worker environments.
 
 Run `npm ci --ignore-scripts`, `npm test` and `npm run check:boundary` from this directory. The
@@ -18,11 +18,11 @@ task proves task completion; a missing import can leave no Fiber and a required 
 PENDING. Required Fiber ACTIVE, binding existence and backend readiness are independent admission
 facts.
 
-The host uses native Cordis logging and the console exporter. js-yaml 4.3.2 satisfies Include's
-upstream `^4.1.0` range and includes the published YAML CPU denial-of-service fixes.
-Native Include/CLI tests exercise this package.
+The host uses native Cordis logging and the console exporter. Include uses its upstream `yaml`
+dependency, selected by the package lock. Native Include/CLI tests exercise configuration loading,
+including trusted `!!js` expressions.
 
-Jobs is a Cordis service that invokes Execa 10.1.0 with literal argv, bounded wall timeout and
+Jobs is a Cordis service that invokes Execa 10.2.1 with literal argv, bounded wall timeout and
 output buffers, cancellation, exit status and retained diagnostics. Each owner cancels and reaps its
 own outstanding subprocesses. No shell command string is accepted. The environment can pin the
 selected execution endpoint explicitly.

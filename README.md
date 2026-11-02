@@ -26,10 +26,10 @@ to launch a composition and record what actually ran.
 
 The published pair is
 [contracts 0.21.1](https://pypi.org/project/robotics-runtime-contracts/0.21.1/) and
-[harness 0.22.2](https://pypi.org/project/robotics-acceptance-harness/0.22.2/):
+[harness 0.22.3](https://pypi.org/project/robotics-acceptance-harness/0.22.3/):
 
 ```bash
-python -m pip install robotics-runtime-contracts==0.21.1 robotics-acceptance-harness==0.22.2
+python -m pip install robotics-runtime-contracts==0.21.1 robotics-acceptance-harness==0.22.3
 robotics-contracts --help
 robotics-acceptance --help
 ```
@@ -44,11 +44,11 @@ published pair outside the workspace. Package installation does not qualify
 a simulator, image, accelerator or physical target.
 
 The compiled host is available as the immutable
-[host 0.1.0-rc.0 prerelease](https://github.com/mmkolpakov/robotics-runtime/releases/tag/host-v0.1.0-rc.0).
+[host 0.1.0-rc.1 prerelease](https://github.com/mmkolpakov/robotics-runtime/releases/tag/host-v0.1.0-rc.1).
 Its TGZ installs as an ordinary npm dependency using Node 24.21.0 and npm 11.19.0:
 
 ```bash
-npm install --ignore-scripts --save-exact https://github.com/mmkolpakov/robotics-runtime/releases/download/host-v0.1.0-rc.0/robotics-runtime-host-0.1.0-rc.0.tgz
+npm install --ignore-scripts --save-exact https://github.com/mmkolpakov/robotics-runtime/releases/download/host-v0.1.0-rc.1/robotics-runtime-host-0.1.0-rc.1.tgz
 ```
 
 The release includes a source manifest, checksums and the external installation
