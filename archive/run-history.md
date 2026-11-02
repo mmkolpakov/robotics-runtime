@@ -1,5 +1,8 @@
 # Preserved run and release records
 
+Archived historical summary. The entries describe the releases and runs named
+below and are not a statement of current support.
+
 These records describe their own package versions, source identities and tested
 profiles. They remain historical evidence. Updating the current guide does not
 change a recorded failure, qualify a newer image or establish a native result.

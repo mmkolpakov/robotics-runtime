@@ -7,25 +7,21 @@ The root `.github/workflows/release.yml` builds one package per candidate.
 The selected package's committed `pyproject.toml` version must match exactly.
 Tag pushes must resolve to the checked-out commit and be reachable from `origin/main`.
 
-## Verified package pair and dry runs
+## Candidate checks
 
-[Contracts 0.20.0](https://pypi.org/project/robotics-runtime-contracts/0.20.0/) and
-[harness 0.21.0](https://pypi.org/project/robotics-acceptance-harness/0.21.0/) are
-a verified published pair. For available releases, see the
+Released packages are listed on the
 [contracts project](https://pypi.org/project/robotics-runtime-contracts/) and
 [harness project](https://pypi.org/project/robotics-acceptance-harness/).
-Their exact GitHub release tags are
-[`contracts-v0.20.0`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/contracts-v0.20.0)
-and [`harness-v0.21.0`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/harness-v0.21.0).
-Harness declares `robotics-runtime-contracts>=0.20,<0.21`; its release checks use
-the exact contracts 0.20.0 archive. Independent installs of both published packages,
-their public writer and CLI, installed file inventories and archive attestations
-were verified outside the workspace.
+The committed [contracts manifest](../packages/contracts/pyproject.toml) and
+[harness manifest](../packages/harness/pyproject.toml) select the candidate
+versions. The harness [changelog](../packages/harness/CHANGELOG.md) names its
+exact contracts release prerequisite; the preflight verifies that release
+and the corresponding package sources.
 
-This evidence establishes the package pair and archive identity. It does not
-qualify a released infra image or hardware target. Infra source integration and
-OCI publication have their own gates. A candidate dry run builds and installs
-both archives without publishing; it does not establish PyPI publisher registration.
+A candidate dry run builds the selected package's wheel and source archive,
+then verifies their isolated installation.
+Publication requires separate publisher registration; infra images and native
+execution profiles have their own qualification gates.
 
 `workflow_dispatch` requires a `candidate` input and always runs in dry-run mode.
 Select the ref containing the reviewed source and matching version. It executes helper

@@ -7,20 +7,14 @@ publication environments. GitHub release creation requires successful PyPI
 publication; a local build or dry run does not establish a published release.
 
 The [harness project](https://pypi.org/project/robotics-acceptance-harness/)
-records available releases. The verified 0.21.0/0.20.0 package pair is described
-in the [release procedure](../../../docs/releasing.md#verified-package-pair-and-dry-runs).
+lists released archives. The [candidate checks](../../../docs/releasing.md#candidate-checks)
+derive each package version and its contracts prerequisite from committed
+metadata. Verify an archive against its exact release tag, source commit,
+digest and publisher workflow. Released bytes and attestations retain their
+original identities.
 
-A historical verified harness release is
-[`harness-v0.20.0`](https://github.com/mmkolpakov/robotics-runtime/releases/tag/harness-v0.20.0)
-and [PyPI 0.20.0](https://pypi.org/project/robotics-acceptance-harness/0.20.0/).
-Their attestations and installed inventories were verified with contracts
-0.19.0 outside the workspace. Harness source is
-`efeac712ea512b19523ce41be40752f703fa782b`; contracts source is
-`6c8bc47d1bc416e1b40cdaebf04983e172e78c21`. Released bytes and attestations
-retain those identities. This establishes package identity and the tested pair.
-Historical infra R9's accepted B2 profile uses the
-0.18.1/0.19.0 pair; R10 uses 0.18.2/0.19.1 but its released B3 run remains
-unaccepted. See [compatibility](compatibility.md) for those execution scopes.
+Infra images and execution profiles have separate qualification requirements;
+see [compatibility](compatibility.md).
 
 ## Release Artifact Assessment
 

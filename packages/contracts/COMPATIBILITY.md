@@ -4,16 +4,15 @@ This policy covers the Python distribution and its JSON Schema contracts.
 
 ## Package Cohort
 
-This release pairs contracts 0.21.1 with harness 0.22.0. Harness metadata requires
-`robotics-runtime-contracts>=0.21,<0.22`; release checks select the exact
-`contracts-v0.21.1` prerequisite. See [package release notes](CHANGELOG.md) and
+The [harness manifest](../harness/pyproject.toml) defines its supported contracts
+range. The [harness changelog](../harness/CHANGELOG.md) names the exact contracts
+release prerequisite checked during publication. See
+[package release notes](CHANGELOG.md) and
 [harness compatibility](../harness/docs/compatibility.md).
 
 Package/API support does not qualify an infrastructure image or native profile.
-[Preserved run and release records](../../docs/run-history.md) retain historical
-versions, source identities and actual outcomes; this release does not rewrite
-those records. Consumers must bind their exact installed distributions and
-profile evidence when adopting this cohort.
+Consumers must bind their exact installed distributions and profile evidence
+when adopting a cohort.
 
 ## Current Catalog
 

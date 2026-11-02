@@ -89,9 +89,8 @@ cd packages/harness
 Release consumers should install the published wheel together with the locked
 contracts wheel and verify release provenance as described in
 [`docs/supply-chain.md`](docs/supply-chain.md).
-[Preserved run and release records](../../docs/run-history.md) retain each
-archive's original versions, identities, scope and outcome. Installing these Python
-packages does not qualify an infra image, simulator, accelerator or physical target.
+Installing these Python packages does not qualify an infra image, simulator,
+accelerator or physical target.
 
 ## Quick Start
 
