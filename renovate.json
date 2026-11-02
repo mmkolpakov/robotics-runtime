@@ -109,6 +109,16 @@
       ]
     },
     {
+      "description": "Keep Node type declarations within the supported Node major",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "@types/node"
+      ],
+      "allowedVersions": ">=24 <25"
+    },
+    {
       "description": "Review supported Python versions as a release compatibility change",
       "matchManagers": [
         "pep621"
