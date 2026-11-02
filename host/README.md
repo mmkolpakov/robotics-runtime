@@ -27,6 +27,11 @@ output buffers, cancellation, exit status and retained diagnostics. Each owner c
 own outstanding subprocesses. No shell command string is accepted. The environment can pin the
 selected execution endpoint explicitly.
 
+Jobs decodes stdout/stderr as UTF-8 text. Its `maxBufferBytes` option limits each
+decoded stream by JavaScript string `.length` (UTF-16 code units), before Execa
+removes one final LF or CRLF. This text limit does not bound the original stream's
+byte count or total process memory.
+
 Documents and Evaluation provide paths and CLI arguments to the installed `robotics-contracts` and
 `robotics-acceptance` commands. `WorkerCommand.prefixArgs` can select a finite worker launcher; no
 second evaluator, document serializer or frame bus is introduced. Evaluation windows accept decimal
