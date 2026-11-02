@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { createOfflineAdapter } from '../src/server.mjs';
 
 let transcriptIndex = 0;
 const reportDirectory = process.env.MCP_TEST_REPORT_DIR;
@@ -33,7 +34,7 @@ async function fixture(t, options = {}) {
   async function add(id, bytes) {
     const path = options.paths?.[id] ?? id + '.json';
     await writeFile(join(artifacts, path), bytes, { mode: 0o444 });
-    entries.push({ id, path, sha256: createHash('sha256').update(bytes).digest('hex'), size_bytes: bytes.length });
+    entries.push({ id, path, sha256: createHash('sha256').update(bytes).digest('hex'), size_bytes: bytes.length, ...options.artifactMetadata });
   }
   await add('profile', await readFile(profilePath));
   await add('invalid', Buffer.from('{}'));
@@ -49,7 +50,7 @@ async function fixture(t, options = {}) {
     args: [...(options.nodeArgs ?? []), resolve(directory, '../bin/server.mjs'), '--config', configPath], stderr: 'pipe', env: {} });
   const errors = [];
   transport.stderr.on('data', bytes => errors.push(bytes.toString()));
-  const client = new Client({ name: 'offline-tools-integration', version: '1.0.0' });
+  const client = new Client({ name: 'offline-tools-integration', version: '1.0.0' }, options.clientOptions);
   t.after(async () => { await client.close(); await transport.close(); });
   try { await client.connect(transport); } catch (error) { error.message += ': ' + errors.join(''); throw error; }
   await record('initialized', { server: client.getServerVersion(), capabilities: client.getServerCapabilities(), scope: 'source offline adapter and installed public workers' });
@@ -380,4 +381,55 @@ test('public explain compares metadata without reading external file or HTTP ref
   assert.match(await readFile(events, 'utf8'), /open/);
   await record('external-reference-positive-control', { exitCode: blocked.status, stderr: blocked.stderr,
     hook_loaded: true, forbidden_open_observed_and_refused: true });
+});
+
+for (const mode of ['legacy', { pin: '2026-07-28' }]) {
+  test('standard catalog resource supplies usable IDs without private paths under ' + JSON.stringify(mode), async t => {
+    const f = await fixture(t, {
+      clientOptions: { versionNegotiation: { mode } },
+      artifactMetadata: { operatorPrivate: '/private/credentials/should-not-appear' },
+    });
+    assert.equal(f.client.getServerCapabilities().resources.listChanged, false);
+    assert.equal(f.client.getServerCapabilities().resources.subscribe, undefined);
+    const listed = await f.client.listResources();
+    assert.deepEqual(listed.resources.map(row => row.uri), ['robotics-runtime://catalog']);
+    const resource = await f.client.readResource({ uri: listed.resources[0].uri });
+    const text = resource.contents[0].text, catalog = JSON.parse(text);
+    assert.ok(Buffer.byteLength(text) <= 65536);
+    assert.deepEqual(Object.keys(catalog).sort(), ['artifacts', 'bundles', 'schemas']);
+    for (const row of catalog.artifacts) {
+      assert.deepEqual(Object.keys(row).sort(), ['id', 'path', 'sha256', 'size_bytes']);
+      assert.equal(row.path.startsWith('/'), false);
+    }
+    assert.ok(!text.includes(f.artifacts) && !text.includes(f.scratch));
+    assert.ok(!text.includes(contractsCli) && !text.includes(harnessCli));
+    assert.ok(!text.includes('operatorPrivate') && !text.includes('credentials'));
+    const described = await f.call('describe_contract', { schema_id: catalog.schemas[0].id });
+    assert.equal(described.value.ok, true, described.value.stderr);
+    const bundle = await f.call('explain_bundle', { bundle_id: catalog.bundles[0].id });
+    assert.equal(bundle.value.ok, true, bundle.value.stderr);
+    const selected = catalog.artifacts.find(row => row.path === 'scenario.json');
+    const validated = await f.call('validate_documents', { artifact_ids: [selected.id] });
+    assert.equal(validated.value.ok, true, validated.value.stderr);
+    assert.equal(validated.value.inputRefs[0].sha256, selected.sha256);
+    await assert.rejects(f.client.readResource({ uri: 'robotics-runtime://unknown' }), /resource|not found/i);
+    await rm(join(f.artifacts, selected.path));
+    assert.equal((await f.client.readResource({ uri: listed.resources[0].uri })).contents[0].text, text);
+    const absent = await f.call('validate_documents', { artifact_ids: [selected.id] });
+    assert.equal(absent.value.worker_started, false);
+    assert.deepEqual(await readdir(f.scratch), []);
+  });
+}
+
+test('catalog projection refuses oversized metadata before worker setup', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'mcp-catalog-bound-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const config = {
+    artifactRoot: root, scratchRoot: root, contractsCli: '/unused/contracts', harnessCli: '/unused/harness',
+    schemas: [], bundles: [],
+    artifacts: Array.from({ length: 64 }, (_, index) => ({
+      id: 'entry' + index, path: 'x'.repeat(1024) + index, sha256: '0'.repeat(64), size_bytes: 0,
+    })),
+  };
+  await assert.rejects(createOfflineAdapter(config), /catalog metadata.*64 KiB/);
 });

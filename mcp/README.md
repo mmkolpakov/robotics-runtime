@@ -146,6 +146,21 @@ signatures nor qualifies the package. Each later MCP call still verifies the
 registered identities through the existing private snapshot mechanism.
 Executables, roots and trust remain explicit operator choices.
 
+Resource-aware clients can discover the registered choices by listing resources
+and reading `robotics-runtime://catalog`. This bounded, fixed bootstrap view
+contains schema IDs/names, relative artifact paths with SHA/size and bundle
+roles. Reading it launches no worker. Tool calls still capture and verify the
+selected bytes; catalog metadata is neither a fresh file check nor qualification.
+
+For a [stock mcporter 0.16.1 configuration](https://github.com/openclaw/mcporter/blob/v0.16.1/docs/config.md)
+whose `robotics_runtime` entry selects the approved Node/entrypoint/config argv,
+list and read the catalog, then use its IDs in the six existing tools:
+
+```bash
+mcporter --config /absolute/operator/mcporter.json resource robotics_runtime --output json
+mcporter --config /absolute/operator/mcporter.json resource robotics_runtime robotics-runtime://catalog --output json
+```
+
 ## Results and limits
 
 Each tool returns a JSON text envelope with the public `Jobs` result:

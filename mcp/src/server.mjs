@@ -64,6 +64,14 @@ export async function createOfflineAdapter(input) {
       || seenUris.has(row.uri) || !registry.has(row.artifact_id)) throw new Error('invalid or unregistered extension schema');
     seenUris.add(row.uri);
   }
+  const catalogText = JSON.stringify({
+    schemas: [...schemas].map(([id, schema]) => ({ id, schema })),
+    artifacts: config.artifacts.map(({ id, path, sha256, size_bytes }) => ({ id, path, sha256, size_bytes })),
+    bundles: [...bundles.values()].map(bundle => Object.fromEntries(
+      ['id', ...roles].filter(key => bundle[key] !== undefined).map(key => [key, bundle[key]]),
+    )),
+  });
+  if (Buffer.byteLength(catalogText, 'utf8') > 65536) throw new Error('catalog metadata exceeds the bootstrap 64 KiB bound');
   const contracts = command(config.contractsCli), harness = command(config.harnessCli);
   const owner = new Context();
   let ctx;
@@ -125,7 +133,10 @@ export async function createOfflineAdapter(input) {
   }
   return {
     serverFactory() {
-      const server = new McpServer({ name: 'robotics-runtime-offline', version: '0.1.0-rc.1' }, { capabilities: { tools: {} } });
+      const server = new McpServer({ name: 'robotics-runtime-offline', version: '0.1.0-rc.1' }, { capabilities: { tools: {}, resources: { listChanged: false } } });
+      server.registerResource('catalog', 'robotics-runtime://catalog',
+        { title: 'Registered evidence catalog', mimeType: 'application/json' },
+        async uri => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: catalogText }] }));
       for (const [name, inputSchema, description] of tools) {
         server.registerTool(name, { description, inputSchema,
           annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },

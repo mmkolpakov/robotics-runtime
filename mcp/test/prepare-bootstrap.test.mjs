@@ -82,16 +82,20 @@ test('published inventory becomes a relocated stable MCP catalog and works throu
  t.after(async()=>{await client.close();await transport.close()});
  await client.connect(transport);
  const listed=await client.listTools();assert.equal(listed.tools.length,6);
+ const resources=await client.listResources();
+ assert.deepEqual(resources.resources.map(row=>row.uri),['robotics-runtime://catalog']);
+ const catalog=JSON.parse((await client.readResource({uri:resources.resources[0].uri})).contents[0].text);
+ const registeredId=path=>catalog.artifacts.find(row=>row.path===path).id;
  async function call(name,args={}){
   const response=await client.callTool({name,arguments:args});
   const value=JSON.parse(response.content[0].text);assert.equal(value.ok,true,value.stdout+value.stderr);
   return value;
  }
- await call('describe_contract',{schema_id:a.config.schemas.find(row=>row.schema==='acceptance-scenario.v1').id});
- await call('validate_documents',{artifact_ids:[a.mapping.artifact_ids['scenario.json'],a.mapping.artifact_ids['runtime-manifests/primary.json']]});
- await call('explain_bundle',{bundle_id:a.config.bundles[0].id});
- await call('explain_result',{artifact_id:a.mapping.artifact_ids['results/primary.json']});
- await call('summarize_otlp',{artifact_id:a.mapping.artifact_ids['metrics/primary.jsonl']});
+ await call('describe_contract',{schema_id:catalog.schemas.find(row=>row.schema==='acceptance-scenario.v1').id});
+ await call('validate_documents',{artifact_ids:[registeredId('subjects/scenario.json'),registeredId('subjects/runtime-manifests/primary.json')]});
+ await call('explain_bundle',{bundle_id:catalog.bundles[0].id});
+ await call('explain_result',{artifact_id:registeredId('subjects/results/primary.json')});
+ await call('summarize_otlp',{artifact_id:registeredId('subjects/metrics.jsonl')});
  await call('inspect_offline_readiness');
  for(const [path,bytes]of originals)assert.deepEqual(await readFile(join(f.root,path)),bytes);
 });

@@ -51,6 +51,9 @@ test('installed native CLI documents cross the six readonly MCP tools without nu
  const client=new Client({name:'native-document-integration',version:'1.0.0'});
  t.after(async()=>{await client.close();await transport.close()});
  await client.connect(transport);
+ const resources=await client.listResources();assert.deepEqual(resources.resources.map(row=>row.uri),['robotics-runtime://catalog']);
+ const catalog=JSON.parse((await client.readResource({uri:resources.resources[0].uri})).contents[0].text);
+ const registeredId=path=>catalog.artifacts.find(row=>row.path===path).id;
  const listed=await client.listTools();assert.deepEqual(listed.tools.map(tool=>tool.name).sort(),['describe_contract','explain_bundle','explain_result','inspect_offline_readiness','summarize_otlp','validate_documents']);
  assert.ok(listed.tools.every(tool=>tool.annotations.readOnlyHint&&!tool.annotations.destructiveHint));
  const transcript=[];
@@ -58,27 +61,27 @@ test('installed native CLI documents cross the six readonly MCP tools without nu
   const response=await client.callTool({name,arguments:args});assert.equal(response.content[0].type,'text');
   const value=JSON.parse(response.content[0].text);transcript.push({name,args,response});return {response,value};
  }
- const described=await call('describe_contract',{schema_id:'native-scenario'});assert.equal(described.value.ok,true,described.value.stderr);assert.match(described.value.stdout,/acceptance-scenario.v2/);
- const validated=await call('validate_documents',{artifact_ids:['scenario','runtime','observation','result']});assert.equal(validated.value.ok,true,validated.value.stdout+validated.value.stderr);
+ const described=await call('describe_contract',{schema_id:catalog.schemas.find(row=>row.schema==='acceptance-scenario.v2').id});assert.equal(described.value.ok,true,described.value.stderr);assert.match(described.value.stdout,/acceptance-scenario.v2/);
+ const validated=await call('validate_documents',{artifact_ids:['scenario','runtime','observation','result'].map(id=>registeredId(id+'.json'))});assert.equal(validated.value.ok,true,validated.value.stdout+validated.value.stderr);
  for(const ref of validated.value.inputRefs)assert.equal(ref.sha256,digest(original.get(ref.id)));
- const explained=await call('explain_bundle',{bundle_id:'native'});assert.equal(explained.value.ok,true,explained.value.stderr);
+ const explained=await call('explain_bundle',{bundle_id:catalog.bundles[0].id});assert.equal(explained.value.ok,true,explained.value.stderr);
  const explanation=JSON.parse(explained.value.stdout);assert.equal(explanation.execution.target_environment,'software');assert.equal(explanation.profile.profile_id,'org.example.native-counter');assert.equal('expected_ros_graph' in explanation,false);
- const summarized=await call('summarize_otlp',{artifact_id:'metrics'});assert.equal(summarized.value.ok,true,summarized.value.stderr);assert.equal(JSON.parse(summarized.value.stdout).sample_count,3);
+ const summarized=await call('summarize_otlp',{artifact_id:registeredId('metrics.json')});assert.equal(summarized.value.ok,true,summarized.value.stderr);assert.equal(JSON.parse(summarized.value.stdout).sample_count,3);
  for(const [id,status]of [['result','passed'],['incomplete','incomplete']]){
-  const result=await call('explain_result',{artifact_id:id});assert.equal(result.value.ok,true,result.value.stderr);assert.equal(result.response.isError,false);
+  const result=await call('explain_result',{artifact_id:registeredId(id+'.json')});assert.equal(result.value.ok,true,result.value.stderr);assert.equal(result.response.isError,false);
   const direct=invoke(harnessCli,['why','--format','json',sources[id]]).replace(/\n$/,'');assert.equal(result.value.stdout,direct);
   const why=JSON.parse(result.value.stdout);assert.equal(why.status,status);assert.equal('forbidden_graph_violations' in why,false);
   if(id==='incomplete'){assert.ok(why.runtime_observations.some(item=>item.observation_id==='condition'&&item.status==='incomplete'));assert.ok(why.unevaluated.length)}
   assert.match(result.value.scope,/not qualification/);
  }
  const readiness=await call('inspect_offline_readiness');assert.equal(readiness.value.ok,true,readiness.value.stderr);assert.equal(JSON.parse(readiness.value.stdout).mode,'offline');
- const numericRefusal=await call('validate_documents',{artifact_ids:['invalid-clock']});assert.equal(numericRefusal.value.ok,false);assert.equal(numericRefusal.response.isError,true);
+ const numericRefusal=await call('validate_documents',{artifact_ids:[registeredId('invalid-clock.json')]});assert.equal(numericRefusal.value.ok,false);assert.equal(numericRefusal.response.isError,true);
  assert.match(numericRefusal.value.stdout+numericRefusal.value.stderr,/9007199254740993/);assert.doesNotMatch(numericRefusal.value.stdout+numericRefusal.value.stderr,/9007199254740992/);
  const unknown=await call('validate_documents',{artifact_ids:['unregistered']});assert.equal(unknown.value.worker_started,false);
  const extra=await client.callTool({name:'validate_documents',arguments:{artifact_ids:['scenario'],path:'/etc/passwd',argv:['--help']}});assert.equal(extra.isError,true);
  await assert.rejects(client.callTool({name:'start_run',arguments:{}}),/not found/);
  await chmod(join(artifacts,'observation.json'),0o600);await writeFile(join(artifacts,'observation.json'),Buffer.alloc(original.get('observation').length,32));await chmod(join(artifacts,'observation.json'),0o444);
- const mutated=await call('validate_documents',{artifact_ids:['observation']});assert.equal(mutated.value.worker_started,false);assert.match(mutated.value.error,/digest/);
+ const mutated=await call('validate_documents',{artifact_ids:[registeredId('observation.json')]});assert.equal(mutated.value.worker_started,false);assert.match(mutated.value.error,/digest/);
  for(const [id,path]of Object.entries(sources))assert.equal(digest(await readFile(path)),digest(original.get(id)));
  assert.deepEqual(await readdir(scratch),[]);assert.equal(errors.join(''),'');
  const report=process.env.MCP_TEST_REPORT_DIR;
