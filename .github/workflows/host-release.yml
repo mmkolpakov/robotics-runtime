@@ -123,6 +123,7 @@ jobs:
           cp "artifacts/host-release/dist/$archive" "$consumer/assets/core.tgz"
           cp host/package.json "$consumer/expected-package.json"
           cp artifacts/host-release/manifest.json "$consumer/expected-artifact.json"
+          cp host/tools/release-consumer.mjs "$consumer/release-consumer.mjs"
           cat > "$consumer/package.json" <<'JSON'
           {"name":"host-release-consumer","private":true,"type":"module",
            "dependencies":{"@robotics-runtime/host":"file:assets/core.tgz"}}
@@ -142,6 +143,7 @@ jobs:
           assert.ok(root.startsWith('/consumer/node_modules/'));
           const installed=JSON.parse(await readFile(root+'/package.json'));
           assert.equal(installed.name,expected.name); assert.equal(installed.version,expected.version);
+          const {verifyInstalledLifecycle}=await import('./release-consumer.mjs');
           const origins={};
           for(const [key,target] of Object.entries(expected.exports)){
             const specifier=expected.name+(key==='.'?'':key.slice(1));
@@ -150,11 +152,12 @@ jobs:
             assert.ok((await stat(root+'/'+target.types)).isFile());
             await import(specifier); origins[specifier]=resolved;
           }
-          console.log(JSON.stringify({installed:installed.name,version:installed.version,origins,workspace_fallback:false}));
+          const lifecycle=await verifyInstalledLifecycle();
+          console.log(JSON.stringify({installed:installed.name,version:installed.version,origins,workspace_fallback:false,lifecycle}));
           JS
           docker run --rm --network=none --user "$(id -u):$(id -g)" \
             --volume "$consumer:/consumer:ro" --workdir /consumer "$NODE_IMAGE" \
-            node verify.mjs > artifacts/host-release/consumer.json
+            timeout --signal=TERM --kill-after=5s 60s node verify.mjs > artifacts/host-release/consumer.json
           cp "$consumer/package-lock.json" artifacts/host-release/consumer-package-lock.json
       - name: Record the closed asset set
         id: artifact

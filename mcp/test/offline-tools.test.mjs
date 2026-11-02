@@ -31,7 +31,7 @@ async function fixture(t, options = {}) {
   await mkdir(artifacts, { mode: 0o700 }); await mkdir(scratch, { mode: 0o700 });
   const entries = [];
   async function add(id, bytes) {
-    const path = id + '.json';
+    const path = options.paths?.[id] ?? id + '.json';
     await writeFile(join(artifacts, path), bytes, { mode: 0o444 });
     entries.push({ id, path, sha256: createHash('sha256').update(bytes).digest('hex'), size_bytes: bytes.length });
   }
@@ -89,6 +89,45 @@ test('official stdio client initializes, lists exactly six read tools and calls 
   assert.ok(pins.includes('robotics-runtime-contracts==' + doctor.robotics_runtime_contracts));
   assert.deepEqual(await readdir(f.scratch), []);
   assert.equal(f.errors.join(''), '');
+});
+
+test('registered document parser modes survive snapshots through installed public workers', { timeout: 60000 }, async t => {
+  const json = await readFile(join(fixtureRoot, 'scenario.json'), 'utf8');
+  const yaml = '---\n' + json;
+  const flowYaml = json.replace('"schema_version":', 'schema_version: ');
+  assert.notEqual(flowYaml, json);
+  const cases = [
+    ['scenario.json', json, true],
+    ['scenario.yaml', yaml, true],
+    ['scenario.yml', yaml, true],
+    ['scenario.YAML', flowYaml, true],
+    ['scenario.txt', yaml, true],
+    ['scenario.data', json, true],
+    ['scenario', yaml, true],
+    ['scenario.json', yaml, false],
+    ['scenario.JSON', flowYaml, false],
+    ['scenario.txt', flowYaml, false],
+  ];
+  for (const [path, text, accepted] of cases) await t.test(path + (accepted ? ' accepts' : ' refuses'), async child => {
+    const bytes = Buffer.from(text);
+    const f = await fixture(child, { documents: { scenario: bytes }, paths: { scenario: path } });
+    const direct = spawnSync(contractsCli, ['--format', 'json', 'validate', join(f.artifacts, path)], { encoding: 'utf8' });
+    assert.equal(direct.status === 0, accepted, direct.stdout + direct.stderr);
+    const validated = await f.call('validate_documents', { artifact_ids: ['scenario'] });
+    assert.equal(validated.value.exitCode, direct.status, validated.value.stdout + validated.value.stderr);
+    assert.equal(validated.value.ok, accepted);
+    assert.equal(validated.response.isError, !accepted);
+    const explained = await f.call('explain_bundle', { bundle_id: 'inference' });
+    assert.equal(explained.value.ok, accepted, explained.value.stdout + explained.value.stderr);
+    assert.equal(explained.response.isError, !accepted);
+    for (const value of [validated.value, explained.value]) {
+      const ref = value.inputRefs.find(item => item.id === 'scenario');
+      assert.equal(ref.sha256, createHash('sha256').update(bytes).digest('hex'));
+      assert.equal(ref.size_bytes, bytes.length);
+    }
+    assert.deepEqual(await readFile(join(f.artifacts, path)), bytes);
+    assert.deepEqual(await readdir(f.scratch), []);
+  });
 });
 
 test('public CLI input refusal preserves its actual exit, stderr and error result', async t => {

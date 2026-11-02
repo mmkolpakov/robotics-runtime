@@ -1,6 +1,6 @@
 import { constants } from 'node:fs';
 import { chmod, lstat, mkdtemp, open, realpath, rm } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { referenceFile } from '@robotics-runtime/host';
 
 const identifier = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
@@ -56,7 +56,9 @@ export async function createArtifactRegistry(config) {
           }
           if (await realpath(record.path) !== record.path) throw new Error('artifact path is not canonical');
           const source = await open(record.path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
-          const destination = join(directory, String(index) + '.json');
+          const suffix = extname(record.path).toLowerCase();
+          const mode = ['.json', '.yaml', '.yml'].includes(suffix) ? suffix : '.data';
+          const destination = join(directory, String(index) + mode);
           try {
             const before = await source.stat({ bigint: true });
             if (!before.isFile() || (before.mode & 0o222n) || before.size !== BigInt(record.size_bytes)) {
