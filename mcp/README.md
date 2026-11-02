@@ -1,8 +1,8 @@
 # Offline MCP tools
 
 This optional source package exposes six read tools through the maintained MCP
-SDK's stdio transport. It uses the published host RC0 package and installed
-contracts 0.21.1/harness 0.22.2 CLIs. Install this adapter from source using the
+SDK's stdio transport. It uses the published host RC1 package and installed
+contracts 0.21.1/harness 0.22.3 CLIs. Install this adapter from source using the
 locked dependencies below. The [assistant integration guide](../docs/agent-integration.md)
 relates these tools to configuration, campaigns, execution and archive assessment.
 
@@ -78,6 +78,46 @@ legacy clients. Current-protocol clients use `server/discover` and per-request
 capabilities; legacy clients use their negotiated initialization path.
 The [protocol specification](https://modelcontextprotocol.io/specification/2026-07-28)
 defines that distinction; client setup does not add domain operations.
+
+## Prepare a qualification package
+
+For an externally verified qualification package, prepare the existing bootstrap
+from its writer-produced `qualification-arguments.txt`. Select a stable read-only
+operator corpus and a private scratch directory, then run the helper with the
+same installed contracts Python used by the workers:
+
+```bash
+.public-workers/bin/python tools/prepare-bootstrap.py \
+  --package-root /absolute/verified-package --domain primary \
+  --scratch-root "$PWD/mcp-scratch" \
+  --contracts-cli "$PWD/.public-workers/bin/robotics-contracts" \
+  --harness-cli "$PWD/.public-workers/bin/robotics-acceptance" > bootstrap.json
+```
+
+Repeat `--domain` for each selected qualification domain. The helper prints the
+artifact/bundle ID mapping to stderr and the existing bootstrap JSON to stdout.
+Success exits 0; a refused input exits 2 without emitting a bootstrap.
+IDs derive from logical subject names and remain stable when the corpus moves.
+Built-in schema IDs use the installed public catalog, replacing dots with
+underscores. No document bytes or signed subject names are rewritten.
+
+The imported file contains literal arguments on separate lines, not a shell
+command. Only artifact/extension bindings and the public qualification profile
+pair are accepted: v1 without a comparison rule, or v2 with
+`exact_assertion_outcome`. These profile fields are data, never forwarded to a
+worker. The public contracts loader validates selected contract documents and
+provides their exact SHA-256/size. Contract documents, metrics and declared
+extension schemas enter the existing catalog; recordings, packages and other raw
+payloads stay outside this read corpus. A bundle needs one scenario and the
+selected `runtime-manifests/<domain>.json`; optional roles must be unambiguous.
+
+Preparation refuses links, nonregular/outside inputs, changed selected files,
+unknown arguments and existing MCP size/count violations. It assumes a stable
+operator-owned corpus: its path/stat checks do not establish raceproof admission
+against malicious concurrent directory replacement. It neither verifies
+signatures nor qualifies the package. Each later MCP call still verifies the
+registered identities through the existing private snapshot mechanism.
+Executables, roots and trust remain explicit operator choices.
 
 ## Results and limits
 
