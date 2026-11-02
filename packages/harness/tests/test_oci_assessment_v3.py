@@ -261,3 +261,27 @@ def test_public_v1_qualification_refuses_v3_result(tmp_path: Path) -> None:
         in completed.stdout + completed.stderr
     )
     assert "KeyError" not in completed.stdout + completed.stderr
+
+
+def test_why_cli_reads_v3_incomplete_without_execution(tmp_path: Path) -> None:
+    from robotics_acceptance_harness.diagnostics import why_report
+
+    _pair(tmp_path, oci=True, result_version="acceptance-result.v3", marked=True)
+    path = tmp_path / "new-result-primary.json"
+    before = path.read_bytes()
+    report = why_report(path)
+    assert report["status"] == "incomplete"
+    assert "$.assertions.org.example.check.first" in report["unevaluated"]
+    environment = os.environ.copy()
+    environment["PATH"] = str(Path(sys.executable).parent) + os.pathsep + environment["PATH"]
+    completed = subprocess.run(
+        ["robotics-acceptance", "why", str(path)],
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=30,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == report
+    assert path.read_bytes() == before
