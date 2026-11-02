@@ -189,9 +189,9 @@ registry; requests cannot choose a URI or path. `describe_contract` describes
 registered built-in schemas. Explain validates document relationships and metadata;
 it does not fetch model/dataset/permit asset URIs or verify those asset bytes.
 
-Each `stdout`/`stderr` value is a UTF-8-decoded string; Jobs removes one final LF
-or CRLF. The adapter leaves worker JSON as text, so large integer tokens never
-become JavaScript Numbers. MCP encodes these strings inside its own JSON envelope.
+Each `stdout`/`stderr` value is a UTF-8-decoded string; Execa applies final-newline
+stripping after capture. The adapter leaves worker JSON as text, so large integer
+tokens never become JavaScript Numbers. MCP encodes these strings inside its own JSON envelope.
 These text results do not preserve arbitrary original worker-stream bytes.
 
 `isError` describes an invocation or admission failure. A successful explanation
