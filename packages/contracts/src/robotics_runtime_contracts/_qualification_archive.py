@@ -82,10 +82,12 @@ def _result_pair(
     aggregates = grouped.get("acceptance_aggregate", ())
     supplied = grouped.get("domain_result", ())
     if any(
-        rules._document(artifact)["schema_version"] != "acceptance-result.v2"
+        rules._document(artifact)["schema_version"]
+        not in {"acceptance-result.v2", "acceptance-result.v3"}
         for artifact in supplied
     ):
-        rules._fail("archive domain results must all use acceptance-result.v2")
+        message = "archive domain results must all use acceptance-result.v2 for originals"
+        rules._fail(f"{message}; assessments may use v3")
     results = {artifact.sha256: artifact for artifact in supplied}
     if len(aggregates) != 2 or len(results) != len(supplied):
         rules._fail("archive requires two aggregates and uniquely captured domain results")
@@ -98,6 +100,11 @@ def _result_pair(
     if len(candidates) != 1:
         rules._fail("archive must identify exactly one original and one assessment per domain")
     original_aggregate, originals, aggregate, assessments = candidates[0]
+    if any(
+        rules._document(artifact)["schema_version"] != "acceptance-result.v2"
+        for artifact in originals.values()
+    ):
+        rules._fail("archive original results must use acceptance-result.v2")
     selected = [*originals.values(), *assessments.values()]
     if len(selected) != len(supplied) or len({item.sha256 for item in selected}) != len(selected):
         rules._fail("archive has unused or multiply selected results")

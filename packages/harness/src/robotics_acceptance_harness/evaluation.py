@@ -267,6 +267,8 @@ def _qualified_entry_points(
     receipts: VerifiedReceiptSet,
     authentications: Mapping[str, AuthenticatedInstallation],
 ) -> tuple[tuple[EntryPoint, _VerifiedRecord], ...]:
+    if any(item.get("kind") == "oci" for item in requirements):
+        raise EvaluationError("OCI evaluator execution is not supported")
     installed = tuple(entry_points(group=EVALUATOR_ENTRY_POINT_GROUP))
     qualified: list[tuple[EntryPoint, _VerifiedRecord]] = []
     for requirement in requirements:

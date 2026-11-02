@@ -510,6 +510,8 @@ def _evaluation_admission(
         if controls is not None
         else bundle.scenario.data["evaluator_requirements"]
     )
+    if controls is not None and controls.data.get("schema_version") == "assessment-controls.v1":
+        raise HarnessInputError("versioned assessment controls execution is not supported")
     return (
         controls,
         _evaluator_receipts(arguments),

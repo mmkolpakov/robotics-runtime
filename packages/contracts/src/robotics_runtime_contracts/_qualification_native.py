@@ -50,13 +50,18 @@ def _domains(context: _Context, observations: Mapping[str, QualificationArtifact
         rules._fail("observation set does not equal acceptance run domains")
     for kind, artifacts, schema in (
         ("runtime", context.runtimes, "runtime-manifest.v2"),
-        ("result", context.results, "acceptance-result.v2"),
         ("observation", observations, "acceptance-observation.v2"),
     ):
         if any(
             rules._document(artifact)["schema_version"] != schema for artifact in artifacts.values()
         ):
             rules._fail(f"native qualification requires one v2 {kind} registry")
+    if any(
+        rules._document(artifact)["schema_version"]
+        not in {"acceptance-result.v2", "acceptance-result.v3"}
+        for artifact in context.results.values()
+    ):
+        rules._fail("native qualification requires v2 or v3 result registry")
     if context.scenario["execution"]["target_environment"] in {"hil", "real_robot"}:
         rules._fail(
             "native v2 physical qualification requires native permit and authority semantics; "
@@ -102,7 +107,8 @@ def _domain(context: _Context, domain: str, observation_artifact: QualificationA
 
 
 def _method_controls(context: _Context, domain: str) -> Mapping[str, Any]:
-    assessment = rules._document(context.results[domain])["evaluation"]
+    result = rules._document(context.results[domain])
+    assessment = result["evaluation"]
     reference = assessment["method"]["configuration"]
     artifact = rules._require_raw(
         context.grouped,
@@ -115,6 +121,9 @@ def _method_controls(context: _Context, domain: str) -> Mapping[str, Any]:
         rules._fail(f"domain {domain} method controls require captured metadata bytes")
     controls = loads_mapping(artifact.native_metadata_bytes, source_name=artifact.subject_name)
     validate_assessment_controls(controls)
+    versioned = controls.get("schema_version") == "assessment-controls.v1"
+    if versioned != (result["schema_version"] == "acceptance-result.v3"):
+        rules._fail(f"domain {domain} result and assessment controls versions differ")
     expected = controls.get("calibration")
     supplied = assessment.get("calibration")
     if expected is not None and supplied is not None:
@@ -130,6 +139,8 @@ def _receipt_requirements(context: _Context) -> list[Mapping[str, Any]]:
         for requirement in _method_controls(context, domain)["evaluator_requirements"]:
             if requirement not in requirements:
                 requirements.append(requirement)
+    if any(requirement.get("kind") == "oci" for requirement in requirements):
+        rules._fail("OCI evaluator qualification is not supported")
     return requirements
 
 

@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:robotics-runtime-contracts:v1:internal:assessment",
+  "title": "Versioned assessment controls",
+  "$defs": {
+    "ociEvaluatorRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "namespace",
+        "execution_subject",
+        "expected_assertion_ids"
+      ],
+      "properties": {
+        "kind": {
+          "const": "oci"
+        },
+        "namespace": {
+          "$ref": "urn:robotics-runtime-contracts:v1:acceptance-scenario#/$defs/evaluatorRequirement/properties/namespace",
+          "maxLength": 128
+        },
+        "execution_subject": {
+          "allOf": [
+            {
+              "$ref": "urn:robotics-runtime-contracts:v1:runtime-manifest#/properties/execution_subject"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "oci_image"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                }
+              }
+            }
+          ]
+        },
+        "expected_assertion_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/identifier"
+          }
+        }
+      }
+    },
+    "evaluatorRequirements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ociEvaluatorRequirement"
+      }
+    },
+    "assessmentControls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "metric_definitions",
+        "assertions",
+        "evaluator_requirements",
+        "evidence_policy"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "assessment-controls.v1"
+        },
+        "metric_definitions": {
+          "$ref": "urn:robotics-runtime-contracts:v1:acceptance-scenario#/properties/metric_definitions"
+        },
+        "assertions": {
+          "$ref": "urn:robotics-runtime-contracts:v1:acceptance-scenario#/properties/assertions"
+        },
+        "evaluator_requirements": {
+          "$ref": "#/$defs/evaluatorRequirements"
+        },
+        "evidence_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_artifact_size_bytes",
+            "max_archive_size_bytes",
+            "max_upload_lag_sec",
+            "upload_mode",
+            "retention_class",
+            "remote_sink_allowed"
+          ],
+          "properties": {
+            "max_artifact_size_bytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_archive_size_bytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_upload_lag_sec": {
+              "type": "number",
+              "minimum": 0
+            },
+            "upload_mode": {
+              "enum": [
+                "local_only",
+                "remote_optional",
+                "remote_required"
+              ]
+            },
+            "retention_class": {
+              "type": "string",
+              "minLength": 1
+            },
+            "remote_sink_allowed": {
+              "type": "boolean"
+            }
+          }
+        },
+        "calibration": {
+          "$ref": "urn:robotics-runtime-contracts:v2:internal:native-execution#/$defs/calibrationSelection"
+        }
+      }
+    }
+  }
+}

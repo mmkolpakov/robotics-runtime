@@ -1250,11 +1250,42 @@ def _validate_native_scenario(document: Mapping[str, Any]) -> None:
     _validate_native_assessment_controls(schema_name, document)
 
 
+def _validate_oci_requirements(
+    schema_name: str, requirements: Sequence[Mapping[str, Any]], path: str
+) -> None:
+    assigned: set[str] = set()
+    for index, requirement in enumerate(requirements):
+        identifiers = set(requirement["expected_assertion_ids"])
+        if assigned & identifiers:
+            _fail(schema_name, path, "OCI assertion ID is assigned to more than one evaluator")
+        assigned.update(identifiers)
+        namespace = requirement["namespace"]
+        if any(
+            not identifier.startswith(f"{namespace}.")
+            for identifier in requirement["expected_assertion_ids"]
+        ):
+            _fail(
+                schema_name,
+                f"{path}[{index}].expected_assertion_ids",
+                "must belong to the evaluator namespace",
+            )
+
+
 def _validate_native_assessment_controls(schema_name: str, document: Mapping[str, Any]) -> None:
     _require_unique(schema_name, document["assertions"], "assertion_id", "$.assertions")
     _require_unique(
         schema_name, document["evaluator_requirements"], "namespace", "$.evaluator_requirements"
     )
+    if schema_name == "acceptance-result.v3":
+        requirements = document["evaluator_requirements"]
+        _validate_oci_requirements(schema_name, requirements, "$.evaluator_requirements")
+        product_ids = {
+            identifier for item in requirements for identifier in item["expected_assertion_ids"]
+        }
+        if product_ids & {item["assertion_id"] for item in document["assertions"]}:
+            _fail(
+                schema_name, "$.assertions", "core and OCI evaluator assertion IDs must be disjoint"
+            )
     _validate_metric_declarations(schema_name, document)
     for assertion in document["assertions"]:
         if assertion["assertion_id"] in RESERVED_ASSERTION_IDS or assertion[
@@ -1388,13 +1419,65 @@ def _validate_native_assertion_sources(document: Mapping[str, Any]) -> None:
                 )
 
 
+def _validate_oci_assessment_coverage(
+    document: Mapping[str, Any],
+    covered: Sequence[Mapping[str, Any]],
+    uncovered: Sequence[Mapping[str, Any]],
+) -> None:
+    schema_name = str(document["schema_version"])
+    evaluators = document["evaluators"]
+    _validate_oci_requirements(schema_name, evaluators, "$.evaluators")
+    expected = {identifier for item in evaluators for identifier in item["expected_assertion_ids"]}
+    namespaces = {item["namespace"] for item in evaluators}
+    owners = {
+        identifier: item["namespace"]
+        for item in evaluators
+        for identifier in item["expected_assertion_ids"]
+    }
+    rows = [
+        item
+        for item in document["assertion_results"]
+        if item["source"] == "product" and item["namespace"] in namespaces
+    ]
+    returned = {item["assertion_id"] for item in rows}
+    if any(owners.get(item["assertion_id"]) != item["namespace"] for item in rows):
+        _fail(
+            schema_name,
+            "$.assertion_results",
+            "OCI product assertion is not assigned to its evaluator",
+        )
+    covered_ids = {item["assertion_id"] for item in covered}
+    uncovered_ids = {item["assertion_id"] for item in uncovered}
+    prefixes = tuple(f"{namespace}." for namespace in namespaces)
+    if {
+        identifier for identifier in covered_ids | uncovered_ids if identifier.startswith(prefixes)
+    } - expected:
+        _fail(schema_name, "$.evaluation.coverage", "OCI coverage contains undeclared assertions")
+    if expected - (covered_ids | uncovered_ids):
+        _fail(
+            schema_name,
+            "$.evaluation.coverage",
+            "OCI expected assertions must be covered or uncovered",
+        )
+    if (covered_ids & expected) - returned:
+        _fail(
+            schema_name,
+            "$.evaluation.coverage",
+            "covered OCI assertions require their product result",
+        )
+
+
 def _validate_native_assessment_coverage(document: Mapping[str, Any]) -> None:
     schema_name = str(document["schema_version"])
     coverage = document["evaluation"].get("coverage")
     if coverage is None:
+        if schema_name == "acceptance-result.v3" and document["evaluators"]:
+            _fail(schema_name, "$.evaluation.coverage", "OCI assessment requires declared coverage")
         return
     covered = coverage["covered_assertions"]
     uncovered = coverage["uncovered_assertions"]
+    if schema_name == "acceptance-result.v3":
+        _validate_oci_assessment_coverage(document, covered, uncovered)
     _require_unique(
         schema_name, covered, "assertion_id", "$.evaluation.coverage.covered_assertions"
     )
@@ -1481,6 +1564,7 @@ _VALIDATORS: dict[str, Callable[[Mapping[str, Any]], None]] = {
     "runtime-manifest.v2": _validate_native_runtime,
     "acceptance-observation.v2": _validate_native_observation,
     "acceptance-result.v2": _validate_native_result,
+    "acceptance-result.v3": _validate_native_result,
     "acceptance-observation.v1": _validate_acceptance_observation,
     "acceptance-scenario.v1": _validate_acceptance_scenario,
     "model-artifact-manifest.v1": _validate_model_artifact,
