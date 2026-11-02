@@ -18,7 +18,8 @@ versions. The harness [changelog](../packages/harness/CHANGELOG.md) names its
 exact contracts release prerequisite; the preflight verifies that release
 and the corresponding package sources.
 
-A candidate dry run builds both archives and verifies their isolated installation.
+A candidate dry run builds the selected package's wheel and source archive,
+then verifies their isolated installation.
 Publication requires separate publisher registration; infra images and native
 execution profiles have their own qualification gates.
 
