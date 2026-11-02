@@ -15,6 +15,7 @@ from typing import Any
 import robotics_acceptance_harness as harness
 import robotics_runtime_contracts as contracts
 from jsonschema import Draft202012Validator, FormatChecker
+from robotics_acceptance_harness.evaluation import EvaluationError
 from robotics_acceptance_harness.evaluator_json import (
     decode_evaluator_response,
     encode_evaluator_request,
@@ -110,6 +111,22 @@ def main() -> None:
         ("unobserved", b'{"counter":7}', b"", "unobserved", "skipped", None),
         ("bad-counter", b'{"counter":"bad"}', b'{"offset":7}', "selected", "error", None),
         ("bad-offset", b'{"counter":7}', b'{"offset":"bad"}', "selected", "error", None),
+        (
+            "bad-counter-utf8",
+            b'{"counter":7,"note":"\xff"}',
+            b'{"offset":7}',
+            "selected",
+            "error",
+            None,
+        ),
+        (
+            "bad-offset-utf8",
+            b'{"counter":7}',
+            b'{"offset":7,"note":"\xff"}',
+            "selected",
+            "error",
+            None,
+        ),
         (
             "large-integer",
             b'{"counter":9007199254740993}',
@@ -268,7 +285,9 @@ def main() -> None:
         assert response_path.is_file() and response_path.stat().st_size <= 1024 * 1024
         response_bytes = response_path.read_bytes()
         validators["response"].validate(json.loads(response_bytes))
-        allowed = {str(ref["sha256"]) for ref in selected}
+        allowed = {str(evidence["sha256"])}
+        if state == "selected":
+            allowed.add(str(calibration["artifacts"][0]["sha256"]))
         rows = decode_evaluator_response(
             response_bytes,
             request_sha256=sha256(request_bytes).hexdigest(),
@@ -278,8 +297,28 @@ def main() -> None:
         )
         by_id = {row.assertion_id: row for row in rows}
         assert by_id[IDS[0]].status == "passed"
+        assert by_id[IDS[0]].source == "product"
+        assert set(by_id[IDS[0]].evidence_sha256) == {str(evidence["sha256"])}
+        assert by_id[IDS[1]].source == "product"
+        assert set(by_id[IDS[1]].evidence_sha256) == allowed
         assert by_id[IDS[1]].status == expected_status
         assert by_id[IDS[1]].observed_value == expected_value
+        for foreign in (str(config["sha256"]), str(controls["sha256"])):
+            assert foreign not in allowed
+            altered = json.loads(response_bytes)
+            altered["assertion_results"][1]["evidence_sha256"] = [foreign]
+            try:
+                decode_evaluator_response(
+                    json.dumps(altered).encode(),
+                    request_sha256=sha256(request_bytes).hexdigest(),
+                    namespace=NAMESPACE,
+                    expected_assertion_ids=IDS,
+                    allowed_evidence_sha256=allowed,
+                )
+            except EvaluationError:
+                pass
+            else:
+                raise AssertionError("unselected configuration or controls digest was accepted")
         outputs[name] = {"status": expected_status, "observed_value": expected_value}
     (ROOT / "wire-consumer-report.json").write_text(json.dumps(outputs, indent=2) + "\n")
     print(json.dumps(outputs, sort_keys=True))

@@ -4,7 +4,8 @@ import { lstatSync, readFileSync, writeFileSync } from 'node:fs';
 const namespace = 'org.example.evidence-bytes-node';
 const ids = [`${namespace}.nonempty`, `${namespace}.calibrated-error`];
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
-const parse = (bytes) => JSON.parse(bytes.toString('utf8'), (_key, value, context) => {
+const decoder = new TextDecoder('utf-8', { fatal: true });
+const parse = (bytes) => JSON.parse(decoder.decode(bytes), (_key, value, context) => {
   if (typeof value === 'number' && /^-?(?:0|[1-9][0-9]*)$/.test(context.source)) {
     return BigInt(context.source);
   }
@@ -69,7 +70,7 @@ if (calibration.state === 'unobserved') {
     counter = parse(raw)?.counter;
     offset = parse(offsetBytes)?.offset;
   } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error;
+    if (!(error instanceof SyntaxError) && !(error instanceof TypeError)) throw error;
   }
   if (typeof counter !== 'bigint' || typeof offset !== 'bigint') {
     results.push({
