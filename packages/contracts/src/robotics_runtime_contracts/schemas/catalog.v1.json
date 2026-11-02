@@ -34,14 +34,16 @@
     "acceptance-scenario-core.v1",
     "runtime-manifest-core.v1",
     "transport-qualification-result-core.v1",
-    "native-execution.v2"
+    "native-execution.v2",
+    "assessment.v1"
   ],
   "supported_versions": {
     "acceptance_observation": [
       "acceptance-observation.v2"
     ],
     "acceptance_result": [
-      "acceptance-result.v2"
+      "acceptance-result.v2",
+      "acceptance-result.v3"
     ],
     "acceptance_scenario": [
       "acceptance-scenario.v2"

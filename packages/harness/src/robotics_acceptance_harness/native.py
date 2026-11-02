@@ -20,7 +20,11 @@ from robotics_acceptance_harness.documents import (
     LoadedDocument,
     load_document_bytes,
 )
-from robotics_acceptance_harness.evaluation import EvaluationContext, evaluate_acceptance
+from robotics_acceptance_harness.evaluation import (
+    EvaluationContext,
+    EvaluationError,
+    evaluate_acceptance,
+)
 from robotics_acceptance_harness.evaluator_trust import AuthenticatedInstallation
 from robotics_acceptance_harness.metrics import AssertionEvaluation
 from robotics_acceptance_harness.receipts import VerifiedReceiptSet
@@ -340,6 +344,8 @@ def evaluate_native(
     evaluator_authentications: Mapping[str, AuthenticatedInstallation] | None = None,
 ) -> dict[str, Any]:
     """Assess captured native observations without executing or rewriting their source."""
+    if context.method_controls.get("schema_version") == "assessment-controls.v1":
+        raise EvaluationError("versioned assessment controls execution is not supported")
     source = _load_observation(context)
     _validate_source(context, source)
     observations = _observations(context, source)

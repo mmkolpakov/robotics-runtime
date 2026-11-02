@@ -40,6 +40,27 @@ def load_qualification_artifact(
     )
 
 
+def _v1_result_version(artifacts: Sequence[QualificationArtifact]) -> QualificationReport | None:
+    if any(
+        artifact.kind == "domain_result"
+        and artifact.document is not None
+        and artifact.document.get("schema_version") == "acceptance-result.v3"
+        for artifact in artifacts
+    ):
+        return QualificationReport(
+            tuple(artifacts),
+            (
+                QualificationDiagnostic(
+                    "qualification.unsupported",
+                    "acceptance-result.v3 requires qualification-bundle.v2 archive reassessment",
+                    "document",
+                ),
+            ),
+            blocked_checks=("links",),
+        )
+    return None
+
+
 def inspect_qualification_documents(
     artifacts: Sequence[QualificationArtifact],
     extension_schemas: Mapping[str, bytes] | None = None,
@@ -61,6 +82,9 @@ def inspect_qualification_documents(
             )
     if diagnostics:
         return QualificationReport(tuple(artifacts), tuple(diagnostics), blocked_checks=("links",))
+    unsupported = _v1_result_version(artifacts)
+    if unsupported is not None:
+        return unsupported
     return inspect_links(artifacts)
 
 
@@ -90,7 +114,7 @@ def _control_references(artifact: QualificationArtifact) -> tuple[Mapping[str, A
     assert document is not None
     if artifact.kind == "dataset_manifest":
         return (document["bag"]["metadata"],)
-    if document["schema_version"] != "acceptance-result.v2":
+    if document["schema_version"] not in {"acceptance-result.v2", "acceptance-result.v3"}:
         return ()
     assessment = document["evaluation"]
     return (
@@ -145,6 +169,9 @@ def inspect_qualification_artifacts(
     artifacts, diagnostics = _capture_artifacts(specifications, extension_schemas)
     if diagnostics:
         return QualificationReport(artifacts, diagnostics, blocked_checks=("links",))
+    unsupported = _v1_result_version(artifacts)
+    if unsupported is not None:
+        return unsupported
     return inspect_links(artifacts)
 
 

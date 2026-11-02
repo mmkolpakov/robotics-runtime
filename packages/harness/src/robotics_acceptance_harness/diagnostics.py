@@ -147,7 +147,7 @@ def why_report(path: str | Path) -> dict[str, Any]:
     ]
     unevaluated = set(result.data["unevaluated"])
     observations: list[dict[str, str]] = []
-    if result.schema_version == "acceptance-result.v2":
+    if result.schema_version in {"acceptance-result.v2", "acceptance-result.v3"}:
         return {
             "result_id": result.data["result_id"],
             "status": result.data["status"],
