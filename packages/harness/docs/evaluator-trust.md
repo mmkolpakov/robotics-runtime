@@ -198,8 +198,12 @@ pre-open protection.
 
 Wheel member count, per-member and aggregate expansion, raw inputs, verifier
 deadline and installed namespace/cache entry counts have explicit limits.
-Verifier reports and diagnostics are checked against capture limits after exit;
-the execution profile supplies live filesystem quotas and process resource bounds.
+Verifier stdout and stderr have live byte limits. A successful capture requires
+both streams to reach EOF and the direct child to exit within the command deadline.
+Cosign attestation reports also share the combined report limit. Overflow or a
+deadline closes the local pipes and starts bounded termination and reaping of
+the direct verifier child. This does not settle descendants or an Engine-managed
+evaluator; the execution profile supplies process resource bounds.
 Standard ZIP/CSV readers perform the decoding; duplicate paths, traversal and
 unsupported members are refused.
 

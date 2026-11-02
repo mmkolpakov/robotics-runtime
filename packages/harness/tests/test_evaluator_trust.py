@@ -366,9 +366,10 @@ def test_verifier_process_surface_is_closed_and_has_no_shell() -> None:
         and isinstance(node.func, ast.Attribute)
         and isinstance(node.func.value, ast.Name)
         and node.func.value.id == "subprocess"
+        and node.func.attr != "TimeoutExpired"
     ]
     assert len(calls) == 1 and isinstance(calls[0].func, ast.Attribute)
-    assert calls[0].func.attr == "run"
+    assert calls[0].func.attr == "Popen"
     keywords = {item.arg: item.value for item in calls[0].keywords}
     assert isinstance(keywords["shell"], ast.Constant)
     assert keywords["shell"].value is False
@@ -378,7 +379,7 @@ def test_verifier_process_surface_is_closed_and_has_no_shell() -> None:
     runner = next(
         node
         for node in ast.walk(tree)
-        if isinstance(node, ast.FunctionDef) and node.name == "_run_tool"
+        if isinstance(node, ast.FunctionDef) and node.name == "_capture_tool"
     )
     assert calls[0] in list(ast.walk(runner))
 
