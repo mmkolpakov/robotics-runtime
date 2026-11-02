@@ -121,8 +121,9 @@ retains opaque uploads through existing custody tools. This source service is se
 native execution and qualification;
 it has no published API image release.
 
-The [optional offline MCP source package](mcp/README.md) provides six read tools
-through stdio and published CLI workers. It has no published MCP artifact.
+The [optional offline MCP package](mcp/README.md) provides six read tools through
+stdio. Its [Linux MCPB release](https://github.com/mmkolpakov/robotics-runtime/releases/tag/mcp-v0.1.0-rc.1)
+uses separately installed published CLI workers.
 
 [Architecture and implementation references](docs/future-designs.md) connect the
 target design to the current package references.

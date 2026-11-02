@@ -1,9 +1,8 @@
 # Offline MCP tools
 
-This optional source package exposes six read tools through the maintained MCP
-SDK's stdio transport. It uses the published host RC1 package and installed
-contracts 0.21.1/harness 0.22.3 CLIs. Install this adapter from source using the
-locked dependencies below. The [assistant integration guide](../docs/agent-integration.md)
+This optional package exposes six read tools through the maintained MCP SDK's
+stdio transport. It uses the published host RC1 package and installed contracts
+0.21.1/harness 0.22.3 CLIs. The [assistant integration guide](../docs/agent-integration.md)
 relates these tools to configuration, campaigns, execution and archive assessment.
 
 - `describe_contract`: describe a schema ID from the operator's catalog.
@@ -24,7 +23,49 @@ defaults and explicit native v2 documents. The adapter forwards both versions
 as exact files without adding ROS fields.
 A native incomplete verdict remains incomplete through `explain_result`.
 
-## Install and configure
+## Install the published bundle
+
+Download the MCPB, worker lock and checksums from the immutable
+[0.1.0-rc.1 release](https://github.com/mmkolpakov/robotics-runtime/releases/tag/mcp-v0.1.0-rc.1).
+This Linux profile uses an operator-selected Node 24.21.0 executable and an
+operator-prepared bootstrap file. The Python workers are installed separately:
+
+```bash
+set -eu
+mkdir robotics-mcp
+cd robotics-mcp
+release=https://github.com/mmkolpakov/robotics-runtime/releases/download/mcp-v0.1.0-rc.1
+curl -fLO "$release/robotics-runtime-mcp-0.1.0-rc.1.mcpb"
+curl -fLO "$release/public-cli.lock"
+curl -fLO "$release/SHA256SUMS"
+gh release verify-asset mcp-v0.1.0-rc.1 robotics-runtime-mcp-0.1.0-rc.1.mcpb \
+  --repo mmkolpakov/robotics-runtime
+gh release verify-asset mcp-v0.1.0-rc.1 public-cli.lock \
+  --repo mmkolpakov/robotics-runtime
+sha256sum --check --ignore-missing SHA256SUMS
+python3 -m zipfile -e robotics-runtime-mcp-0.1.0-rc.1.mcpb bundle
+uv venv --python 3.12 .public-workers
+uv pip install --python .public-workers/bin/python --require-hashes --no-deps \
+  --only-binary :all: --requirement public-cli.lock
+```
+
+The GitHub CLI verifies each downloaded file against the immutable release.
+Checksums also check the downloaded bytes. Treat the bundle as executable code.
+For a qualification package, prepare `bootstrap.json` with the helper below.
+A compatible MCPB client substitutes the approved `node_executable` and
+`bootstrap_file` into the bundle's manifest. A generic stdio client can launch:
+
+```bash
+/approved/node-24.21.0/bin/node "$PWD/bundle/bin/server.mjs" \
+  --config "$PWD/bootstrap.json"
+```
+
+The bundle contains the server, bootstrap helper, license and locked production
+Node dependencies. It does not install the Python workers or prepare the
+operator's corpus at startup. The MCPB manifest declares the Linux profile and
+its two required file selections.
+
+## Install and configure from source
 
 Use Node 24.21.0/npm 11.19.0. Install the locked dependencies and published
 Python workers in separate environments:
@@ -47,7 +88,7 @@ For example, prepare read-only `evidence/scenario.json` and
 `evidence/runtime.json`, then generate a bootstrap using public byte references:
 
 ```bash
-mkdir -m 700 mcp-scratch
+mkdir -p -m 700 mcp-scratch
 chmod 444 evidence/scenario.json evidence/runtime.json
 CONTRACTS_CLI="$PWD/.public-workers/bin/robotics-contracts" \
 HARNESS_CLI="$PWD/.public-workers/bin/robotics-acceptance" \
@@ -79,49 +120,24 @@ capabilities; legacy clients use their negotiated initialization path.
 The [protocol specification](https://modelcontextprotocol.io/specification/2026-07-28)
 defines that distinction; client setup does not add domain operations.
 
-## Build and consume an offline MCPB
-
-The MCP CI job builds one `.mcpb` containing the server, preparation helper,
-license and production Node dependencies from `package-lock.json`. It validates
-the manifest against the official MCPB 0.3 schema from MCPB 2.1.2, pinned by SHA,
-and uses Python's standard ZIP CLI. Source locks remain separate build inputs.
-CI compares two archives built with normalized mtimes in the same toolchain.
-
-The current profile is Linux with an operator-selected Node 24.21.0 executable
-and bootstrap file. A standard MCPB client substitutes `node_executable` and
-`bootstrap_file` into the manifest's literal command/arguments. The separately
-installed C0.21.1/H0.22.3 workers remain selected by that bootstrap; startup
-performs no package installation. A generic stdio client can use the extracted
-bundle directly:
-
-```bash
-python3 -m zipfile -e robotics-runtime-mcp-0.1.0-rc.1.mcpb /approved/bundle
-/approved/node-24.21.0/bin/node /approved/bundle/bin/server.mjs \
-  --config /approved/bootstrap.json
-```
-
-Select and verify the bundle as executable code before configuring the client.
-The installed consumer check runs the existing six-tool test with a read-only
-filesystem, disabled network and separate artifact/client mounts. Its dependency
-image supplies the explicit published Python workers. These are offline document
-checks; native execution and desktop client qualification have separate gates.
-
 ## Prepare a qualification package
 
 For an externally verified qualification package, prepare the existing bootstrap
 from its writer-produced `qualification-arguments.txt`. Select a stable read-only
 operator corpus and a private scratch directory, then run the helper with the
-same installed contracts Python used by the workers:
+same installed contracts Python used by the workers. From the published bundle:
 
 ```bash
-.public-workers/bin/python tools/prepare-bootstrap.py \
+mkdir -p -m 700 mcp-scratch
+.public-workers/bin/python bundle/tools/prepare-bootstrap.py \
   --package-root /absolute/verified-package --domain primary \
   --scratch-root "$PWD/mcp-scratch" \
   --contracts-cli "$PWD/.public-workers/bin/robotics-contracts" \
   --harness-cli "$PWD/.public-workers/bin/robotics-acceptance" > bootstrap.json
 ```
 
-Repeat `--domain` for each selected qualification domain. The helper prints the
+For a source checkout, use `tools/prepare-bootstrap.py` instead of the bundle
+path. Repeat `--domain` for each selected qualification domain. The helper prints the
 artifact/bundle ID mapping to stderr and the existing bootstrap JSON to stdout.
 Success exits 0; a refused input exits 2 without emitting a bootstrap.
 IDs derive from logical subject names and remain stable when the corpus moves.
@@ -203,15 +219,20 @@ broader operator powers. It does not replace this document adapter.
 
 ## Test
 
+From the source checkout after installing the dependencies above:
+
 ```bash
 MCP_TEST_CONTRACTS_CLI="$PWD/.public-workers/bin/robotics-contracts" \
 MCP_TEST_HARNESS_CLI="$PWD/.public-workers/bin/robotics-acceptance" \
   npm test
 ```
 
-Tests use the official MCP client and the installed public CLIs. Controlled
-worker probes separately exercise raw 64-bit output, timeout, output overflow
-and request cancellation. These probes are subprocess-boundary checks.
+Tests use the official MCP client and the installed public CLIs. The installed
+consumer check also runs the existing tool tests with a read-only filesystem,
+no network and no source checkout. Native execution and desktop client
+qualification have separate gates. Controlled worker probes separately exercise
+raw 64-bit output, timeout, output overflow and request cancellation. These
+probes are subprocess-boundary checks.
 
 With the locked published workers, run the native v2 document integration check:
 
