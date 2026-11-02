@@ -170,6 +170,7 @@ def main() -> None:
         )
         source = next(item for item in index["artifacts"] if item["artifact_id"] == "method-input")
         evidence = stored(input_root, "method-input.json", method_input.read_bytes(), source["uri"])
+        calibration: dict[str, Any]
         if state == "selected":
             offset_source = directory / "original-offset.json"
             offset_source.write_bytes(offset)

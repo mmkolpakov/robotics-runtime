@@ -171,7 +171,8 @@ def verify_consumers(
                 "contracts_wheel": {
                     "filename": filename,
                     "sha256": expected,
-                    "origin": "https://pypi.org/project/robotics-runtime-contracts/0.21.1/",
+                    "published_reference": "https://pypi.org/project/robotics-runtime-contracts/0.21.1/",
+                    "source": "caller-supplied wheel verified by SHA-256",
                 },
                 "source_commit": plan.commit,
                 "candidate_artifacts": [
