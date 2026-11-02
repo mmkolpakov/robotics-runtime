@@ -70,6 +70,45 @@
       ]
     },
     {
+      "description": "Review Node and npm toolchain declarations as one compatibility cohort",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "engines",
+        "packageManager"
+      ],
+      "matchPackageNames": [
+        "node",
+        "npm"
+      ],
+      "groupName": "Node and npm toolchain",
+      "dependencyDashboardApproval": true,
+      "automerge": false,
+      "prBodyNotes": [
+        "Coordinate Node and npm with the supported host release and its published consumer requirements before approving this update."
+      ]
+    },
+    {
+      "description": "Review Node runtime images with the Node and npm toolchain",
+      "matchManagers": [
+        "dockerfile",
+        "github-actions"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "node"
+      ],
+      "groupName": "Node and npm toolchain",
+      "dependencyDashboardApproval": true,
+      "automerge": false,
+      "prBodyNotes": [
+        "Coordinate Node and npm with the supported host release and its published consumer requirements before approving this update."
+      ]
+    },
+    {
       "description": "Review supported Python versions as a release compatibility change",
       "matchManagers": [
         "pep621"
