@@ -10,6 +10,7 @@ import tempfile
 from dataclasses import asdict
 from email import policy
 from email.parser import BytesParser
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 from zipfile import ZipFile
@@ -95,8 +96,12 @@ def clean_install(
     additional_artifacts: tuple[Path, ...] = (),
     consumer_fixtures: Path | None = None,
     consumer_provenance: dict[str, Any] | None = None,
+    wire_consumer: bool = False,
+    published_contracts_sha256: str | None = None,
 ) -> dict[str, Any]:
     env = clean_environment()
+    if wire_consumer and (len(additional_artifacts) != 1 or published_contracts_sha256 is None):
+        raise ReleaseError("wire consumer requires a verified published contracts wheel")
     with tempfile.TemporaryDirectory(prefix="robotics-release-") as temporary:
         root = Path(temporary).resolve()
         if root.is_relative_to(workspace.resolve()):
@@ -108,6 +113,9 @@ def clean_install(
         for archive in archives:
             dist = root / archive.name
             shutil.copyfile(archive, dist)
+            if wire_consumer and archive in additional_artifacts:
+                if sha256(dist.read_bytes()).hexdigest() != published_contracts_sha256:
+                    raise ReleaseError("copied published contracts wheel digest differs")
             copied.append(str(dist))
         shutil.copyfile(Path(__file__).with_name("smoke.py"), root / "smoke.py")
         smoke_plan = asdict(plan)
@@ -120,6 +128,19 @@ def clean_install(
                 consumer_provenance=consumer_provenance,
                 workspace=str(workspace.resolve()),
                 archive_packages=[distribution_metadata(path)[0] for path in archives],
+            )
+        if wire_consumer:
+            shutil.copyfile(
+                workspace / "tests/workspace/installed_wire_consumer.py", root / "wire-consumer.py"
+            )
+            shutil.copyfile(
+                workspace
+                / "packages/contracts/consumer-examples/minimal-native-archive/producer.py",
+                root / "native-producer.py",
+            )
+            shutil.copytree(
+                workspace / "packages/harness/consumer-examples/evidence-byte-check-node",
+                root / "node-fixture",
             )
         (root / "plan.json").write_text(json.dumps(smoke_plan), encoding="utf-8")
         shutil.copytree(
@@ -150,11 +171,17 @@ def clean_install(
         ]
         for command in commands:
             subprocess.run(command, cwd=root, env=env, check=True)
+        if wire_consumer:
+            subprocess.run([str(python), "-I", "wire-consumer.py"], cwd=root, env=env, check=True)
         result = {
             "artifact": artifact.name if artifact is not None else "published-pair",
             "status": "passed",
             "outside_workspace": True,
         }
+        if wire_consumer:
+            result["wire_consumer"] = json.loads(
+                (root / "wire-consumer-report.json").read_text("utf-8")
+            )
         if consumer_fixtures is not None:
             result["consumer"] = json.loads((root / "consumer-report.json").read_text("utf-8"))
         return result

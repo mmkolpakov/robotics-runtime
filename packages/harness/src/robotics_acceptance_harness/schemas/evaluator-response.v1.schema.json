@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Finite evaluator response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_sha256",
+    "assertion_results"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "evaluator-response.v1"
+    },
+    "request_sha256": {
+      "$ref": "urn:robotics-runtime-contracts:v1:internal:common#/$defs/sha256"
+    },
+    "assertion_results": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "$ref": "urn:robotics-runtime-contracts:v1:acceptance-result#/properties/assertion_results/items",
+        "properties": {
+          "source": {
+            "const": "product"
+          },
+          "evidence_sha256": {
+            "maxItems": 256
+          }
+        }
+      }
+    }
+  }
+}
