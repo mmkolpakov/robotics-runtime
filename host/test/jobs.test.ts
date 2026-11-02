@@ -101,7 +101,7 @@ test('output overflow stops the live worker and its owned descendant', { skip: p
   }
   try {
     const job = ctx.jobs.run({ executable: process.execPath, args: ['-e',
-      'const {spawn}=require("node:child_process"); const fs=require("node:fs"); const child=spawn(process.execPath,["-e","setInterval(()=>{},100)"],{stdio:"ignore"}); fs.writeFileSync(process.argv[1],JSON.stringify([process.pid,child.pid])); let emitted=false; setInterval(()=>{if(!emitted && fs.existsSync(process.argv[2])){emitted=true; process.stdout.write("x".repeat(8192));}},10);',
+      'const {spawn}=require("node:child_process"); const fs=require("node:fs"); const child=spawn(process.execPath,["-e","setInterval(()=>{},100)"],{stdio:"ignore"}); fs.writeFileSync(process.argv[1]+".tmp",JSON.stringify([process.pid,child.pid])); fs.renameSync(process.argv[1]+".tmp",process.argv[1]); let emitted=false; setInterval(()=>{if(!emitted && fs.existsSync(process.argv[2])){emitted=true; process.stdout.write("x".repeat(8192));}},10);',
       pidsPath, releasePath] });
     let pids: number[] | undefined;
     for (let attempt = 0; attempt < 100; attempt++) {
@@ -121,6 +121,7 @@ test('output overflow stops the live worker and its owned descendant', { skip: p
     await writeFile(releasePath, '');
     const result = await Promise.race([job, pause(3000, undefined, { ref: false }).then(() => undefined)]);
     assert.ok(result, 'overflow must settle before the job deadline without cancellation');
+    assert.ok(result.durationMs < 9000, 'overflow must settle before the total job deadline');
     assert.equal(result.ok, false);
     assert.match(result.diagnostic ?? '', /maxBuffer/);
     assert.equal(result.timedOut, false, 'overflow must stop the worker before its deadline');
