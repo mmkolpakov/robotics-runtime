@@ -412,7 +412,7 @@ jobs:
 
   required-validation:
     name: ci
-    needs: [package, quality, consumers, live-ros, mcp, evaluator-admission]
+    needs: [package, quality, consumers, live-ros, mcp, mcp-installed, evaluator-admission]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -424,6 +424,7 @@ jobs:
           CONSUMERS_RESULT: ${{ needs.consumers.result }}
           ROS_RESULT: ${{ needs.live-ros.result }}
           MCP_RESULT: ${{ needs.mcp.result }}
+          MCP_INSTALLED_RESULT: ${{ needs.mcp-installed.result }}
           ADMISSION_RESULT: ${{ needs.evaluator-admission.result }}
         run: |
           test "$PACKAGE_RESULT" = success
@@ -431,6 +432,7 @@ jobs:
           test "$CONSUMERS_RESULT" = success
           test "$ROS_RESULT" = success
           test "$MCP_RESULT" = success
+          test "$MCP_INSTALLED_RESULT" = success
           test "$ADMISSION_RESULT" = success
 
   mcp-installed:
