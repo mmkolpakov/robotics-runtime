@@ -25,10 +25,12 @@ test('finite argv, exits, spawn errors, timeout, output limit and cancellation',
     assert.throws(() => ctx.jobs.run({ executable: process.execPath, args: [], maxBufferBytes: 5000 }), RangeError);
   } finally { await fiber.dispose(); }
 });
-test('disposing jobs owner cancels and reaps its child', async () => {
+test('disposing jobs owner cancels and reaps both text and raw children', async () => {
   const ctx = new Context(); const fiber = ctx.plugin(Jobs); await fiber.await();
-  const child = ctx.jobs.run({ executable: process.execPath, args: ['-e', 'setInterval(()=>{},100)'] });
-  await fiber.dispose(); assert.equal((await child).canceled, true);
+  const request = { executable: process.execPath, args: ['-e', 'setInterval(()=>{},100)'] };
+  const text = ctx.jobs.run(request); const raw = ctx.jobs.runBytes(request);
+  await fiber.dispose();
+  assert.equal((await text).canceled, true); assert.equal((await raw).canceled, true);
 });
 
 test('worker environment withholds inherited secrets and admits explicit values', async () => {
@@ -42,7 +44,8 @@ test('worker environment withholds inherited secrets and admits explicit values'
   } finally { delete process.env.RR_PARENT_PRIVATE_SENTINEL; await fiber.dispose(); }
 });
 
-test('native Execa killDescendants cancels the observed process group', async () => {
+for (const method of ['run', 'runBytes'] as const) {
+test(`native Execa killDescendants cancels the observed process group (${method})`, async () => {
   const { mkdtemp, readFile, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
@@ -53,7 +56,7 @@ test('native Execa killDescendants cancels the observed process group', async ()
   const abort = new AbortController();
   let pid: number | undefined;
   try {
-    const child = ctx.jobs.run({ executable: process.execPath, cancelSignal: abort.signal, args: ['-e',
+    const child = ctx.jobs[method]({ executable: process.execPath, cancelSignal: abort.signal, args: ['-e',
       'const {spawn}=require("node:child_process"); const fs=require("node:fs"); const child=spawn(process.execPath,["-e","setInterval(()=>{},100)"],{stdio:"ignore"}); fs.writeFileSync(process.argv[1],String(child.pid)); setInterval(()=>{},100);',
       pidPath] });
     for (let attempt = 0; attempt < 100; attempt++) {
@@ -75,8 +78,10 @@ test('native Execa killDescendants cancels the observed process group', async ()
     await rm(directory, { recursive: true, force: true });
   }
 });
+}
 
-test('output overflow stops the live worker and its owned descendant', { skip: process.platform !== 'linux' }, async () => {
+for (const method of ['run', 'runBytes'] as const) {
+test(`output overflow stops the live worker and its owned descendant (${method})`, { skip: process.platform !== 'linux' }, async () => {
   const { mkdtemp, readFile, writeFile, rm } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
@@ -100,7 +105,7 @@ test('output overflow stops the live worker and its owned descendant', { skip: p
     }
   }
   try {
-    const job = ctx.jobs.run({ executable: process.execPath, args: ['-e',
+    const job = ctx.jobs[method]({ executable: process.execPath, args: ['-e',
       'const {spawn}=require("node:child_process"); const fs=require("node:fs"); const child=spawn(process.execPath,["-e","setInterval(()=>{},100)"],{stdio:"ignore"}); fs.writeFileSync(process.argv[1]+".tmp",JSON.stringify([process.pid,child.pid])); fs.renameSync(process.argv[1]+".tmp",process.argv[1]); let emitted=false; setInterval(()=>{if(!emitted && fs.existsSync(process.argv[2])){emitted=true; process.stdout.write("x".repeat(8192));}},10);',
       pidsPath, releasePath] });
     let pids: number[] | undefined;
@@ -147,4 +152,85 @@ test('output overflow stops the live worker and its owned descendant', { skip: p
     }
     await rm(directory, { recursive: true, force: true });
   }
+});
+}
+
+test('raw streams preserve invalid UTF-8, NUL and every final newline independently', async () => {
+  const { createHash } = await import('node:crypto');
+  const ctx = new Context(); const fiber = ctx.plugin(Jobs); await fiber.await();
+  try {
+    const expected = new Uint8Array([0, 255, 195, 40, 13, 10, 10]);
+    const diagnostic = new Uint8Array([101, 255, 13, 10]);
+    const result = await ctx.jobs.runBytes({ executable: process.execPath, args: ['-e',
+      'process.stdout.write(Buffer.from([0,255,195,40,13,10,10])); process.stderr.write(Buffer.from([101,255,13,10]));'] });
+    assert.equal(result.ok, true); assert.equal(result.isMaxBuffer, false);
+    assert.equal(result.stdout.constructor, Uint8Array); assert.equal(result.stderr.constructor, Uint8Array);
+    assert.deepEqual(result.stdout, expected); assert.deepEqual(result.stderr, diagnostic);
+    assert.equal(createHash('sha256').update(result.stdout).digest('hex'), createHash('sha256').update(expected).digest('hex'));
+    const text = await ctx.jobs.run({ executable: process.execPath, args: ['-e', 'process.stdout.write("text\\n")'] });
+    assert.equal(text.stdout, 'text'); assert.equal(typeof text.stdout, 'string');
+    assert.equal(Object.hasOwn(text, 'isMaxBuffer'), false);
+  } finally { await fiber.dispose(); }
+});
+
+test('raw JSON retains the exact uint64 numeric token and trailing CRLF', async () => {
+  const ctx = new Context(); const fiber = ctx.plugin(Jobs); await fiber.await();
+  try {
+    const original = '{"value":18446744073709551615}\r\n\n';
+    const result = await ctx.jobs.runBytes({ executable: process.execPath,
+      args: ['-e', 'process.stdout.write(process.argv[1])', original] });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.stdout, new TextEncoder().encode(original));
+  } finally { await fiber.dispose(); }
+});
+
+test('raw limits count multibyte output bytes and bound stderr separately', async () => {
+  const ctx = new Context();
+  const fiber = ctx.plugin(Jobs, { maxBufferBytes: 32, killTimeoutMs: 100 }); await fiber.await();
+  try {
+    const request = { executable: process.execPath, args: ['-e', 'process.stdout.write("\\u00e9".repeat(4))'] };
+    const exact = await ctx.jobs.runBytes({ ...request, maxBufferBytes: 8 });
+    assert.equal(exact.ok, true); assert.equal(exact.stdout.byteLength, 8);
+    const tooLarge = await ctx.jobs.runBytes({ ...request, maxBufferBytes: 7 });
+    assert.equal(tooLarge.ok, false); assert.equal(tooLarge.isMaxBuffer, true);
+    assert.ok(tooLarge.stdout.byteLength <= 7);
+    const stderr = await ctx.jobs.runBytes({ executable: process.execPath,
+      args: ['-e', 'process.stdout.write("{}"); process.stderr.write("\\u00e9".repeat(2))'],
+      maxBufferBytes: 32, stderrMaxBufferBytes: 3 });
+    assert.equal(stderr.ok, false); assert.equal(stderr.isMaxBuffer, true);
+    assert.ok(stderr.stderr.byteLength <= 3);
+    for (const value of [0, -1, 1.5, 33, Number.POSITIVE_INFINITY]) {
+      assert.throws(() => ctx.jobs.runBytes({ ...request, stderrMaxBufferBytes: value }), RangeError);
+    }
+  } finally { await fiber.dispose(); }
+});
+
+test('a parseable JSON prefix after raw overflow is still a failed capture', async () => {
+  const ctx = new Context();
+  const fiber = ctx.plugin(Jobs, { maxBufferBytes: 128, killTimeoutMs: 100 }); await fiber.await();
+  try {
+    const result = await ctx.jobs.runBytes({ executable: process.execPath, args: ['-e',
+      'process.stdout.write("{}\\n"+" ".repeat(16384))'] });
+    assert.equal(result.ok, false); assert.equal(result.isMaxBuffer, true);
+    assert.ok(result.stdout.byteLength <= 128);
+    assert.deepEqual(JSON.parse(Buffer.from(result.stdout).toString('utf8')), {});
+  } finally { await fiber.dispose(); }
+});
+
+test('raw spawn failure, nonzero exit and timeout retain process outcomes', async () => {
+  const ctx = new Context(); const fiber = ctx.plugin(Jobs, { timeoutMs: 2000, killTimeoutMs: 100 }); await fiber.await();
+  try {
+    const failed = await ctx.jobs.runBytes({ executable: process.execPath,
+      args: ['-e', 'process.stderr.write("detail\\n"); process.exit(7)'] });
+    assert.equal(failed.ok, false); assert.equal(failed.exitCode, 7);
+    assert.equal(failed.isMaxBuffer, false);
+    assert.deepEqual(failed.stderr, new TextEncoder().encode('detail\n'));
+    const missing = await ctx.jobs.runBytes({ executable: '/rr-does-not-exist', args: [] });
+    assert.equal(missing.ok, false); assert.equal(missing.code, 'ENOENT');
+    assert.deepEqual(missing.stdout, new Uint8Array());
+    const timeout = await ctx.jobs.runBytes({ executable: process.execPath,
+      args: ['-e', 'setInterval(()=>{},100)'], timeoutMs: 80 });
+    assert.equal(timeout.ok, false); assert.equal(timeout.timedOut, true);
+    assert.equal(timeout.isMaxBuffer, false);
+  } finally { await fiber.dispose(); }
 });

@@ -27,6 +27,19 @@ output buffers, cancellation, exit status and retained diagnostics. Each owner c
 own outstanding subprocesses. No shell command string is accepted. The environment can pin the
 selected execution endpoint explicitly.
 
+`Jobs.run` returns UTF-8 strings and retains Execa's final-newline stripping.
+Its existing `maxBufferBytes` name refers to Execa's character limit in this text mode.
+`Jobs.runBytes` returns separate plain `Uint8Array` stdout/stderr values without text
+decoding or newline removal. In this mode, `maxBufferBytes` limits stdout bytes and
+`stderrMaxBufferBytes` independently limits stderr bytes; its default is 64 KiB or the
+owner ceiling, whichever is lower. Both requested limits must fit the owner ceiling.
+
+A byte result exposes `isMaxBuffer` and the same process outcome fields as a text result.
+Partial bytes retained on failure are diagnostics, not a successful response, even if they
+contain parseable JSON. Stream limits bound captured data, not total process memory or runtime
+buffer overhead. Both methods share the owner's cancellation and subprocess settlement.
+Settlement of a local Engine client does not establish that its container has stopped.
+
 Documents and Evaluation provide paths and CLI arguments to the installed `robotics-contracts` and
 `robotics-acceptance` commands. `WorkerCommand.prefixArgs` can select a finite worker launcher; no
 second evaluator, document serializer or frame bus is introduced. Evaluation windows accept decimal
