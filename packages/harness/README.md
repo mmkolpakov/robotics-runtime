@@ -377,6 +377,9 @@ See [evaluator authentication and operator profile](docs/evaluator-trust.md).
 The APIs and CLI trust-profile option establish evaluator-code admission;
 execution-composition and native-method qualification remain separate.
 
+The development workspace also provides a [finite evaluator JSON codec](docs/evaluator-json.md)
+for exchanging prepared requests and captured responses.
+
 The harness compiles captured authenticated Python source bytes using an
 explicit source loader, without reading or writing bytecode caches. This covers
 the evaluator's parent packages and imports within the distribution's module

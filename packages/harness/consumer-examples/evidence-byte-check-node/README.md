@@ -20,3 +20,5 @@ JavaScript's safe Number range without changing them into strings. The owner
 validates the request, authenticates and limits the process, and validates the
 response against the expected assertions and original evidence identities.
 Running this example does not establish native readiness or admit an evaluator.
+
+See the [finite evaluator JSON reference](../../docs/evaluator-json.md) for the codec.
