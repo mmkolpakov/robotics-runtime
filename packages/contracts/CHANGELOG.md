@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add acceptance-result.v3 and versioned OCI assessment controls for independent
+  archive assessment data validation. Preserve original v2 documents and their
+  exact-byte identities. OCI execution and qualification remain unsupported. See
+  [assessment controls and migration](docs/assessment-controls.md) for version
+  selection, assertion ownership and coverage requirements.
+
 ## 0.21.1
 
 - Add opt-in acceptance-scenario.v2, runtime-manifest.v2,

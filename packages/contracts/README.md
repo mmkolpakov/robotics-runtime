@@ -165,6 +165,8 @@ assessment method, environment, time, calibration and coverage. The
 [qualification reference](docs/qualification.md) describe explicit bundle2
 selection. Physical v2 qualification is unsupported; v1 signed documents are
 read under their original semantics.
+See [assessment controls and archive result versions](docs/assessment-controls.md)
+for result v3 declarations and the separate execution and qualification limits.
 
 ## Extensions
 
