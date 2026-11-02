@@ -314,7 +314,8 @@ def _run_tool(
     admitted = (
         command[1:] == ["--version"] or command[1:3] == ["attestation", "verify"]
         if tool_name == "gh"
-        else command[1:] == ["version", "--json"] or command[1:2] == ["verify-blob-attestation"]
+        else command[1:] == ["version", "--json"]
+        or command[1:2] in (["verify-blob-attestation"], ["verify-blob"])
     )
     if not command or command[0] != expected or not admitted:
         raise EvaluatorTrustError("only the pinned snapshot verifier commands are admitted")
