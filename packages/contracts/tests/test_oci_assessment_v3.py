@@ -108,12 +108,6 @@ def test_oci_coverage_requires_declared_ids_and_preserves_incomplete() -> None:
     with pytest.raises(ContractError, match="covered or uncovered"):
         _validate_native_assessment_coverage(bad)
     bad = deepcopy(result)
-    bad["evaluation"]["coverage"]["uncovered_assertions"].append(
-        {"assertion_id": "org.example.check.extra", "reason": "undeclared"}
-    )
-    with pytest.raises(ContractError, match="undeclared"):
-        _validate_native_assessment_coverage(bad)
-    bad = deepcopy(result)
     bad["assertion_results"] = [
         {
             "source": "product",
@@ -194,5 +188,65 @@ def test_builtin_rows_cannot_satisfy_oci_ownership() -> None:
             }
         },
     }
-    with pytest.raises(ContractError, match="require their product result"):
+    with pytest.raises(ContractError, match="cannot be claimed by a core row"):
         _validate_native_assessment_coverage(result)
+
+
+def test_core_id_under_oci_prefix_is_not_inferred_as_product() -> None:
+    result: dict[str, Any] = {
+        "schema_version": "acceptance-result.v3",
+        "evaluators": [deepcopy(OCI)],
+        "assertion_results": [
+            {"source": "core", "assertion_id": "org.example.check.latency", "status": "passed"}
+        ],
+        "evidence": [{"sha256": DIGEST}],
+        "unevaluated": ["$.assertions.org.example.check.first"],
+        "evaluation": {
+            "coverage": {
+                "covered_assertions": [
+                    {"assertion_id": "org.example.check.latency", "evidence_sha256": [DIGEST]}
+                ],
+                "uncovered_assertions": [
+                    {"assertion_id": "org.example.check.first", "reason": "unavailable"}
+                ],
+            }
+        },
+    }
+    _validate_native_assessment_coverage(result)
+    result["assertion_results"][0]["assertion_id"] = "org.example.check.first"
+    result["evaluation"]["coverage"]["covered_assertions"] = []
+    with pytest.raises(ContractError, match="cannot be claimed by a core row"):
+        _validate_native_assessment_coverage(result)
+
+
+def test_qualification_checks_coverage_against_captured_controls() -> None:
+    from types import SimpleNamespace
+
+    from robotics_runtime_contracts._qualification_native import (
+        _NATIVE_POLICY_ASSERTIONS,
+        _domain_assertion_registry,
+    )
+
+    method = controls()
+    method["assertions"] = [{"assertion_id": "org.example.check.latency"}]
+    result: dict[str, Any] = {
+        "schema_version": "acceptance-result.v3",
+        "assertion_results": [
+            {"source": "core", "assertion_id": identifier}
+            for identifier in _NATIVE_POLICY_ASSERTIONS | {"org.example.check.latency"}
+        ],
+        "evidence": [],
+        "evaluation": {
+            "coverage": {
+                "covered_assertions": [{"assertion_id": "org.example.check.latency"}],
+                "uncovered_assertions": [{"assertion_id": "org.example.check.first"}],
+            }
+        },
+    }
+    context: Any = SimpleNamespace(results={"primary": SimpleNamespace(document=result)})
+    _domain_assertion_registry(context, "primary", method)
+    result["evaluation"]["coverage"]["uncovered_assertions"].append(
+        {"assertion_id": "org.example.check.extra"}
+    )
+    with pytest.raises(ContractError, match="coverage includes an undeclared assertion"):
+        _domain_assertion_registry(context, "primary", method)

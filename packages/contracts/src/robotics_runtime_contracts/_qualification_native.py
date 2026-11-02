@@ -321,6 +321,20 @@ def _domain_assertion_registry(context: _Context, domain: str, controls: Mapping
             f"result {domain} core assertions differ from declared metrics and native policy"
         )
     namespaces = {item["namespace"] for item in controls["evaluator_requirements"]}
+    if result["schema_version"] == "acceptance-result.v3":
+        assigned = {
+            identifier
+            for item in controls["evaluator_requirements"]
+            for identifier in item["expected_assertion_ids"]
+        }
+        coverage = result["evaluation"].get("coverage", {})
+        coverage_ids = {
+            item["assertion_id"]
+            for key in ("covered_assertions", "uncovered_assertions")
+            for item in coverage.get(key, ())
+        }
+        if coverage_ids - (expected | _NATIVE_POLICY_ASSERTIONS | assigned):
+            rules._fail(f"result {domain} coverage includes an undeclared assertion")
     evidence = {item["sha256"] for item in result["evidence"]}
     evidence.update(item["sha256"] for item in controls.get("calibration", {}).get("artifacts", ()))
     for assertion in result["assertion_results"]:

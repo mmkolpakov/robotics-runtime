@@ -12,7 +12,7 @@
   "acceptance-scenario.v2.schema.json": "4d14c0b92aaf16c0164507293bbbb3da111caf6f54c916c1ebc158562c57577b",
   "artifact-receipt.v1.schema.json": "b7a566d35aa3b1f2370202da99d3cec469f7685926290cd69f5d11149c2bbbb6",
   "artifact-verification.v1.schema.json": "283e840cfb5625c1ac1a1dd463dbadc8ce8c99468ba02d5cf30efab7766b5010",
-  "assessment.v1.schema.json": "8d6eb27deabc1db3c519bfb3b1ac0250a5bf6b5c450856de12cfe01b66368a3c",
+  "assessment.v1.schema.json": "d5d7a9621d54387de37f875fef4ad5711c6fbdd7f32837a837276323bdf59922",
   "campaign-summary.v1.schema.json": "c75c1600964add3f887cef129c8abd0344cb8970c388a58bc2867596eea5c632",
   "catalog.v1.json": "56a31949a0534f082873625f093c1c0e0820236066a6809738df51842e2672c1",
   "causal-chain.v1.schema.json": "f7241e5cd12a9a6465d536fd8a02a995bd39bbf5fd4a2e380f308af240c1a6ea",

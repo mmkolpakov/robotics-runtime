@@ -1440,6 +1440,13 @@ def _validate_oci_assessment_coverage(
         if item["source"] == "product" and item["namespace"] in namespaces
     ]
     returned = {item["assertion_id"] for item in rows}
+    if any(
+        item["source"] != "product" and item["assertion_id"] in expected
+        for item in document["assertion_results"]
+    ):
+        _fail(
+            schema_name, "$.assertion_results", "OCI assertion ID cannot be claimed by a core row"
+        )
     if any(owners.get(item["assertion_id"]) != item["namespace"] for item in rows):
         _fail(
             schema_name,
@@ -1448,11 +1455,6 @@ def _validate_oci_assessment_coverage(
         )
     covered_ids = {item["assertion_id"] for item in covered}
     uncovered_ids = {item["assertion_id"] for item in uncovered}
-    prefixes = tuple(f"{namespace}." for namespace in namespaces)
-    if {
-        identifier for identifier in covered_ids | uncovered_ids if identifier.startswith(prefixes)
-    } - expected:
-        _fail(schema_name, "$.evaluation.coverage", "OCI coverage contains undeclared assertions")
     if expected - (covered_ids | uncovered_ids):
         _fail(
             schema_name,
