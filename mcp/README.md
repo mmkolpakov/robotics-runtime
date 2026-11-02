@@ -189,17 +189,21 @@ registry; requests cannot choose a URI or path. `describe_contract` describes
 registered built-in schemas. Explain validates document relationships and metadata;
 it does not fetch model/dataset/permit asset URIs or verify those asset bytes.
 
-Worker stdout/stderr remain text; their JSON is never parsed or reserialized.
-This preserves large integer values. Public Jobs uses upstream Execa text
-semantics, including normalization of the terminating newline.
+Each `stdout`/`stderr` value is a UTF-8-decoded string; Execa applies final-newline
+stripping after capture. The adapter leaves worker JSON as text, so large integer
+tokens never become JavaScript Numbers. MCP encodes these strings inside its own JSON envelope.
+These text results do not preserve arbitrary original worker-stream bytes.
 
 `isError` describes an invocation or admission failure. A successful explanation
 of a failed result preserves that result's failure; it does not make the run pass.
 An offline dependency report is not native readiness or qualification.
 
-Default limits are 30 seconds per worker, 1 MiB per output stream and 16 MiB
-combined input. Bootstrap overrides are capped at 120 seconds, 4 MiB output and
-64 MiB input. Four calls may execute concurrently. Inputs are captured into
+Default limits are 30 seconds per worker, 1,048,576 UTF-16 code units per decoded
+output stream and 16 MiB combined regular-file input. Bootstrap overrides are
+capped at 120 seconds, 4,194,304 code units per output stream and 64 MiB input.
+`limits.maxOutputBytes` measures JavaScript string `.length` before final-newline
+removal. It is not an encoded MCP JSON envelope byte limit.
+Four calls may execute concurrently. Inputs are captured into
 private verified read-only copies, removed after the worker settles. Symlinks,
 changed bytes, outside paths and unknown IDs refuse before worker startup.
 Byte bounds apply to regular-file capture. Worker deadlines do not interrupt

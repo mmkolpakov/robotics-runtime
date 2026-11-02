@@ -115,13 +115,14 @@ replacement verdict. The harness checks assertion namespace, unique identifiers,
 evidence references and calibration bindings before combining results.
 
 The target external-method boundary is a finite process in an admitted OCI image.
-The operator supplies an independent trust policy and verifies the admitted
-platform digest using stock Cosign. The container runtime enforces verified
-read-only input snapshots, bounded separate output and resource limits, without
-network, device or engine socket access. A versioned
-JSON exchange carries the existing assessment facts and assertions. Original
-execution identity and the new assessment remain distinct. Image provenance
-does not prove that a method or physics model is correct.
+The operator selects an external trust policy. The harness checks the actual
+platform manifest and uses stock Cosign for image admission. It verifies captured
+input bytes and owns finite execution and bounded raw-response capture. The
+container runtime enforces read-only input mounts, resource limits and isolation
+from the network, host devices and engine sockets. A versioned JSON exchange
+carries the existing assessment facts and assertions. Original execution identity
+and the new assessment remain distinct. Image provenance does not prove that a
+method or physics model is correct.
 
 Previously signed wheel-profile inputs and results retain their original
 semantics and can be assessed with their pinned published tools. They are not
