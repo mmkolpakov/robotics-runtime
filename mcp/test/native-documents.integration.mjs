@@ -12,6 +12,7 @@ const directory=dirname(fileURLToPath(import.meta.url));
 const contractsCli=process.env.MCP_TEST_CONTRACTS_CLI,harnessCli=process.env.MCP_TEST_HARNESS_CLI;
 assert.ok(contractsCli&&harnessCli,'native integration requires explicitly selected installed public workers');
 const example=resolve(process.env.MCP_TEST_NATIVE_EXAMPLE??join(directory,'../../packages/contracts/consumer-examples/minimal-native-archive'));
+const serverEntrypoint=resolve(process.env.MCP_TEST_SERVER_ENTRYPOINT??join(directory,'../bin/server.mjs'));
 const python=join(dirname(harnessCli),'python');
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const environment={PATH:dirname(harnessCli)+':'+dirname(contractsCli)+':/usr/bin:/bin',LANG:'C.UTF-8',PYTHONDONTWRITEBYTECODE:'1'};
@@ -45,7 +46,7 @@ test('installed native CLI documents cross the six readonly MCP tools without nu
  const config={artifactRoot:artifacts,scratchRoot:scratch,contractsCli,harnessCli,artifacts:entries,
   schemas:[{id:'native-scenario',schema:'acceptance-scenario.v2'}],bundles:[{id:'native',scenario:'scenario',runtime:'runtime'}]};
  const configPath=join(root,'bootstrap.json');await writeFile(configPath,JSON.stringify(config));
- const transport=new StdioClientTransport({command:process.execPath,args:[resolve(directory,'../bin/server.mjs'),'--config',configPath],stderr:'pipe',env:{}});
+ const transport=new StdioClientTransport({command:process.execPath,args:[serverEntrypoint,'--config',configPath],stderr:'pipe',env:{}});
  const errors=[];transport.stderr.on('data',bytes=>errors.push(bytes.toString()));
  const client=new Client({name:'native-document-integration',version:'1.0.0'});
  t.after(async()=>{await client.close();await transport.close()});

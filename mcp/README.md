@@ -31,7 +31,7 @@ Python workers in separate environments:
 
 ```bash
 cd mcp
-npm ci --ignore-scripts
+npm ci --ignore-scripts --engine-strict
 uv venv --python 3.12 .public-workers
 uv pip install --python .public-workers/bin/python --require-hashes --no-deps \
   --only-binary :all: --requirement public-cli.lock
@@ -78,6 +78,33 @@ legacy clients. Current-protocol clients use `server/discover` and per-request
 capabilities; legacy clients use their negotiated initialization path.
 The [protocol specification](https://modelcontextprotocol.io/specification/2026-07-28)
 defines that distinction; client setup does not add domain operations.
+
+## Build and consume an offline MCPB
+
+The MCP CI job builds one `.mcpb` containing the server, preparation helper,
+license and production Node dependencies from `package-lock.json`. It validates
+the manifest against the official MCPB 0.3 schema from MCPB 2.1.2, pinned by SHA,
+and uses Python's standard ZIP CLI. Source locks remain separate build inputs.
+CI compares two archives built with normalized mtimes in the same toolchain.
+
+The current profile is Linux with an operator-selected Node 24.21.0 executable
+and bootstrap file. A standard MCPB client substitutes `node_executable` and
+`bootstrap_file` into the manifest's literal command/arguments. The separately
+installed C0.21.1/H0.22.3 workers remain selected by that bootstrap; startup
+performs no package installation. A generic stdio client can use the extracted
+bundle directly:
+
+```bash
+python3 -m zipfile -e robotics-runtime-mcp-0.1.0-rc.1.mcpb /approved/bundle
+/approved/node-24.21.0/bin/node /approved/bundle/bin/server.mjs \
+  --config /approved/bootstrap.json
+```
+
+Select and verify the bundle as executable code before configuring the client.
+The installed consumer check runs the existing six-tool test with a read-only
+filesystem, disabled network and separate artifact/client mounts. Its dependency
+image supplies the explicit published Python workers. These are offline document
+checks; native execution and desktop client qualification have separate gates.
 
 ## Prepare a qualification package
 

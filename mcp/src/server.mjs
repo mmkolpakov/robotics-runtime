@@ -125,7 +125,7 @@ export async function createOfflineAdapter(input) {
   }
   return {
     serverFactory() {
-      const server = new McpServer({ name: 'robotics-runtime-offline', version: '0.1.0-rc.0' }, { capabilities: { tools: {} } });
+      const server = new McpServer({ name: 'robotics-runtime-offline', version: '0.1.0-rc.1' }, { capabilities: { tools: {} } });
       for (const [name, inputSchema, description] of tools) {
         server.registerTool(name, { description, inputSchema,
           annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
