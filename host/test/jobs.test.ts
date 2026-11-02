@@ -75,3 +75,76 @@ test('native Execa killDescendants cancels the observed process group', async ()
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('output overflow stops the live worker and its owned descendant', { skip: process.platform !== 'linux' }, async () => {
+  const { mkdtemp, readFile, writeFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { setTimeout: pause } = await import('node:timers/promises');
+  const directory = await mkdtemp(join(tmpdir(), 'rr-overflow-'));
+  const pidsPath = join(directory, 'pids.json');
+  const releasePath = join(directory, 'release');
+  const ctx = new Context();
+  const fiber = ctx.plugin(Jobs, { timeoutMs: 10000, maxBufferBytes: 4096, killTimeoutMs: 100 });
+  await fiber.await();
+  type Identity = { pid: number; start: string };
+  const identities: Identity[] = [];
+  async function state(pid: number): Promise<{ state: string; start: string } | undefined> {
+    try {
+      const stat = await readFile('/proc/' + pid + '/stat', 'utf8');
+      const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+      return { state: fields[0]!, start: fields[19]! };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+      throw error;
+    }
+  }
+  try {
+    const job = ctx.jobs.run({ executable: process.execPath, args: ['-e',
+      'const {spawn}=require("node:child_process"); const fs=require("node:fs"); const child=spawn(process.execPath,["-e","setInterval(()=>{},100)"],{stdio:"ignore"}); fs.writeFileSync(process.argv[1]+".tmp",JSON.stringify([process.pid,child.pid])); fs.renameSync(process.argv[1]+".tmp",process.argv[1]); let emitted=false; setInterval(()=>{if(!emitted && fs.existsSync(process.argv[2])){emitted=true; process.stdout.write("x".repeat(8192));}},10);',
+      pidsPath, releasePath] });
+    let pids: number[] | undefined;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      try { pids = JSON.parse(await readFile(pidsPath, 'utf8')) as number[]; break; }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        await pause(10);
+      }
+    }
+    assert.equal(pids?.length, 2);
+    for (const pid of pids!) {
+      assert.ok(Number.isSafeInteger(pid) && pid > 1);
+      const observed = await state(pid);
+      assert.ok(observed && observed.state !== 'Z', 'worker and descendant must be alive before overflow');
+      identities.push({ pid, start: observed.start });
+    }
+    await writeFile(releasePath, '');
+    const result = await Promise.race([job, pause(3000, undefined, { ref: false }).then(() => undefined)]);
+    assert.ok(result, 'overflow must settle before the job deadline without cancellation');
+    assert.ok(result.durationMs < 9000, 'overflow must settle before the total job deadline');
+    assert.equal(result.ok, false);
+    assert.match(result.diagnostic ?? '', /maxBuffer/);
+    assert.equal(result.timedOut, false, 'overflow must stop the worker before its deadline');
+    assert.equal(result.canceled, false, 'overflow must not depend on external cancellation');
+    for (const [index, identity] of identities.entries()) {
+      let exited = false;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const observed = await state(identity.pid);
+        if (!observed || observed.start !== identity.start || observed.state === 'Z') { exited = true; break; }
+        await pause(10);
+      }
+      assert.equal(exited, true, index === 0 ? 'worker must exit' : 'descendant must exit');
+    }
+  } finally {
+    await fiber.dispose();
+    for (const identity of identities) {
+      const observed = await state(identity.pid);
+      if (observed && observed.start === identity.start && observed.state !== 'Z') {
+        try { process.kill(identity.pid, 'SIGKILL'); } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+        }
+      }
+    }
+    await rm(directory, { recursive: true, force: true });
+  }
+});
