@@ -91,7 +91,12 @@ registers the catalog and artifact IDs before the client starts.
 | `explain_result` | `artifact_id` | Harness result explanation | Explains a stored verdict without evaluating it again |
 | `inspect_offline_readiness` | Empty object | Harness offline dependency inspection | Reports installed dependencies, not native readiness |
 
-For the bootstrap in the [MCP guide](../mcp/README.md#install-and-configure),
+A resource-aware client lists resources, reads `robotics-runtime://catalog`, and
+uses the returned schema, artifact and bundle IDs with the six tools. The catalog
+is a bounded view of registered bootstrap metadata; it does not recheck files.
+Each tool call captures and verifies the selected bytes before invoking its worker.
+
+For the bootstrap in the [MCP guide](../mcp/README.md#install-and-configure-from-source),
 a client can call `describe_contract` with `{"schema_id":"scenario"}` and
 `explain_bundle` with `{"bundle_id":"example"}`. Register a result or metrics
 artifact through the same trusted bootstrap before using its ID.
@@ -102,7 +107,8 @@ and negotiated legacy clients. Per-request capabilities and
 `server/discover` belong to the current protocol; legacy clients use their
 negotiated initialization path. The SDK handles the wire differences. See the
 [MCP specification](https://modelcontextprotocol.io/specification/2026-07-28)
-and the [SDK transport](https://github.com/modelcontextprotocol/typescript-sdk/tree/v2.3.1).
+and the [SDK release](https://github.com/modelcontextprotocol/typescript-sdk/releases/tag/v2.4.0).
+The locked server and core packages are version 2.4.0.
 
 Stdio authenticates no remote user. The local operator controls the executable,
 bootstrap, admitted read-only files and process permissions; the client owns the
