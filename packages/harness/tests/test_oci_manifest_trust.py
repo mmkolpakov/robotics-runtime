@@ -280,3 +280,31 @@ def test_raw_blob_command_does_not_admit_signing_or_registry_operations(tmp_path
             _run_tool(
                 [str(tmp_path / "cosign"), command], tmp_path, TrustLimits(), tool_name="cosign"
             )
+
+
+@pytest.mark.parametrize("role", ["manifest", "config"])
+def test_oci_documents_require_json_before_verifier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, role: str
+) -> None:
+    import yaml
+
+    manifest, config, bundle, _ = inputs(tmp_path)
+    target = manifest if role == "manifest" else config
+    target.write_bytes(yaml.safe_dump(json.loads(target.read_bytes())).encode())
+    if role == "config":
+        document = json.loads(manifest.read_bytes())
+        document["config"]["digest"] = "sha256:" + digest(config.read_bytes())
+        document["config"]["size"] = config.stat().st_size
+        manifest.write_bytes(json.dumps(document).encode())
+
+    def forbidden(*args: Any, **kwargs: Any) -> bytes:
+        pytest.fail("non-JSON OCI input reached verifier")
+
+    monkeypatch.setattr(oci, "verify_blob_snapshot", forbidden)
+    with pytest.raises(EvaluatorTrustError, match="invalid OCI"):
+        oci.authenticate_manifest(
+            (manifest, config, bundle),
+            expected_digest="sha256:" + digest(manifest.read_bytes()),
+            platform=PLATFORM,
+            profile=fake_profile(tmp_path),
+        )

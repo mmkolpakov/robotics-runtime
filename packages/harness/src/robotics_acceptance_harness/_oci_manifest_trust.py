@@ -35,7 +35,7 @@ def _platform(value: Mapping[str, str]) -> dict[str, str]:
 
 def _mapping(raw: bytes, label: str) -> dict[str, Any]:
     try:
-        return loads_mapping(raw, source_name=label)
+        return loads_mapping(raw, source_name=f"{label}.json")
     except ContractError as failure:
         raise EvaluatorTrustError(f"invalid OCI {label}: {failure}") from failure
 
