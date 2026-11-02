@@ -113,9 +113,12 @@ def clean_install(
         for archive in archives:
             dist = root / archive.name
             shutil.copyfile(archive, dist)
-            if wire_consumer and archive in additional_artifacts:
-                if sha256(dist.read_bytes()).hexdigest() != published_contracts_sha256:
-                    raise ReleaseError("copied published contracts wheel digest differs")
+            if (
+                wire_consumer
+                and archive in additional_artifacts
+                and sha256(dist.read_bytes()).hexdigest() != published_contracts_sha256
+            ):
+                raise ReleaseError("copied published contracts wheel digest differs")
             copied.append(str(dist))
         shutil.copyfile(Path(__file__).with_name("smoke.py"), root / "smoke.py")
         smoke_plan = asdict(plan)
