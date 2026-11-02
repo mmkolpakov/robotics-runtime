@@ -353,7 +353,14 @@ jobs:
           cp -R "$production/node_modules" "$stage/"
           rm "$stage/node_modules/.package-lock.json"
           schema="$out/mcpb-manifest-v0.3.schema.json"
-          .public-workers/bin/python -c 'import sys, urllib.request; from pathlib import Path; Path(sys.argv[1]).write_bytes(urllib.request.urlopen("https://raw.githubusercontent.com/modelcontextprotocol/mcpb/v2.1.2/schemas/mcpb-manifest-v0.3.schema.json", timeout=30).read())' "$schema"
+          node --input-type=module -e '
+            import { writeFile } from "node:fs/promises";
+            const url =
+              "https://raw.githubusercontent.com/modelcontextprotocol/mcpb/v2.1.2/schemas/mcpb-manifest-v0.3.schema.json";
+            const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+            if (!response.ok) throw new Error(`Schema download HTTP ${response.status}`);
+            await writeFile(process.argv[1], Buffer.from(await response.arrayBuffer()));
+          ' "$schema"
           echo "3a0ac9d845711a1b9b17dfa5a52f8b60628239d6a86a9db417206a9efc78592d  $schema" | sha256sum --check
           uv tool run --isolated --python "$PWD/.public-workers/bin/python" --from check-jsonschema==0.39.0 check-jsonschema --schemafile "$schema" "$stage/manifest.json"
           cp package.json package-lock.json public-cli.lock "$out/"
