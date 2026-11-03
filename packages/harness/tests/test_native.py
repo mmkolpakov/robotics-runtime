@@ -203,6 +203,46 @@ def test_verified_evidence_sdk_returns_captured_bytes_and_checks_limits(tmp_path
         evidence.read_local(payload)
 
 
+def test_verified_evidence_raw_budget_above_document_limit(tmp_path: Path) -> None:
+    payload = tmp_path / "payload.bin"
+    original = b"x" * (8 * 1024 * 1024 + 1)
+    payload.write_bytes(original)
+    index = write_evidence_index(
+        tmp_path / "index.json",
+        run_id="run-00000000-0000-4000-8000-000000000001",
+        artifacts=[local_evidence_artifact(payload)],
+    )
+    evidence = load_evidence_index(index)
+
+    with pytest.raises(EvidenceValidationError, match="document byte limit"):
+        evidence.read_local(payload)
+    with pytest.raises(EvidenceValidationError, match="raw evidence byte budget"):
+        evidence.read_local(payload, max_raw_evidence_bytes=len(original) - 1)
+    assert evidence.read_local(payload, max_raw_evidence_bytes=len(original)) == original
+    assert evidence.read_local(payload, max_raw_evidence_bytes=64 * 1024 * 1024) == original
+
+    payload.write_bytes(b"y" + original[1:])
+    with pytest.raises(EvidenceValidationError, match="sha256"):
+        evidence.read_local(payload, max_raw_evidence_bytes=len(original))
+    payload.write_bytes(original + b"x")
+    with pytest.raises(EvidenceValidationError, match="size_bytes"):
+        evidence.read_local(payload, max_raw_evidence_bytes=len(original))
+
+
+@pytest.mark.parametrize("budget", [0, -1, True, 1.5, "10"])
+def test_verified_evidence_rejects_invalid_raw_budgets(tmp_path: Path, budget: Any) -> None:
+    payload = tmp_path / "payload.bin"
+    payload.write_bytes(b"x")
+    index = write_evidence_index(
+        tmp_path / "index.json",
+        run_id="run-00000000-0000-4000-8000-000000000001",
+        artifacts=[local_evidence_artifact(payload)],
+    )
+    evidence = load_evidence_index(index)
+    with pytest.raises(EvidenceValidationError, match="positive integer"):
+        evidence.read_local(payload, max_raw_evidence_bytes=budget)
+
+
 @pytest.mark.parametrize(
     "option,missing",
     [

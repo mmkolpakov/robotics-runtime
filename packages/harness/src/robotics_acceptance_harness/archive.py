@@ -132,7 +132,7 @@ def load_assessment_controls(path: str | Path) -> AssessmentControls:
                 reference,
                 source.parent,
                 f"$.calibration.artifacts[{index}]",
-                capture=True,
+                capture_limit=MAX_DOCUMENT_BYTES,
             )
             inputs[digest] = payload
     return AssessmentControls(source, raw, MappingProxyType(inputs))

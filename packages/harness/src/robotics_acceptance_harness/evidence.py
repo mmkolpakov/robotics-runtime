@@ -74,7 +74,15 @@ class VerifiedEvidence:
             raise EvidenceValidationError(
                 "$.artifacts.size_bytes", "source exceeds the raw evidence byte budget"
             )
-        return _read_local(source, reference, self.index.path.parent, "$.artifacts", capture=True)
+        return _read_local(
+            source,
+            reference,
+            self.index.path.parent,
+            "$.artifacts",
+            capture_limit=(
+                MAX_DOCUMENT_BYTES if max_raw_evidence_bytes is None else max_raw_evidence_bytes
+            ),
+        )
 
 
 def _verified_payload(
@@ -82,11 +90,11 @@ def _verified_payload(
     reference: Mapping[str, Any],
     root: Path,
     *,
-    capture: bool = False,
     sink: BinaryIO | None = None,
+    capture_limit: int | None = None,
 ) -> bytes:
     expected_size = int(reference["size_bytes"])
-    if capture and expected_size > MAX_DOCUMENT_BYTES:
+    if capture_limit is not None and expected_size > capture_limit:
         raise EvidenceReadError(
             "captured evidence exceeds the contract document byte limit", field="size_bytes"
         )
@@ -104,7 +112,7 @@ def _verified_payload(
             if size > expected_size:
                 raise EvidenceReadError("evidence grew while being read", field="size_bytes")
             digest.update(chunk)
-            if capture:
+            if capture_limit is not None:
                 payload.extend(chunk)
             if sink is not None and sink.write(chunk) != len(chunk):
                 raise EvidenceReadError("snapshot sink did not write the complete chunk")
@@ -129,10 +137,10 @@ def _read_local(
     root: Path,
     json_path: str,
     *,
-    capture: bool = False,
+    capture_limit: int | None = None,
 ) -> bytes:
     try:
-        return _verified_payload(path, reference, root, capture=capture)
+        return _verified_payload(path, reference, root, capture_limit=capture_limit)
     except FileNotFoundError as error:
         raise EvidenceValidationError(json_path, f"file does not exist: {path}") from error
     except EvidenceReadError as error:
@@ -219,7 +227,7 @@ def _local_summary(
             "acceptance verification requires a local recording summary",
         )
     path = Path(url2pathname(uri.path)).absolute()
-    raw = _read_local(path, reference, root, json_path, capture=True)
+    raw = _read_local(path, reference, root, json_path, capture_limit=MAX_DOCUMENT_BYTES)
     try:
         summary = load_document_bytes(raw, source=path, expected_role="recording_summary")
     except BundleValidationError as error:
