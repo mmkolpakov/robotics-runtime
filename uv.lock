@@ -956,7 +956,7 @@ wheels = [
 
 [[package]]
 name = "robotics-acceptance-harness"
-version = "0.22.3"
+version = "0.23.0"
 source = { editable = "packages/harness" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },
@@ -984,7 +984,7 @@ provides-extras = ["pytest"]
 
 [[package]]
 name = "robotics-runtime-contracts"
-version = "0.21.1"
+version = "0.22.0"
 source = { editable = "packages/contracts" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },

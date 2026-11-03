@@ -83,6 +83,7 @@ PY
 uv build --package robotics-runtime-contracts --no-sources --out-dir artifacts/release/dist
 "$PY" -m scripts.release.verify_install \
   --plan artifacts/release/plan.json --dist artifacts/release/dist \
+  --repository mmkolpakov/robotics-runtime \
   --python 3.12 --report artifacts/release/clean-install.json
 ```
 
@@ -128,9 +129,10 @@ dependency bounds. Direct URL, local path and VCS dependencies are rejected.
 
 Each archive is copied to its own temporary directory outside the workspace and installed
 into a new venv. The installer disables uv configuration and workspace sources, clears
-Python/index environment overrides, and uses only PyPI plus that archive. The sdist is
-actually built and installed there. Harness installs pin the selected released contracts
-version explicitly. `uv pip check` verifies dependency compatibility.
+Python/index environment overrides, and uses only PyPI plus the copied selected archives.
+The sdist is actually built and installed there. Harness release installs include the
+authenticated wheel of the selected released contracts version. `uv pip check` verifies
+dependency compatibility.
 
 Smoke runs use the clean interpreter with `-I`, without `PYTHONPATH` or editable packages.
 They check installed file inventories and digests, schema resource loading, API validation
@@ -140,6 +142,20 @@ checks its existing `EvaluationContext`/`ProductEvaluator` exports and
 `robotics-acceptance explain`. Contracts has no `--version` option. These checks
 exercise the existing public API; they do not establish a general consumer SDK.
 A temporary directory configured inside the workspace fails.
+
+Harness verification also authenticates the exact selected contracts wheel with
+stock GitHub release and source/workflow attestation checks, and requires the
+published PyPI bytes to have the same SHA-256. The existing tag, source and
+project-metadata comparison still applies. A missing release or failed verifier
+blocks publication; a locally built candidate is not a published prerequisite.
+
+Candidate-pair consumer checks exercise both harness archives with the matching
+source-built contracts wheel. The original published pair remains a separate
+baseline, and the stock resolver must reject its unsupported contracts version
+for the new candidate. Harness release checks run the same foreign Node fixture
+with the authenticated published contracts wheel before publication. This test
+fixture uses Docker in CI; offline built-in assessment does not require it, and
+these checks do not qualify an OCI execution profile.
 
 ## External publication settings
 
@@ -165,8 +181,9 @@ must verify them before enabling publication:
    registration and release prerequisites are verified. Without it, tag builds run but
    publication jobs are skipped. A green build alone does not mean anything was published.
 
-All actions are pinned to full commit SHAs. Build jobs have only `contents: read`; the PyPI
-job uses the environment selected by the validated release plan with `id-token: write`.
+All actions are pinned to full commit SHAs. The build job has `contents: read` and
+`attestations: read`; the PyPI job uses the environment selected by the validated release
+plan with `id-token: write`.
 There is no user-supplied environment input. The separate GitHub release
 job has the contents, attestation and OIDC permissions it needs, and runs only after PyPI
 succeeds. Failed, cancelled or skipped prerequisites cannot publish a GitHub release.
