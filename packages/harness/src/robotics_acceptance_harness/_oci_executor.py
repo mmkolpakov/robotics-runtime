@@ -199,10 +199,16 @@ class _Attempt:
             self.config_sha256 is None
             or document.get("Image") not in {self.config_sha256, "sha256:" + self.config_sha256}
             or document.get("Id") != self.cid
-            or document.get("ImageDigest") != "sha256:" + self.binding["manifest_sha256"]
+            or document.get("ImageName") != self.binding["image_ref"]
             or document.get("Config", {}).get("Labels", {}).get(_LABEL) != self.identifier
         ):
             raise EvaluatorTrustError("Podman container identity differs from this owned attempt")
+        transport_digest = document.get("ImageDigest")
+        if not isinstance(transport_digest, str) or len(transport_digest) > 256:
+            raise EvaluatorTrustError("Podman container transport metadata is malformed")
+        self.record["container_transport_digest"] = transport_digest
+        self.record["container_image_ref"] = document["ImageName"]
+        self.record["container_image_id"] = self.config_sha256
         return document
 
     def recover(self) -> None:
@@ -285,6 +291,14 @@ def _create_arguments(attempt: _Attempt, inputs: Path) -> list[str]:
 def _image(attempt: _Attempt, manifest: bytes, config: bytes) -> list[str]:
     expected = _mapping(manifest, "manifest")
     values = _mapping(config, "config")
+    rootfs = values.get("rootfs")
+    if (
+        not isinstance(rootfs, Mapping)
+        or rootfs.get("type") != "layers"
+        or not isinstance(rootfs.get("diff_ids"), list)
+        or any(not isinstance(item, str) or not item for item in rootfs["diff_ids"])
+    ):
+        raise EvaluatorTrustError("Signed OCI config requires ordered rootfs layer identities")
     entrypoint = values.get("config", {}).get("Entrypoint")
     if (
         not isinstance(entrypoint, list)
@@ -297,8 +311,12 @@ def _image(attempt: _Attempt, manifest: bytes, config: bytes) -> list[str]:
         attempt.deadline,
     )
     observed = _mapping(raw, "image-inspect")
+    observed_rootfs = observed.get("RootFS")
     if (
-        observed.get("Digest") != "sha256:" + attempt.binding["manifest_sha256"]
+        not isinstance(observed_rootfs, Mapping)
+        or observed_rootfs.get("Type") != rootfs["type"]
+        or observed_rootfs.get("Layers") != rootfs["diff_ids"]
+        or observed.get("Digest") != "sha256:" + attempt.binding["manifest_sha256"]
         or observed.get("Id", "").removeprefix("sha256:") != hashlib.sha256(config).hexdigest()
         or observed.get("ManifestType") != expected["mediaType"]
         or any(
@@ -339,8 +357,10 @@ def _isolation(document: Mapping[str, Any], attempt: _Attempt) -> None:
         or host.get("LogConfig", {}).get("Type") != "none"
         or host.get("RestartPolicy", {}).get("Name") not in ("", "no")
         or "no-new-privileges" not in host.get("SecurityOpt", [])
-        or document.get("EffectiveCaps") != []
-        or document.get("BoundingCaps") != []
+        or any(
+            key not in document or document[key] not in (None, [])
+            for key in ("EffectiveCaps", "BoundingCaps")
+        )
     ):
         raise EvaluatorTrustError("Created container differs from the required isolation or limits")
 
@@ -354,7 +374,7 @@ def _created(
         document.get("Image", "").removeprefix("sha256:") != hashlib.sha256(config).hexdigest()
         or document.get("Path") != entrypoint[0]
         or document.get("Args") != entrypoint[1:] + ["--request", _MOUNT + "/request.json"]
-        or document.get("State", {}).get("Status") != "configured"
+        or document.get("State", {}).get("Status") != "created"
         or document.get("State", {}).get("Running") is not False
         or not isinstance(mounts, list)
         or len(mounts) != 1

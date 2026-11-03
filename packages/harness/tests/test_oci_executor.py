@@ -30,7 +30,7 @@ with (home / 'calls.jsonl').open('a') as stream:
 fault = settings['fault']
 cid = 'a' * 64
 state_path = home / 'state'
-state = state_path.read_text() if state_path.exists() else 'configured'
+state = state_path.read_text() if state_path.exists() else settings.get('initial_state', 'created')
 if args == ['--version']:
     print('podman version 4.9.3')
 elif args[0] == 'info':
@@ -99,10 +99,20 @@ def _prepare(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fault: str = "") -
         pytest.skip("real fake-CLI lifecycle uses the non-root owner profile")
     path, data, requirements = fixture(tmp_path)
     binding = data["evaluators"][0]
-    config = {"os": "linux", "architecture": "amd64", "config": {"Entrypoint": ["/evaluator"]}}
+    layers = ["sha256:" + "1" * 64, "sha256:" + "2" * 64]
+    config = {
+        "os": "linux",
+        "architecture": "amd64",
+        "config": {"Entrypoint": ["/evaluator"]},
+        "rootfs": {"type": "layers", "diff_ids": layers},
+    }
     config_raw = json.dumps(config).encode()
     Path(binding["config"]).write_bytes(config_raw)
     manifest = json.loads(Path(binding["manifest"]).read_bytes())
+    manifest["layers"] = [
+        {"mediaType": "application/vnd.oci.image.layer.v1.tar", "digest": layer, "size": 1024}
+        for layer in layers
+    ]
     config_sha = hashlib.sha256(config_raw).hexdigest()
     manifest["config"].update(digest="sha256:" + config_sha, size=len(config_raw))
     manifest_raw = json.dumps(manifest).encode()
@@ -159,6 +169,7 @@ def _prepare(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fault: str = "") -
             "Digest": "sha256:" + manifest_sha,
             "Id": config_sha,
             "ManifestType": manifest["mediaType"],
+            "RootFS": {"Type": "layers", "Layers": layers},
             "Os": "linux",
             "Architecture": "amd64",
         },
@@ -167,6 +178,7 @@ def _prepare(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fault: str = "") -
     settings["container"] = {
         "Id": "a" * 64,
         "Image": config_sha,
+        "ImageName": binding["image_ref"],
         "ImageDigest": "sha256:" + manifest_sha,
         "Path": "/evaluator",
         "Args": ["--request", "/run/robotics-evaluator/request.json"],
@@ -192,8 +204,8 @@ def _prepare(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fault: str = "") -
             "SecurityOpt": ["no-new-privileges"],
             "Tmpfs": {"/tmp": "rw,nosuid,nodev,noexec,size=16777216"},
         },
-        "EffectiveCaps": [],
-        "BoundingCaps": [],
+        "EffectiveCaps": None,
+        "BoundingCaps": None,
         "Mounts": [
             {
                 "Type": "bind",
@@ -461,3 +473,119 @@ def test_captured_bytes_are_retained_before_the_next_effect(
         assert "stop" in operations and "rm" not in operations
     else:
         assert not (home / "calls.jsonl").exists()
+
+
+@pytest.mark.parametrize("state", ["configured", "initialized"])
+def test_create_state_uses_the_exact_public_podman_spelling(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, state: str
+) -> None:
+    profile, packet, inputs, attempt, home = _prepare(tmp_path, monkeypatch)
+    path = home / "settings.json"
+    settings = json.loads(path.read_bytes())
+    settings["initial_state"] = state
+    path.write_text(json.dumps(settings))
+    with pytest.raises(EvaluatorTrustError, match="retained journal"):
+        executor.run_oci_evaluator(profile, "org.example", packet, inputs, attempt)
+    assert "start" not in [call["args"][0] for call in _calls(home)]
+
+
+@pytest.mark.parametrize("value", [None, []])
+def test_explicit_zero_capability_representations_are_accepted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: Any
+) -> None:
+    profile, packet, inputs, attempt, home = _prepare(tmp_path, monkeypatch)
+    path = home / "settings.json"
+    settings = json.loads(path.read_bytes())
+    for key in ("EffectiveCaps", "BoundingCaps"):
+        settings["container"][key] = value
+    path.write_text(json.dumps(settings))
+    assert executor.run_oci_evaluator(profile, "org.example", packet, inputs, attempt)
+
+
+@pytest.mark.parametrize("key", ["EffectiveCaps", "BoundingCaps"])
+@pytest.mark.parametrize("value", ["missing", ["CAP_SYS_ADMIN"], {}, False])
+def test_missing_nonempty_or_wrong_type_capabilities_refuse_before_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, key: str, value: Any
+) -> None:
+    profile, packet, inputs, attempt, home = _prepare(tmp_path, monkeypatch)
+    path = home / "settings.json"
+    settings = json.loads(path.read_bytes())
+    if value == "missing":
+        del settings["container"][key]
+    else:
+        settings["container"][key] = value
+    path.write_text(json.dumps(settings))
+    with pytest.raises(EvaluatorTrustError, match="retained journal"):
+        executor.run_oci_evaluator(profile, "org.example", packet, inputs, attempt)
+    assert "start" not in [call["args"][0] for call in _calls(home)]
+
+
+def test_creation_time_transport_digest_is_not_runtime_content_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile, packet, inputs, attempt, home = _prepare(tmp_path, monkeypatch)
+    path = home / "settings.json"
+    settings = json.loads(path.read_bytes())
+    other = "sha256:" + "f" * 64
+    settings["container"]["ImageDigest"] = other
+    settings["image"]["RepoDigests"] = []
+    path.write_text(json.dumps(settings))
+    assert executor.run_oci_evaluator(profile, "org.example", packet, inputs, attempt)
+    journal = json.loads((attempt / "journal.json").read_bytes())
+    assert journal["container_transport_digest"] == other
+    assert (
+        journal["manifest.json"]["sha256"] == profile.evaluators["org.example"]["manifest_sha256"]
+    )
+
+
+@pytest.mark.parametrize("fault", ["missing", "null", "type", "layer", "order", "layers-type"])
+def test_image_rootfs_must_match_the_signed_config_in_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fault: str
+) -> None:
+    profile, packet, inputs, attempt, home = _prepare(tmp_path, monkeypatch)
+    path = home / "settings.json"
+    settings = json.loads(path.read_bytes())
+    image = settings["image"]
+    if fault == "missing":
+        del image["RootFS"]
+    elif fault == "null":
+        image["RootFS"] = None
+    elif fault == "type":
+        image["RootFS"]["Type"] = "unknown"
+    elif fault == "layer":
+        image["RootFS"]["Layers"][0] = "sha256:" + "3" * 64
+    elif fault == "order":
+        image["RootFS"]["Layers"].reverse()
+    else:
+        image["RootFS"]["Layers"] = "not-an-array"
+    path.write_text(json.dumps(settings))
+    with pytest.raises(EvaluatorTrustError, match="retained journal"):
+        executor.run_oci_evaluator(profile, "org.example", packet, inputs, attempt)
+    assert "create" not in [call["args"][0] for call in _calls(home)]
+
+
+def test_container_must_keep_the_selected_immutable_image_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile, packet, inputs, attempt, home = _prepare(tmp_path, monkeypatch)
+    path = home / "settings.json"
+    settings = json.loads(path.read_bytes())
+    settings["container"]["ImageName"] = "localhost/other@" + settings["image"]["Digest"]
+    path.write_text(json.dumps(settings))
+    with pytest.raises(EvaluatorTrustError, match="retained journal"):
+        executor.run_oci_evaluator(profile, "org.example", packet, inputs, attempt)
+    assert not {"start", "stop", "rm"} & {call["args"][0] for call in _calls(home)}
+
+
+def test_signature_refusal_cannot_be_replaced_by_matching_engine_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile, packet, inputs, attempt, home = _prepare(tmp_path, monkeypatch)
+
+    def refuse(*args: Any, **kwargs: Any) -> Any:
+        raise EvaluatorTrustError("unit signature refused")
+
+    monkeypatch.setattr(executor, "authenticate_manifest", refuse)
+    with pytest.raises(EvaluatorTrustError, match="retained journal"):
+        executor.run_oci_evaluator(profile, "org.example", packet, inputs, attempt)
+    assert not (home / "calls.jsonl").exists()
