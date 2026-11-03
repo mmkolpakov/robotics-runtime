@@ -1,9 +1,9 @@
 # Archive assessment
 
-Harness `0.23.0` assesses captured native v2 software or simulation inputs
-through the SDK and CLI without starting a workload. Its release prerequisite is
-contracts `0.22.0`; the harness `0.22.0` cohort uses contracts `0.21.1`. An
-execution composition requires separate admission.
+Harness `0.23.x` assesses captured native v2 software or simulation inputs
+through the SDK and CLI without starting a workload. The `0.23.1` release
+prerequisite is contracts `0.22.0`; the harness `0.22.0` cohort uses contracts
+`0.21.1`. The execution composition requires separate admission.
 [Compatibility](compatibility.md) defines its package and profile boundaries.
 
 The original scenario, pre-run runtime, run context, observation and evidence

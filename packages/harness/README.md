@@ -11,7 +11,7 @@ contract-valid JSON/JUnit results. The live ROS observer is attach-only. The
 harness does not launch workloads, control simulators, change node lifecycle
 states or publish commands to equipment.
 
-Harness `0.23.0` supports native v2 software/simulation assessment, explicit
+Harness `0.23.x` supports native v2 software/simulation assessment, explicit
 method controls and qualification-bundle.v2 archive comparison. Selected
 evaluator admission uses an operator-pinned stock signature verifier and executes
 captured authenticated source through the existing import guard. Physical
@@ -52,7 +52,7 @@ profile; selecting middleware or a simulator does not establish a native verdict
 | Component | Baseline |
 | --- | --- |
 | Python | 3.12 through 3.14 |
-| Contracts | `robotics-runtime-contracts>=0.22,<0.23` |
+| Contracts | Selected by package metadata; see [compatibility](https://mmkolpakov.github.io/robotics-runtime/packages/harness/docs/compatibility.html) |
 | ROS observation | ROS 2 Jazzy packages in the observer environment |
 | Metrics | OTLP JSON Lines exported by OpenTelemetry Collector |
 

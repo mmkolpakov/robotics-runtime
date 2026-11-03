@@ -16,7 +16,7 @@ def test_candidate_plan_requires_the_new_minor_without_claiming_a_release() -> N
     workspace = Path(__file__).resolve().parents[2]
     plan = verify_consumers.consumer_plan(workspace, "candidate")
     assert plan.contracts_version == "0.22.0"
-    assert plan.version == "0.23.0"
+    assert plan.version == "0.23.1"
     assert plan.contracts_requirement == "robotics-runtime-contracts<0.23,>=0.22"
     assert plan.contracts_commit == plan.contracts_tag == ""
     assert plan.source_files["robotics-runtime-contracts"] == source_files(workspace, "contracts")
@@ -96,7 +96,7 @@ def test_candidate_pair_runs_the_same_wire_for_wheel_and_sdist(
             1,
             (
                 "No solution found when resolving dependencies: "
-                "Because robotics-acceptance-harness==0.23.0 depends on "
+                "Because robotics-acceptance-harness==0.23.1 depends on "
                 "robotics-runtime-contracts>=0.22,<0.23 and "
                 "robotics-runtime-contracts==0.21.1 is selected; "
                 "your requirements are unsatisfiable"
