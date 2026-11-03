@@ -44,7 +44,7 @@ def test_actions_are_pinned_and_oidc_is_limited_to_publication_jobs() -> None:
     data = workflow()
     assert data["permissions"] == {"contents": "read"}
     jobs = data["jobs"]
-    assert jobs["build"]["permissions"] == {"contents": "read"}
+    assert jobs["build"]["permissions"] == {"contents": "read", "attestations": "read"}
     assert (
         jobs["publish-pypi"]["environment"]["name"] == "${{ needs.build.outputs.pypi_environment }}"
     )
