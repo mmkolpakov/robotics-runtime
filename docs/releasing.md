@@ -83,6 +83,7 @@ PY
 uv build --package robotics-runtime-contracts --no-sources --out-dir artifacts/release/dist
 "$PY" -m scripts.release.verify_install \
   --plan artifacts/release/plan.json --dist artifacts/release/dist \
+  --repository mmkolpakov/robotics-runtime \
   --python 3.12 --report artifacts/release/clean-install.json
 ```
 
@@ -128,9 +129,10 @@ dependency bounds. Direct URL, local path and VCS dependencies are rejected.
 
 Each archive is copied to its own temporary directory outside the workspace and installed
 into a new venv. The installer disables uv configuration and workspace sources, clears
-Python/index environment overrides, and uses only PyPI plus that archive. The sdist is
-actually built and installed there. Harness installs pin the selected released contracts
-version explicitly. `uv pip check` verifies dependency compatibility.
+Python/index environment overrides, and uses only PyPI plus the copied selected archives.
+The sdist is actually built and installed there. Harness release installs include the
+authenticated wheel of the selected released contracts version. `uv pip check` verifies
+dependency compatibility.
 
 Smoke runs use the clean interpreter with `-I`, without `PYTHONPATH` or editable packages.
 They check installed file inventories and digests, schema resource loading, API validation
@@ -179,8 +181,9 @@ must verify them before enabling publication:
    registration and release prerequisites are verified. Without it, tag builds run but
    publication jobs are skipped. A green build alone does not mean anything was published.
 
-All actions are pinned to full commit SHAs. Build jobs have only `contents: read`; the PyPI
-job uses the environment selected by the validated release plan with `id-token: write`.
+All actions are pinned to full commit SHAs. The build job has `contents: read` and
+`attestations: read`; the PyPI job uses the environment selected by the validated release
+plan with `id-token: write`.
 There is no user-supplied environment input. The separate GitHub release
 job has the contents, attestation and OIDC permissions it needs, and runs only after PyPI
 succeeds. Failed, cancelled or skipped prerequisites cannot publish a GitHub release.
