@@ -2,11 +2,15 @@
 
 ## Package Line
 
+Harness `0.23.0` requires Python `>=3.12,<3.15` and
+`robotics-runtime-contracts>=0.22,<0.23`. Its exact
+[release prerequisite](../../../docs/releasing.md) is `contracts-v0.22.0`.
+
 The `0.22.x` harness line requires Python `>=3.12,<3.15` and
-`robotics-runtime-contracts>=0.21,<0.22`. This release selects contracts 0.21.1
-and harness 0.22.0, with exact prerequisite `contracts-v0.21.1`.
-Package metadata, tagged source and distribution digests identify the installed
-pair; package support and native-profile qualification remain separate.
+`robotics-runtime-contracts>=0.21,<0.22`; harness `0.22.0` uses contracts `0.21.1`
+with release prerequisite `contracts-v0.21.1`. Package metadata, tagged source
+and distribution digests identify the installed pair; package support and
+native-profile qualification remain separate.
 
 Each role retains its canonical default. Datasets use v2 for one or multiple
 MCAP members. Explicit v2 scenario/runtime/observation/result/qualification roles
