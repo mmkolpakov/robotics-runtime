@@ -1006,3 +1006,64 @@ def test_transport_qualification_writes_contract_valid_failed_channel_observatio
         "loss_ratio_exceeded",
     }
     assert all("channel_id" not in item for item in observation["violations"])
+
+
+@pytest.mark.parametrize("version", ["acceptance-result.v2", "acceptance-result.v3"])
+def test_native_aggregate_accepts_homogeneous_result_registry(tmp_path: Path, version: str) -> None:
+    from tests.test_neutral_qualification import _archive, _document, _write
+
+    _archive(tmp_path, ("first", "second"))
+    paths = []
+    for domain in ("first", "second"):
+        path = tmp_path / f"result-{domain}.json"
+        result_document = _document(path)
+        result_document["schema_version"] = version
+        _write(path, result_document)
+        paths.append(path)
+    output = aggregate_results(
+        scenario_path=tmp_path / "scenario.json",
+        run_context_path=tmp_path / "run.json",
+        result_paths=paths,
+        output_path=tmp_path / "versioned-aggregate.json",
+        generated_at=datetime.fromisoformat("2026-10-10T12:00:07+00:00"),
+    )
+    aggregate = json.loads(output.read_bytes())
+    assert {item["domain_id"] for item in aggregate["per_domain_results"]} == {"first", "second"}
+    assert aggregate["per_domain_aggregate"] == "incomplete"
+    assert aggregate["cross_domain_e2e"]["status"] == "unevaluated"
+
+
+def test_native_aggregate_refuses_mixed_v2_v3_registry(tmp_path: Path) -> None:
+    from tests.test_neutral_qualification import _archive, _document, _write
+
+    _archive(tmp_path, ("first", "second"))
+    path = tmp_path / "result-second.json"
+    result_document = _document(path)
+    result_document["schema_version"] = "acceptance-result.v3"
+    _write(path, result_document)
+    with pytest.raises(BundleValidationError, match="one contract version"):
+        aggregate_results(
+            scenario_path=tmp_path / "scenario.json",
+            run_context_path=tmp_path / "run.json",
+            result_paths=[tmp_path / "result-first.json", path],
+            output_path=tmp_path / "mixed-aggregate.json",
+        )
+
+
+def test_native_aggregate_refuses_unsupported_version_and_transport() -> None:
+    from types import SimpleNamespace
+
+    from robotics_acceptance_harness.aggregate import _validate_registry_version
+
+    scenario = {"schema_version": "acceptance-scenario.v2"}
+    for version in ("acceptance-result.v1", "acceptance-result.v4"):
+        with pytest.raises(BundleValidationError, match="one contract version"):
+            _validate_registry_version(
+                scenario, [SimpleNamespace(data={"schema_version": version})], None
+            )
+    with pytest.raises(BundleValidationError, match="does not support native"):
+        _validate_registry_version(
+            scenario,
+            [SimpleNamespace(data={"schema_version": "acceptance-result.v3"})],
+            Path("transport.json"),
+        )
