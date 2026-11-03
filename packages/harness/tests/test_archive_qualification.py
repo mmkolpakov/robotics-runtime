@@ -518,7 +518,7 @@ def test_oci_archive_keeps_original_wheel_receipt_chain(tmp_path: Path) -> None:
             _qualify(shortened)
 
 
-def test_oci_archive_journal_is_in_signed_exact_inventory(tmp_path: Path) -> None:
+def test_oci_archive_journal_is_in_exact_statement_inventory(tmp_path: Path) -> None:
     specs = _oci_archive_with_original_wheel(tmp_path)
     journal = _write(tmp_path / "journal.json", {"state": "settled", "cid": "fixture"})
     specs.append(f"other_evidence:attempt/journal.json={journal}")
@@ -624,5 +624,87 @@ def test_oci_archive_accepts_covered_product_result_with_original_evidence(tmp_p
     method = _document(method_path)
     method["evaluator_requirements"][0]["expected_assertion_ids"] = ["org.example.check.changed"]
     _write(method_path, method)
+    with pytest.raises(ContractError):
+        _qualify(specs)
+
+
+def _oci_archive_with_provenance(tmp_path: Path, *, wrong_size: bool = False) -> list[str]:
+    specs = _oci_archive_with_original_wheel(tmp_path)
+    fixture = (
+        Path(__file__).resolve().parents[2] / "contracts/tests/fixtures/qualification/inference"
+    )
+    manifest = _write(tmp_path / "oci-manifest.json", {"schemaVersion": 2, "fixture": True})
+    digest = _digest(manifest)
+    artifact = {
+        "uri": manifest.as_uri(),
+        "sha256": digest,
+        "size_bytes": manifest.stat().st_size + int(wrong_size),
+        "media_type": "application/vnd.oci.image.manifest.v1+json",
+        "immutable_revision": "sha256:" + digest,
+    }
+    statement = _write(
+        tmp_path / "oci-statement.json",
+        {
+            "_type": "https://in-toto.io/Statement/v1",
+            "subject": [{"name": "manifest.json", "digest": {"sha256": digest}}],
+            "predicateType": "https://example.invalid/fixture",
+            "predicate": {},
+        },
+    )
+    verification = _document(fixture / "evaluator-verification.json")
+    verification["artifact"] = artifact
+    verification["statement_sha256"] = _digest(statement)
+    verification_path = _write(tmp_path / "oci-verification.json", verification)
+    receipt = _document(fixture / "evaluator-receipt.json")
+    receipt["artifact"] = artifact
+    receipt["statement_sha256"] = _digest(statement)
+    receipt["verification_sha256"] = _digest(verification_path)
+    receipt_path = _write(tmp_path / "oci-receipt.json", receipt)
+    method_path = tmp_path / "new-method.json"
+    method = _document(method_path)
+    subject = method["evaluator_requirements"][0]["execution_subject"]
+    subject["digest"] = "sha256:" + digest
+    subject["locator"] = "oci://example.invalid/evaluator@sha256:" + digest
+    subject["provenance_receipt_sha256"] = _digest(receipt_path)
+    _write(method_path, method)
+    result_path = tmp_path / "new-result-primary.json"
+    result = _document(result_path)
+    result["evaluators"] = method["evaluator_requirements"]
+    result["evaluation"]["method"]["configuration"] = _reference(method_path)
+    _write(result_path, result)
+    _refresh(tmp_path)
+    specs.extend(
+        [
+            f"package:oci/manifest.json={manifest}",
+            f"attestation:oci/statement.json={statement}",
+            f"artifact_verification:oci/verification.json={verification_path}",
+            f"artifact_receipt:oci/receipt.json={receipt_path}",
+        ]
+    )
+    return specs
+
+
+def test_oci_optional_provenance_uses_existing_receipt_chain(tmp_path: Path) -> None:
+    specs = _oci_archive_with_provenance(tmp_path)
+    metadata = _qualify(specs)
+    assert metadata["comparison"]["per_domain"][0]["status"] == "not_comparable"
+    for prefix in (
+        "package:oci/",
+        "attestation:oci/",
+        "artifact_verification:oci/",
+        "artifact_receipt:oci/",
+    ):
+        with pytest.raises(ContractError):
+            _qualify([item for item in specs if not item.startswith(prefix)])
+
+
+def test_oci_provenance_refuses_wrong_manifest_size(tmp_path: Path) -> None:
+    with pytest.raises(ContractError, match="receipt describes another package"):
+        _qualify(_oci_archive_with_provenance(tmp_path, wrong_size=True))
+
+
+def test_oci_provenance_refuses_manifest_replacement(tmp_path: Path) -> None:
+    specs = _oci_archive_with_provenance(tmp_path)
+    _write(tmp_path / "oci-manifest.json", {"schemaVersion": 2, "fixture": False})
     with pytest.raises(ContractError):
         _qualify(specs)

@@ -139,7 +139,21 @@ def _receipt_requirements(context: _Context) -> list[Mapping[str, Any]]:
         for requirement in _method_controls(context, domain)["evaluator_requirements"]:
             if requirement not in requirements:
                 requirements.append(requirement)
-    return [requirement for requirement in requirements if requirement.get("kind") != "oci"]
+    receipt_requirements = []
+    for requirement in requirements:
+        if requirement.get("kind") != "oci":
+            receipt_requirements.append(requirement)
+            continue
+        subject = requirement["execution_subject"]
+        if "provenance_receipt_sha256" in subject:
+            receipt_requirements.append(
+                {
+                    "namespace": requirement["namespace"],
+                    "artifact_sha256": subject["digest"].removeprefix("sha256:"),
+                    "receipt_sha256": subject["provenance_receipt_sha256"],
+                }
+            )
+    return receipt_requirements
 
 
 def _native_receipts(context: _Context) -> None:
