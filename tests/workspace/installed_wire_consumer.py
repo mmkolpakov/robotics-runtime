@@ -221,6 +221,17 @@ def main() -> None:
             )
         }
         control_data["calibration"] = calibration
+        # This declaration describes the source-reference fixture, not an authenticated wheel.
+        control_data["evaluator_requirements"] = [
+            {
+                "namespace": NAMESPACE,
+                "entry_point": "evidence_byte_check:evaluate",
+                "distribution": "example-evidence-byte-check",
+                "version": "0.1.0",
+                "artifact_sha256": "a" * 64,
+                "receipt_sha256": "b" * 64,
+            }
+        ]
         controls_validator.validate(control_data)
         controls_source = directory / "original-controls.json"
         controls_source.write_bytes(json.dumps(control_data).encode())
