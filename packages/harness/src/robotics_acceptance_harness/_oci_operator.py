@@ -126,6 +126,11 @@ def _limits(value: object) -> Mapping[str, int]:
         raise EvaluatorTrustError("OCI stdout limit exceeds the evaluator packet limit")
     if fields["stderr_bytes"] > DEFAULT_TRUST_LIMITS.max_report_bytes:
         raise EvaluatorTrustError("OCI stderr limit exceeds the capture limit")
+    if any(
+        fields[name] > 86_400
+        for name in ("attempt_timeout_sec", "command_timeout_sec", "cleanup_timeout_sec")
+    ):
+        raise EvaluatorTrustError("OCI timeout limit exceeds one day")
     if fields["command_timeout_sec"] > fields["attempt_timeout_sec"]:
         raise EvaluatorTrustError("OCI command timeout exceeds the attempt timeout")
     return MappingProxyType(fields)
@@ -153,14 +158,49 @@ def _storage(configuration: Mapping[str, Any], store: Mapping[str, Any]) -> None
         raise EvaluatorTrustError("OCI profile does not admit additional image stores")
 
 
+def _user_bus(address: str, evidence_root: Path | None) -> None:
+    prefix = "unix:path="
+    if not address.startswith(prefix) or any(char in address for char in (";", ",", "%", "\\")):
+        raise EvaluatorTrustError("engine requires one explicit local user-bus path")
+    path = Path(address[len(prefix) :])
+    _outside_evidence(path, evidence_root)
+    if not path.is_absolute() or path.resolve(strict=True) != path:
+        raise EvaluatorTrustError("engine user-bus path must be absolute and contain no symlinks")
+    observed = path.stat()
+    if not stat.S_ISSOCK(observed.st_mode) or observed.st_uid != os.getuid():
+        raise EvaluatorTrustError("engine user-bus must be an existing owned local socket")
+
+
+def _engine_configuration(
+    configuration: Mapping[str, Any],
+    store: Mapping[str, Any],
+    root: Path,
+    evidence_root: Path | None,
+) -> None:
+    expected = {
+        "lock_type": "file",
+        "tmp_dir": str(store["tmpdir"]),
+        "static_dir": str(store["graph_root"] / "libpod"),
+        "volume_path": str(store["graph_root"] / "volumes"),
+    }
+    values = configuration["data"].get("engine")
+    if not isinstance(values, dict) or any(
+        values.get(key) != value for key, value in expected.items()
+    ):
+        raise EvaluatorTrustError("engine configuration differs from the selected project context")
+    for name in ("static_dir", "volume_path"):
+        _directory(expected[name], root, evidence_root)
+
+
 def _environment(value: object, root: Path, evidence_root: Path | None) -> Mapping[str, str]:
-    environment = _object(value, {"HOME", "XDG_RUNTIME_DIR", "PATH"})
+    environment = _object(value, {"HOME", "XDG_RUNTIME_DIR", "PATH", "DBUS_SESSION_BUS_ADDRESS"})
     if any(
         not isinstance(item, str) or not item or "\x00" in item for item in environment.values()
     ):
         raise EvaluatorTrustError("engine environment must contain explicit nonempty strings")
     if any(not Path(item).is_absolute() for item in environment["PATH"].split(os.pathsep)):
         raise EvaluatorTrustError("engine PATH must contain only explicit absolute entries")
+    _user_bus(environment["DBUS_SESSION_BUS_ADDRESS"], evidence_root)
     home = _directory(environment["HOME"], root, evidence_root)
     runtime = _directory(environment["XDG_RUNTIME_DIR"], root, evidence_root)
     if runtime in {home, Path(f"/run/user/{os.getuid()}"), Path("/")}:
@@ -213,6 +253,7 @@ def _engine(value: object, root: Path, evidence_root: Path | None) -> Mapping[st
     containers = _configuration(fields["containers_conf"], root, evidence_root)
     storage = _configuration(fields["storage_conf"], root, evidence_root)
     _storage(storage, selected_store)
+    _engine_configuration(containers, selected_store, root, evidence_root)
     executable = _absolute(fields["executable"], root)
     _outside_evidence(executable, evidence_root)
     if not isinstance(fields["executable_sha256"], str):

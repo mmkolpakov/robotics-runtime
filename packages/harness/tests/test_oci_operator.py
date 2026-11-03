@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import socket
 import subprocess
 from dataclasses import asdict
 from pathlib import Path
@@ -37,11 +38,21 @@ def fixture(root: Path) -> tuple[Path, dict[str, Any], list[dict[str, Any]]]:
     paths = {name: context / name for name in ("home", "runtime", "graph", "run", "tmp", "hooks")}
     for path in paths.values():
         path.mkdir(mode=0o700)
+    for name in ("libpod", "volumes"):
+        (paths["graph"] / name).mkdir(mode=0o700)
+    bus_path = root / "user-bus"
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as bus:
+        bus.bind(str(bus_path))
     engine = context / "podman"
     engine.write_bytes(b"unit engine bytes; not executed")
     engine.chmod(0o500)
     containers = context / "containers.conf"
-    containers.write_text('[engine]\ncgroup_manager = "systemd"\n')
+    containers.write_text(
+        '[engine]\ncgroup_manager = "systemd"\nlock_type = "file"\n'
+        f"tmp_dir = {json.dumps(str(paths['tmp']))}\n"
+        f"static_dir = {json.dumps(str(paths['graph'] / 'libpod'))}\n"
+        f"volume_path = {json.dumps(str(paths['graph'] / 'volumes'))}\n"
+    )
     storage = context / "storage.conf"
     storage.write_text(
         '[storage]\ndriver = "vfs"\n'
@@ -62,6 +73,7 @@ def fixture(root: Path) -> tuple[Path, dict[str, Any], list[dict[str, Any]]]:
                 "HOME": str(paths["home"]),
                 "XDG_RUNTIME_DIR": str(paths["runtime"]),
                 "PATH": "/usr/bin:/bin",
+                "DBUS_SESSION_BUS_ADDRESS": "unix:path=" + str(bus_path),
             },
             "containers_conf": {"path": str(containers), "sha256": digest(containers.read_bytes())},
             "storage_conf": {"path": str(storage), "sha256": digest(storage.read_bytes())},
@@ -289,3 +301,89 @@ def test_operator_profile_cannot_be_taken_from_the_evidence_root(tmp_path: Path)
     write(path, data)
     with pytest.raises(EvaluatorTrustError, match="outside evidence"):
         operator.load_oci_profile(path, requirements, evidence_root=evidence)
+
+
+@pytest.mark.parametrize(
+    "fault", ["missing", "network", "fallback", "regular", "symlink", "absent", "owner"]
+)
+def test_user_bus_requires_a_single_owned_socket_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fault: str
+) -> None:
+    path, data, requirements = fixture(tmp_path)
+    environment = data["engine"]["environment"]
+    address = environment["DBUS_SESSION_BUS_ADDRESS"]
+    if fault == "missing":
+        del environment["DBUS_SESSION_BUS_ADDRESS"]
+    elif fault == "network":
+        environment["DBUS_SESSION_BUS_ADDRESS"] = "tcp:host=example.com,port=1234"
+    elif fault == "fallback":
+        environment["DBUS_SESSION_BUS_ADDRESS"] = address + ";unix:path=/another/bus"
+    elif fault == "regular":
+        environment["DBUS_SESSION_BUS_ADDRESS"] = (
+            "unix:path=" + data["engine"]["storage_conf"]["path"]
+        )
+    elif fault == "symlink":
+        alias = tmp_path / "bus-alias"
+        alias.symlink_to(tmp_path / "user-bus")
+        environment["DBUS_SESSION_BUS_ADDRESS"] = "unix:path=" + str(alias)
+    elif fault == "absent":
+        environment["DBUS_SESSION_BUS_ADDRESS"] = "unix:path=" + str(tmp_path / "absent-bus")
+    else:
+        other_uid = os.getuid() + 1
+        monkeypatch.setattr(os, "getuid", lambda: other_uid)
+    write(path, data)
+    with pytest.raises(EvaluatorTrustError):
+        operator.load_oci_profile(path, requirements)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("lock_type", "shm"),
+        ("tmp_dir", "/other/tmp"),
+        ("static_dir", "/other/static"),
+        ("volume_path", "/other/volumes"),
+        ("lock_type", None),
+    ],
+)
+def test_engine_lock_and_state_paths_are_bound_before_any_invocation(
+    tmp_path: Path, field: str, value: str | None
+) -> None:
+    path, data, requirements = fixture(tmp_path)
+    record = data["engine"]["containers_conf"]
+    target = Path(record["path"])
+    lines = [line for line in target.read_text().splitlines() if not line.startswith(field + " =")]
+    if value is not None:
+        lines.append(field + " = " + json.dumps(value))
+    target.write_text("\n".join(lines) + "\n")
+    record["sha256"] = digest(target.read_bytes())
+    write(path, data)
+    with pytest.raises(EvaluatorTrustError, match="selected project context"):
+        operator.load_oci_profile(path, requirements)
+
+
+@pytest.mark.parametrize("directory", ["libpod", "volumes"])
+def test_state_directories_must_be_preprovisioned(tmp_path: Path, directory: str) -> None:
+    path, data, requirements = fixture(tmp_path)
+    target = Path(data["engine"]["store"]["graph_root"]) / directory
+    target.rmdir()
+    write(path, data)
+    with pytest.raises(EvaluatorTrustError):
+        operator.load_oci_profile(path, requirements)
+    assert not target.exists()
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "attempt_timeout_sec",
+        "command_timeout_sec",
+        "cleanup_timeout_sec",
+    ],
+)
+def test_backend_timeouts_refuse_values_beyond_one_day(tmp_path: Path, field: str) -> None:
+    path, data, requirements = fixture(tmp_path)
+    data["limits"][field] = 86_401
+    write(path, data)
+    with pytest.raises(EvaluatorTrustError, match="exceeds one day"):
+        operator.load_oci_profile(path, requirements)
