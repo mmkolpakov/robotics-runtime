@@ -6,7 +6,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -220,3 +220,134 @@ def test_allowed_argv_is_literal_and_environment_is_closed(
     assert "GH_TOKEN" not in observed["env"]
     assert "PATH" not in observed["env"]
     assert observed["env"]["HOME"] == str(tmp_path / "home")
+
+
+def test_private_capture_uses_only_explicit_selected_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+
+    monkeypatch.setenv("UNSELECTED_ENGINE_SETTING", "must-not-inherit")
+    command = verifier(tmp_path, "import json\nprint(json.dumps(dict(os.environ)))")
+    code, output, error = trust._capture_tool(
+        command,
+        tmp_path,
+        environment={"PATH": "/operator/helpers", "ENGINE_SELECTION": "project-store"},
+        deadline=time.monotonic() + 4,
+        byte_limits=(4096, 32, None),
+    )
+    observed = json.loads(output)
+    assert code == 0 and error == b""
+    assert observed["PATH"] == "/operator/helpers"
+    assert observed["ENGINE_SELECTION"] == "project-store"
+    assert "UNSELECTED_ENGINE_SETTING" not in observed
+
+
+@pytest.mark.parametrize(
+    ("stdout", "stderr"), [(b"abc", b"12345"), (b"abcd", b""), (b"", b"123456")]
+)
+def test_private_capture_has_independent_stream_caps(
+    tmp_path: Path, stdout: bytes, stderr: bytes
+) -> None:
+    command = verifier(tmp_path, f"os.write(1, {stdout!r})\nos.write(2, {stderr!r})")
+    arguments: dict[str, Any] = {
+        "environment": {},
+        "deadline": time.monotonic() + 4,
+        "byte_limits": (3, 5, None),
+    }
+    if len(stdout) <= 3 and len(stderr) <= 5:
+        assert trust._capture_tool(command, tmp_path, **arguments) == (0, stdout, stderr)
+    else:
+        with pytest.raises(trust.EvaluatorTrustError, match="byte limit"):
+            trust._capture_tool(command, tmp_path, **arguments)
+
+
+def test_expired_deadline_and_absent_environment_refuse_before_spawn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def forbidden(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
+        pytest.fail("refused capture spawned a child")
+
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    with pytest.raises(subprocess.TimeoutExpired):
+        trust._capture_tool(
+            ["never-run"],
+            tmp_path,
+            environment={},
+            deadline=time.monotonic() - 1,
+            byte_limits=(1, 1, None),
+        )
+    with pytest.raises(trust.EvaluatorTrustError, match="explicit environment"):
+        trust._capture_tool(
+            ["never-run"],
+            tmp_path,
+            environment=cast(Any, None),
+            deadline=time.monotonic() + 1,
+            byte_limits=(1, 1, None),
+        )
+
+
+def test_two_commands_share_one_absolute_deadline(tmp_path: Path) -> None:
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    first_command = verifier(first, "time.sleep(1)\nos.write(1, b'first')")
+    second_command = verifier(second, "time.sleep(2.5)\nos.write(1, b'late')")
+    deadline = time.monotonic() + 3
+    assert trust._capture_tool(
+        first_command, first, environment={}, deadline=deadline, byte_limits=(32, 32, None)
+    ) == (0, b"first", b"")
+    with pytest.raises(subprocess.TimeoutExpired):
+        trust._capture_tool(
+            second_command, second, environment={}, deadline=deadline, byte_limits=(32, 32, None)
+        )
+
+
+def test_process_settlement_after_deadline_cannot_return_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    command = verifier(tmp_path, "os.write(1, b'otherwise-valid')")
+    deadline = time.monotonic() + 4
+    original = subprocess.Popen
+
+    def start(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
+        process = original(*args, **kwargs)
+        original_wait = process.wait
+
+        def wait(timeout: float | None = None) -> int:
+            result = original_wait(timeout=timeout)
+            monkeypatch.setattr(time, "monotonic", lambda: deadline + 1)
+            return result
+
+        monkeypatch.setattr(process, "wait", wait)
+        return process
+
+    monkeypatch.setattr(subprocess, "Popen", start)
+    with pytest.raises(subprocess.TimeoutExpired):
+        trust._capture_tool(
+            command, tmp_path, environment={}, deadline=deadline, byte_limits=(32, 32, None)
+        )
+
+
+def test_verifier_expired_parent_deadline_refuses_before_spawn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        pytest.fail("expired verifier deadline spawned a process")
+
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    with pytest.raises(trust.EvaluatorTrustError, match="exceeded its deadline"):
+        trust._run_tool(
+            [str(tmp_path / "gh"), "--version"],
+            tmp_path,
+            trust.TrustLimits(),
+            deadline=time.monotonic() - 1,
+        )
+
+
+def test_verifier_command_timeout_still_limits_a_later_parent_deadline(tmp_path: Path) -> None:
+    command = verifier(tmp_path, "time.sleep(6)")
+    started = time.monotonic()
+    with pytest.raises(trust.EvaluatorTrustError, match="exceeded its deadline"):
+        trust._run_tool(command, tmp_path, trust.TrustLimits(timeout_sec=1), deadline=started + 5)
+    assert time.monotonic() - started < 3
