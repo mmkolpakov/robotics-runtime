@@ -184,8 +184,11 @@ def _validate_registry_version(
     transport_qualification_path: str | Path | None,
 ) -> bool:
     native = bool(scenario["schema_version"] == "acceptance-scenario.v2")
-    expected_schema = "acceptance-result.v2" if native else "acceptance-result.v1"
-    if any(result.data["schema_version"] != expected_schema for result in results):
+    expected_schemas = (
+        {"acceptance-result.v2", "acceptance-result.v3"} if native else {"acceptance-result.v1"}
+    )
+    actual_schemas = {result.data["schema_version"] for result in results}
+    if len(actual_schemas) != 1 or not actual_schemas <= expected_schemas:
         raise BundleValidationError(
             "$.per_domain_results", "scenario and result registry must use one contract version"
         )

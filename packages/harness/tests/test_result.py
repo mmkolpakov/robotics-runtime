@@ -334,3 +334,28 @@ def test_physical_result_passes_without_simulation_clock_measurements(tmp_path: 
     assert result["status"] == "passed"
     assert result["unevaluated"] == []
     assert (junit.failures, junit.errors, junit.skipped) == (0, 0, 0)
+
+
+def test_native_v3_junit_preserves_v2_observations_coverage_and_properties(tmp_path: Path) -> None:
+    import xml.etree.ElementTree as ET
+
+    from tests.test_neutral_qualification import _archive, _document
+
+    _archive(tmp_path)
+    original = _document(tmp_path / "result-primary.json")
+    candidate = {**original, "schema_version": "acceptance-result.v3"}
+    original_xml = write_junit_xml(original, tmp_path / "v2.xml")
+    candidate_xml = write_junit_xml(candidate, tmp_path / "v3.xml")
+    before = ET.parse(original_xml).getroot()
+    after = ET.parse(candidate_xml).getroot()
+    assert ET.tostring(after) == ET.tostring(before)
+    cases = {item.attrib["name"] for item in after.iter("testcase")}
+    assert {"observation-error", "observation-clock-delivery", "evaluation-coverage"} <= cases
+    properties = {item.attrib["name"]: item.attrib["value"] for item in after.iter("property")}
+    assert properties["status"] == "incomplete"
+    assert properties["profile_id"] == original["profile"]["profile_id"]
+    assert properties["observation_sha256"] == original["original_execution"]["observation_sha256"]
+    assert (
+        properties["evaluation_environment_sha256"]
+        == original["evaluation"]["environment"]["sha256"]
+    )

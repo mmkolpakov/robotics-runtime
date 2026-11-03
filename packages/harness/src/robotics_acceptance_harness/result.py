@@ -337,7 +337,7 @@ def _result_assertions(result: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     """Share assertion and observation outcomes between the verdict and JUnit."""
 
     assertion_results = list(result["assertion_results"])
-    if result["schema_version"] == "acceptance-result.v2":
+    if result["schema_version"] in {"acceptance-result.v2", "acceptance-result.v3"}:
         for name, observation in result["observations"].items():
             assertion_results.append(
                 {
@@ -409,7 +409,7 @@ def write_junit_xml(result: Mapping[str, Any], path: str | Path) -> Path:
     suite = TestSuite("robotics-acceptance")
     suite.add_property("scenario_sha256", result["scenario_sha256"])
     suite.add_property("runtime_manifest_sha256", result["runtime_manifest_sha256"])
-    if result["schema_version"] == "acceptance-result.v2":
+    if result["schema_version"] in {"acceptance-result.v2", "acceptance-result.v3"}:
         suite.add_property("status", result["status"])
         suite.add_property("profile_id", result["profile"]["profile_id"])
         suite.add_property("observation_sha256", result["original_execution"]["observation_sha256"])
