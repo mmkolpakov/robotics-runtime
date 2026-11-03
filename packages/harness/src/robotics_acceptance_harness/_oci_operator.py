@@ -34,6 +34,7 @@ _LIMIT_NAMES = {
     "stdout_bytes",
     "stderr_bytes",
     "memory_bytes",
+    "input_bytes",
     "pids",
     "cpus",
     "tmpfs_bytes",

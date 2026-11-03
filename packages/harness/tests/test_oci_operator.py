@@ -92,6 +92,7 @@ def fixture(root: Path) -> tuple[Path, dict[str, Any], list[dict[str, Any]]]:
             "stdout_bytes": MAX_PACKET_BYTES,
             "stderr_bytes": 65536,
             "memory_bytes": 268435456,
+            "input_bytes": 1073741824,
             "pids": 32,
             "cpus": 1,
             "tmpfs_bytes": 16777216,
@@ -386,4 +387,26 @@ def test_backend_timeouts_refuse_values_beyond_one_day(tmp_path: Path, field: st
     data["limits"][field] = 86_401
     write(path, data)
     with pytest.raises(EvaluatorTrustError, match="exceeds one day"):
+        operator.load_oci_profile(path, requirements)
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 2**63, "1024"])
+def test_input_disk_budget_requires_a_positive_int64(tmp_path: Path, value: Any) -> None:
+    path, data, requirements = fixture(tmp_path)
+    data["limits"]["input_bytes"] = value
+    write(path, data)
+    with pytest.raises(EvaluatorTrustError, match="positive bounded integers"):
+        operator.load_oci_profile(path, requirements)
+
+
+def test_input_disk_budget_is_explicit_and_independent_of_child_memory(tmp_path: Path) -> None:
+    path, data, requirements = fixture(tmp_path)
+    data["limits"]["input_bytes"] = 2**63 - 1
+    write(path, data)
+    loaded = operator.load_oci_profile(path, requirements)
+    assert loaded.limits["input_bytes"] == 2**63 - 1
+    assert loaded.limits["memory_bytes"] == 268435456
+    del data["limits"]["input_bytes"]
+    write(path, data)
+    with pytest.raises(EvaluatorTrustError):
         operator.load_oci_profile(path, requirements)
