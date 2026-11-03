@@ -198,7 +198,7 @@ def test_closed_profile_refuses_unsupported_fields(tmp_path: Path, field: str, v
         operator.load_oci_profile(path, requirements)
 
 
-@pytest.mark.parametrize("fault", ["missing", "duplicate", "wheel", "receipt"])
+@pytest.mark.parametrize("fault", ["missing", "duplicate", "wheel"])
 def test_requirements_are_complete_and_no_claim_is_silently_dropped(
     tmp_path: Path, fault: str
 ) -> None:
@@ -207,10 +207,8 @@ def test_requirements_are_complete_and_no_claim_is_silently_dropped(
         data["evaluators"] = []
     elif fault == "duplicate":
         data["evaluators"].append(data["evaluators"][0])
-    elif fault == "wheel":
-        requirements[0]["kind"] = "wheel"
     else:
-        requirements[0]["execution_subject"]["provenance_receipt_sha256"] = "b" * 64
+        requirements[0]["kind"] = "wheel"
     write(path, data)
     with pytest.raises(EvaluatorTrustError):
         operator.load_oci_profile(path, requirements)
@@ -410,3 +408,17 @@ def test_input_disk_budget_is_explicit_and_independent_of_child_memory(tmp_path:
     write(path, data)
     with pytest.raises(EvaluatorTrustError):
         operator.load_oci_profile(path, requirements)
+
+
+def test_configuration_capture_accepts_a_documentary_receipt_reference_without_admitting_it(
+    tmp_path: Path,
+) -> None:
+    path, data, requirements = fixture(tmp_path)
+    requirements[0]["execution_subject"]["provenance_receipt_sha256"] = "b" * 64
+    write(path, data)
+    loaded = operator.load_oci_profile(path, requirements)
+    assert (
+        loaded.evaluators["org.example"]["manifest_sha256"]
+        == data["evaluators"][0]["manifest_sha256"]
+    )
+    assert requirements[0]["execution_subject"]["provenance_receipt_sha256"] == "b" * 64

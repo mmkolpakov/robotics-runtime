@@ -292,10 +292,6 @@ def _requirements(requirements: Sequence[Mapping[str, Any]]) -> dict[str, str]:
             raise EvaluatorTrustError("OCI requirements need distinct declared namespaces")
         if not isinstance(subject, Mapping) or subject.get("kind") != "oci_image":
             raise EvaluatorTrustError("OCI requirement needs an image execution subject")
-        if "provenance_receipt_sha256" in subject:
-            raise EvaluatorTrustError(
-                "OCI execution profile does not yet support provenance receipts"
-            )
         digest = subject.get("digest")
         if not isinstance(digest, str) or not digest.startswith("sha256:"):
             raise EvaluatorTrustError("OCI requirement needs an exact sha256 image digest")
