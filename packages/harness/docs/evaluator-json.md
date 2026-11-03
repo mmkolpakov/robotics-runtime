@@ -67,8 +67,8 @@ They reuse published contracts fragments and do not add roles to the contracts
 catalog. Python callers can inspect the package resources with
 `importlib.resources.files("robotics_acceptance_harness").joinpath("schemas")`.
 
-The [Node example](../consumer-examples/evidence-byte-check-node/README.md) uses
-`/input/request.json` and `/output/response.json` with separate captured input
-and output directories. Those paths belong to the example's process arrangement;
-the codec itself handles bytes only. The caller owns execution, trust, timeouts,
-file capture and cleanup, and must bind observations to their source clocks.
+The [Node example](../consumer-examples/evidence-byte-check-node/README.md) takes
+`--request <path>`, resolves captured locations relative to the request directory,
+and writes one JSON response to stdout. The codec itself handles bytes only.
+The caller owns execution, trust, timeouts, raw stream capture and cleanup,
+and must bind observations to their source clocks.
