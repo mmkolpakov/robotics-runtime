@@ -30,6 +30,18 @@ def digest(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def binding(
+    paths: tuple[Path, Path, Path], expected: str, platform: dict[str, str]
+) -> dict[str, Any]:
+    return {
+        "manifest": paths[0],
+        "config": paths[1],
+        "bundle": paths[2],
+        "manifest_sha256": expected.removeprefix("sha256:"),
+        "platform": platform,
+    }
+
+
 def fake_profile(root: Path, version: str = "v3.1.4+dirty") -> CosignKeyVerifierProfile:
     tool, key, trust_root = root / "unit-cosign", root / "key.pub", root / "root.json"
     key.write_bytes(b"unit-key")
@@ -95,9 +107,7 @@ def inputs(root: Path) -> tuple[Path, Path, Path, str]:
 def call(root: Path, *, limits: TrustLimits = DEFAULT_TRUST_LIMITS) -> tuple[bytes, bytes, bytes]:
     manifest, config, bundle, expected = inputs(root)
     return oci.authenticate_manifest(
-        (manifest, config, bundle),
-        expected_digest=expected,
-        platform=PLATFORM,
+        binding((manifest, config, bundle), expected, PLATFORM),
         profile=fake_profile(root),
         limits=limits,
     )
@@ -159,9 +169,7 @@ def test_identity_refuses_before_verifier_execution(
     monkeypatch.setattr(oci, "verify_blob_snapshot", forbidden)
     with pytest.raises(EvaluatorTrustError):
         oci.authenticate_manifest(
-            (manifest, config, bundle),
-            expected_digest="sha256:" + digest(raw),
-            platform=PLATFORM,
+            binding((manifest, config, bundle), "sha256:" + digest(raw), PLATFORM),
             profile=fake_profile(tmp_path),
         )
 
@@ -171,10 +179,7 @@ def test_external_subject_must_match_original_manifest(tmp_path: Path, expected:
     manifest, config, bundle, _ = inputs(tmp_path)
     with pytest.raises(EvaluatorTrustError):
         oci.authenticate_manifest(
-            (manifest, config, bundle),
-            expected_digest=expected,
-            platform=PLATFORM,
-            profile=fake_profile(tmp_path),
+            binding((manifest, config, bundle), expected, PLATFORM), profile=fake_profile(tmp_path)
         )
 
 
@@ -183,10 +188,7 @@ def test_external_platform_is_closed(tmp_path: Path, platform: dict[str, str]) -
     manifest, config, bundle, expected = inputs(tmp_path)
     with pytest.raises(EvaluatorTrustError, match="platform requires"):
         oci.authenticate_manifest(
-            (manifest, config, bundle),
-            expected_digest=expected,
-            platform=platform,
-            profile=fake_profile(tmp_path),
+            binding((manifest, config, bundle), expected, platform), profile=fake_profile(tmp_path)
         )
 
 
@@ -198,18 +200,20 @@ def test_capture_survives_original_path_replacement(
     verifier = cosign.verify_blob_snapshot
 
     def changed(
-        raw: bytes, signature: bytes, profile: CosignKeyVerifierProfile, limits: TrustLimits
+        raw: bytes,
+        signature: bytes,
+        profile: CosignKeyVerifierProfile,
+        limits: TrustLimits,
+        *,
+        deadline: float | None = None,
     ) -> bytes:
         for path in (manifest, config, bundle):
             path.write_bytes(b"changed original path")
-        return verifier(raw, signature, profile, limits)
+        return verifier(raw, signature, profile, limits, deadline=deadline)
 
     monkeypatch.setattr(oci, "verify_blob_snapshot", changed)
     observed = oci.authenticate_manifest(
-        (manifest, config, bundle),
-        expected_digest=expected,
-        platform=PLATFORM,
-        profile=fake_profile(tmp_path),
+        binding((manifest, config, bundle), expected, PLATFORM), profile=fake_profile(tmp_path)
     )
     assert observed[:2] == original
 
@@ -231,7 +235,7 @@ def test_verifier_refusal_cannot_return_captured_admission(tmp_path: Path, fault
         profile = replace(profile, version="v3.1.3")
     with pytest.raises(EvaluatorTrustError):
         oci.authenticate_manifest(
-            (manifest, config, bundle), expected_digest=expected, platform=PLATFORM, profile=profile
+            binding((manifest, config, bundle), expected, PLATFORM), profile=profile
         )
 
 
@@ -250,9 +254,7 @@ def test_capture_refuses_unsafe_inputs(tmp_path: Path, fault: str) -> None:
         os.mkfifo(manifest)
     with pytest.raises(EvaluatorTrustError):
         oci.authenticate_manifest(
-            (manifest, config, bundle),
-            expected_digest=expected,
-            platform=PLATFORM,
+            binding((manifest, config, bundle), expected, PLATFORM),
             profile=fake_profile(tmp_path),
             limits=limits,
         )
@@ -303,9 +305,9 @@ def test_oci_documents_require_json_before_verifier(
     monkeypatch.setattr(oci, "verify_blob_snapshot", forbidden)
     with pytest.raises(EvaluatorTrustError, match="invalid OCI"):
         oci.authenticate_manifest(
-            (manifest, config, bundle),
-            expected_digest="sha256:" + digest(manifest.read_bytes()),
-            platform=PLATFORM,
+            binding(
+                (manifest, config, bundle), "sha256:" + digest(manifest.read_bytes()), PLATFORM
+            ),
             profile=fake_profile(tmp_path),
         )
 
@@ -325,9 +327,7 @@ def test_docker_schema2_preserves_original_manifest_and_config_bytes(tmp_path: P
     manifest.write_bytes(original_manifest)
     bundle.write_bytes(digest(original_manifest).encode())
     observed = oci.authenticate_manifest(
-        (manifest, config, bundle),
-        expected_digest="sha256:" + digest(original_manifest),
-        platform=PLATFORM,
+        binding((manifest, config, bundle), "sha256:" + digest(original_manifest), PLATFORM),
         profile=fake_profile(tmp_path),
     )
     assert observed == (original_manifest, original_config, b"unit fixture verified")
@@ -362,8 +362,46 @@ def test_media_pair_refusal_is_closed_and_type_safe(
     monkeypatch.setattr(oci, "verify_blob_snapshot", forbidden)
     with pytest.raises(EvaluatorTrustError):
         oci.authenticate_manifest(
-            (manifest, config, bundle),
-            expected_digest="sha256:" + digest(manifest.read_bytes()),
-            platform=PLATFORM,
+            binding(
+                (manifest, config, bundle), "sha256:" + digest(manifest.read_bytes()), PLATFORM
+            ),
             profile=fake_profile(tmp_path),
         )
+
+
+def test_manifest_version_and_signature_share_the_parent_deadline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time
+
+    manifest, config, bundle, expected = inputs(tmp_path)
+    profile = fake_profile(tmp_path)
+    source = profile.executable.read_text().replace(
+        "args = sys.argv[1:]",
+        "import time\nargs = sys.argv[1:]\ntime.sleep(0.5 if args[0] == 'version' else 1.5)",
+    )
+    profile.executable.unlink()
+    profile.executable.write_text(source)
+    profile.executable.chmod(0o500)
+    profile = replace(profile, executable_sha256=digest(profile.executable.read_bytes()))
+    from robotics_acceptance_harness.evaluator_trust import _run_tool
+
+    original = _run_tool
+    observed: list[tuple[str, float | None]] = []
+
+    def run(*args: Any, **kwargs: Any) -> bytes:
+        observed.append((args[0][1], kwargs.get("deadline")))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(cosign, "_run_tool", run)
+    started = time.monotonic()
+    deadline = started + 1.5
+    with pytest.raises(EvaluatorTrustError, match="exceeded its deadline"):
+        oci.authenticate_manifest(
+            binding((manifest, config, bundle), expected, PLATFORM),
+            profile=profile,
+            limits=TrustLimits(timeout_sec=5),
+            deadline=deadline,
+        )
+    assert observed == [("version", deadline), ("verify-blob", deadline)]
+    assert time.monotonic() - started < 3.5

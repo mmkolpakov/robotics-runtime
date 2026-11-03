@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any
 
 from robotics_runtime_contracts import ContractError, loads_mapping
@@ -80,18 +79,18 @@ def _validate_identity(
 
 
 def authenticate_manifest(
-    paths: tuple[Path, Path, Path],
+    binding: Mapping[str, Any],
     *,
-    expected_digest: str,
-    platform: Mapping[str, str],
     profile: CosignKeyVerifierProfile,
     limits: TrustLimits = DEFAULT_TRUST_LIMITS,
+    deadline: float | None = None,
 ) -> tuple[bytes, bytes, bytes]:
     """Capture manifest/config/bundle paths; return manifest/config/audit, not CID proof."""
-    manifest_path, config_path, bundle_path = paths
-    manifest = read_once(manifest_path, limits.max_bundle_bytes)
-    config = read_once(config_path, limits.max_bundle_bytes)
-    bundle = read_once(bundle_path, limits.max_bundle_bytes)
-    _validate_identity(manifest, config, expected_digest, platform)
-    audit = verify_blob_snapshot(manifest, bundle, profile, limits)
+    manifest = read_once(binding["manifest"], limits.max_bundle_bytes)
+    config = read_once(binding["config"], limits.max_bundle_bytes)
+    bundle = read_once(binding["bundle"], limits.max_bundle_bytes)
+    _validate_identity(
+        manifest, config, "sha256:" + binding["manifest_sha256"], binding["platform"]
+    )
+    audit = verify_blob_snapshot(manifest, bundle, profile, limits, deadline=deadline)
     return manifest, config, audit

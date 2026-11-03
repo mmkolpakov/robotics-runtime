@@ -23,7 +23,7 @@ from robotics_acceptance_harness.evaluator_trust import (
 
 @contextmanager
 def _verifier_snapshot(
-    profile: CosignKeyVerifierProfile, limits: TrustLimits
+    profile: CosignKeyVerifierProfile, limits: TrustLimits, *, deadline: float | None = None
 ) -> Iterator[tuple[Path, Path, Path, Path]]:
     tool = _pinned_snapshot(profile.executable, profile.executable_sha256, limits.max_tool_bytes)
     key = _pinned_snapshot(profile.public_key, profile.public_key_sha256, limits.max_root_bytes)
@@ -40,7 +40,13 @@ def _verifier_snapshot(
             path.write_bytes(payload)
             path.chmod(0o400)
         version = json.loads(
-            _run_tool([str(executable), "version", "--json"], directory, limits, tool_name="cosign")
+            _run_tool(
+                [str(executable), "version", "--json"],
+                directory,
+                limits,
+                tool_name="cosign",
+                deadline=deadline,
+            )
         )
         if not isinstance(version, dict) or version.get("gitVersion") != profile.version:
             raise EvaluatorTrustError("Cosign version differs from its admitted operator profile")
@@ -89,11 +95,21 @@ def verify_snapshot(
 
 
 def verify_blob_snapshot(
-    artifact: bytes, bundle: bytes, profile: CosignKeyVerifierProfile, limits: TrustLimits
+    artifact: bytes,
+    bundle: bytes,
+    profile: CosignKeyVerifierProfile,
+    limits: TrustLimits,
+    *,
+    deadline: float | None = None,
 ) -> bytes:
     if Version(profile.version) < Version("3.1.4"):
         raise EvaluatorTrustError("OCI blob verification requires an admitted Cosign >=3.1.4")
-    with _verifier_snapshot(profile, limits) as (directory, executable, key_path, root_path):
+    with _verifier_snapshot(profile, limits, deadline=deadline) as (
+        directory,
+        executable,
+        key_path,
+        root_path,
+    ):
         artifact_path, bundle_path = _input_snapshots(
             directory, ("manifest.json", artifact), bundle
         )
@@ -113,4 +129,5 @@ def verify_blob_snapshot(
             directory,
             limits,
             tool_name="cosign",
+            deadline=deadline,
         )

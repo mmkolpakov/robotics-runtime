@@ -320,6 +320,7 @@ def _run_tool(
     limits: TrustLimits,
     *,
     tool_name: Literal["gh", "cosign"] = "gh",
+    deadline: float | None = None,
 ) -> bytes:
     if tool_name not in {"gh", "cosign"}:
         raise EvaluatorTrustError("unsupported snapshot verifier")
@@ -335,12 +336,15 @@ def _run_tool(
     if not command or command[0] != expected or not admitted:
         raise EvaluatorTrustError("only the pinned snapshot verifier commands are admitted")
     combined = tool_name == "cosign" and command[1] != "version"
+    command_deadline = time.monotonic() + limits.timeout_sec
+    if deadline is not None:
+        command_deadline = min(command_deadline, deadline)
     try:
         returncode, report, diagnostic = _capture_tool(
             command,
             directory,
             environment=_verifier_environment(directory),
-            deadline=time.monotonic() + limits.timeout_sec,
+            deadline=command_deadline,
             byte_limits=(
                 limits.max_report_bytes,
                 limits.max_report_bytes,

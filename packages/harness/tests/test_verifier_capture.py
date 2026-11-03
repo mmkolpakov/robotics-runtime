@@ -327,3 +327,27 @@ def test_process_settlement_after_deadline_cannot_return_success(
         trust._capture_tool(
             command, tmp_path, environment={}, deadline=deadline, byte_limits=(32, 32, None)
         )
+
+
+def test_verifier_expired_parent_deadline_refuses_before_spawn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def forbidden(*args: Any, **kwargs: Any) -> Any:
+        pytest.fail("expired verifier deadline spawned a process")
+
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    with pytest.raises(trust.EvaluatorTrustError, match="exceeded its deadline"):
+        trust._run_tool(
+            [str(tmp_path / "gh"), "--version"],
+            tmp_path,
+            trust.TrustLimits(),
+            deadline=time.monotonic() - 1,
+        )
+
+
+def test_verifier_command_timeout_still_limits_a_later_parent_deadline(tmp_path: Path) -> None:
+    command = verifier(tmp_path, "time.sleep(6)")
+    started = time.monotonic()
+    with pytest.raises(trust.EvaluatorTrustError, match="exceeded its deadline"):
+        trust._run_tool(command, tmp_path, trust.TrustLimits(timeout_sec=1), deadline=started + 5)
+    assert time.monotonic() - started < 3
