@@ -6,7 +6,7 @@ from hashlib import sha256
 from os import fstat
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, BinaryIO
 from urllib.parse import quote, urlsplit
 from urllib.request import url2pathname
 
@@ -83,6 +83,7 @@ def _verified_payload(
     root: Path,
     *,
     capture: bool = False,
+    sink: BinaryIO | None = None,
 ) -> bytes:
     expected_size = int(reference["size_bytes"])
     if capture and expected_size > MAX_DOCUMENT_BYTES:
@@ -105,6 +106,8 @@ def _verified_payload(
             digest.update(chunk)
             if capture:
                 payload.extend(chunk)
+            if sink is not None and sink.write(chunk) != len(chunk):
+                raise EvidenceReadError("snapshot sink did not write the complete chunk")
         after = fstat(stream.fileno())
     if size != expected_size or (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
         after.st_size,
