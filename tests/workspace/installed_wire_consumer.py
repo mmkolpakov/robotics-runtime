@@ -221,6 +221,7 @@ def main() -> None:
             )
         }
         control_data["calibration"] = calibration
+        control_data["assertions"] = []
         # This declaration describes the source-reference fixture, not an authenticated wheel.
         control_data["evaluator_requirements"] = [
             {
