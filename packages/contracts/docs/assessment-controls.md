@@ -46,12 +46,16 @@ result. Omitting it from coverage is a validation error.
 ## Validation and qualification boundaries
 
 Individual result validation checks data and cross-field invariants. It does not
-admit an image or prove evaluator execution. The high-level harness CLI refuses
-marked controls. OCI evaluator execution and qualification are unsupported;
-neither an image digest nor a valid declaration supplies that authority.
+admit an image or prove evaluator execution. In a matching source workspace, the
+harness's [local OCI archive path](../../harness/docs/evaluator-trust.md#local-oci-archive-assessment)
+requires an external operator profile and performs live image admission and
+owned execution. An image digest or valid declaration alone grants no execution
+authority. Built-in document validation requires no Engine.
 
 A `qualification-bundle.v1` cannot admit result v3. The explicit archive
 `qualification-bundle.v2` path pairs original v2 results with new v3 assessments,
-preserving original-result digest links and controls-version checks. This
-data-model pairing does not bypass the OCI qualification refusal. See the
-[qualification reference](qualification.md) for retained-artifact validation.
+preserving original-result digest links and controls-version checks. Portable
+qualification validates retained bytes, declared optional provenance receipts
+and the original wheel receipt relationships. It does not independently attest
+historical container execution. See the [qualification reference](qualification.md)
+for retained-artifact validation.

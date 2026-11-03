@@ -72,3 +72,9 @@ The [Node example](../consumer-examples/evidence-byte-check-node/README.md) take
 and writes one JSON response to stdout. The codec itself handles bytes only.
 The caller owns execution, trust, timeouts, raw stream capture and cleanup,
 and must bind observations to their source clocks.
+
+The [local OCI archive path](evaluator-trust.md#local-oci-archive-assessment)
+makes the harness that caller. It prepares verified read-only snapshots, invokes
+the pinned local Engine with an operator profile, retains raw response bytes and
+decodes them after container settlement. The codec API remains usable without
+an Engine; it does not turn caller-supplied response bytes into execution proof.

@@ -255,9 +255,11 @@ The isolated evaluator integration executes an admitted OCI digest as a finite
 process with verified read-only inputs and bounded output. Operator trust admits
 the code; the harness validates namespace, evidence digests, calibration and
 coverage and produces the final verdict. The
-[published evaluator trust profile](../packages/harness/docs/evaluator-trust.md)
-documents the installed Python evaluator interface. OCI execution is a distinct
-integration contract; it does not introduce a new command in that interface.
+[evaluator trust reference](../packages/harness/docs/evaluator-trust.md)
+separates the Python wheel interface from the optional OCI archive path in a
+matching source workspace. The latter uses the existing `evaluate` command with
+versioned assessment controls and an external operator profile; it is not a
+capability of the published read-only MCP tools.
 
 Use JUnit in the CI viewer and open compatible original recordings with
 [Rerun or PlotJuggler](viewing-results.md). A campaign UI links to the retained
