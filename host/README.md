@@ -111,7 +111,11 @@ Lifecycle deadlines are checked during admission before any provider Fiber start
 reserved until disposal and independent resource verification finish. Runtime JavaScript numbers and
 coercible objects are rejected by the nanos API before any worker is launched.
 
-MAVSDK uses grpc-js 1.14.5 and proto-loader 0.8.1 with official proto inputs pinned to commit
+The existing host RC retains its public MAVSDK gRPC adapter for legacy consumers.
+This is separate from the native MAVSDK Python API; removing it requires consumer
+migration and a separately versioned host release.
+
+MAVSDK uses grpc-js 1.14.7 and proto-loader 0.8.1 with official proto inputs pinned to commit
 5c81ecfeb6110cf74ba75ae50b78a1b265c05670. The official type generator emits ESM .js imports; runtime
 loader flags match generation and decoded int64 values remain strings. Mavsdk exposes native
 generated Core/Action/Telemetry clients. waitForReady proves transport; Core connection state,

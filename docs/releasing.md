@@ -7,6 +7,39 @@ The root `.github/workflows/release.yml` builds one package per candidate.
 The selected package's committed `pyproject.toml` version must match exactly.
 Tag pushes must resolve to the checked-out commit and be reachable from `origin/main`.
 
+## Compatibility and consumer scope
+
+Review a candidate against the released package and its documented public
+interfaces, not just the version currently written in the source tree. The
+[architecture](architecture.md#public-compatibility-boundaries) identifies these
+boundaries. Accessible private modules and internal implementation choices are
+not additional stable APIs.
+
+The packages use pre-1.0 versions. Following the distinctions in
+[Semantic Versioning](https://semver.org/), choose the version for the complete
+candidate: a patch contains compatible corrections; new public functionality,
+deprecations or intentional incompatible migrations use a new minor line before
+1.0. Describe the supported scope and migration in the package changelog and
+references. This is not an unconditional stability or fixed-duration support
+promise.
+
+Before removing a documented interface, audit its callers, package exports,
+resources, build scripts and consumer checks. Announce its replacement or
+retirement in a separately versioned release. Keep previously released artifacts,
+schema identities and signed archive references unchanged; historical consumers
+retain their pinned tools. The existing
+[schema compatibility gate](schema-compatibility.md) and installed-consumer checks
+must validate the candidate's declared scope. They do not establish universal
+compatibility.
+
+A package release, a consumer cohort change and native execution admission are
+separate decisions. A new dependency range does not update an existing lock or
+qualify an image. Adopt exact published artifacts in each consumer only after its
+checks pass; do not silently replace released MCP bundles or archive bindings.
+The harness prerequisite below still requires the exact released contracts
+sources and metadata. Package publication does not waive the execution profile's
+supplier, platform or lifecycle gates.
+
 ## Candidate checks
 
 Released packages are listed on the

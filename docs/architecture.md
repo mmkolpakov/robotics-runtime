@@ -27,6 +27,30 @@ a simulator, Node host or container engine. An assessment of a custom method
 may require its own execution environment. Validating a stored verdict and its
 evidence is distinct from independently recomputing that verdict.
 
+## Public compatibility boundaries
+
+The selected release and its references define the supported
+[contracts](../packages/contracts/README.md),
+[harness](../packages/harness/docs/compatibility.md),
+[host exports](../host/README.md) and [offline MCP tools](../mcp/README.md).
+Compatibility includes documented schema identities and meanings, CLI arguments
+and machine-readable results, public Python interfaces and package exports, and
+MCP tool names and input/output semantics. Package versions, document versions
+and the MCP protocol version are separate identities.
+
+Original artifact references, exact time representations and unavailable states
+keep their declared meaning. A new format or method selects its own version;
+it does not reinterpret signed archives. Existing archives remain associated
+with their pinned tools. The [release policy](releasing.md#compatibility-and-consumer-scope)
+describes consumer review and migration; pre-1.0 versions do not promise
+unconditional stability for every accessible module or source helper.
+
+Native SDK adapters, generated clients, process and Engine plumbing, and the
+composition framework remain implementation choices. Replacing them must
+preserve the selected public behavior or use an explicit versioned migration.
+Existing host exports are part of their host release; they do not make Cordis
+or a particular native binding mandatory at the external consumer boundary.
+
 ## Attempts and campaigns
 
 A finite attempt has one owner for admission, acquired resources and lifecycle.
