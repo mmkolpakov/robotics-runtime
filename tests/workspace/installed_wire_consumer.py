@@ -4,17 +4,20 @@ from __future__ import annotations
 
 import json
 import os
+import runpy
 import shutil
 import subprocess
 import sys
 from hashlib import sha256
 from importlib import resources
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import robotics_acceptance_harness as harness
 import robotics_runtime_contracts as contracts
 from jsonschema import Draft202012Validator, FormatChecker
+from robotics_acceptance_harness.archive import load_assessment_controls
 from robotics_acceptance_harness.evaluation import EvaluationError
 from robotics_acceptance_harness.evaluator_json import (
     decode_evaluator_response,
@@ -55,6 +58,7 @@ def main() -> None:
     assert shutil.which("docker"), "Docker is required for the foreign fixture"
     fixture = ROOT / "node-fixture" / "evaluate.mjs"
     assert fixture.is_file()
+    python_evaluator = runpy.run_path(str(ROOT / "python-evaluator.py"))["evaluate"]
     schemas = resources.files("robotics_acceptance_harness").joinpath("schemas")
     validators = {}
     for role in ("request", "response"):
@@ -311,6 +315,38 @@ def main() -> None:
         assert set(by_id[IDS[1]].evidence_sha256) == allowed
         assert by_id[IDS[1]].status == expected_status
         assert by_id[IDS[1]].observed_value == expected_value
+        if name in {"selected-seven", "selected-six", "unobserved"}:
+            selected_controls = load_assessment_controls(controls_source)
+
+            def read_test_evidence(
+                path: Path,
+                *,
+                max_raw_evidence_bytes: int,
+                expected_path: Path = method_input,
+                expected_size: int = len(counter),
+                expected_digest: str = str(source["sha256"]),
+            ) -> bytes:
+                assert path == expected_path and expected_size <= max_raw_evidence_bytes
+                raw = path.read_bytes()
+                assert sha256(raw).hexdigest() == expected_digest
+                return raw
+
+            evidence_view = SimpleNamespace(
+                local_files={method_input: source}, read_local=read_test_evidence
+            )
+            python_rows = python_evaluator(
+                SimpleNamespace(evidence=evidence_view, assessment_controls=selected_controls)
+            )
+            python_by_id = {row.assertion_id: row for row in python_rows}
+            assert set(python_by_id) == set(by_id)
+            for identifier, node_row in by_id.items():
+                python_row = python_by_id[identifier]
+                assert (python_row.status, python_row.observed_value, python_row.unit) == (
+                    node_row.status,
+                    node_row.observed_value,
+                    node_row.unit,
+                )
+                assert set(python_row.evidence_sha256) == set(node_row.evidence_sha256)
         for foreign in (str(config["sha256"]), str(controls["sha256"])):
             assert foreign not in allowed
             altered = json.loads(response_bytes)

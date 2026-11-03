@@ -433,6 +433,16 @@ def _validate_calibration_bindings(
     if calibration is None or calibration["state"] != "selected":
         return
     product = [item for item in evaluations if item.source == "product"]
+    controls = context.method_controls
+    if (
+        not product
+        and controls.get("schema_version") == "assessment-controls.v1"
+        and any(
+            item.get("kind") == "oci" and item.get("expected_assertion_ids")
+            for item in controls["evaluator_requirements"]
+        )
+    ):
+        return
     claimed = {digest for item in product for digest in item.evidence_sha256}
     if {item["sha256"] for item in calibration["artifacts"]} - claimed:
         raise EvaluationError("selected calibration has no product assertion source binding")
