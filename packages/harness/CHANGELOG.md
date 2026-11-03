@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add optional local OCI archive assessment with an external operator profile,
+  captured read-only inputs and bounded execution; retain raw responses and
+  validate assertions before producing v3 results.
+
 - Bound gh/Cosign stdout and stderr during verification, including direct-child
   cleanup after output overflow or a command deadline.
 

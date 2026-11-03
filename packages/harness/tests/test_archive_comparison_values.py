@@ -20,6 +20,7 @@ def _context(value: int | bool | float, name: str) -> _Context:
         "domain_result",
         name,
         {
+            "schema_version": "acceptance-result.v2",
             "evaluation": {
                 "method": {
                     "implementation": "sample-evaluator",

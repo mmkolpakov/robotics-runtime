@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
-const namespace = 'org.example.evidence-bytes-node';
+const namespace = 'org.example.evidence-bytes';
 const ids = [`${namespace}.nonempty`, `${namespace}.calibrated-error`];
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const decoder = new TextDecoder('utf-8', { fatal: true });
@@ -53,14 +53,13 @@ const requestBytes = readFileSync(requestPath);
 if (requestBytes.length > 1048576) throw new Error('request exceeds method limit');
 const request = parse(requestBytes);
 if (request.schema_version !== 'evaluator-request.v1' || request.namespace !== namespace ||
-    request.method.implementation !== namespace || request.method.version !== '1' ||
     request.expected_assertion_ids.length !== ids.length ||
     !ids.every((id) => request.expected_assertion_ids.includes(id))) {
   throw new Error('unexpected evaluator profile');
 }
 const sources = request.evidence.filter((entry) =>
-  entry.artifact_id === 'method-input' && entry.media_type === 'application/json');
-if (sources.length !== 1) throw new Error('one method-input JSON artifact required');
+  entry.artifact_id === 'native-state' && entry.media_type === 'application/json');
+if (sources.length !== 1) throw new Error('one native-state JSON artifact required');
 const source = sources[0];
 const raw = captured(request, source);
 const controls = parse(captured(request, request.controls));

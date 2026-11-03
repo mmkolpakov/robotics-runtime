@@ -25,9 +25,11 @@ from robotics_acceptance_harness.evaluator_trust import EvaluatorTrustError, rea
 from robotics_acceptance_harness.evidence import _read_local
 
 if TYPE_CHECKING:
+    from robotics_acceptance_harness._oci_operator import _OCIProfile
     from robotics_acceptance_harness.application import VerificationOutputs
     from robotics_acceptance_harness.evaluation import EvaluationContext
     from robotics_acceptance_harness.evaluator_trust import AuthenticatedInstallation
+    from robotics_acceptance_harness.native import _NativeAdmission
     from robotics_acceptance_harness.receipts import VerifiedReceiptSet
 
 
@@ -157,8 +159,41 @@ def assess_archive(
     evaluator_authentications: Mapping[str, AuthenticatedInstallation] | None = None,
 ) -> VerificationOutputs:
     """Assess captured native source inputs using explicit controls and public writers."""
+    return _assess_archive(
+        context,
+        run_context,
+        output_dir,
+        {
+            "receipts": evaluator_receipts,
+            "authentications": evaluator_authentications,
+            "oci_profile": None,
+        },
+    )
+
+
+def _assess_oci_archive(
+    context: EvaluationContext,
+    run_context: LoadedDocument,
+    output_dir: str | Path,
+    evaluator_receipts: VerifiedReceiptSet | None,
+    profile: _OCIProfile,
+) -> VerificationOutputs:
+    return _assess_archive(
+        context,
+        run_context,
+        output_dir,
+        {"receipts": evaluator_receipts, "authentications": None, "oci_profile": profile},
+    )
+
+
+def _assess_archive(
+    context: EvaluationContext,
+    run_context: LoadedDocument,
+    output_dir: str | Path,
+    admission: _NativeAdmission,
+) -> VerificationOutputs:
     from robotics_acceptance_harness.application import VerificationOutputs
-    from robotics_acceptance_harness.native import evaluate_native
+    from robotics_acceptance_harness.native import _evaluate_native
     from robotics_acceptance_harness.result import write_contract_json, write_junit_xml
 
     if context.bundle.scenario.schema_version != "acceptance-scenario.v2":
@@ -167,9 +202,7 @@ def assess_archive(
         raise BundleValidationError("$", "physical archive qualification is not supported")
     if context.assessment_controls is None:
         raise BundleValidationError("$.evaluation.method", "archive assessment requires controls")
-    result = evaluate_native(
-        context, run_context, output_dir, evaluator_receipts, evaluator_authentications
-    )
+    result = _evaluate_native(context, run_context, output_dir, admission)
     destination = Path(output_dir).expanduser().resolve()
     result_path = write_contract_json(result, destination / "acceptance-result.json")
     junit_path = write_junit_xml(result, destination / "junit.xml")

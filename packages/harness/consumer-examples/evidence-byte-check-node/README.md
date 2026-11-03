@@ -1,7 +1,7 @@
 # Node evaluator example
 
 This Node 24.21 example evaluates a retained JSON counter and an explicitly
-selected offset in the `org.example.evidence-bytes-node` namespace.
+selected offset in the `org.example.evidence-bytes` namespace.
 It is a byte-access example, not a robotics performance or calibration method.
 
 Pass one prepared request path and capture stdout:

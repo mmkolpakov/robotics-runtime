@@ -4,7 +4,10 @@
 
 - Add acceptance-result.v3 and versioned OCI assessment controls for independent
   archive assessment data validation. Preserve original v2 documents and their
-  exact-byte identities. OCI execution and qualification remain unsupported. See
+  exact-byte identities. Extend portable archive qualification to OCI declarations
+  and their optional provenance receipts, preserving original wheel receipt
+  checks. Qualification verifies retained document relationships, not historical
+  container execution. See
   [assessment controls and migration](docs/assessment-controls.md) for version
   selection, assertion ownership and coverage requirements.
 

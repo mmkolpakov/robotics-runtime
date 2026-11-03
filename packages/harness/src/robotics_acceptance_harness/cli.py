@@ -7,9 +7,10 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, replace
 from pathlib import Path
-from typing import cast
+from typing import TypedDict, cast
 
 from robotics_acceptance_harness import __version__
+from robotics_acceptance_harness._oci_operator import _OCIProfile, load_oci_profile
 from robotics_acceptance_harness.aggregate import (
     aggregate_results,
     evaluate_transport_qualification,
@@ -23,6 +24,7 @@ from robotics_acceptance_harness.application import (
 )
 from robotics_acceptance_harness.archive import (
     AssessmentControls,
+    _assess_oci_archive,
     assess_archive,
     load_assessment_controls,
     load_original_result,
@@ -433,13 +435,18 @@ def _report_status(output: Path, status: str, key: str) -> int:
     return 0 if status == "passed" else 1
 
 
+class _CLIAdmission(TypedDict):
+    controls: AssessmentControls | None
+    receipts: VerifiedReceiptSet
+    authentications: Mapping[str, AuthenticatedInstallation]
+    oci_profile: _OCIProfile | None
+
+
 def _archive_evaluation(
-    arguments: argparse.Namespace,
-    bundle: DocumentBundle,
-    controls: AssessmentControls,
-    receipts: VerifiedReceiptSet,
-    authentications: Mapping[str, AuthenticatedInstallation],
+    arguments: argparse.Namespace, bundle: DocumentBundle, admission: _CLIAdmission
 ) -> VerificationOutputs:
+    controls = admission["controls"]
+    assert controls is not None
     run_context = load_run_context(
         arguments.run_context,
         run_id=arguments.run_id,
@@ -478,22 +485,20 @@ def _archive_evaluation(
         metric_samples=samples,
         metric_evidence_sha256=str(link["sha256"]) if link is not None else None,
     )
+    if admission["oci_profile"] is not None:
+        return _assess_oci_archive(
+            context, run_context, arguments.output, admission["receipts"], admission["oci_profile"]
+        )
     return assess_archive(
         context,
         run_context,
         arguments.output,
-        evaluator_receipts=receipts,
-        evaluator_authentications=authentications,
+        evaluator_receipts=admission["receipts"],
+        evaluator_authentications=admission["authentications"],
     )
 
 
-def _evaluation_admission(
-    arguments: argparse.Namespace, bundle: DocumentBundle
-) -> tuple[
-    AssessmentControls | None,
-    VerifiedReceiptSet,
-    Mapping[str, AuthenticatedInstallation],
-]:
+def _evaluation_admission(arguments: argparse.Namespace, bundle: DocumentBundle) -> _CLIAdmission:
     if (
         arguments.command == "evaluate"
         and arguments.original_result is not None
@@ -511,27 +516,41 @@ def _evaluation_admission(
         else bundle.scenario.data["evaluator_requirements"]
     )
     if controls is not None and controls.data.get("schema_version") == "assessment-controls.v1":
-        raise HarnessInputError("versioned assessment controls execution is not supported")
-    return (
-        controls,
-        _evaluator_receipts(arguments),
-        load_evaluator_authentications(
+        if requirements:
+            if arguments.evaluator_trust_profile is None:
+                raise HarnessInputError("OCI evaluator execution requires an operator profile")
+            profile = load_oci_profile(
+                arguments.evaluator_trust_profile,
+                requirements,
+                evidence_root=Path(arguments.evidence_index).expanduser().resolve().parent,
+            )
+        else:
+            if arguments.evaluator_trust_profile is not None:
+                raise HarnessInputError("no evaluator profile is used by this method")
+            profile = None
+        return {
+            "controls": controls,
+            "receipts": _evaluator_receipts(arguments),
+            "authentications": {},
+            "oci_profile": profile,
+        }
+    return {
+        "controls": controls,
+        "receipts": _evaluator_receipts(arguments),
+        "authentications": load_evaluator_authentications(
             arguments.evaluator_trust_profile,
             requirements,
             evidence_root=Path(arguments.evidence_index).expanduser().resolve().parent,
         ),
-    )
+        "oci_profile": None,
+    }
 
 
 def _offline_outputs(
-    arguments: argparse.Namespace,
-    bundle: DocumentBundle,
-    controls: AssessmentControls | None,
-    receipts: VerifiedReceiptSet,
-    authentications: Mapping[str, AuthenticatedInstallation],
+    arguments: argparse.Namespace, bundle: DocumentBundle, admission: _CLIAdmission
 ) -> VerificationOutputs:
-    if controls is not None:
-        return _archive_evaluation(arguments, bundle, controls, receipts, authentications)
+    if admission["controls"] is not None:
+        return _archive_evaluation(arguments, bundle, admission)
     return evaluate_from_evidence(
         run_id=arguments.run_id,
         domain_id=arguments.domain_id,
@@ -541,8 +560,8 @@ def _offline_outputs(
         artifact_receipt_paths=_receipt_source(arguments),
         artifact_verification_paths=arguments.artifact_verification,
         receipt_dependency_paths=arguments.receipt_dependency,
-        evaluator_receipts=receipts,
-        evaluator_authentications=authentications,
+        evaluator_receipts=admission["receipts"],
+        evaluator_authentications=admission["authentications"],
         otel_metrics_path=arguments.otel_metrics,
         max_raw_evidence_bytes=arguments.max_raw_evidence_bytes,
         window_start_ns=arguments.window_start_ns,
@@ -736,14 +755,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(json.dumps(explain_bundle(bundle), indent=2, sort_keys=True, allow_nan=False))
                 return 0
 
-            controls, evaluator_receipts, evaluator_authentications = _evaluation_admission(
-                arguments, bundle
-            )
+            admission = _evaluation_admission(arguments, bundle)
 
             if arguments.command == "evaluate":
-                outputs = _offline_outputs(
-                    arguments, bundle, controls, evaluator_receipts, evaluator_authentications
-                )
+                outputs = _offline_outputs(arguments, bundle, admission)
             else:
                 outputs = run_verification(
                     run_id=arguments.run_id,
@@ -754,8 +769,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     artifact_receipt_paths=_receipt_source(arguments),
                     artifact_verification_paths=arguments.artifact_verification,
                     receipt_dependency_paths=arguments.receipt_dependency,
-                    evaluator_receipts=evaluator_receipts,
-                    evaluator_authentications=evaluator_authentications,
+                    evaluator_receipts=admission["receipts"],
+                    evaluator_authentications=admission["authentications"],
                     otel_metrics_path=arguments.otel_metrics,
                     max_raw_evidence_bytes=arguments.max_raw_evidence_bytes,
                     measurement_complete_path=arguments.measurement_complete,

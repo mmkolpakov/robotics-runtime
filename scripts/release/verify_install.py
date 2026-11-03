@@ -145,6 +145,12 @@ def clean_install(
                 workspace / "packages/harness/consumer-examples/evidence-byte-check-node",
                 root / "node-fixture",
             )
+            shutil.copyfile(
+                workspace
+                / "packages/harness/consumer-examples/evidence-byte-check"
+                / "src/evidence_byte_check/__init__.py",
+                root / "python-evaluator.py",
+            )
         (root / "plan.json").write_text(json.dumps(smoke_plan), encoding="utf-8")
         shutil.copytree(
             workspace / "packages/contracts/consumer-examples/minimal-simulation", root / "examples"

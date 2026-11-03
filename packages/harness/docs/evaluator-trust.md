@@ -1,6 +1,6 @@
-# Evaluator wheel authentication
+# Evaluator authentication
 
-This release provides `authenticate_wheel`, `authenticate_wheel_with_cosign_key`,
+The wheel profile provides `authenticate_wheel`, `authenticate_wheel_with_cosign_key`,
 `validate_evaluator_wheel` and
 `verify_installed_wheel` in `robotics_acceptance_harness.evaluator_trust`.
 These APIs verify artifact origin and installed bytes. The loader and CLI require these
@@ -267,20 +267,107 @@ remains possible; executing a receipt-only evaluator now fails closed.
 `doctor` with requirements reports authenticated metadata without importing the
 target; discovery without requirements grants no execution admission.
 
+## Local OCI archive assessment
+
+Use the matching [source workspace installation](../README.md#development) for
+this path. On `evaluate`, select `--assessment-controls`, `--original-result` and
+`--evaluator-trust-profile`. Controls marked `assessment-controls.v1` declare
+each OCI namespace, image subject and exact expected assertion IDs. The original
+scenario, runtime, observation and result retain their v2 schemas; the original
+run and evidence index retain v1. The new assessment is `acceptance-result.v3`.
+The version 1 wheel profile and its public Python
+authentication APIs keep their existing behavior. Version 2 belongs to this
+archive `evaluate` path; version 1 also serves `verify` and `doctor`.
+
+Version 2 is a closed operator file with exactly `profile_version`, `verifier`,
+`engine`, `limits` and `evaluators`. It belongs outside the evidence root.
+Relative file paths resolve from the operator file's directory.
+
+- `verifier`: `kind="cosign_blob_key_no_tlog"`, `executable`,
+  `executable_sha256`, exact `version`, `public_key`, `public_key_sha256`,
+  `trusted_root` and `trusted_root_sha256`. Use an independently approved stable
+  Cosign composition at least 3.1.4; the observed version must match exactly.
+- `engine`: `backend="podman_local"`, pinned `executable` and
+  `executable_sha256`, `version="4.9.3"`, `environment`, `containers_conf`,
+  `storage_conf`, `store` and `hooks_dir`. Each configuration file has exactly
+  `path` and `sha256`.
+- `environment`: explicit `HOME`, absolute-entry `PATH`, `XDG_RUNTIME_DIR` and
+  one owned local `DBUS_SESSION_BUS_ADDRESS` socket. `store` has `graph_root`,
+  `run_root`, `tmpdir` and `driver`.
+- Each evaluator has exactly `namespace`, fully qualified immutable `image_ref`,
+  `manifest`, `config`, `bundle`, `manifest_sha256`, `platform` and
+  `invocation="evaluator_json_v1"`. Platform has `os`, `architecture` and an
+  optional `variant`. Bind every declared namespace once.
+
+The operator preloads the image and initializes a dedicated rootless context.
+Pin `storage.graphroot` and `storage.rootless_storage_path` to the selected graph
+directory; select `run_root` and `storage.runroot` as
+`<XDG_RUNTIME_DIR>/containers`. In `containers.conf`, select `lock_type="file"`,
+the exact project `tmp_dir` on tmpfs, `static_dir=<graph_root>/libpod` and
+`volume_path=<graph_root>/volumes`. Keep a separate project runtime/pause directory,
+an empty hooks directory and the existing local user bus. The caller must have
+normal systemd delegation for CPU, memory and PIDs. The harness checks declared
+paths and observed Engine facts; the operator owns store initialization.
+
+`limits` contains positive integers: `attempt_timeout_sec`,
+`command_timeout_sec`, `cleanup_timeout_sec`, `stdout_bytes`, `stderr_bytes`,
+`memory_bytes`, `input_bytes`, `pids`, `cpus` and `tmpfs_bytes`.
+Timeouts cannot exceed 86400 seconds; command timeout cannot exceed attempt
+timeout. Stdout is capped at 1 MiB and stderr at 32 MiB. `input_bytes` limits
+unique staged bytes, including the request, in addition to existing evidence
+file limits; it is separate from container memory.
+
+After input preparation, one attempt deadline covers raw-manifest authentication
+and Engine commands. Stock Cosign verifies the exact manifest with the selected
+external public key. The harness checks the OCI or Docker Schema2 manifest/config
+pair, raw digests, config size and platform. The selected manifest digest remains
+the signed transport identity. Execution binds its config SHA
+([OCI ImageID](https://github.com/opencontainers/image-spec/blob/v1.1.1/config.md#imageid)),
+the exact ordered `rootfs.diff_ids`, and the container's image ID, immutable image
+name, full CID and attempt label. The container's canonical `ImageDigest` is
+recorded transport metadata. An index or manifest list is not a platform manifest.
+The signature is not build provenance or evidence that a container ran.
+
+The image keeps its declared exec-array ENTRYPOINT and receives the fixed
+`--request /run/robotics-evaluator/request.json` arguments. Only private captured
+inputs are mounted read-only. The worker has no network, TTY or inherited stdin,
+a read-only root and declared resource limits. Stdout and stderr are captured as
+separate bounded byte streams. The parent retains completed stdout as
+`response.bin` before removing the container, confirms its exit and absence,
+then decodes the response with the authoritative request hash, namespace,
+expected IDs and evidence digests. The harness computes coverage and final status.
+
+The output's `oci-attempt-*` directory keeps files written before a failure.
+The owner creates `journal.json` after checking the prepared inputs; successful
+authentication adds manifest/config bytes and signature audit. A completed stdout
+capture adds `response.bin` before removal. Early refusals may precede these files.
+Uncertain termination or cleanup refuses the assessment and retains the attempt.
+Recovery does not replay creation/start or remove an unconfirmed container. A separate cleanup
+deadline bounds the attempt to stop its exact owned CID. Local CLI termination
+alone does not prove all descendants or the Engine container stopped.
+
+If `execution_subject.provenance_receipt_sha256` is declared, the existing
+receipt/verification/dependency inputs must bind that receipt to the captured
+manifest SHA and size before execution. The supplied receipt set must match the
+declared set exactly. This documentary check is separate from live signature and
+CID checks. Retained environment bytes describe stable assessment composition;
+per-attempt CID facts stay in the journal. Portable qualification checks retained
+bytes and contract relationships, not independent historical execution authenticity.
+
 ## Evidence and third-party execution
 
-An evaluator receives the public `EvaluationContext` and produces namespaced
-`AssertionEvaluation` records with verified evidence digests. Read an admitted
+A Python wheel evaluator receives the public `EvaluationContext` and produces namespaced
+`AssertionEvaluation` records with verified evidence digests. In that wheel, read an admitted
 local evidence path once through the matching SDK public API
 `context.evidence.read_local(path, max_raw_evidence_bytes=...)`; process the returned
 immutable bytes rather than
 reopening a mutable path. Evidence inputs must be read-only in the author profile.
 
-Run third-party evaluators in the selected limited process/image profile with
-read-only evidence mounts and declared resource/deadline limits. The infrastructure
-owns that boundary; this SDK is not a sandbox or a process supervisor. The
-existing import guard is retained until any replacement establishes equivalent
-protection.
+The wheel import guard authenticates Python source; process isolation belongs to
+its selected execution composition. For the optional OCI archive path, the harness
+owns admission, captured inputs, the finite Engine invocation and response decoding.
+The Engine enforces the read-only mounts, network and resource policy. Built-in
+evaluation and offline document inspection do not require an Engine.
 
 The installed-byte result covers this wheel's files. A complete qualification also
 needs the agreed interpreter, dependencies, verifier/root provenance and execution
