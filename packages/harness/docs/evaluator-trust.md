@@ -361,7 +361,10 @@ A Python wheel evaluator receives the public `EvaluationContext` and produces na
 local evidence path once through the matching SDK public API
 `context.evidence.read_local(path, max_raw_evidence_bytes=...)`; process the returned
 immutable bytes rather than
-reopening a mutable path. Evidence inputs must be read-only in the author profile.
+reopening a mutable path. Without an explicit byte budget, this API limits each
+capture to 8 MiB; a positive explicit budget sets the limit for that raw capture.
+Structured documents retain their separate 8 MiB limit. Evidence inputs must be
+read-only in the author profile.
 
 The wheel import guard authenticates Python source; process isolation belongs to
 its selected execution composition. For the optional OCI archive path, the harness
