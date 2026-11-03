@@ -2,11 +2,14 @@
 
 ## Unreleased
 
-## 0.23.0
+## 0.23.1
 
 Requires contracts 0.22 (`>=0.22,<0.23`), with exact release prerequisite
 `contracts-v0.22.0`. Earlier contracts minors are not supported by this release.
 Package and execution-profile qualification remain separate.
+
+- Correct the packaged requirements reference and align the 0.23 compatibility
+  documentation with the contracts dependency declared in package metadata.
 
 - Add optional local OCI archive assessment with an external operator profile,
   captured read-only inputs and bounded execution; retain raw responses and

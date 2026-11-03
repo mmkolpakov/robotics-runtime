@@ -2,9 +2,10 @@
 
 ## Package Line
 
-Harness `0.23.0` requires Python `>=3.12,<3.15` and
-`robotics-runtime-contracts>=0.22,<0.23`. Its exact
-[release prerequisite](../../../docs/releasing.md) is `contracts-v0.22.0`.
+The `0.23.x` harness line requires Python `>=3.12,<3.15` and
+`robotics-runtime-contracts>=0.22,<0.23`. The exact
+[release prerequisite](../../../docs/releasing.md) for `0.23.1` is
+`contracts-v0.22.0`.
 
 The `0.22.x` harness line requires Python `>=3.12,<3.15` and
 `robotics-runtime-contracts>=0.21,<0.22`; harness `0.22.0` uses contracts `0.21.1`

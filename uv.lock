@@ -956,7 +956,7 @@ wheels = [
 
 [[package]]
 name = "robotics-acceptance-harness"
-version = "0.23.0"
+version = "0.23.1"
 source = { editable = "packages/harness" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },
