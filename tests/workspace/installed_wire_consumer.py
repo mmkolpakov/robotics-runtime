@@ -31,7 +31,7 @@ NODE_IMAGE = (
     "node:24.21.0-trixie-slim@sha256:"
     "c83040f7e24bacea68e58a0b96a484ba430bf24abb2973eab7ba4701144b7b63"
 )
-NAMESPACE = "org.example.evidence-bytes-node"
+NAMESPACE = "org.example.evidence-bytes"
 IDS = [f"{NAMESPACE}.nonempty", f"{NAMESPACE}.calibrated-error"]
 ROOT = Path.cwd()
 
@@ -157,15 +157,22 @@ def main() -> None:
             for key, value in source_index.items()
             if key not in {"artifacts", "finalized"}
         }
-        index_template["policy_observation"]["spool_peak_size_bytes"] += len(counter)
+        replaced = [
+            item for item in source_index["artifacts"] if item["artifact_id"] == "native-state"
+        ]
+        assert len(replaced) == 1
+        index_template["policy_observation"]["spool_peak_size_bytes"] += (
+            len(counter) - replaced[0]["size_bytes"]
+        )
         draft = create_evidence_index(index_template)
         for item in source_index["artifacts"]:
-            draft = add_evidence_artifact(draft, item["local_path"], item)
+            if item["artifact_id"] != "native-state":
+                draft = add_evidence_artifact(draft, item["local_path"], item)
         draft = add_evidence_artifact(
             draft,
             method_input,
             {
-                "artifact_id": "method-input",
+                "artifact_id": "native-state",
                 "kind": "other_evidence",
                 "media_type": "application/json",
                 "retention_class": "pull-request-7d",
@@ -180,10 +187,13 @@ def main() -> None:
             for role, path in selected_documents.items()
         }
         config_path = archive / "configuration.json"
-        config = stored(
-            input_root, "config.json", config_path.read_bytes(), config_path.resolve().as_uri()
-        )
-        source = next(item for item in index["artifacts"] if item["artifact_id"] == "method-input")
+        config_bytes = config_path.read_bytes()
+        config = {
+            "uri": config_path.resolve().as_uri(),
+            "sha256": sha256(config_bytes).hexdigest(),
+            "size_bytes": len(config_bytes),
+        }
+        source = next(item for item in index["artifacts"] if item["artifact_id"] == "native-state")
         evidence = stored(input_root, "method-input.json", method_input.read_bytes(), source["uri"])
         calibration: dict[str, Any]
         if state == "selected":
@@ -227,7 +237,11 @@ def main() -> None:
             "domain_id": archive_info["domain_id"],
             "namespace": NAMESPACE,
             "expected_assertion_ids": IDS,
-            "method": {"implementation": NAMESPACE, "version": "1", "configuration": config},
+            "method": {
+                "implementation": "robotics_acceptance_harness.evaluate_acceptance",
+                "version": harness.__version__,
+                "configuration": controls,
+            },
             "documents": references,
             "controls": controls,
             "evidence": [
