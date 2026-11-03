@@ -148,9 +148,7 @@ def main() -> None:
     for name, counter, offset, state, expected_status, expected_value in cases:
         directory = ROOT / ("wire-" + name)
         input_root = directory / "input"
-        output_root = directory / "output"
         input_root.mkdir(parents=True, mode=0o700)
-        output_root.mkdir(mode=0o700)
         method_input = directory / "original-method-input.json"
         method_input.write_bytes(counter)
         source_index = json.loads((archive / "evidence-index.json").read_bytes())
@@ -267,20 +265,19 @@ def main() -> None:
             "--memory",
             "256m",
             "--mount",
-            f"type=bind,src={input_root},dst=/input,readonly",
-            "--mount",
-            f"type=bind,src={output_root},dst=/output",
+            f"type=bind,src={input_root},dst=/run/robotics-evaluator,readonly",
             "--mount",
             f"type=bind,src={fixture},dst=/fixture/evaluate.mjs,readonly",
             "--entrypoint",
             "node",
             NODE_IMAGE,
             "/fixture/evaluate.mjs",
+            "--request",
+            "/run/robotics-evaluator/request.json",
         ]
-        subprocess.run(command, capture_output=True, check=True, timeout=30)
-        response_path = output_root / "response.json"
-        assert response_path.is_file() and response_path.stat().st_size <= 1024 * 1024
-        response_bytes = response_path.read_bytes()
+        completed = subprocess.run(command, capture_output=True, check=True, timeout=30)
+        response_bytes = completed.stdout
+        assert len(response_bytes) <= 1024 * 1024
         validators["response"].validate(json.loads(response_bytes))
         allowed = {str(evidence["sha256"])}
         if state == "selected":

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync, writeFileSync } from 'node:fs';
+import { lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 const namespace = 'org.example.evidence-bytes-node';
 const ids = [`${namespace}.nonempty`, `${namespace}.calibrated-error`];
@@ -24,9 +25,10 @@ function captured(request, reference) {
   }
   if (typeof reference.size_bytes !== 'bigint' || reference.size_bytes < 0n ||
       reference.size_bytes > 1048576n) throw new Error('captured input exceeds method limit');
-  const source = `/input/${path}`;
+  const source = join(inputRoot, path);
   const stat = lstatSync(source);
-  if (!stat.isFile() || BigInt(stat.size) !== reference.size_bytes) {
+  if (!stat.isFile() || realpathSync(source) !== source ||
+      BigInt(stat.size) !== reference.size_bytes) {
     throw new Error('captured input is not the expected regular file');
   }
   const bytes = readFileSync(source);
@@ -36,7 +38,19 @@ function captured(request, reference) {
   return bytes;
 }
 
-const requestBytes = readFileSync('/input/request.json');
+const args = process.argv.slice(2);
+if (args.length !== 2 || args[0] !== '--request' || !args[1]) {
+  throw new Error('usage: node evaluate.mjs --request <path>');
+}
+const requestPath = resolve(args[1]);
+const inputRoot = dirname(requestPath);
+const requestStat = lstatSync(requestPath);
+if (!requestStat.isFile() || realpathSync(requestPath) !== requestPath ||
+    requestStat.size > 1048576) {
+  throw new Error('request must be a bounded regular file without symlinks');
+}
+const requestBytes = readFileSync(requestPath);
+if (requestBytes.length > 1048576) throw new Error('request exceeds method limit');
 const request = parse(requestBytes);
 if (request.schema_version !== 'evaluator-request.v1' || request.namespace !== namespace ||
     request.method.implementation !== namespace || request.method.version !== '1' ||
@@ -87,7 +101,7 @@ if (calibration.state === 'unobserved') {
 } else {
   throw new Error('selected or unobserved calibration required');
 }
-writeFileSync('/output/response.json', encode({
+process.stdout.write(encode({
   schema_version: 'evaluator-response.v1',
   request_sha256: digest(requestBytes),
   assertion_results: results,
