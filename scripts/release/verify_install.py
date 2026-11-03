@@ -97,11 +97,11 @@ def clean_install(
     consumer_fixtures: Path | None = None,
     consumer_provenance: dict[str, Any] | None = None,
     wire_consumer: bool = False,
-    published_contracts_sha256: str | None = None,
+    contracts_wheel_sha256: str | None = None,
 ) -> dict[str, Any]:
     env = clean_environment()
-    if wire_consumer and (len(additional_artifacts) != 1 or published_contracts_sha256 is None):
-        raise ReleaseError("wire consumer requires a verified published contracts wheel")
+    if wire_consumer and (len(additional_artifacts) != 1 or contracts_wheel_sha256 is None):
+        raise ReleaseError("wire consumer requires one digest-bound contracts wheel")
     with tempfile.TemporaryDirectory(prefix="robotics-release-") as temporary:
         root = Path(temporary).resolve()
         if root.is_relative_to(workspace.resolve()):
@@ -111,17 +111,45 @@ def clean_install(
         archives = (() if artifact is None else (artifact,)) + additional_artifacts
         copied = []
         for archive in archives:
+            if (
+                wire_consumer
+                and archive in additional_artifacts
+                and (
+                    archive.is_symlink()
+                    or not archive.is_file()
+                    or sha256(archive.read_bytes()).hexdigest() != contracts_wheel_sha256
+                )
+            ):
+                raise ReleaseError("source contracts wheel digest differs")
             dist = root / archive.name
             shutil.copyfile(archive, dist)
             if (
                 wire_consumer
                 and archive in additional_artifacts
-                and sha256(dist.read_bytes()).hexdigest() != published_contracts_sha256
+                and sha256(dist.read_bytes()).hexdigest() != contracts_wheel_sha256
             ):
-                raise ReleaseError("copied published contracts wheel digest differs")
+                raise ReleaseError("copied contracts wheel digest differs")
             copied.append(str(dist))
         shutil.copyfile(Path(__file__).with_name("smoke.py"), root / "smoke.py")
         smoke_plan = asdict(plan)
+        archive_packages = []
+        for index, copied_archive in enumerate(copied):
+            name, version, _dependencies = distribution_metadata(Path(copied_archive))
+            selected_name, selected_version = (
+                (plan.package, plan.version)
+                if artifact is not None and index == 0
+                else ("robotics-runtime-contracts", plan.contracts_version)
+            )
+            if canonicalize_name(name) != selected_name or Version(version) != Version(
+                selected_version
+            ):
+                raise ReleaseError(
+                    "local archive is not the selected package or contracts prerequisite"
+                )
+            archive_packages.append(selected_name)
+        if len(set(archive_packages)) != len(archive_packages):
+            raise ReleaseError("duplicate local package archives are not a consumer cohort")
+        smoke_plan["archive_packages"] = archive_packages
         if consumer_fixtures is not None:
             shutil.copytree(consumer_fixtures, root / "infra-fixtures")
             shutil.copyfile(
@@ -130,7 +158,6 @@ def clean_install(
             smoke_plan.update(
                 consumer_provenance=consumer_provenance,
                 workspace=str(workspace.resolve()),
-                archive_packages=[distribution_metadata(path)[0] for path in archives],
             )
         if wire_consumer:
             shutil.copyfile(
@@ -188,6 +215,7 @@ def clean_install(
             "outside_workspace": True,
         }
         if wire_consumer:
+            result["contracts_wheel_sha256"] = contracts_wheel_sha256
             result["wire_consumer"] = json.loads(
                 (root / "wire-consumer-report.json").read_text("utf-8")
             )
@@ -205,6 +233,9 @@ def main() -> int:
     parser.add_argument("--workspace", type=Path, default=Path.cwd())
     parser.add_argument("--python", default="3.12")
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument(
+        "--repository", help="GitHub repository owning the selected contracts release"
+    )
     args = parser.parse_args()
     plan = ReleasePlan(**json.loads(args.plan.read_text(encoding="utf-8")))
     uv = shutil.which("uv")
@@ -212,11 +243,37 @@ def main() -> int:
         parser.exit(1, "uv executable is required\n")
     try:
         artifacts = validate_distributions(args.dist, plan)
-        results = [
-            clean_install(path, plan, workspace=args.workspace, interpreter=args.python, uv=uv)
-            for path in artifacts
-        ]
-    except (ReleaseError, OSError, subprocess.CalledProcessError) as error:
+        with tempfile.TemporaryDirectory(prefix="robotics-released-contracts-") as temporary:
+            wheel = None
+            authentication = None
+            if plan.key == "harness":
+                from scripts.release.verified_contracts import authenticate_contracts
+
+                wheel, authentication = authenticate_contracts(
+                    plan, args.workspace, Path(temporary) / "contracts", args.repository or ""
+                )
+                if distribution_metadata(wheel)[:2] != (
+                    "robotics-runtime-contracts",
+                    plan.contracts_version,
+                ):
+                    raise ReleaseError(
+                        "authenticated contracts wheel metadata differs from the plan"
+                    )
+            results = [
+                clean_install(
+                    path,
+                    plan,
+                    workspace=args.workspace,
+                    interpreter=args.python,
+                    uv=uv,
+                    additional_artifacts=(wheel,) if wheel is not None else (),
+                    wire_consumer=wheel is not None,
+                    contracts_wheel_sha256=authentication["sha256"] if authentication else None,
+                )
+                | ({"released_contracts": authentication} if authentication else {})
+                for path in artifacts
+            ]
+    except (ReleaseError, OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
         parser.exit(1, f"clean release verification failed: {error}\n")
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")

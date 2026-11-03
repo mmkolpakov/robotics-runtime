@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.22.0
+
 - Add acceptance-result.v3 and versioned OCI assessment controls for independent
   archive assessment data validation. Preserve original v2 documents and their
   exact-byte identities. Extend portable archive qualification to OCI declarations

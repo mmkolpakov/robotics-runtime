@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import io
+import json
 import subprocess
+import sys
 import tarfile
 import tempfile
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
 from zipfile import ZipFile
@@ -214,4 +216,135 @@ def test_temp_directory_inside_workspace_is_rejected(
     with pytest.raises(ReleaseError, match="outside the workspace"):
         verify.clean_install(
             tmp_path / "unused.whl", plan, workspace=tmp_path, interpreter="3.12", uv="uv"
+        )
+
+
+@pytest.mark.parametrize("tamper", ["source", "copy"])
+def test_wire_contracts_digest_is_checked_before_any_installed_code(
+    tmp_path: Path, plan: ReleasePlan, monkeypatch: pytest.MonkeyPatch, tamper: str
+) -> None:
+    import shutil
+    from hashlib import sha256
+
+    wheel = tmp_path / "contracts.whl"
+    wheel.write_bytes(b"original contracts")
+    expected = sha256(wheel.read_bytes()).hexdigest()
+    copy = shutil.copyfile
+
+    def copying(source: Path, destination: Path, **kwargs: Any) -> Path:
+        result = copy(source, destination, **kwargs)
+        if source == wheel:
+            Path(destination).write_bytes(b"changed copy")
+        return Path(result)
+
+    if tamper == "source":
+        wheel.write_bytes(b"changed source")
+    else:
+        monkeypatch.setattr(shutil, "copyfile", copying)
+    monkeypatch.setattr(
+        subprocess, "run", lambda *a, **k: pytest.fail("installer or target code ran")
+    )
+    with pytest.raises(ReleaseError, match="contracts wheel digest differs"):
+        verify.clean_install(
+            None,
+            plan,
+            workspace=tmp_path,
+            interpreter="3.12",
+            uv="uv",
+            additional_artifacts=(wheel,),
+            wire_consumer=True,
+            contracts_wheel_sha256=expected,
+        )
+
+
+@pytest.mark.parametrize("available", [True, False])
+def test_harness_release_cannot_bypass_authenticated_contracts_or_either_archive(
+    tmp_path: Path,
+    plan: ReleasePlan,
+    monkeypatch: pytest.MonkeyPatch,
+    available: bool,
+) -> None:
+    from scripts.release import verified_contracts
+
+    selected = replace(
+        plan,
+        candidate="harness-v0.23.0",
+        key="harness",
+        package="robotics-acceptance-harness",
+        version="0.23.0",
+        contracts_version="0.22.0",
+    )
+    document = tmp_path / "plan.json"
+    document.write_text(json.dumps(asdict(selected)))
+    artifacts = [tmp_path / "harness.whl", tmp_path / "harness.tar.gz"]
+    contracts = tmp_path / "contracts.whl"
+    calls: list[tuple[Path, dict[str, Any]]] = []
+
+    def authenticated(*_args: Any) -> tuple[Path, dict[str, str]]:
+        if not available:
+            raise ReleaseError("selected contracts release is not authenticated")
+        return contracts, {"sha256": "a" * 64, "scope": "unit routing, not a real release"}
+
+    def installed(artifact: Path, _plan: ReleasePlan, **kwargs: Any) -> dict[str, str]:
+        calls.append((artifact, kwargs))
+        assert kwargs["additional_artifacts"] == (contracts,)
+        assert kwargs["wire_consumer"] is True
+        assert kwargs["contracts_wheel_sha256"] == "a" * 64
+        return {"status": "passed"}
+
+    monkeypatch.setattr(verify, "validate_distributions", lambda *_: artifacts)
+    monkeypatch.setattr(
+        verify, "distribution_metadata", lambda *_: ("robotics-runtime-contracts", "0.22.0", [])
+    )
+    monkeypatch.setattr(verified_contracts, "authenticate_contracts", authenticated)
+    monkeypatch.setattr(verify, "clean_install", installed)
+    monkeypatch.setattr("shutil.which", lambda *_: "uv")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "verify_install",
+            "--plan",
+            str(document),
+            "--dist",
+            str(tmp_path),
+            "--workspace",
+            str(tmp_path),
+            "--repository",
+            "mmkolpakov/robotics-runtime",
+            "--report",
+            str(tmp_path / "result.json"),
+        ],
+    )
+    if available:
+        assert verify.main() == 0
+        assert [artifact for artifact, _ in calls] == artifacts
+    else:
+        with pytest.raises(SystemExit) as error:
+            verify.main()
+        assert error.value.code == 1
+        assert not calls and not (tmp_path / "result.json").exists()
+
+
+def test_additional_archive_cannot_admit_an_unrelated_dependency(
+    tmp_path: Path,
+    plan: ReleasePlan,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from hashlib import sha256
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    foreign = archives(tmp_path / "foreign", name="unrelated-dependency", version="0.17.0")[0]
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: pytest.fail("installer ran"))
+    with pytest.raises(ReleaseError, match="selected package or contracts prerequisite"):
+        verify.clean_install(
+            None,
+            replace(plan, contracts_version="0.17.0"),
+            workspace=workspace,
+            interpreter="3.12",
+            uv="uv",
+            additional_artifacts=(foreign,),
+            wire_consumer=True,
+            contracts_wheel_sha256=sha256(foreign.read_bytes()).hexdigest(),
         )

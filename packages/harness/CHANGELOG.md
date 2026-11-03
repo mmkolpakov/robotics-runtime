@@ -2,12 +2,22 @@
 
 ## Unreleased
 
+## 0.23.0
+
+Requires contracts 0.22 (`>=0.22,<0.23`), with exact release prerequisite
+`contracts-v0.22.0`. Earlier contracts minors are not supported by this release.
+Package and execution-profile qualification remain separate.
+
 - Add optional local OCI archive assessment with an external operator profile,
   captured read-only inputs and bounded execution; retain raw responses and
   validate assertions before producing v3 results.
 
 - Bound gh/Cosign stdout and stderr during verification, including direct-child
   cleanup after output overflow or a command deadline.
+
+- Honor an explicit positive raw-evidence capture limit in the verified byte API.
+  Preserve the default 8 MiB capture limit and the separate structured-document
+  limit, source identity checks and streaming behavior.
 
 ## 0.22.3
 

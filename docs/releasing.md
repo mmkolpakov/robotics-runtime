@@ -141,6 +141,20 @@ checks its existing `EvaluationContext`/`ProductEvaluator` exports and
 exercise the existing public API; they do not establish a general consumer SDK.
 A temporary directory configured inside the workspace fails.
 
+Harness verification also authenticates the exact selected contracts wheel with
+stock GitHub release and source/workflow attestation checks, and requires the
+published PyPI bytes to have the same SHA-256. The existing tag, source and
+project-metadata comparison still applies. A missing release or failed verifier
+blocks publication; a locally built candidate is not a published prerequisite.
+
+Candidate-pair consumer checks exercise both harness archives with the matching
+source-built contracts wheel. The original published pair remains a separate
+baseline, and the stock resolver must reject its unsupported contracts version
+for the new candidate. Harness release checks run the same foreign Node fixture
+with the authenticated published contracts wheel before publication. This test
+fixture uses Docker in CI; offline built-in assessment does not require it, and
+these checks do not qualify an OCI execution profile.
+
 ## External publication settings
 
 Repository code cannot complete or attest to the following account settings. A maintainer

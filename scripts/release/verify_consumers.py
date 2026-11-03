@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
 import shutil
 import subprocess
 import tarfile
@@ -13,8 +14,24 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
-from scripts.release.plan import PACKAGES, ReleaseError, ReleasePlan, git, project, source_files
-from scripts.release.verify_install import clean_environment, clean_install, distribution_metadata
+from packaging.requirements import Requirement
+from packaging.version import Version
+
+from scripts.release.plan import (
+    PACKAGES,
+    ReleaseError,
+    ReleasePlan,
+    contracts_requirement,
+    git,
+    project,
+    source_files,
+)
+from scripts.release.verify_install import (
+    clean_environment,
+    clean_install,
+    distribution_metadata,
+    validate_distributions,
+)
 
 INFRA_REPOSITORY = "https://github.com/mmkolpakov/robotics-runtime-infra"
 INFRA_COMMIT = "dfbf26e99d3d569f9d25bdc260510220d4dd2872"
@@ -62,20 +79,13 @@ def extract_infra_fixtures(infra: Path, destination: Path) -> tuple[Path, dict[s
 
 
 def consumer_plan(workspace: Path, mode: str) -> ReleasePlan:
+    published = mode == "published"
     versions = (
-        PUBLISHED_VERSIONS
-        if mode == "published"
+        dict(PUBLISHED_VERSIONS)
+        if published
         else {key: str(project(workspace, key)["version"]) for key in PACKAGES}
     )
-    refs = (
-        PUBLISHED_COMMITS
-        if mode == "published"
-        else {"contracts": PUBLISHED_COMMITS["contracts"]}
-        if mode == "candidate-published"
-        else {}
-    )
-    if mode == "candidate-published":
-        versions["contracts"] = PUBLISHED_VERSIONS["contracts"]
+    refs = PUBLISHED_COMMITS if published else {}
     commit = refs.get("harness") or git(workspace, "rev-parse", "HEAD")
     contracts_commit = refs.get("contracts", "")
     return ReleasePlan(
@@ -95,10 +105,115 @@ def consumer_plan(workspace: Path, mode: str) -> ReleasePlan:
             if contracts_commit
             else ""
         ),
+        contracts_requirement=(
+            ""
+            if published
+            else contracts_requirement(
+                project(workspace, "harness")["dependencies"],
+                Version(versions["harness"]),
+                Version(versions["contracts"]),
+            )
+        ),
         source_files={
             name: source_files(workspace, key, ref=refs.get(key)) for key, name in PACKAGES.items()
         },
     )
+
+
+def _harness_archives(workspace: Path, directory: Path, uv: str, plan: ReleasePlan) -> list[Path]:
+    subprocess.run(
+        [
+            uv,
+            "--no-config",
+            "build",
+            "--package",
+            PACKAGES["harness"],
+            "--no-sources",
+            "--out-dir",
+            str(directory),
+        ],
+        cwd=workspace,
+        env=clean_environment(),
+        check=True,
+    )
+    return validate_distributions(directory, plan)
+
+
+def _published_reference(wheel: Path | None) -> Path:
+    filename = "robotics_runtime_contracts-0.21.1-py3-none-any.whl"
+    if wheel is None or wheel.name != filename:
+        raise ReleaseError("the exact published contracts reference wheel is required")
+    if wheel.is_symlink() or not wheel.is_file() or wheel.stat().st_size != 152270:
+        raise ReleaseError(
+            "published contracts reference must be a regular file of the expected size"
+        )
+    if (
+        sha256(wheel.read_bytes()).hexdigest()
+        != "34a476046ce3326384780224b4e40cad72f41ce756f627d63a6503e01349e015"
+    ):
+        raise ReleaseError("published contracts reference wheel digest differs")
+    return wheel
+
+
+def _reject_published(
+    artifact: Path,
+    contracts: Path,
+    root: Path,
+    plan: ReleasePlan,
+    *,
+    uv: str,
+    interpreter: str,
+) -> dict[str, Any]:
+    _published_reference(contracts)
+    venv = root / ("reject-wheel" if artifact.suffix == ".whl" else "reject-sdist")
+    env = clean_environment() | {"NO_COLOR": "1"}
+    subprocess.run(
+        [uv, "--no-config", "venv", "--python", interpreter, str(venv)],
+        cwd=root,
+        env=env,
+        check=True,
+    )
+    python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    arguments = [
+        uv,
+        "--no-config",
+        "pip",
+        "install",
+        "--python",
+        str(python),
+        "--offline",
+        "--no-sources",
+        str(artifact),
+        str(contracts),
+    ]
+    result = subprocess.run(
+        arguments, cwd=root, env=env, capture_output=True, text=True, timeout=120
+    )
+    _published_reference(contracts)
+    diagnostic = " ".join(result.stderr.lower().split())
+    minimum = Version(plan.contracts_version)
+    requirement = (
+        f"robotics-runtime-contracts>={minimum.major}.{minimum.minor},"
+        f"<{minimum.major}.{minimum.minor + 1}"
+    )
+    reasons = (
+        "no solution found",
+        f"robotics-acceptance-harness=={plan.version}",
+        "depends on " + requirement,
+        "requirements are unsatisfiable",
+    )
+    if result.returncode == 0 or not all(text in diagnostic for text in reasons):
+        raise ReleaseError(
+            "unsupported contracts were not rejected as an explicit dependency conflict: "
+            + result.stderr
+        )
+    return {
+        "artifact": artifact.name,
+        "status": "expected-dependency-conflict",
+        "returncode": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+    }
 
 
 def verify_consumers(
@@ -111,124 +226,105 @@ def verify_consumers(
     contracts_wheel: Path | None = None,
 ) -> dict[str, Any]:
     plan = consumer_plan(workspace, mode)
+    reference = (
+        _published_reference(contracts_wheel) if mode == "candidate-rejects-published" else None
+    )
     with tempfile.TemporaryDirectory(prefix="robotics-consumer-") as temporary:
         root = Path(temporary).resolve()
         if root.is_relative_to(workspace.resolve()):
             raise ReleaseError("consumer temporary directory must be outside the workspace")
         fixtures, provenance = extract_infra_fixtures(infra, root / "producer")
-        if mode == "candidate-published":
-            expected = "34a476046ce3326384780224b4e40cad72f41ce756f627d63a6503e01349e015"
-            filename = "robotics_runtime_contracts-0.21.1-py3-none-any.whl"
-            if contracts_wheel is None or contracts_wheel.name != filename:
-                raise ReleaseError("the exact published contracts wheel is required")
+        if mode == "published":
+            result = clean_install(
+                None,
+                plan,
+                workspace=workspace,
+                interpreter=interpreter,
+                uv=uv,
+                consumer_fixtures=fixtures,
+                consumer_provenance=provenance,
+            )
+            return {"mode": mode, "versions": dict(PUBLISHED_VERSIONS), **result}
+        archives = _harness_archives(workspace, root / "harness", uv, plan)
+        if mode == "candidate-rejects-published":
             if (
-                contracts_wheel.is_symlink()
-                or not contracts_wheel.is_file()
-                or contracts_wheel.stat().st_size != 152270
+                Version(PUBLISHED_VERSIONS["contracts"])
+                in Requirement(plan.contracts_requirement).specifier
             ):
-                raise ReleaseError(
-                    "published contracts wheel must be a regular file of the expected size"
-                )
-            if sha256(contracts_wheel.read_bytes()).hexdigest() != expected:
-                raise ReleaseError("published contracts wheel digest differs")
-            subprocess.run(
-                [
-                    uv,
-                    "--no-config",
-                    "build",
-                    "--package",
-                    PACKAGES["harness"],
-                    "--no-sources",
-                    "--out-dir",
-                    str(root / "dist"),
-                ],
-                cwd=workspace,
-                env=clean_environment(),
-                check=True,
-            )
-            artifacts = sorted((root / "dist").glob("*.whl")) + sorted(
-                (root / "dist").glob("*.tar.gz")
-            )
-            if len(artifacts) != 2 or sum(path.suffix == ".whl" for path in artifacts) != 1:
-                raise ReleaseError("candidate harness requires a wheel and sdist")
-            results = [
-                clean_install(
-                    artifact,
-                    plan,
-                    workspace=workspace,
-                    interpreter=interpreter,
-                    uv=uv,
-                    additional_artifacts=(contracts_wheel,),
-                    consumer_fixtures=fixtures,
-                    consumer_provenance=provenance,
-                    wire_consumer=True,
-                    published_contracts_sha256=expected,
-                )
-                for artifact in artifacts
-            ]
+                raise ReleaseError("the candidate still supports the published contracts reference")
+            assert reference is not None
             return {
                 "mode": mode,
-                "contracts_wheel": {
-                    "filename": filename,
-                    "sha256": expected,
-                    "published_reference": "https://pypi.org/project/robotics-runtime-contracts/0.21.1/",
-                    "source": "caller-supplied wheel verified by SHA-256",
+                "candidate": plan.candidate,
+                "contracts_reference": {
+                    "version": PUBLISHED_VERSIONS["contracts"],
+                    "sha256": sha256(reference.read_bytes()).hexdigest(),
                 },
-                "source_commit": plan.commit,
-                "candidate_artifacts": [
-                    {"filename": artifact.name, "sha256": sha256(artifact.read_bytes()).hexdigest()}
-                    for artifact in artifacts
+                "results": [
+                    _reject_published(
+                        artifact, reference, root, plan, uv=uv, interpreter=interpreter
+                    )
+                    for artifact in archives
                 ],
-                "results": results,
             }
-        wheels: dict[str, Path] = {}
-        if mode == "candidate":
-            for name in PACKAGES.values():
-                subprocess.run(
-                    [
-                        uv,
-                        "--no-config",
-                        "build",
-                        "--wheel",
-                        "--package",
-                        name,
-                        "--no-sources",
-                        "--out-dir",
-                        str(root / "dist"),
-                    ],
-                    cwd=workspace,
-                    env=clean_environment(),
-                    check=True,
-                )
-            wheels = {
-                distribution_metadata(path)[0]: path for path in (root / "dist").glob("*.whl")
-            }
-            if set(wheels) != set(PACKAGES.values()):
-                raise ReleaseError("consumer build must produce exactly the two package wheels")
-        result = clean_install(
-            wheels.get(PACKAGES["harness"]),
-            plan,
-            workspace=workspace,
-            interpreter=interpreter,
-            uv=uv,
-            additional_artifacts=(wheels[PACKAGES["contracts"]],) if wheels else (),
-            consumer_fixtures=fixtures,
-            consumer_provenance=provenance,
+        if mode != "candidate":
+            raise ReleaseError("unknown consumer cohort mode")
+        directory = root / "contracts"
+        subprocess.run(
+            [
+                uv,
+                "--no-config",
+                "build",
+                "--wheel",
+                "--package",
+                PACKAGES["contracts"],
+                "--no-sources",
+                "--out-dir",
+                str(directory),
+            ],
+            cwd=workspace,
+            env=clean_environment(),
+            check=True,
         )
+        wheels = sorted(directory.glob("*.whl"))
+        if len(wheels) != 1 or distribution_metadata(wheels[0])[:2] != (
+            PACKAGES["contracts"],
+            plan.contracts_version,
+        ):
+            raise ReleaseError("candidate build must produce the selected contracts wheel")
+        wheel = wheels[0]
+        digest = sha256(wheel.read_bytes()).hexdigest()
+        results = [
+            clean_install(
+                artifact,
+                plan,
+                workspace=workspace,
+                interpreter=interpreter,
+                uv=uv,
+                additional_artifacts=(wheel,),
+                consumer_fixtures=fixtures,
+                consumer_provenance=provenance,
+                wire_consumer=True,
+                contracts_wheel_sha256=digest,
+            )
+            for artifact in archives
+        ]
         return {
             "mode": mode,
-            "versions": {
-                key: value
-                for key, value in (("contracts", plan.contracts_version), ("harness", plan.version))
+            "versions": {"contracts": plan.contracts_version, "harness": plan.version},
+            "contracts_wheel": {
+                "filename": wheel.name,
+                "sha256": digest,
+                "provenance": "source-built candidate; not a published artifact",
             },
-            **result,
+            "results": results,
         }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--mode", choices=("candidate", "published", "candidate-published"), required=True
+        "--mode", choices=("candidate", "published", "candidate-rejects-published"), required=True
     )
     parser.add_argument("--contracts-wheel", type=Path)
     parser.add_argument("--infra", type=Path, required=True)
@@ -248,7 +344,7 @@ def main() -> int:
             uv=uv,
             contracts_wheel=args.contracts_wheel,
         )
-    except (ReleaseError, OSError, subprocess.CalledProcessError) as error:
+    except (ReleaseError, OSError, subprocess.SubprocessError) as error:
         parser.exit(1, f"installed consumer verification failed: {error}\n")
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
