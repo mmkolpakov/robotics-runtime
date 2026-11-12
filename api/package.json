@@ -13,7 +13,7 @@
     "test": "npm run build && node --test dist/test/*.test.js"
   },
   "dependencies": {
-    "@robotics-runtime/host": "*",
+    "@robotics-runtime/host": "file:../host",
     "fastify": "5.12.7",
     "pg": "8.23.1",
     "jose": "6.2.15",

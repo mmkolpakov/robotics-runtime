@@ -1,6 +1,6 @@
 {
   "name": "@robotics-runtime/host",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "private": true,
   "type": "module",
   "description": "Cordis composition host for robotics runtime workers",
