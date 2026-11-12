@@ -67,12 +67,14 @@ its two required file selections.
 
 ## Install and configure from source
 
-Use Node 24.21.0/npm 11.19.0. Install the locked dependencies and published
-Python workers in separate environments:
+Use Node 24.21.0/npm 11.19.0. Install the locked workspace dependencies at the
+repository root, build the host, and install the published Python workers in a
+separate environment:
 
 ```bash
-cd mcp
 npm ci --ignore-scripts --engine-strict
+npm run build --workspace @robotics-runtime/host
+cd mcp
 uv venv --python 3.12 .public-workers
 uv pip install --python .public-workers/bin/python --require-hashes --no-deps \
   --only-binary :all: --requirement public-cli.lock

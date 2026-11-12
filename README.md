@@ -130,12 +130,15 @@ target design to the current package references.
 
 ## Host development
 
-The host uses the Node version in `host/.node-version` and its own npm lockfile:
+The TypeScript packages `host`, `api` and `mcp` form one npm workspace with the Node version in
+`.node-version` and a single root npm lockfile. Internal dependencies link the workspace host
+directly, so development needs no release archive:
 
 ```bash
-npm --prefix host ci --ignore-scripts
-npm --prefix host test
-npm --prefix host run check:boundary
+npm ci --ignore-scripts
+npm run build --workspace @robotics-runtime/host
+npm test --workspace @robotics-runtime/host
+npm run check:boundary --workspace @robotics-runtime/host
 ```
 
 [Host configuration and worker integration](host/README.md) describes admission,
