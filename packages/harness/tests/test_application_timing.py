@@ -83,7 +83,7 @@ def test_verification_uses_every_deadline_gauge_inside_the_wall_clock_window(
     assert outputs.result["clock_observation"]["deadline_miss_ratio"] == (0.5 if inside else 0)
     assert outputs.result["status"] == ("failed" if inside else "passed")
     junit = JUnitXml.fromfile(str(outputs.junit_path))
-    assert junit.failures == int(inside)
+    assert junit.failures == (2 if inside else 0)
 
 
 def test_cumulative_sum_baseline_cannot_impersonate_a_deadline_gauge() -> None:

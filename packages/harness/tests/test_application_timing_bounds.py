@@ -198,7 +198,7 @@ def test_full_measurement_rejects_pauses_and_missing_clock_coverage(
     assert outputs.result["status"] == expected_status
     assert outputs.result["clock_observation"]["real_time_factor"] == 0
     junit = JUnitXml.fromfile(str(outputs.junit_path))
-    assert junit.failures == (1 if expected_status == "failed" else 0)
+    assert junit.failures == (2 if expected_status == "failed" else 1)
     assert junit.errors == 0
     if expected_status == "incomplete":
         assert junit.skipped == 2  # Time policy and incomplete evaluation coverage.
@@ -221,7 +221,8 @@ def test_callback_jitter_and_real_slowdown_remain_distinct(
         0.9 if profile == "jitter" else 0.475
     )
     junit = JUnitXml.fromfile(str(outputs.junit_path))
-    assert junit.failures == int(status == "failed") and junit.errors == 0
+    assert junit.failures == int(status != "passed") + int(status == "failed")
+    assert junit.errors == 0
 
 
 @pytest.mark.parametrize("values", [(-0.1, 0.0), (0.0, -0.1), (0.0, 1.1), (1.1, 0.0)])
@@ -241,7 +242,7 @@ def test_valid_deadline_peak_still_fails_the_measurement(
     )
     assert outputs.result["status"] == "failed"
     assert outputs.result["clock_observation"]["deadline_miss_ratio"] == 0.5
-    assert JUnitXml.fromfile(str(outputs.junit_path)).failures == 1
+    assert JUnitXml.fromfile(str(outputs.junit_path)).failures == 2
 
 
 def test_repeated_callback_overflow_aborts_verification_instead_of_truncating_evidence(

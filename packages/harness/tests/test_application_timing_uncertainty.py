@@ -136,7 +136,7 @@ def test_thirty_second_1x_clock_uncertainty_is_incomplete(
     assert assertion["status"] == "skipped"
     assert "bound" in assertion["message"]
     junit = JUnitXml.fromfile(str(outputs.junit_path))
-    assert junit.failures == junit.errors == 0
+    assert junit.failures == 1 and junit.errors == 0
     assert junit.skipped > 0
 
 
@@ -158,7 +158,7 @@ def test_missing_or_ambiguous_clock_progress_is_not_a_measured_failure(
     assert outputs.result["status"] == "incomplete"
     assert "$.clock_observation.real_time_factor" in outputs.result["unevaluated"]
     junit = JUnitXml.fromfile(str(outputs.junit_path))
-    assert junit.failures == junit.errors == 0 and junit.skipped > 0
+    assert junit.failures == 1 and junit.errors == 0 and junit.skipped > 0
 
 
 @pytest.mark.parametrize(
@@ -177,7 +177,7 @@ def test_proven_clock_violations_remain_failed(
     assert assertion["status"] == "failed"
     assert "RTF is at most" in assertion["message"]
     junit = JUnitXml.fromfile(str(outputs.junit_path))
-    assert junit.failures == 1 and junit.errors == 0
+    assert junit.failures == 2 and junit.errors == 0
 
 
 @pytest.mark.parametrize("profile", ["steady", "jitter", "no-clock", "silent-interior"])
@@ -188,7 +188,7 @@ def test_deadline_peak_failure_takes_precedence_over_clock_uncertainty(
     assert outputs.result["status"] == "failed"
     assert outputs.result["clock_observation"]["deadline_miss_ratio"] == 0.5
     junit = JUnitXml.fromfile(str(outputs.junit_path))
-    assert junit.failures == 1 and junit.errors == 0
+    assert junit.failures == 2 and junit.errors == 0
 
 
 @pytest.mark.parametrize(
@@ -201,7 +201,7 @@ def test_missing_deadline_evidence_is_unevaluated_and_preserves_failure_preceden
     assert outputs.result["status"] == status
     assert "$.clock_observation.deadline_miss_ratio" in outputs.result["unevaluated"]
     junit = JUnitXml.fromfile(str(outputs.junit_path))
-    assert junit.failures == int(status == "failed") and junit.errors == 0
+    assert junit.failures == 1 + int(status == "failed") and junit.errors == 0
 
 
 @pytest.mark.parametrize(

@@ -403,7 +403,7 @@ def _result_assertions(result: Mapping[str, Any]) -> list[Mapping[str, Any]]:
 
 
 def write_junit_xml(result: Mapping[str, Any], path: str | Path) -> Path:
-    """Write assertion outcomes in standard JUnit XML using junitparser."""
+    """Write the qualification verdict and assertion outcomes as standard JUnit XML."""
 
     validate_document(result)
     suite = TestSuite("robotics-acceptance")
@@ -416,6 +416,12 @@ def write_junit_xml(result: Mapping[str, Any], path: str | Path) -> Path:
         suite.add_property(
             "evaluation_environment_sha256", result["evaluation"]["environment"]["sha256"]
         )
+    # CI viewers render skipped cases as neutral or green, so every non-passing
+    # verdict also gets an explicit failure case; assertion outcomes are unchanged.
+    verdict = TestCase("qualification-verdict", classname="robotics.acceptance.verdict")
+    if result["status"] != "passed":
+        verdict.result = [Failure(f"qualification verdict is {result['status']}, not passed")]
+    suite.add_testcase(verdict)
     for assertion in _result_assertions(result):
         case = TestCase(
             assertion["assertion_id"],

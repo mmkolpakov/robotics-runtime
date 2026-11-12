@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Render a synthetic `qualification-verdict` JUnit test case that fails for every
+  non-passing verdict (`incomplete`, `failed`, `error`, `cancelled`). Assertion
+  and coverage cases keep their own outcomes, and the CLI exit-code contract
+  (0 passed, 1 completed non-pass, 2 handled exception) is unchanged.
+
 ## 0.23.1
 
 Requires contracts 0.22 (`>=0.22,<0.23`), with exact release prerequisite

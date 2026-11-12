@@ -54,7 +54,7 @@ def test_verification_retains_measurement_faults_but_not_initialization_faults(
     assertions = outputs.result["assertion_results"]
     graph_assertions = [item for item in assertions if item["assertion_id"] == "expected-ros-graph"]
     junit = JUnitXml.fromfile(str(outputs.junit_path))
-    assert junit.failures == int(status == "failed")
+    assert junit.failures == int(status != "passed") + int(status == "failed")
     assert junit.errors == int(status == "error")
     if status == "passed":
         assert graph_assertions == []

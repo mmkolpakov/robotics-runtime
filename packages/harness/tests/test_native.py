@@ -380,8 +380,8 @@ def test_native_junit_keeps_user_assertions_distinct_from_synthetic_cases(tmp_pa
     xml = ElementTree.parse(write_junit_xml(result, tmp_path / "collision.xml"))
     cases = xml.findall(".//testcase")
     identities = {(case.attrib["classname"], case.attrib["name"]) for case in cases}
-    assert len(cases) == len(identities) == 16
-    assert sum(case.find("failure") is not None for case in cases) == 1
+    assert len(cases) == len(identities) == 17
+    assert sum(case.find("failure") is not None for case in cases) == 2
     assert sum(case.find("error") is not None for case in cases) == 0
     assert sum(case.find("skipped") is not None for case in cases) == 3
     assert len([case for case in cases if case.attrib["name"] == "observation-condition"]) == 2

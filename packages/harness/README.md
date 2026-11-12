@@ -152,7 +152,10 @@ diagnostic. A result whose status is `error` is distinct from such an exception.
 A v1 domain result takes the most severe outcome of its assertions and of the
 forbidden-graph, hardware-clock and time-authority observations. Skipped
 assertions and declared `unevaluated` paths make an otherwise passing result
-`incomplete`; they appear in JUnit as skipped cases, not failures.
+`incomplete`. Their assertion and coverage cases stay skipped in JUnit, while
+the synthetic `qualification-verdict` case fails for every non-passing verdict
+(`incomplete`, `failed`, `error`, `cancelled`), so a CI reporter cannot render a
+non-passing qualification as green.
 
 V1 `clock_observation.real_time_factor` and `deadline_miss_ratio` are measured only
 in `simulation_realtime`; other time modes report `0`.
@@ -221,10 +224,11 @@ marked `unevaluated`, so an offline result cannot silently claim complete live
 acceptance.
 
 If every available offline check passes, the result is still `incomplete` and
-`evaluate` exits `1`. JUnit marks the missing live coverage as skipped. Evidence
-of a failure or error can raise the result's severity; malformed input or an
-execution exception exits `2`. A successful offline invocation therefore does
-not establish the `passed` verdict required for exit `0`.
+`evaluate` exits `1`. JUnit marks the missing live coverage as skipped and fails
+the synthetic `qualification-verdict` case. Evidence of a failure or error can
+raise the result's severity; malformed input or an execution exception exits
+`2`. A successful offline invocation therefore does not establish the `passed`
+verdict required for exit `0`.
 
 Local evidence is verified by URI, path, size, and SHA-256. Retained evidence
 also requires a receipt, its typed external-verification record, and the
