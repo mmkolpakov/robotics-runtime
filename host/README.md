@@ -4,7 +4,8 @@ The host composes finite workers with upstream Cordis 4.0.0-rc.12, Loader 1.0.0-
 1.2.0. Node 24.21.0, npm 11.19.0 and TypeScript 7.0.2 are pinned. Python packages remain in their
 existing uv workspace. Simulator libraries belong to selected worker environments.
 
-Run `npm ci --ignore-scripts`, `npm test` and `npm run check:boundary` from this directory. The
+Run `npm ci --ignore-scripts` at the repository root, then `npm test` and
+`npm run check:boundary` from this directory. The
 strict compiler checks upstream declarations without `skipLibCheck`, overrides or vendor patches.
 Sources compile to ESM with `.js` imports.
 

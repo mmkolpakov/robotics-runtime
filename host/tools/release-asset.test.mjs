@@ -115,3 +115,52 @@ test('one missing draft asset cannot be accepted', () => draftFixture(async remo
 test('surplus remote draft asset cannot be silently ignored', () => draftFixture(async remote => {
   await writeFile(join(remote, 'extra.json'), 'surplus');
 }, false));
+
+test('a tagged host version cannot name changed package content', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'host-version-guard-'));
+  try {
+    const git = (...args) => {
+      const result = spawnSync('git', args, {cwd: root, encoding: 'utf8'});
+      assert.equal(result.status, 0, result.stderr);
+      return result.stdout.trim();
+    };
+    git('init', '-q');
+    git('config', 'user.email', 'guard@example.invalid');
+    git('config', 'user.name', 'Guard');
+    const files = {
+      'host/package.json': '{"name":"@robotics-runtime/host","version":"0.1.0-rc.0"}\n',
+      'host/tsconfig.json': '{}\n',
+      'host/src/index.ts': 'export const value = 1;\n',
+      'host/schemas/a.json': '{}\n',
+      'host/producers/a.py': '',
+      'host/proto/a.proto': '',
+      'host/tools/fetch-mavsdk-server.mjs': '',
+      'host/tools/mavsdk-server.v4.0.3.json': '{}\n',
+    };
+    for (const [file, content] of Object.entries(files)) {
+      await mkdir(join(root, file, '..'), {recursive: true});
+      await writeFile(join(root, file), content);
+    }
+    git('add', '.');
+    git('commit', '-qm', 'base');
+    git('tag', 'host-v0.1.0-rc.0');
+    const workflow = await readFile(new URL('../../.github/workflows/host-release.yml', import.meta.url), 'utf8');
+    const start = workflow.indexOf('          host_content_id() {');
+    const end = workflow.indexOf('\n          require_fresh_host_version\n', start);
+    assert.ok(start >= 0 && end > start, 'actual workflow version guard is required');
+    const guard = workflow.slice(start, end + '\n          require_fresh_host_version'.length)
+      .replace(/^          /gm, '');
+    const run = () => spawnSync('bash', ['-Eeuo', 'pipefail', '-c', guard], {cwd: root, encoding: 'utf8'});
+    assert.equal(run().status, 0, 'identical tagged content is admitted');
+    await writeFile(join(root, 'host/src/index.ts'), 'export const value = 2;\n');
+    git('add', '.');
+    git('commit', '-qm', 'change');
+    const refused = run();
+    assert.equal(refused.status, 1);
+    assert.match(refused.stderr, /bump the version/);
+    await writeFile(join(root, 'host/package.json'), '{"name":"@robotics-runtime/host","version":"0.1.0-rc.1"}\n');
+    git('add', '.');
+    git('commit', '-qm', 'bump');
+    assert.equal(run().status, 0, 'a fresh version is admitted without a tag');
+  } finally {await rm(root, {recursive: true, force: true});}
+});

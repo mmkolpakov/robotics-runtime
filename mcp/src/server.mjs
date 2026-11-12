@@ -133,7 +133,7 @@ export async function createOfflineAdapter(input) {
   }
   return {
     serverFactory() {
-      const server = new McpServer({ name: 'robotics-runtime-offline', version: '0.1.0-rc.1' }, { capabilities: { tools: {}, resources: { listChanged: false } } });
+      const server = new McpServer({ name: 'robotics-runtime-offline', version: '0.1.0-rc.2' }, { capabilities: { tools: {}, resources: { listChanged: false } } });
       server.registerResource('catalog', 'robotics-runtime://catalog',
         { title: 'Registered evidence catalog', mimeType: 'application/json' },
         async uri => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: catalogText }] }));

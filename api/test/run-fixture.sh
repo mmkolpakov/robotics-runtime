@@ -109,7 +109,8 @@ if [[ ! -d api/.tools/npm ]]; then "$engine" cp "$nodeCopy:/usr/local/lib/node_m
 ln -sfn ../npm/bin/npm-cli.js api/.tools/bin/npm
 export PATH="$root/api/.tools/bin:$root/api/.tools:$PATH"
 [[ "$(node --version)" == v24.21.0 && "$(npm --version)" == 11.19.0 ]]
-(cd api && timeout 180 npm ci --ignore-scripts --no-fund && timeout 120 npm audit --audit-level=high && timeout 120 npm test) >"artifacts/api-ci-$scope-node.log" 2>&1
+(timeout 300 npm ci --ignore-scripts --no-fund && timeout 120 npm audit --audit-level=high && timeout 120 npm run build --workspace @robotics-runtime/host && cd api && timeout 120 npm test) >"artifacts/api-ci-$scope-node.log" 2>&1
+mkdir -p host/node_modules api/node_modules
 cosign="cgr.dev/chainguard/cosign:latest@sha256:e7ef547a42e52b877a9069ee49e2caa6287c30bcb97d27df3ec5d22c0afdbb6f"
 wheels="localhost/rr-api-fixture-wheels:$scope"
 evidence="localhost/rr-api-fixture-evidence:$scope"

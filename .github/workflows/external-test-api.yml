@@ -2,10 +2,24 @@
 name: external-test-api
 on:
   pull_request:
-    paths: [api/**, .github/workflows/external-test-api.yml]
+    paths:
+      - api/**
+      - host/**
+      - package.json
+      - package-lock.json
+      - .npmrc
+      - .node-version
+      - .github/workflows/external-test-api.yml
   push:
     branches: [main]
-    paths: [api/**, .github/workflows/external-test-api.yml]
+    paths:
+      - api/**
+      - host/**
+      - package.json
+      - package-lock.json
+      - .npmrc
+      - .node-version
+      - .github/workflows/external-test-api.yml
   workflow_dispatch:
 permissions:
   contents: read

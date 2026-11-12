@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "robotics-runtime-mcp",
   "display_name": "Robotics Runtime offline tools",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "description": "Six read-only tools over explicitly installed robotics contracts and harness CLIs.",
   "author": {
     "name": "Maxim Kolpakov"

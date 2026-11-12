@@ -83,7 +83,7 @@ test('upstream cordis CLI reads cwd/cordis.yml', async () => {
     // Config resolves packages from this trusted project's closure.
     await writeFile(join(directory, 'package.json'), '{"type":"module"}');
     const { symlink } = await import('node:fs/promises');
-    await symlink(join(process.cwd(), 'node_modules'), join(directory, 'node_modules'), 'dir');
+    await symlink(dirname(dirname(cli)), join(directory, 'node_modules'), 'dir');
     const result = await run(process.execPath, [cli], { cwd: directory, timeout: 5000 });
     assert.match(result.stdout + result.stderr, /native profile loaded cli/);
   } finally { await rm(directory, { recursive: true, force: true }); }

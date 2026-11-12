@@ -67,12 +67,14 @@ its two required file selections.
 
 ## Install and configure from source
 
-Use Node 24.21.0/npm 11.19.0. Install the locked dependencies and published
-Python workers in separate environments:
+Use Node 24.21.0/npm 11.19.0. Install the locked workspace dependencies at the
+repository root, build the host, and install the published Python workers in a
+separate environment:
 
 ```bash
-cd mcp
 npm ci --ignore-scripts --engine-strict
+npm run build --workspace @robotics-runtime/host
+cd mcp
 uv venv --python 3.12 .public-workers
 uv pip install --python .public-workers/bin/python --require-hashes --no-deps \
   --only-binary :all: --requirement public-cli.lock
@@ -232,8 +234,9 @@ MCP_TEST_HARNESS_CLI="$PWD/.public-workers/bin/robotics-acceptance" \
 ```
 
 Tests use the official MCP client and the installed public CLIs. The installed
-consumer check also runs the existing tool tests with a read-only filesystem,
-no network and no source checkout. Native execution and desktop client
+consumer check installs only the host and mcp workspaces from the single root
+lockfile and runs the existing tool tests with a read-only filesystem, no
+network and no source checkout. Native execution and desktop client
 qualification have separate gates. Controlled worker probes separately exercise
 raw 64-bit output, timeout, output overflow and request cancellation. These
 probes are subprocess-boundary checks.
