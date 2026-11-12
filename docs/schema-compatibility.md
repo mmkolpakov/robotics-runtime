@@ -29,7 +29,7 @@ A separate 20-case raw/syntax corpus calls the selected package's public loader
 and dumper. It preserves expected JSON/YAML acceptance, refusal, JSON scalar
 types and roundtrips. These bytes are identical for both probes; current syntax
 restrictions are not applied retroactively to legacy YAML. The full workspace
-comparison currently reports 375 cases. The legacy-only fallback reports its
+comparison reports 375 cases. The legacy-only fallback reports its
 67 semantic cases.
 
 Baseline and candidate run in separate `python -I -B` processes with explicit
@@ -45,4 +45,4 @@ are attested and verified release assets, outside PyPI wheels and sdists.
 Documentation bytes are recorded from that source separately because they have
 no semantic or artifact binding in the corpus. Original fixture and evidence
 bytes are never rewritten. This finite API comparison complements raw artifact
-and signature verification; it does not establish universal compatibility.
+and signature verification.

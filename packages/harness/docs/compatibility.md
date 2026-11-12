@@ -28,12 +28,12 @@ pinned by exact SHA-256 digests, the document schema versions they emit and
 consume, and the operator trust policy that admits those evaluators. Replacing
 one member without retesting the whole tuple is unsupported.
 
-The onboarding guide and the released reader artifacts still pin the older
-cohort (contracts `0.21.1`, harness `0.22.3`); the current PyPI releases are
-contracts `0.22.0` and harness `0.23.1`. Released infra images and native
-execution profiles carry their own qualified digests and are not updated by a
-package release. Do not mix cohorts: select one tested tuple and keep its
-package pins, evaluator digests, schemas and trust policy together.
+The current published pair is contracts `0.22.0` and harness `0.23.1`; the
+onboarding guide and the published-cli consumer example install exactly this
+pair. Released infra images and native execution profiles carry their own
+qualified digests and are not updated by a package release. Select one tested
+tuple and keep its package pins, evaluator digests, schemas and trust policy
+together.
 
 One tested tuple, verified end to end with the published PyPI wheels and the
 published-cli consumer example:

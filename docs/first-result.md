@@ -1,16 +1,16 @@
 # First result with the published Python tools
 
-This path installs contracts 0.21.1 and harness 0.22.3 from PyPI, creates explicit
-inputs, and evaluates them offline. It uses Python 3.12–3.14, pip and an ordinary
-POSIX shell. It requires neither ROS nor Node. The MCAP extra is required by this example's
-recording producer; ordinary document validation does not require that extra. MCAP 1.4.0 is pinned
-for this example producer, independently of native runtime release compositions.
+In about ten minutes this path gives you a complete offline acceptance cycle
+with the published Python tools:
 
-The example is synthetic. Its scenario policy, runtime declarations, metric points
-and single UInt64 recording are authored sample data. The producer binds real file
-bytes and the harness checks them, but no simulator, robot, image or native operation
-is qualified by this exercise. The v1 profile still carries ROS-specific fields;
-those sample declarations are not observations of the machine running this tutorial.
+- contracts 0.22.0 and harness 0.23.1 installed from PyPI;
+- five validated execution documents with byte-bound evidence;
+- an acceptance result and CI-ready JUnit report from an offline evaluation;
+- a readable explanation of the verdict and the coverage it still needs;
+- a demonstrated integrity refusal when indexed evidence bytes change.
+
+It uses Python 3.12–3.14, pip and an ordinary POSIX shell. It requires neither
+ROS nor Node.
 
 ## Install and obtain the inputs
 
@@ -21,8 +21,8 @@ mkdir robotics-first-result
 cd robotics-first-result
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install "robotics-runtime-contracts[mcap]==0.21.1" \
-  robotics-acceptance-harness==0.22.3 mcap==1.4.0
+python -m pip install "robotics-runtime-contracts[mcap]==0.22.0" \
+  robotics-acceptance-harness==0.23.1 mcap==1.4.0
 robotics-contracts --help
 robotics-acceptance --version
 ```
@@ -105,14 +105,32 @@ robotics-acceptance evaluate \
   --output results --diagnostic-output evaluation-diagnostic.json
 ```
 
-This command deliberately exits `1`, with `status: incomplete`. It creates
-`results/acceptance-result.json` and `results/junit.xml`. The available synthetic
-metric and evidence checks pass, while graph, live clock, forbidden graph and
-shutdown coverage remain in `unevaluated`. JUnit reports the absent coverage as
-skipped. A completed offline evaluation cannot establish the live `passed`
-verdict.
+The command exits `1` with `status: incomplete` and writes
+`results/acceptance-result.json` and `results/junit.xml`. This is the expected
+first-run outcome: the available synthetic metric and evidence checks pass, and
+the result names the coverage a live `passed` verdict still needs. JUnit reports
+the absent coverage as skipped.
 
-Use `why` only after a result exists:
+## From incomplete to passed
+
+The first result is an entry point, not a defect. Its `unevaluated` list is the
+agenda for a live qualification:
+
+- `$.observed_ros_graph` and `$.forbidden_graph_observation` — the running ROS 2
+  graph and its forbidden-graph check, observed by the attach-only harness
+  observer;
+- `$.clock_observation` — live clock and time-authority evidence from the
+  selected runtime;
+- `$.shutdown` — observed lifecycle shutdown coverage.
+
+A live `passed` verdict requires the selected ROS environment, an externally
+started workload, finalized evidence and the applicable qualification inputs,
+evaluated through live `verify`. The
+[harness reference](../packages/harness/README.md) and
+[compatibility boundaries](../packages/harness/docs/compatibility.md) name the
+supported profiles.
+
+Use `why` to read the stored verdict and its causes:
 
 ```bash
 robotics-contracts validate results/acceptance-result.json
@@ -123,12 +141,12 @@ Both commands exit `0`; explaining an incomplete result leaves its verdict
 incomplete. Result IDs vary per evaluation. The declared synthetic input time
 window and input file digests retain their original meanings.
 
-## Refusal and non-passing outcomes
+## Refusal and exit codes
 
 Harness verdict commands exit `0` for `passed` and `1` for completed
 `failed`, `incomplete` or `error` verdicts. A handled input or execution
-exception exits `2` and emits a diagnostic; it is different from a result with
-status `error`. Do not treat all nonzero codes as a missing output.
+exception exits `2` and emits a diagnostic instead of a result; it is different
+from a result with status `error`.
 
 To see a refusal after retaining the first result, append one blank line to the
 indexed metrics without rebuilding the index:
@@ -143,16 +161,24 @@ bytes no longer match the index. It writes a diagnostic rather than a new result
 or JUnit report. The earlier `results/` remains the record of the first evaluation.
 Start a new producer output directory to obtain an unmodified example again.
 
-## Published boundaries
+## Boundaries of this example
+
+The example is synthetic: its scenario policy, runtime declarations, metric
+points and single UInt64 recording are authored sample data. The producer binds
+real file bytes and the harness checks them. The v1 profile includes
+ROS-specific fields; the sample declarations are not observations of the machine
+running this tutorial. This exercise qualifies no simulator, robot, image or
+native operation.
+
+The MCAP extra is required by this example's recording producer; ordinary
+document validation does not require that extra. MCAP 1.4.0 is pinned for this
+example producer, independently of native runtime release compositions.
 
 This recipe uses canonical v1 execution documents and no custom extensions.
 The published loader forwards an explicitly supplied pinned extension registry
 to every loaded bundle document. Custom namespaces cannot override common
 contract rules.
 
-`doctor` reports observer/evaluator metadata where needed. It is not a prerequisite
-for contracts-only validation and it does not prove native readiness. Live
-`verify` requires the selected ROS environment, externally started workload,
-finalized evidence and applicable qualification inputs. See the
-[harness reference](../packages/harness/README.md) and
-[compatibility boundaries](../packages/harness/docs/compatibility.md).
+`doctor` reports observer/evaluator metadata where needed. It is not a
+prerequisite for contracts-only validation and it does not prove native
+readiness.
