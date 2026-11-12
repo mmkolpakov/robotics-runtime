@@ -3,7 +3,13 @@ name: host-release
 
 on:
   pull_request:
-    paths: [host/**, .github/workflows/host-release.yml]
+    paths:
+      - host/**
+      - package.json
+      - package-lock.json
+      - .npmrc
+      - .node-version
+      - .github/workflows/host-release.yml
   push:
     tags: ["host-v*"]
   workflow_dispatch:
@@ -54,6 +60,28 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Refuse a tagged host version for changed package content
+        run: |
+          set -euo pipefail
+          host_content_id() {
+            local revision="$1" path
+            for path in host/package.json host/tsconfig.json host/src host/schemas host/producers \
+              host/proto host/tools/fetch-mavsdk-server.mjs host/tools/mavsdk-server.v4.0.3.json; do
+              git rev-parse "$revision:$path"
+            done | sha256sum | cut -d' ' -f1
+          }
+          require_fresh_host_version() {
+            local version tag
+            version="$(python3 -c 'import json; print(json.load(open("host/package.json"))["version"])')"
+            tag="host-v$version"
+            git rev-parse -q --verify "refs/tags/$tag" >/dev/null || return 0
+            if [[ "$(host_content_id "refs/tags/$tag^{commit}")" != "$(host_content_id HEAD)" ]]; then
+              printf 'host version %s already names %s with different package content; bump the version\n' \
+                "$version" "$tag" >&2
+              return 1
+            fi
+          }
+          require_fresh_host_version
       - name: Bind the actual source and optional accepted reference
         run: |
           set -euo pipefail
@@ -94,7 +122,6 @@ jobs:
               npm test --workspace @robotics-runtime/host
               npm run check:boundary --workspace @robotics-runtime/host
               npm audit --audit-level=high
-              node --test host/tools/release-asset.test.mjs
               npm pack --workspace @robotics-runtime/host --ignore-scripts \
                 --pack-destination /workspace/artifacts/host-release/dist \
                 --json > /workspace/artifacts/host-release/npm-pack.json
@@ -103,6 +130,9 @@ jobs:
                 > /workspace/artifacts/host-release/manifest.json)
             '
           git diff --exit-code -- host
+      - name: Exercise the release asset and workflow guards
+        # The guard tests need git and python3, which the pinned node image does not ship.
+        run: node --test host/tools/release-asset.test.mjs
       - name: Require identical clean rebuild and ordinary external installation
         run: |
           set -euo pipefail
