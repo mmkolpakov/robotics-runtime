@@ -363,10 +363,13 @@ jobs:
           cp ../api/package.json "$production/api/"
           cp package.json "$production/mcp/"
           npm ci --prefix "$production" --omit=dev --ignore-scripts --engine-strict --workspace mcp --workspace host
-          (cd .. && npm pack --workspace @robotics-runtime/host --ignore-scripts --pack-destination "$RUNNER_TEMP")
+          (cd .. && npm pack --workspace @robotics-runtime/host --ignore-scripts \
+            --pack-destination "$RUNNER_TEMP" --json > "$RUNNER_TEMP/host-pack.json")
+          host_tgz="$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))[0].filename' \
+            "$RUNNER_TEMP/host-pack.json")"
           rm "$production/node_modules/@robotics-runtime/host"
           mkdir "$production/node_modules/@robotics-runtime/host"
-          tar -xzf "$RUNNER_TEMP/robotics-runtime-host-0.1.0-rc.1.tgz" --strip-components=1 \
+          tar -xzf "$RUNNER_TEMP/$host_tgz" --strip-components=1 \
             -C "$production/node_modules/@robotics-runtime/host"
           rm -f "$production/node_modules/@robotics-runtime/mcp" \
             "$production/node_modules/@robotics-runtime/external-test-api"
@@ -374,8 +377,9 @@ jobs:
           cp -R bin src "$stage/"
           cp tools/prepare-bootstrap.py "$stage/tools/"
           cp manifest.json LICENSE "$stage/"
-          cp -R "$production/node_modules" "$stage/"
+          cp -RL "$production/node_modules" "$stage/"
           rm "$stage/node_modules/.package-lock.json"
+          test -z "$(find "$stage/node_modules" -type l)"
           schema="$out/mcpb-manifest-v0.3.schema.json"
           node --input-type=module -e '
             import { writeFile } from "node:fs/promises";
@@ -391,20 +395,23 @@ jobs:
           cp package.json "$out/mcp-package.json"
           cp ../host/package.json "$out/host-package.json"
           cp ../api/package.json "$out/api-package.json"
+          cp "$RUNNER_TEMP/$host_tgz" "$out/"
+          mcp_version="$(node -p 'require("./package.json").version')"
+          bundle="robotics-runtime-mcp-$mcp_version.mcpb"
           export TZ=UTC
           zip_epoch=315532800
           find "$stage" -exec touch -h -d "@$zip_epoch" {} +
           python="$PWD/.public-workers/bin/python"
           (
             cd "$stage"
-            "$python" -m zipfile -c "$out/robotics-runtime-mcp-0.1.0-rc.1.mcpb" manifest.json LICENSE bin src tools node_modules
+            "$python" -m zipfile -c "$out/$bundle" manifest.json LICENSE bin src tools node_modules
             "$python" -m zipfile -c "$RUNNER_TEMP/mcpb-rebuild.zip" manifest.json LICENSE bin src tools node_modules
           )
-          cmp "$out/robotics-runtime-mcp-0.1.0-rc.1.mcpb" "$RUNNER_TEMP/mcpb-rebuild.zip"
-          "$python" -m zipfile -t "$out/robotics-runtime-mcp-0.1.0-rc.1.mcpb"
+          cmp "$out/$bundle" "$RUNNER_TEMP/mcpb-rebuild.zip"
+          "$python" -m zipfile -t "$out/$bundle"
           (
             cd "$out"
-            sha256sum robotics-runtime-mcp-0.1.0-rc.1.mcpb mcpb-manifest-v0.3.schema.json \
+            sha256sum "$bundle" "$host_tgz" mcpb-manifest-v0.3.schema.json \
               package.json package-lock.json mcp-package.json host-package.json api-package.json \
               public-cli.lock > SHA256SUMS
           )
@@ -502,10 +509,12 @@ jobs:
           cp "$input/mcp-package.json" "$consumer/mcp/package.json"
           cp mcp/test/native-documents.integration.mjs "$consumer/test/"
           cp -R packages/contracts/consumer-examples/minimal-native-archive "$consumer/native-example"
-          python3 -m zipfile -e "$input/robotics-runtime-mcp-0.1.0-rc.1.mcpb" "$bundle"
+          mcp_version="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' \
+            "$input/mcp-package.json")"
+          python3 -m zipfile -e "$input/robotics-runtime-mcp-$mcp_version.mcpb" "$bundle"
           docker run --rm --user "$(id -u):$(id -g)" --env NPM_CONFIG_CACHE=/tmp/npm-cache \
             --volume "$consumer:/consumer" --workdir /consumer "$NODE_IMAGE" \
-            npm ci --ignore-scripts --engine-strict
+            npm ci --ignore-scripts --engine-strict --workspace mcp --workspace host
           docker build --file mcp/test/installed.Dockerfile --tag mcp-installed:ci .
           mkdir -p artifacts/mcp-installed
           docker image inspect mcp-installed:ci > artifacts/mcp-installed/worker-image.json

@@ -234,8 +234,9 @@ MCP_TEST_HARNESS_CLI="$PWD/.public-workers/bin/robotics-acceptance" \
 ```
 
 Tests use the official MCP client and the installed public CLIs. The installed
-consumer check also runs the existing tool tests with a read-only filesystem,
-no network and no source checkout. Native execution and desktop client
+consumer check installs only the host and mcp workspaces from the single root
+lockfile and runs the existing tool tests with a read-only filesystem, no
+network and no source checkout. Native execution and desktop client
 qualification have separate gates. Controlled worker probes separately exercise
 raw 64-bit output, timeout, output overflow and request cancellation. These
 probes are subprocess-boundary checks.

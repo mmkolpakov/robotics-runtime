@@ -213,6 +213,14 @@ npm dependency installation. PR and manual runs verify a clean rebuild, archive
 identity and installation outside the source workspace; they do not publish or
 qualify native execution.
 
+The release manifest records `package_lock_sha256`, the SHA-256 of the single
+workspace root `package-lock.json`; the TypeScript packages no longer keep
+separate lockfiles. A candidate whose `host/package.json` version already
+names an existing `host-v*` tag must keep the packed host content identical
+to that tag, or the build refuses before packing and the version must be
+bumped. The MCP CI job retains the same packed host TGZ beside the offline
+bundle in `artifacts/mcpb` and covers both with `SHA256SUMS`.
+
 Before publication, verify the repository's current release-immutability setting,
 the host/provider source cohort, cancellation and retained verification after
 source deletion. Set `HOST_QUALIFIED_SOURCE_SHA` and `HOST_QUALIFIED_ASSET_SHA256`

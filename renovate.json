@@ -136,6 +136,7 @@
     "dependencies"
   ],
   "lockFileMaintenance": {
+    "description": "host, api and mcp share one root package-lock.json in the npm workspace.",
     "enabled": true,
     "schedule": [
       "before 4am on monday"
