@@ -57,6 +57,18 @@ export async function verifyArtifact(pkg, plan, rows, directory) {
   const reference_matches = Boolean(reference && reference.source_tree === plan.source_tree && reference.asset_sha256 === sha256);
   return {...plan, filename, sha256, npm_pack: row, reference_matches};
 }
+// The workspace root holds the single lockfile and the hoisted compiler.
+async function readLockfile() {
+  try { return await readFile('package-lock.json'); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; return readFile('../package-lock.json'); }
+}
+async function readTypescriptManifest() {
+  for (const directory of ['node_modules', '../node_modules']) {
+    try { return JSON.parse(await readFile(join(directory, 'typescript/package.json'), 'utf8')); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  throw new Error('typescript is not installed');
+}
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [command, ...args] = process.argv.slice(2);
   const json = async path => JSON.parse(await readFile(path, 'utf8'));
@@ -76,7 +88,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   }
   Object.assign(result, {repository: process.env.GITHUB_REPOSITORY || null, source_ref: process.env.GITHUB_REF || null,
     source_date_epoch: process.env.SOURCE_DATE_EPOCH || null});
-  result.package_lock_sha256 = createHash('sha256').update(await readFile('package-lock.json')).digest('hex');
-  if (command === 'verify') result.toolchain.typescript = (await json('node_modules/typescript/package.json')).version;
+  result.package_lock_sha256 = createHash('sha256').update(await readLockfile()).digest('hex');
+  if (command === 'verify') result.toolchain.typescript = (await readTypescriptManifest()).version;
   console.log(JSON.stringify(result, null, 2));
 }

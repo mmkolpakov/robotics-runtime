@@ -25,7 +25,7 @@ test('host extension uses existing generic role, verifies actual refs and reject
     const configRef = await referenceFile(value.profilePath);
     const { version } = JSON.parse(await readFile(join(root, 'host/package.json'), 'utf8')) as { version: string };
     const hostIdentity = { package: '@robotics-runtime/host', version, node: process.version,
-      package_lock_ref: await referenceFile(join(root, 'host/package-lock.json')) };
+      package_lock_ref: await referenceFile(join(root, 'package-lock.json')) };
     const providers = [{
       id: 'finite-file-fixture', identity: { package: 'fixture', version: '1', config_ref: configRef },
       bindings: [{ service: 'backend', provider: 'finite-file-fixture', evidence_ref: readyRef }],

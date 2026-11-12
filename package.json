@@ -1,0 +1,20 @@
+{
+  "name": "robotics-runtime",
+  "private": true,
+  "type": "module",
+  "description": "npm workspaces root for the TypeScript host, external test API and offline MCP packages",
+  "engines": {
+    "node": "24.21.0",
+    "npm": "11.19.0"
+  },
+  "packageManager": "npm@11.19.0",
+  "workspaces": [
+    "host",
+    "api",
+    "mcp"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  }
+}

@@ -13,7 +13,7 @@
     "test": "npm run build && node --test dist/test/*.test.js"
   },
   "dependencies": {
-    "@robotics-runtime/host": "https://github.com/mmkolpakov/robotics-runtime/releases/download/host-v0.1.0-rc.1/robotics-runtime-host-0.1.0-rc.1.tgz",
+    "@robotics-runtime/host": "*",
     "fastify": "5.12.7",
     "pg": "8.23.1",
     "jose": "6.2.15",
