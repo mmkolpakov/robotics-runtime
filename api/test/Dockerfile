@@ -14,7 +14,16 @@ COPY --chmod=0555 artifacts/worker-assets/retained-artifact.py /usr/local/libexe
 COPY --chmod=0555 api/test/retention-witness.py /usr/local/bin/retained-artifact
 COPY --chmod=0555 artifacts/worker-assets/receipt-inputs.py /usr/local/bin/receipt-inputs
 COPY --chmod=0555 artifacts/worker-assets/catatonit /usr/local/bin/catatonit
+COPY node_modules /opt/api/node_modules
 COPY api/node_modules /opt/api/node_modules
+COPY host/node_modules /opt/api/host/node_modules
+COPY host/package.json /opt/api/host/package.json
+COPY host/dist /opt/api/host/dist
+COPY host/schemas /opt/api/host/schemas
+COPY host/producers /opt/api/host/producers
+COPY host/proto /opt/api/host/proto
+COPY host/tools/fetch-mavsdk-server.mjs /opt/api/host/tools/fetch-mavsdk-server.mjs
+COPY host/tools/mavsdk-server.v4.0.3.json /opt/api/host/tools/mavsdk-server.v4.0.3.json
 COPY api/dist /opt/api/dist
 COPY api/package.json /opt/api/package.json
 USER 1000:1000

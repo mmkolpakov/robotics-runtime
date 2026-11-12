@@ -1,5 +1,6 @@
 **
 !api/
+!api/node_modules/
 !api/node_modules/**
 !api/dist/**
 !api/package.json
@@ -8,3 +9,16 @@
 !api/test/retention-witness.py
 !artifacts/
 !artifacts/worker-assets/**
+!node_modules/
+!node_modules/**
+!host/
+!host/node_modules/
+!host/node_modules/**
+!host/package.json
+!host/dist/**
+!host/schemas/**
+!host/producers/**
+!host/proto/**
+!host/tools/
+!host/tools/fetch-mavsdk-server.mjs
+!host/tools/mavsdk-server.v4.0.3.json

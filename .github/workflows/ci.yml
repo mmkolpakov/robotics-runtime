@@ -318,7 +318,11 @@ jobs:
           persist-credentials: false
       - run: node --version && npm --version
       - run: npm ci --ignore-scripts --engine-strict
+        working-directory: .
+      - run: npm run build --workspace @robotics-runtime/host
+        working-directory: .
       - run: npm audit --audit-level=high
+        working-directory: .
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
         with:
           version: "0.13.6"
@@ -353,9 +357,19 @@ jobs:
           stage="$RUNNER_TEMP/mcpb-stage"
           out="$GITHUB_WORKSPACE/artifacts/mcpb"
           mkdir "$production" "$stage"
-          mkdir -p "$out" "$stage/tools"
-          cp package.json package-lock.json "$production/"
-          npm ci --prefix "$production" --omit=dev --ignore-scripts --engine-strict
+          mkdir -p "$out" "$stage/tools" "$production/host" "$production/api" "$production/mcp"
+          cp ../package.json ../package-lock.json "$production/"
+          cp ../host/package.json "$production/host/"
+          cp ../api/package.json "$production/api/"
+          cp package.json "$production/mcp/"
+          npm ci --prefix "$production" --omit=dev --ignore-scripts --engine-strict --workspace mcp --workspace host
+          (cd .. && npm pack --workspace @robotics-runtime/host --ignore-scripts --pack-destination "$RUNNER_TEMP")
+          rm "$production/node_modules/@robotics-runtime/host"
+          mkdir "$production/node_modules/@robotics-runtime/host"
+          tar -xzf "$RUNNER_TEMP/robotics-runtime-host-0.1.0-rc.1.tgz" --strip-components=1 \
+            -C "$production/node_modules/@robotics-runtime/host"
+          rm -f "$production/node_modules/@robotics-runtime/mcp" \
+            "$production/node_modules/@robotics-runtime/external-test-api"
           npm audit --prefix "$production" --omit=dev --audit-level=high --json > "$out/production-audit.json"
           cp -R bin src "$stage/"
           cp tools/prepare-bootstrap.py "$stage/tools/"
@@ -373,7 +387,10 @@ jobs:
           ' "$schema"
           echo "3a0ac9d845711a1b9b17dfa5a52f8b60628239d6a86a9db417206a9efc78592d  $schema" | sha256sum --check
           uv tool run --isolated --python "$PWD/.public-workers/bin/python" --from check-jsonschema==0.39.0 check-jsonschema --schemafile "$schema" "$stage/manifest.json"
-          cp package.json package-lock.json public-cli.lock "$out/"
+          cp ../package.json ../package-lock.json public-cli.lock "$out/"
+          cp package.json "$out/mcp-package.json"
+          cp ../host/package.json "$out/host-package.json"
+          cp ../api/package.json "$out/api-package.json"
           export TZ=UTC
           zip_epoch=315532800
           find "$stage" -exec touch -h -d "@$zip_epoch" {} +
@@ -387,7 +404,9 @@ jobs:
           "$python" -m zipfile -t "$out/robotics-runtime-mcp-0.1.0-rc.1.mcpb"
           (
             cd "$out"
-            sha256sum robotics-runtime-mcp-0.1.0-rc.1.mcpb mcpb-manifest-v0.3.schema.json package.json package-lock.json public-cli.lock > SHA256SUMS
+            sha256sum robotics-runtime-mcp-0.1.0-rc.1.mcpb mcpb-manifest-v0.3.schema.json \
+              package.json package-lock.json mcp-package.json host-package.json api-package.json \
+              public-cli.lock > SHA256SUMS
           )
       - name: Build and install the current candidate workers independently
         working-directory: .
@@ -470,14 +489,17 @@ jobs:
           set -euo pipefail
           input="$PWD/artifacts/mcp-install-input/mcpb"
           (cd "$input" && sha256sum --check SHA256SUMS)
-          cmp mcp/package-lock.json "$input/package-lock.json"
+          cmp package-lock.json "$input/package-lock.json"
           cmp mcp/public-cli.lock "$input/public-cli.lock"
           consumer="$(mktemp -d "$RUNNER_TEMP/mcp-consumer.XXXXXX")"
           bundle="$(mktemp -d "$RUNNER_TEMP/mcp-unpacked.XXXXXX")"
           echo "MCP_CONSUMER=$consumer" >> "$GITHUB_ENV"
           echo "MCP_BUNDLE=$bundle" >> "$GITHUB_ENV"
           cp "$input/package.json" "$input/package-lock.json" "$consumer/"
-          mkdir "$consumer/test"
+          mkdir -p "$consumer/host" "$consumer/api" "$consumer/mcp" "$consumer/test"
+          cp "$input/host-package.json" "$consumer/host/package.json"
+          cp "$input/api-package.json" "$consumer/api/package.json"
+          cp "$input/mcp-package.json" "$consumer/mcp/package.json"
           cp mcp/test/native-documents.integration.mjs "$consumer/test/"
           cp -R packages/contracts/consumer-examples/minimal-native-archive "$consumer/native-example"
           python3 -m zipfile -e "$input/robotics-runtime-mcp-0.1.0-rc.1.mcpb" "$bundle"
