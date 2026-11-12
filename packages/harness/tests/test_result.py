@@ -160,7 +160,7 @@ def test_json_and_junit_outputs_share_status(tmp_path: Path) -> None:
 
     assert json.loads(json_path.read_text(encoding="utf-8"))["status"] == "failed"
     xml = JUnitXml.fromfile(str(junit_path))
-    assert (xml.failures, xml.errors) == (1, 0)
+    assert (xml.failures, xml.errors) == (2, 0)
 
 
 def test_result_rejects_evidence_from_another_run(tmp_path: Path) -> None:
@@ -188,7 +188,7 @@ def test_result_marks_declared_gap_incomplete(tmp_path: Path) -> None:
     assert result["status"] == "incomplete"
     assert "evidence_sha256" not in result["time_authority_observation"]
     junit = JUnitXml.fromfile(str(write_junit_xml(result, tmp_path / "junit.xml")))
-    assert (junit.failures, junit.errors, junit.skipped) == (0, 0, 2)
+    assert (junit.failures, junit.errors, junit.skipped) == (1, 0, 2)
 
 
 def test_result_and_junit_mark_skipped_assertion_incomplete(tmp_path: Path) -> None:
@@ -201,7 +201,7 @@ def test_result_and_junit_mark_skipped_assertion_incomplete(tmp_path: Path) -> N
     assert result["unevaluated"] == ["$.assertions.optional-check"]
     assert result["assertion_results"][0]["observed_value"] == "not-observed"
     junit = JUnitXml.fromfile(str(write_junit_xml(result, tmp_path / "junit.xml")))
-    assert (junit.failures, junit.errors, junit.skipped) == (0, 0, 2)
+    assert (junit.failures, junit.errors, junit.skipped) == (1, 0, 2)
 
 
 def hardware_result_inputs(tmp_path: Path) -> ResultInputs:
@@ -258,7 +258,7 @@ def test_policy_violation_dominates_incomplete_but_not_error(
     junit = JUnitXml.fromfile(str(write_junit_xml(result, tmp_path / "junit.xml")))
 
     assert result["status"] == ("error" if assertion_status == "error" else "failed")
-    assert junit.failures == 1 + (assertion_status == "failed")
+    assert junit.failures == 2 + (assertion_status == "failed")
     assert junit.errors == (assertion_status == "error")
     assert junit.skipped == 1 + (assertion_status == "skipped")
 
@@ -303,7 +303,7 @@ def test_multiple_violations_preserve_product_and_core_error_precedence(
     junit = JUnitXml.fromfile(str(write_junit_xml(result, tmp_path / "junit.xml")))
 
     assert result["status"] == expected
-    assert junit.failures == 3 + (product_status == "failed")
+    assert junit.failures == 4 + (product_status == "failed")
     assert junit.errors == (expected == "error")
     skipped = (core_status == "skipped") + (product_status == "skipped")
     assert junit.skipped == skipped + (skipped > 0)
@@ -315,7 +315,7 @@ def test_multiple_violations_preserve_product_and_core_error_precedence(
     }
 
 
-def test_empty_assertions_report_skipped_coverage_without_a_failure(tmp_path: Path) -> None:
+def test_empty_assertions_report_skipped_coverage_and_verdict_failure(tmp_path: Path) -> None:
     inputs = result_inputs(tmp_path)
     inputs["assertions"] = ()
 
@@ -324,7 +324,31 @@ def test_empty_assertions_report_skipped_coverage_without_a_failure(tmp_path: Pa
 
     assert result["status"] == "incomplete"
     assert result["unevaluated"] == ["$.assertions"]
-    assert (junit.failures, junit.errors, junit.skipped) == (0, 0, 1)
+    assert (junit.failures, junit.errors, junit.skipped) == (1, 0, 1)
+
+
+@pytest.mark.parametrize("status", ["passed", "incomplete", "failed", "error", "cancelled"])
+def test_junit_verdict_case_fails_for_non_passed_verdicts(tmp_path: Path, status: str) -> None:
+    import xml.etree.ElementTree as ET
+
+    result = build_acceptance_result(**result_inputs(tmp_path))
+    result["status"] = status
+    if status == "incomplete":
+        result["unevaluated"] = ["$.observed_ros_graph"]
+
+    xml = ET.parse(write_junit_xml(result, tmp_path / "junit.xml")).getroot()
+
+    (verdict,) = xml.findall(".//testcase[@name='qualification-verdict']")
+    assert verdict.attrib["classname"] == "robotics.acceptance.verdict"
+    failure = verdict.find("failure")
+    if status == "passed":
+        assert failure is None
+    else:
+        assert failure is not None
+        assert status in failure.attrib["message"]
+    (smoke,) = xml.findall(".//testcase[@name='domain-smoke']")
+    assert smoke.find("failure") is None
+    assert smoke.find("skipped") is None
 
 
 def test_physical_result_passes_without_simulation_clock_measurements(tmp_path: Path) -> None:

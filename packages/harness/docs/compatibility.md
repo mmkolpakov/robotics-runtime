@@ -19,6 +19,40 @@ support the [native archive example](../../contracts/consumer-examples/minimal-n
 and [distinct archive assessments](archive-assessment.md). Historical datasets
 require their matching archived package; readers do not convert old forms.
 
+## Compatibility Tuple
+
+A qualification composition is compatible as one tuple, not as independent
+latest versions: the CLI package pair (`robotics-runtime-contracts` and
+`robotics-acceptance-harness`), the evaluator artifacts (wheel or OCI image)
+pinned by exact SHA-256 digests, the document schema versions they emit and
+consume, and the operator trust policy that admits those evaluators. Replacing
+one member without retesting the whole tuple is unsupported.
+
+The onboarding guide and the released reader artifacts still pin the older
+cohort (contracts `0.21.1`, harness `0.22.3`); the current PyPI releases are
+contracts `0.22.0` and harness `0.23.1`. Released infra images and native
+execution profiles carry their own qualified digests and are not updated by a
+package release. Do not mix cohorts: select one tested tuple and keep its
+package pins, evaluator digests, schemas and trust policy together.
+
+One tested tuple, verified end to end with the published PyPI wheels and the
+published-cli consumer example:
+
+| Member | Pin |
+| --- | --- |
+| CLI packages | `robotics-runtime-contracts[mcap]==0.22.0`, `robotics-acceptance-harness==0.23.1` |
+| Evaluator | built-in OTLP metric method; no external evaluator wheel or OCI image |
+| Image digest | none; this tuple executes no container image |
+| Schemas | contracts `0.22.0` catalog, v1 scenario/runtime/run/evidence/result documents |
+| Trust policy | none required; no external evaluator is admitted |
+| Example producer | `mcap==1.4.0` for the synthetic recording |
+
+The verification ran `robotics-contracts validate` and `robotics-acceptance
+explain` (exit `0`), then `robotics-acceptance evaluate` (exit `1`, status
+`incomplete`) on the produced inputs. External evaluator wheels or OCI images
+and their operator profiles form separate tuples; qualify them with their exact
+digests before use.
+
 ## Document Set
 
 The authoritative role-to-schema mapping is the contracts package catalog. The

@@ -264,7 +264,7 @@ def test_overflow_uncertainty_keeps_count_and_builds_incomplete_result(tmp_path:
     assert result["time_authority_observation"]["sample_count"] == 30
     assert "$.time_authority_observation" in result["unevaluated"]
     junit = JUnitXml.fromfile(str(write_junit_xml(result, tmp_path / "result.xml")))
-    assert junit.failures == 0 and junit.errors == 0 and junit.skipped >= 1
+    assert junit.failures == 1 and junit.errors == 0 and junit.skipped >= 1
 
 
 def test_empty_but_covered_histogram_proves_sample_count_failure() -> None:

@@ -7,9 +7,11 @@ robotics-acceptance why --format markdown assessment/acceptance-result.json
 ```
 
 Use the accompanying JUnit XML in your CI report viewer. JSON retains the source
-identities and observation coverage; JUnit reports assertion outcomes. A successful
-`why` invocation explains the stored verdict and does not change a failed or
-incomplete result into a pass. The [optional MCP adapter](../mcp/README.md) exposes
+identities and observation coverage; JUnit reports assertion outcomes plus a
+synthetic `qualification-verdict` case that fails for any verdict other than
+`passed`. Explanation and validation commands emit no qualification JUnit.
+A successful `why` invocation explains the stored verdict and does not change a
+failed or incomplete result into a pass. The [optional MCP adapter](../mcp/README.md) exposes
 these same document operations without starting or evaluating a workload.
 
 ## Open the original format
