@@ -29,8 +29,7 @@ retirement in a separately versioned release. Keep previously released artifacts
 schema identities and signed archive references unchanged; historical consumers
 retain their pinned tools. The existing
 [schema compatibility gate](schema-compatibility.md) and installed-consumer checks
-must validate the candidate's declared scope. They do not establish universal
-compatibility.
+must validate the candidate's declared scope.
 
 A package release, a consumer cohort change and native execution admission are
 separate decisions. A new dependency range does not update an existing lock or

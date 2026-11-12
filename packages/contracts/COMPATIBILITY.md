@@ -90,8 +90,7 @@ name only additive changes are permitted. Breaking changes require a new schema
 major, a catalog role and migration notes. The workspace's
 [published compatibility gate](docs/schema-compatibility.md) compares actual
 released Git sources with the candidate using bounded D10 structural rules and
-public API semantic regressions. Unsupported cases require explicit review;
-neither this finite check nor a digest comparison proves universal compatibility.
+public API semantic regressions. Unsupported cases require explicit review.
 
 This workspace validates package fixtures and consumer examples against the
 current checkout. Clean release installs separately check wheel and sdist
