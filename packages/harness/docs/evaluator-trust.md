@@ -269,8 +269,10 @@ target; discovery without requirements grants no execution admission.
 
 ## Local OCI archive assessment
 
-Use the matching [source workspace installation](../README.md#development) for
-this path. On `evaluate`, select `--assessment-controls`, `--original-result` and
+The [published harness installation](../../../docs/first-result.md#install-and-obtain-the-inputs)
+includes this optional path. An OCI assessment additionally requires an operator
+trust profile, Engine and Cosign executables, and the exact admitted evaluator
+image. On `evaluate`, select `--assessment-controls`, `--original-result` and
 `--evaluator-trust-profile`. Controls marked `assessment-controls.v1` declare
 each OCI namespace, image subject and exact expected assertion IDs. The original
 scenario, runtime, observation and result retain their v2 schemas; the original
