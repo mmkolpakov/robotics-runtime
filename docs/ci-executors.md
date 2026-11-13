@@ -2,8 +2,8 @@
 
 The software workflows accept the repository variable `ROBOTICS_CI_EXECUTOR`.
 Its default is `hosted`. Set it to `home` to select the corresponding registered
-self-hosted runner; an unknown value fails job selection. No repository variable
-or runner registration is changed by adding these workflows.
+self-hosted runner; an unknown value fails job selection. Configure runner
+registration and repository variables separately.
 
 | Executor | x64 jobs | ARM64 build jobs |
 | --- | --- | --- |
@@ -45,7 +45,7 @@ remain unchanged. Package authenticity and native qualification are separate.
 
 The executor selector is an execution path for the listed checks, not evidence
 that every CI job already runs at home. Complete home CI also requires runner
-enrollment/tooling and the release/provenance profile below.
+enrollment/tooling and an admitted release/provenance profile.
 
 A path-filtered success is not evidence that the full matrix ran at home.
 Complete home validation must force the applicable build and qualification
