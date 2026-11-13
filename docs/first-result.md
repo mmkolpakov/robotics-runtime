@@ -1,13 +1,10 @@
 # First result with the published Python tools
 
-In about ten minutes this path gives you a complete offline acceptance cycle
-with the published Python tools:
-
-- contracts 0.22.0 and harness 0.23.1 installed from PyPI;
-- five validated execution documents with byte-bound evidence;
-- an acceptance result and CI-ready JUnit report from an offline evaluation;
-- a readable explanation of the verdict and the coverage it still needs;
-- a demonstrated integrity refusal when indexed evidence bytes change.
+Create a validated input set, evaluate it with the published Python tools, then
+read the verdict and the evidence behind it. The result is intentionally
+`incomplete`: the example supplies synthetic data but not the live observations
+needed for a passed qualification. You will also change an evidence file and
+see the integrity check refuse it.
 
 It uses Python 3.12–3.14, pip and an ordinary POSIX shell. It requires neither
 ROS nor Node.
@@ -27,57 +24,29 @@ robotics-contracts --help
 robotics-acceptance --version
 ```
 
-Download the consumer inputs archive exported by this documentation build. Save it
-as `consumer-inputs.zip` in the working directory. The published reader serves the same download here:
+This recipe selects a stable harness release. Use its source archive to keep the
+example producer and templates tied to that release rather than to a later
+documentation build:
 
 ```bash
-curl -fL https://mmkolpakov.github.io/robotics-runtime/consumer-inputs.zip \
-  -o consumer-inputs.zip
-python -m zipfile -e consumer-inputs.zip example
-python example/produce.py --output inputs
+EXAMPLE_TAG="harness-v$(python -c 'from importlib.metadata import version; print(version("robotics-acceptance-harness"))')"
+curl -fL "https://github.com/mmkolpakov/robotics-runtime/archive/refs/tags/$EXAMPLE_TAG.zip" \
+  -o example-source.zip
+python -m zipfile -e example-source.zip example-source
+python "example-source/robotics-runtime-$EXAMPLE_TAG/packages/contracts/consumer-examples/published-cli/produce.py" \
+  --output inputs
 ```
 
-The archive contains `produce.py`, `scenario-input.json`,
-`runtime-template.json`, `README.md` and `manifest.json`. Its manifest records
-the source revision and SHA-256 of each example file. Retain the downloaded
-archive and manifest with your result. It is an example distribution from the
-reader, separate from the two PyPI wheels. Package installation does not install
-these files or `tests/fixtures`.
+Retain `example-source.zip` and the selected tag with the result. The producer
+imports the installed Python packages, not modules from the source archive.
+The [source example](../packages/contracts/consumer-examples/published-cli/README.md)
+contains `produce.py`, `scenario-input.json`, `runtime-template.json` and its
+README. Package installation does not install these files or `tests/fixtures`.
 
-For development from a checkout, the identical inputs are in
-[consumer examples](../packages/contracts/consumer-examples/published-cli/README.md).
-Run its producer with the installed Python interpreter. No checkout imports or
-test support modules are used.
-
-## What produces each input
-
-- `scenario-input.json`: the sample scenario author's declared policy. The producer
-  validates and writes it as `inputs/scenario.json` with `write_document`.
-- `runtime-template.json`: synthetic runtime facts supplied to
-  `create_runtime_manifest`, then `write_document`. Output:
-  `inputs/runtime-manifest.json`. A real integration supplies facts from its
-  selected runtime producer rather than filling them with defaults.
-- `inputs/acceptance-run.json`: the producer supplies an explicit run ID, timestamp,
-  time authority and primary domain; `write_document` writes the run and binds its
-  scenario SHA-256 to the exact emitted bytes. For a new real run, the public
-  `robotics-acceptance create-run` command creates this context.
-- `inputs/metrics.otlp.jsonl`: this example producer writes one synthetic OTLP
-  JSON-lines envelope, attributed to the declared run and domain. In a real run,
-  the workload and configured OpenTelemetry collector produce the metrics.
-- `inputs/recording.mcap`: the upstream MCAP writer writes one synthetic
-  `std_msgs/msg/UInt64` sample on `/example/counter`. The public
-  `recording_summary_from_mcap` producer derives
-  `inputs/recording-summary.json` from those finalized bytes.
-- `inputs/evidence-index.json`: `create_evidence_index`,
-  `add_evidence_artifact`, `finalize_evidence_index` and `write_document` bind
-  both source files and the summary. `inputs/evidence-draft.json` is intermediate
-  writer state, not a document consumers may use as finalized evidence.
-
-The evidence writer computes file size, digest, local path and URI. Run the
-producer in the final input directory: copying the generated documents alone to
-another location leaves their absolute evidence references pointing at the old
-files. Transfer the originals through your evidence retention process and rebuild
-the local references where appropriate; preserve signed original bytes.
+The reader also provides a smaller `consumer-inputs.zip` for its current build.
+That archive's manifest identifies its source revision and file digests. It is a
+separate source snapshot, not a replacement for the release archive selected by
+this recipe; matching file hashes alone do not establish package compatibility.
 
 ## Validate, then evaluate
 
@@ -113,15 +82,15 @@ the absent coverage as skipped.
 
 ## From incomplete to passed
 
-The first result is an entry point, not a defect. Its `unevaluated` list is the
-agenda for a live qualification:
+Each `unevaluated` path identifies evidence the selected live profile still
+needs:
 
-- `$.observed_ros_graph` and `$.forbidden_graph_observation` — the running ROS 2
+- `$.observed_ros_graph` and `$.forbidden_graph_observation`: the running ROS 2
   graph and its forbidden-graph check, observed by the attach-only harness
   observer;
-- `$.clock_observation` — live clock and time-authority evidence from the
+- `$.clock_observation`: live clock and time-authority evidence from the
   selected runtime;
-- `$.shutdown` — observed lifecycle shutdown coverage.
+- `$.shutdown`: observed lifecycle shutdown coverage.
 
 A live `passed` verdict requires the selected ROS environment, an externally
 started workload, finalized evidence and the applicable qualification inputs,
@@ -161,6 +130,36 @@ bytes no longer match the index. It writes a diagnostic rather than a new result
 or JUnit report. The earlier `results/` remains the record of the first evaluation.
 Start a new producer output directory to obtain an unmodified example again.
 
+## What produces each input
+
+- `scenario-input.json`: the sample scenario author's declared policy. The producer
+  validates and writes it as `inputs/scenario.json` with `write_document`.
+- `runtime-template.json`: synthetic runtime facts supplied to
+  `create_runtime_manifest`, then `write_document`. Output:
+  `inputs/runtime-manifest.json`. A real integration supplies facts from its
+  selected runtime producer rather than filling them with defaults.
+- `inputs/acceptance-run.json`: the producer supplies an explicit run ID, timestamp,
+  time authority and primary domain; `write_document` writes the run and binds its
+  scenario SHA-256 to the exact emitted bytes. For a new real run, the public
+  `robotics-acceptance create-run` command creates this context.
+- `inputs/metrics.otlp.jsonl`: this example producer writes one synthetic OTLP
+  JSON-lines envelope, attributed to the declared run and domain. In a real run,
+  the workload and configured OpenTelemetry collector produce the metrics.
+- `inputs/recording.mcap`: the upstream MCAP writer writes one synthetic
+  `std_msgs/msg/UInt64` sample on `/example/counter`. The public
+  `recording_summary_from_mcap` producer derives
+  `inputs/recording-summary.json` from those finalized bytes.
+- `inputs/evidence-index.json`: `create_evidence_index`,
+  `add_evidence_artifact`, `finalize_evidence_index` and `write_document` bind
+  both source files and the summary. `inputs/evidence-draft.json` is intermediate
+  writer state, not a document consumers may use as finalized evidence.
+
+The evidence writer computes file size, digest, local path and URI. Run the
+producer in the final input directory: copying the generated documents alone to
+another location leaves their absolute evidence references pointing at the old
+files. Transfer the originals through your evidence retention process and rebuild
+the local references where appropriate; preserve signed original bytes.
+
 ## Boundaries of this example
 
 The example is synthetic: its scenario policy, runtime declarations, metric
@@ -171,8 +170,8 @@ running this tutorial. This exercise qualifies no simulator, robot, image or
 native operation.
 
 The MCAP extra is required by this example's recording producer; ordinary
-document validation does not require that extra. MCAP 1.4.0 is pinned for this
-example producer, independently of native runtime release compositions.
+document validation does not require that extra. The installation command pins
+MCAP for this example producer, independently of native runtime compositions.
 
 This recipe uses canonical v1 execution documents and no custom extensions.
 The published loader forwards an explicitly supplied pinned extension registry

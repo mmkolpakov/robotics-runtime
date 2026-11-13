@@ -1,19 +1,19 @@
 # Published CLI consumer inputs
 
-Use these exact files with [the first-result guide](../../../../docs/first-result.md)
-and the published contracts 0.22.0 / harness 0.23.1 pair. The documentation reader
-exports them as `consumer-inputs.zip`, with source revision and per-file SHA-256
-in `manifest.json`. PyPI installation alone does not install the examples.
+For installation and evaluation commands, follow the
+[first-result guide included in the source archive](../../../../docs/first-result.md).
+The reader also exports these files as `consumer-inputs.zip`; use the
+[published guide](https://mmkolpakov.github.io/robotics-runtime/docs/first-result.html#install-and-obtain-the-inputs)
+with that standalone download. Its `manifest.json` records the source revision
+and per-file SHA-256. PyPI installation alone does not install the examples.
 
 `scenario-input.json` is an authored synthetic scenario; `runtime-template.json`
 contains explicitly synthetic runtime facts. `produce.py` uses public contracts
-writers and MCAP 1.4.0 to create the exact scenario, runtime, run context, synthetic
-OTLP JSON-lines stream, one UInt64 MCAP recording, recording summary and finalized
-evidence index. It has no repository or test support imports.
+writers and the upstream MCAP writer to create the scenario, runtime, run
+context, synthetic OTLP JSON-lines stream, one UInt64 MCAP recording, recording
+summary and finalized evidence index. It has no repository or test support imports.
 
 ```bash
-python -m pip install "robotics-runtime-contracts[mcap]==0.22.0" \
-  robotics-acceptance-harness==0.23.1 mcap==1.4.0
 python produce.py --output inputs
 ```
 

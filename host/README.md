@@ -4,6 +4,25 @@ The host composes finite workers with upstream Cordis 4.0.0-rc.12, Loader 1.0.0-
 1.2.0. Node 24.21.0, npm 11.19.0 and TypeScript 7.0.2 are pinned. Python packages remain in their
 existing uv workspace. Simulator libraries belong to selected worker environments.
 
+## Install the published host
+
+The [host 0.1.0-rc.1 prerelease](https://github.com/mmkolpakov/robotics-runtime/releases/tag/host-v0.1.0-rc.1)
+provides the compiled package as a TGZ. Use the Node and npm versions recorded
+in its [release manifest](https://github.com/mmkolpakov/robotics-runtime/releases/download/host-v0.1.0-rc.1/manifest.json),
+then install it as an ordinary dependency:
+
+```bash
+npm install --ignore-scripts --save-exact https://github.com/mmkolpakov/robotics-runtime/releases/download/host-v0.1.0-rc.1/robotics-runtime-host-0.1.0-rc.1.tgz
+```
+
+The release includes a source manifest, checksums and an external installation
+report. Package integrity and provider execution qualification have separate
+scopes; see the [release procedure](../docs/releasing.md#compiled-host).
+The installed artifact determines the released API; the reference below describes
+the current source checkout.
+
+## Development and composition
+
 Run `npm ci --ignore-scripts` at the repository root, then `npm test` and
 `npm run check:boundary` from this directory. The
 strict compiler checks upstream declarations without `skipLibCheck`, overrides or vendor patches.
