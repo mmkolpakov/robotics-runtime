@@ -12,7 +12,9 @@ permissions:
 
 jobs:
   host:
-    runs-on: ubuntu-24.04
+    runs-on: >-
+      ${{ fromJSON('{"hosted":"ubuntu-24.04","home":["self-hosted","linux","x64","robotics-ci-home"]}')
+          [vars.ROBOTICS_CI_EXECUTOR || 'hosted'] }}
     timeout-minutes: 15
     container:
       options: --init
@@ -21,6 +23,13 @@ jobs:
       run:
         working-directory: host
     steps:
+      - name: Check CI executor and source context
+        id: ci-profile
+        uses: mmkolpakov/robotics-runtime/.github/actions/ci-profile@ba72584a64837724b1a2df5279019cde15a80d5e
+        with:
+          executor: ${{ vars.ROBOTICS_CI_EXECUTOR || 'hosted' }}
+          architecture: x64
+          runner-environment: ${{ runner.environment }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
