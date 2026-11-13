@@ -3,15 +3,13 @@
 ## Package Line
 
 The `0.23.x` harness line requires Python `>=3.12,<3.15` and
-`robotics-runtime-contracts>=0.22,<0.23`. The exact
-[release prerequisite](../../../docs/releasing.md) for `0.23.1` is
-`contracts-v0.22.0`.
+`robotics-runtime-contracts>=0.22,<0.23`. The `0.22.x` line requires the same
+Python range and `robotics-runtime-contracts>=0.21,<0.22`.
 
-The `0.22.x` harness line requires Python `>=3.12,<3.15` and
-`robotics-runtime-contracts>=0.21,<0.22`; harness `0.22.0` uses contracts `0.21.1`
-with release prerequisite `contracts-v0.21.1`. Package metadata, tagged source
-and distribution digests identify the installed pair; package support and
-native-profile qualification remain separate.
+The [changelog](../CHANGELOG.md) and [release procedure](../../../docs/releasing.md)
+record exact release prerequisites. Installed package metadata, tagged source
+and distribution digests identify the selected pair. Package support and native
+profile qualification remain separate.
 
 Each role retains its canonical default. Datasets use v2 for one or multiple
 MCAP members. Explicit v2 scenario/runtime/observation/result/qualification roles
@@ -28,30 +26,26 @@ pinned by exact SHA-256 digests, the document schema versions they emit and
 consume, and the operator trust policy that admits those evaluators. Replacing
 one member without retesting the whole tuple is unsupported.
 
-The current published pair is contracts `0.22.0` and harness `0.23.1`; the
-onboarding guide and the published-cli consumer example install exactly this
-pair. Released infra images and native execution profiles carry their own
-qualified digests and are not updated by a package release. Select one tested
-tuple and keep its package pins, evaluator digests, schemas and trust policy
-together.
+Select one tested tuple and retain its package pins, evaluator digests, schemas
+and trust policy together. Infra images and native execution profiles have their
+own qualified digests; a Python package release does not update them.
 
-One tested tuple, verified end to end with the published PyPI wheels and the
-published-cli consumer example:
+The [first-result recipe](../../../docs/first-result.md#install-and-obtain-the-inputs)
+uses this offline tuple:
 
-| Member | Pin |
+| Member | Selection |
 | --- | --- |
-| CLI packages | `robotics-runtime-contracts[mcap]==0.22.0`, `robotics-acceptance-harness==0.23.1` |
-| Evaluator | built-in OTLP metric method; no external evaluator wheel or OCI image |
-| Image digest | none; this tuple executes no container image |
-| Schemas | contracts `0.22.0` catalog, v1 scenario/runtime/run/evidence/result documents |
-| Trust policy | none required; no external evaluator is admitted |
-| Example producer | `mcap==1.4.0` for the synthetic recording |
+| CLI packages | Exact installation command in the first-result recipe; [source example](../../contracts/consumer-examples/published-cli/README.md) |
+| Evaluator | Built-in OTLP metric method; no external evaluator wheel or OCI image |
+| Image digest | None; this tuple executes no container image |
+| Schemas | Catalogue-selected v1 scenario, runtime, run, evidence and result documents |
+| Trust policy | None required; no external evaluator is admitted |
+| Example producer | MCAP writer, pinned in the first-result installation command |
 
-The verification ran `robotics-contracts validate` and `robotics-acceptance
-explain` (exit `0`), then `robotics-acceptance evaluate` (exit `1`, status
-`incomplete`) on the produced inputs. External evaluator wheels or OCI images
-and their operator profiles form separate tuples; qualify them with their exact
-digests before use.
+The example deliberately returns `incomplete` for the missing live observations.
+Its guide explains the validation, evaluation and exit codes. External evaluator
+wheels, OCI images and their operator profiles form separate tuples; qualify
+those exact artifacts before use.
 
 ## Document Set
 

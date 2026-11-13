@@ -1,59 +1,34 @@
 # Robotics runtime
 
-Contracts and evidence tools for composing and qualifying robotic software.
-
-The workspace contains two independently versioned Python packages:
-
-- **robotics-runtime-contracts** validates execution, evidence and qualification
-  documents, and writes artifacts without changing signed bytes.
-- **robotics-acceptance-harness** observes an existing execution and evaluates
-  retained evidence. It does not launch services or control a robot.
-
-[robotics-runtime-infra](https://github.com/mmkolpakov/robotics-runtime-infra)
-owns worker images, simulator providers, product provisioning, deployment and
-execution qualification. Product repositories own robot models, scenes, control
-logic and vision models. Deployment operators supply host prerequisites.
+Evaluate robotic software from recorded evidence and inspect why a check passed,
+failed or remains incomplete.
 
 ## Start with the part you need
 
-[Install the published Python tools and produce your first result](docs/first-result.md).
-The guide includes downloadable exact inputs, their producers, expected JSON/JUnit,
-exit codes and an integrity refusal. The document path needs no Node or ROS.
+- [Produce a first result](docs/first-result.md): install the published Python
+  tools, create example inputs, evaluate them and inspect an integrity refusal.
+- [Inspect recorded results](docs/viewing-results.md): open the evidence and read
+  the reported causes and coverage.
+- [Run a selected execution profile](https://github.com/mmkolpakov/robotics-runtime-infra):
+  use the infrastructure repository's images, workload and qualification guides.
+- [Integrate a consumer](packages/contracts/consumer-examples/README.md): use the
+  public document APIs and CLI; [MCP](mcp/README.md) exposes offline document tools
+  to agents.
 
-Use contracts to validate files independently of ROS or a simulator. Use the
-harness to evaluate evidence for a supported qualification profile. Use infra
-to launch a composition and record what actually ran.
+The Python document path needs neither Node nor ROS. The
+[compatibility reference](packages/harness/docs/compatibility.md) describes
+package lines and the components that must be selected together. Installing the
+packages does not qualify a simulator, image, accelerator or physical target.
 
-The published pair is
-[contracts 0.22.0](https://pypi.org/project/robotics-runtime-contracts/0.22.0/) and
-[harness 0.23.1](https://pypi.org/project/robotics-acceptance-harness/0.23.1/):
+This repository contains two independently versioned Python packages:
+[contracts](packages/contracts/README.md) validates and writes documents, while
+[harness](packages/harness/README.md) observes an existing execution and evaluates
+retained evidence. The host, Test API and MCP packages provide separate interfaces.
 
-```bash
-python -m pip install robotics-runtime-contracts==0.22.0 robotics-acceptance-harness==0.23.1
-robotics-contracts --help
-robotics-acceptance --help
-```
-
-Package reference:
-[contracts](packages/contracts/README.md),
-[harness](packages/harness/README.md),
-[consumer examples](packages/contracts/consumer-examples/README.md).
-
-Harness requires contracts `>=0.22,<0.23`; release checks install the exact
-published pair outside the workspace. Package installation does not qualify
-a simulator, image, accelerator or physical target.
-
-The compiled host is available as the immutable
-[host 0.1.0-rc.1 prerelease](https://github.com/mmkolpakov/robotics-runtime/releases/tag/host-v0.1.0-rc.1).
-Its TGZ installs as an ordinary npm dependency using Node 24.21.0 and npm 11.19.0:
-
-```bash
-npm install --ignore-scripts --save-exact https://github.com/mmkolpakov/robotics-runtime/releases/download/host-v0.1.0-rc.1/robotics-runtime-host-0.1.0-rc.1.tgz
-```
-
-The release includes a source manifest, checksums and the external installation
-report. Host package integrity and provider execution qualification have separate
-scopes; see the [host reference](host/README.md).
+[robotics-runtime-infra](https://github.com/mmkolpakov/robotics-runtime-infra)
+owns worker images, simulator providers, deployment and execution qualification.
+Consumers own robot models, scenes, control logic and vision models; operators
+supply the selected host environment.
 
 ## Architecture
 
@@ -78,7 +53,7 @@ use their native connections; lifecycle completion and evidence evaluation are
 separate outcomes.
 
 <details>
-<summary>C4 context — product boundaries and external systems</summary>
+<summary>C4 context: product boundaries and external systems</summary>
 
 <!-- architecture:Context:start -->
 
@@ -98,35 +73,17 @@ available as a reference.
 
 [Diagram sources, sequence and deployment](docs/architecture/README.md).
 
-The host can coordinate resources through upstream
-[Cordis](https://github.com/cordiverse/cordis). Campaign orchestration is external;
-commands and frames use native SDK and media connections.
+The host uses [Cordis](https://github.com/cordiverse/cordis) for resource
+composition. Native control and media stay with the selected SDK and provider.
 
-[Composition framework and its limits](docs/architecture.md#composition-framework).
-Common document/evaluation code does not require Gazebo, Isaac Sim, Webots or
-ROS. Engine-specific APIs and assets belong to selected infra providers.
-Simulator support does not imply the same physics, frame output or autopilot
-integration in every backend.
-
-The [architecture reference](docs/architecture.md) describes repository
-boundaries, native API lines, time and evidence ownership, and qualification.
-Current public compatibility is recorded in
-[harness compatibility](packages/harness/docs/compatibility.md) and the package
-[compatibility policy](packages/contracts/COMPATIBILITY.md).
-
-The optional [external Test API](docs/external-test-api.md) supports a limited
-SignalFlag SDK 1.8.0 recipe: existing project/branch, explicit JWT, configuration
-sync and six REST operations. It stores immutable configuration snapshots and
-retains opaque uploads through existing custody tools. This source service is separate from
-native execution and qualification;
-it has no published API image release.
-
-The [optional offline MCP package](mcp/README.md) provides six read tools through
-stdio. Its [Linux MCPB release](https://github.com/mmkolpakov/robotics-runtime/releases/tag/mcp-v0.1.0-rc.1)
-uses separately installed published CLI workers.
-
-[Architecture and implementation references](docs/future-designs.md) connect the
-target design to the current package references.
+- [Host reference](host/README.md): configuration and worker integration.
+- [External Test API](docs/external-test-api.md): a source service for selected SDK
+  operations; its reference describes the scope and deployment requirements.
+  It has no published API image.
+- [Offline MCP](mcp/README.md): six document tools and their packaged distribution.
+- [Architecture reference](docs/architecture.md): component, time and evidence
+  ownership; [implementation references](docs/future-designs.md) link the design
+  to available interfaces.
 
 ## Host development
 
@@ -183,9 +140,9 @@ consumer verification. Source history lives in `packages/contracts` and
 
 Edit the public Markdown, SVG and canonical diagram sources in this repository.
 The reader uses the stock Sphinx, MyST and Furo toolchain; its source allowlist is in
-`docs/reader/build.py`. Keep release instructions current
-when package versions or interfaces change. Preserve the exact version and commit
-pins in archived examples and qualification records.
+`docs/reader/build.py`. Installation pins belong to the executable examples;
+release prerequisites and dependency pins stay in their package and release
+metadata. Archived examples and qualification records retain their original pins.
 The LLM export includes current guidance and the C4 DSL and Mermaid sequence/state
 sources exactly once. Historical run records, ADRs and migration archives remain readable in HTML
 and the source download but are excluded from the LLM text. The source archive
