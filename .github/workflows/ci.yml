@@ -107,6 +107,11 @@ jobs:
           prune-cache: true
           cache-dependency-glob: uv.lock
       - run: uv sync --locked --all-packages --all-groups
+      - name: Verify hosted runner dependency updates
+        uses: docker://renovate/renovate:43.257.5@sha256:3c9169d402da098f57eaf16d03947777a195bb91383d9000ad02dee92e0a0a7d
+        with:
+          entrypoint: node
+          args: test/renovate/check-runners.mjs /usr/local/renovate
       - name: Keep the compatibility checker within its complexity budget
         run: >-
           uv run --no-sync ruff check --extend-select C901,PLR0913
