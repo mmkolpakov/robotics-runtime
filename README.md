@@ -210,3 +210,6 @@ Open `build/docs/html/index.html` or serve that directory locally. The strict PR
 build checks document references; the existing scheduled `links` workflow checks
 external links. Main rebuilds the reader from committed source through the Pages
 workflow. Generated HTML, text and downloads stay in the ignored `build/` directory.
+
+[CI executors](docs/ci-executors.md) describes hosted and enrolled home checks,
+required runner isolation and the separate release-trust boundary.
