@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.25.0
+
+Requires contracts 0.22 (`>=0.22,<0.23`), with exact release prerequisite
+`contracts-v0.22.0`. Package and execution-profile qualification remain separate.
+
+- Evaluate copied archives with `--evidence-origin-root` or the matching API
+  keyword. Resolve captured absolute evidence references beneath the current
+  evidence-index directory while preserving their recorded identities and
+  verifying size and digest through the existing bounded reader.
+- Reject references outside the original root, duplicate relocated paths,
+  symlinks, missing files and changed bytes. Keep calibration and evaluator
+  admission tied to the external operator profile.
+
 ## 0.24.0
 
 Requires contracts 0.22 (`>=0.22,<0.23`), with exact release prerequisite
