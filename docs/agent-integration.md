@@ -169,6 +169,14 @@ a separate program and commercial embedding have distinct terms. See
 [self-host plans](https://docs.dagu.sh/overview/self-host-license) and
 [licensing](https://github.com/dagucloud/dagu/blob/v2.24.0/LICENSING.md).
 
+A runnable offline worked example is [examples/dagu/](../examples/dagu/README.md):
+a stock Dagu definition driving the published contracts and harness CLIs through
+produce, validate, explain, evaluate and `why`, tested with Dagu v2.25.8 and the
+contracts 0.22.0 / harness 0.24.0 cohort. The synthetic verdict is `incomplete`
+(evaluate exits 1); the workflow fails, retains the result and JUnit, and a
+failure handler explains the verdict. A tampered input demonstrates the exit-2
+refusal. The Dagu dag-run ID, domain run ID and result ID stay distinct.
+
 ### Kubernetes campaigns with Argo
 
 Argo Workflows supplies the campaign DAG, fan-out, retry policy, status and UI.
@@ -227,6 +235,12 @@ to validate the explicit subject inventory and document relationships. Authentic
 the retained statement using the external verifier and operator trust policy.
 A digest match or schema-valid statement alone does not authenticate a signer.
 Keep exact original subjects, receipt dependencies and signature evidence.
+
+To inspect a qualification package through the read-only domain adapter, the MCP
+bootstrap helper [mcp/tools/prepare-bootstrap.py](../mcp/tools/prepare-bootstrap.py)
+consumes a writer-produced `qualification-arguments.txt` inventory, produced by
+`scripts/qualification/package_artifacts.py` in the `robotics-runtime-infra`
+repository. See the [MCP guide](../mcp/README.md#prepare-a-qualification-package).
 
 For the result produced by the [first-result example](first-result.md), these
 existing commands validate and explain the result without executing a workload:
