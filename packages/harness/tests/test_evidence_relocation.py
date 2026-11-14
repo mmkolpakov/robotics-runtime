@@ -183,3 +183,89 @@ def test_relocated_malformed_uri_is_rejected(tmp_path: Path, suffix: str) -> Non
     (copied / index.name).write_text(json.dumps(document))
     with pytest.raises(EvidenceValidationError):
         load_evidence_index(copied / index.name, evidence_origin_root=original)
+
+
+@pytest.mark.parametrize("suffix", ["/", "///"])
+def test_origin_root_accepts_trailing_separators(tmp_path: Path, suffix: str) -> None:
+    original, copied, index, payload = archive(tmp_path)
+    verified = load_evidence_index(copied / index.name, evidence_origin_root=str(original) + suffix)
+    assert verified.read_local(copied / payload.relative_to(original)) == payload.read_bytes()
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing", "tampered", "leaf-link", "directory-link", "fifo", "outside", "query", "fragment"],
+)
+def test_relocated_summary_failures_never_use_original(tmp_path: Path, mutation: str) -> None:
+    original, copied, index, payload = archive(tmp_path, "recording.mcap", recording=True)
+    summary = copied / payload.relative_to(original).with_suffix(".recording-summary.json")
+    document = json.loads(index.read_bytes())
+    reference = document["artifacts"][0]["recording_summary"]
+    if mutation == "missing":
+        summary.unlink()
+    elif mutation == "tampered":
+        summary.write_bytes(b"x" * summary.stat().st_size)
+    elif mutation == "leaf-link":
+        summary.unlink()
+        summary.symlink_to(original / summary.relative_to(copied))
+    elif mutation == "directory-link":
+        shutil.rmtree(summary.parent)
+        summary.parent.symlink_to(payload.parent, target_is_directory=True)
+    elif mutation == "fifo":
+        summary.unlink()
+        os.mkfifo(summary)
+    elif mutation == "outside":
+        reference["uri"] = (tmp_path / "outside-summary.json").as_uri()
+    elif mutation == "query":
+        reference["uri"] += "?x"
+    else:
+        reference["uri"] += "#y"
+    (copied / index.name).write_text(json.dumps(document))
+    with pytest.raises(EvidenceValidationError):
+        load_evidence_index(copied / index.name, evidence_origin_root=original)
+
+
+@pytest.mark.parametrize("suffix", ["?x", "#y"])
+def test_relocated_artifact_query_or_fragment_rejected(tmp_path: Path, suffix: str) -> None:
+    original, copied, index, _ = archive(tmp_path)
+    document = json.loads(index.read_bytes())
+    document["artifacts"][0]["uri"] += suffix
+    (copied / index.name).write_text(json.dumps(document))
+    with pytest.raises(EvidenceValidationError):
+        load_evidence_index(copied / index.name, evidence_origin_root=original)
+
+
+@pytest.mark.parametrize("style", ["literal", "lowercase", "encoded-unreserved"])
+def test_relocated_uri_accepts_equivalent_encoding(tmp_path: Path, style: str) -> None:
+    original, copied, index, payload = archive(tmp_path, "data+at@(x),.bin")
+    document = json.loads(index.read_bytes())
+    uri = document["artifacts"][0]["uri"]
+    if style == "literal":
+        for encoded, literal in [
+            ("%2B", "+"),
+            ("%40", "@"),
+            ("%28", "("),
+            ("%29", ")"),
+            ("%2C", ","),
+        ]:
+            uri = uri.replace(encoded, literal)
+    elif style == "lowercase":
+        for encoded in ["%2B", "%40", "%28", "%29", "%2C"]:
+            uri = uri.replace(encoded, encoded.lower())
+    else:
+        uri = uri.replace("data", "%64ata")
+    document["artifacts"][0]["uri"] = uri
+    (copied / index.name).write_text(json.dumps(document))
+    verified = load_evidence_index(copied / index.name, evidence_origin_root=original)
+    assert verified.read_local(copied / payload.relative_to(original)) == payload.read_bytes()
+
+
+def test_relocated_uri_rejects_encoded_separator(tmp_path: Path) -> None:
+    original, copied, index, _ = archive(tmp_path)
+    document = json.loads(index.read_bytes())
+    document["artifacts"][0]["uri"] = document["artifacts"][0]["uri"].replace(
+        "/nested/", "%2fnested/"
+    )
+    (copied / index.name).write_text(json.dumps(document))
+    with pytest.raises(EvidenceValidationError):
+        load_evidence_index(copied / index.name, evidence_origin_root=original)

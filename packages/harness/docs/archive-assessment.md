@@ -90,11 +90,13 @@ bundle2 statement matching. It checks actual write refusal and unchanged bytes
 after a byte-preserving copy is mounted read-only at the recorded URI path.
 
 A byte-preserving archive copy can be evaluated at a new location with
-`evaluate --evidence-origin-root /original/archive`. Supply the copied paths for
-`--scenario`, `--runtime`, `--run-context` and `--evidence-index`, plus the usual
+`evaluate --evidence-origin-root /original/evidence-directory`. Use the original
+resolved directory that contained the evidence index when it was finalized.
+Supply the copied paths for `--scenario`, `--runtime`, `--run-context`,
+`--evidence-index` and `--otel-metrics` when metrics are selected, plus the usual
 method and evaluator arguments. Each original local artifact and recording
-summary below that root is read at the same relative path beneath the copied
-evidence index directory. Keep that relative layout intact.
+summary below that directory is read at the same relative path beneath the
+copied evidence index directory. Keep that relative layout intact.
 
 The SDK exposes the same optional `evidence_origin_root` keyword on
 `load_evidence_index` and `evaluate_from_evidence`. Evaluators receive the actual
@@ -103,10 +105,13 @@ copied paths in `context.evidence.local_files` and read verified bytes through
 Missing, changed, duplicate or escaping mapped files are rejected, including
 symlinks. Selecting a mapping never falls back to the original location.
 
-The option applies to retained evidence. Select assessment controls, calibration
-inputs and operator trust files through their own existing arguments. Signed
-qualification exports use their separate subject inventory and verification
-workflow.
+The option applies to retained evidence. Select assessment controls and operator
+trust files through their existing arguments. Calibration artifacts
+are read from the locations recorded in the selected controls and must exist
+beneath the controls directory. This option does not relocate those references.
+Signed qualification exports use their separate subject inventory and verification
+workflow. Commands without this option still require the recorded paths, which
+can be supplied with read-only bind mounts.
 
 The reader does not rewrite ArtifactRefs or normalize historical ROS documents.
 Output belongs in a separate writable directory. UTC provenance and native

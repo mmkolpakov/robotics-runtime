@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
@@ -7,7 +8,7 @@ from os import fstat
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, BinaryIO
-from urllib.parse import quote, urlsplit
+from urllib.parse import SplitResult, quote, unquote, urlsplit
 from urllib.request import url2pathname
 
 from robotics_runtime_contracts.serialization import MAX_DOCUMENT_BYTES
@@ -155,6 +156,19 @@ def _read_local(
         raise EvidenceValidationError(json_path, str(error)) from error
 
 
+def _mapped_uri_path(uri: SplitResult, json_path: str) -> Path:
+    if uri.query or uri.fragment or re.search(r"%(?![0-9a-fA-F]{2})|%2[fF]|%00", uri.path):
+        raise EvidenceValidationError(json_path, "invalid local evidence URI")
+    try:
+        decoded = unquote(uri.path, errors="strict")
+    except UnicodeDecodeError as error:
+        raise EvidenceValidationError(json_path, "invalid local evidence URI encoding") from error
+    path = Path(decoded)
+    if str(path) != decoded:
+        raise EvidenceValidationError(json_path, "expected a canonical local evidence path")
+    return path
+
+
 def _relocated_path(path: Path, root: Path, origin: Path) -> Path:
     if not path.is_absolute() or ".." in path.parts or "\x00" in str(path):
         raise EvidenceValidationError("$.artifacts", "expected an absolute original evidence path")
@@ -185,11 +199,13 @@ def _local_link(
             f"{json_path}.uri",
             "local evidence requires a local file URI",
         )
-    uri_path = Path(url2pathname(uri.path))
-    if origin is not None and (
-        str(path) != artifact["local_path"] or quote(str(uri_path), safe="/") != uri.path
-    ):
-        raise EvidenceValidationError(json_path, "expected canonical local evidence paths")
+    uri_path = (
+        _mapped_uri_path(uri, f"{json_path}.uri")
+        if origin is not None
+        else Path(url2pathname(uri.path))
+    )
+    if origin is not None and str(path) != artifact["local_path"]:
+        raise EvidenceValidationError(json_path, "expected a canonical local evidence path")
     same_path = uri_path == path if origin is not None else uri_path.resolve() == path.resolve()
     if not same_path:
         raise EvidenceValidationError(
@@ -197,10 +213,6 @@ def _local_link(
             f"does not identify file URI {artifact['uri']}",
         )
     if origin is not None:
-        if uri.query or uri.fragment:
-            raise EvidenceValidationError(
-                f"{json_path}.uri", "file URI cannot have query or fragment"
-            )
         path = _relocated_path(path, root, origin)
     _read_local(path, artifact, root, json_path)
     return (path if origin is not None else path.resolve()), _result_link(artifact)
@@ -258,17 +270,11 @@ def _local_summary(
             f"{json_path}.uri",
             "acceptance verification requires a local recording summary",
         )
-    path = Path(url2pathname(uri.path))
-    if origin is not None:
-        if quote(str(path), safe="/") != uri.path:
-            raise EvidenceValidationError(json_path, "expected a canonical recording summary URI")
-        if uri.query or uri.fragment:
-            raise EvidenceValidationError(
-                f"{json_path}.uri", "file URI cannot have query or fragment"
-            )
-        path = _relocated_path(path, root, origin)
-    else:
-        path = path.absolute()
+    path = (
+        _relocated_path(_mapped_uri_path(uri, json_path), root, origin)
+        if origin is not None
+        else Path(url2pathname(uri.path)).absolute()
+    )
     raw = _read_local(path, reference, root, json_path, capture_limit=MAX_DOCUMENT_BYTES)
     try:
         summary = load_document_bytes(raw, source=path, expected_role="recording_summary")
@@ -285,12 +291,13 @@ def _local_summary(
 def _origin_root(value: str | Path | None) -> Path | None:
     origin = None
     if value is not None:
-        origin = Path(value)
+        normalized = str(value).rstrip("/") or "/"
+        origin = Path(normalized)
         if (
             not origin.is_absolute()
             or ".." in origin.parts
             or "\x00" in str(origin)
-            or str(origin) != str(value)
+            or str(origin) != normalized
         ):
             raise EvidenceValidationError(
                 "$.artifacts", "evidence origin root must be an absolute path without traversal"

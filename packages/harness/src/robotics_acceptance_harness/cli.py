@@ -216,7 +216,7 @@ def _parser() -> argparse.ArgumentParser:
     evaluate.add_argument(
         "--evidence-origin-root",
         metavar="PATH",
-        help="Original absolute evidence root, relocated beneath the current index directory.",
+        help="Original resolved evidence-index directory, mapped to the current index directory.",
     )
     evaluate.add_argument(
         "--otel-metrics",
