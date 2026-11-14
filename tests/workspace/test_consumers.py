@@ -1,6 +1,8 @@
 """Exercise the public boundary between contract producers and their consumer."""
 
 import json
+import subprocess
+import sys
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
@@ -70,3 +72,108 @@ def test_cross_package_gate_rejects_individually_valid_but_mismatched_documents(
     with pytest.raises(BundleValidationError) as caught:
         load_bundle(EXAMPLES / "scenario.yaml", runtime_path=path)
     assert caught.value.json_path == "$.runtime.execution.time_mode"
+
+
+PUBLISHED_CLI = ROOT / "packages/contracts/consumer-examples/published-cli"
+# Declared window of the published-cli producer fixture (produce.py constants).
+FIXTURE_WINDOW_START_NS = 1785067200000000000
+FIXTURE_WINDOW_END_NS = 1785067201000000000
+
+
+def test_published_cli_first_result_journey(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Guard the offline first-result journey the Dagu recipe drives."""
+    inputs = tmp_path / "inputs"
+    subprocess.run(
+        [sys.executable, str(PUBLISHED_CLI / "produce.py"), "--output", str(inputs)],
+        check=True,
+    )
+    run_id = json.loads((inputs / "acceptance-run.json").read_text())["run_id"]
+    evaluate_args = [
+        "evaluate",
+        "--scenario",
+        str(inputs / "scenario.json"),
+        "--runtime",
+        str(inputs / "runtime-manifest.json"),
+        "--run-id",
+        run_id,
+        "--domain-id",
+        "primary",
+        "--run-context",
+        str(inputs / "acceptance-run.json"),
+        "--evidence-index",
+        str(inputs / "evidence-index.json"),
+        "--otel-metrics",
+        str(inputs / "metrics.otlp.jsonl"),
+        "--window-start-ns",
+        str(FIXTURE_WINDOW_START_NS),
+        "--window-end-ns",
+        str(FIXTURE_WINDOW_END_NS),
+    ]
+
+    results = tmp_path / "results"
+    status = main(
+        [
+            *evaluate_args,
+            "--output",
+            str(results),
+            "--diagnostic-output",
+            str(tmp_path / "diagnostic.json"),
+        ]
+    )
+    assert status == 1
+    result = json.loads((results / "acceptance-result.json").read_text())
+    assert result["status"] == "incomplete"
+    assert (results / "junit.xml").exists()
+    capsys.readouterr()
+
+    assert main(["why", str(results / "acceptance-result.json"), "--format", "markdown"]) == 0
+    capsys.readouterr()
+
+    metrics = inputs / "metrics.otlp.jsonl"
+    metrics.write_bytes(metrics.read_bytes() + b"\n")
+    rejected = tmp_path / "rejected"
+    diagnostic = tmp_path / "refusal-diagnostic.json"
+    status = main(
+        [*evaluate_args, "--output", str(rejected), "--diagnostic-output", str(diagnostic)]
+    )
+    assert status == 2
+    assert diagnostic.exists()
+    assert not (rejected / "acceptance-result.json").exists()
+
+
+def test_dagu_failure_handler_preserves_quoted_paths(tmp_path: Path) -> None:
+    import yaml
+
+    recipe = yaml.safe_load((ROOT / "examples/dagu/first-result.yaml").read_text())
+    handler = recipe["handler_on"]["failure"]
+    assert handler["action"] == "exec"
+    assert "run" not in handler and "env" not in handler and "preconditions" not in handler
+    assert handler["with"]["command"] == "${PYTHON}"
+    arguments = handler["with"]["args"]
+    assert arguments[0] == "-c"
+    assert arguments[2:] == ["${HARNESS}", "${OUT}/results/acceptance-result.json"]
+
+    executable = tmp_path / "harness space's double\"quote"
+    executable.write_text(
+        "#!" + sys.executable + "\nimport json, sys\nprint(json.dumps(sys.argv[1:]))\n"
+    )
+    executable.chmod(0o700)
+    result = tmp_path / "result space's double\"quote.json"
+    result.write_text("{}")
+    completed = subprocess.run(
+        [sys.executable, arguments[0], arguments[1], str(executable), str(result)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert json.loads(completed.stdout) == ["why", str(result), "--format", "markdown"]
+    result.unlink()
+    completed = subprocess.run(
+        [sys.executable, arguments[0], arguments[1], str(executable), str(result)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.stdout == ""

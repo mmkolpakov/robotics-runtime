@@ -1,0 +1,134 @@
+---
+name: robotics-first-result
+description: >
+  Offline first-result journey through the published contracts and harness CLIs:
+  produce synthetic documents, validate, explain, evaluate, then explain the
+  verdict. The synthetic inputs yield an incomplete verdict (evaluate exits 1),
+  so the workflow fails and retains the result, JUnit and diagnostic files.
+
+# PYTHON, CONTRACTS and HARNESS point at an installed published environment
+# (tested with contracts 0.22.0 / harness 0.24.0 / mcap 1.4.0). OUT collects the
+# inputs, results and diagnostics. TAMPER=1 appends a byte to demonstrate the
+# exit-2 refusal path. The producer path, run identity and window below are the
+# published-cli fixture's fixed literals; they are not operator choices.
+params:
+  - name: PYTHON
+    default: python3
+  - name: CONTRACTS
+    default: robotics-contracts
+  - name: HARNESS
+    default: robotics-acceptance
+  - name: OUT
+    default: dagu-out
+  - name: TAMPER
+    default: "0"
+
+working_dir: ../..
+
+env:
+  - PYTHONDONTWRITEBYTECODE=1
+
+steps:
+  - id: produce
+    name: Produce synthetic inputs
+    action: exec
+    with:
+      command: ${PYTHON}
+      args:
+        - packages/contracts/consumer-examples/published-cli/produce.py
+        - --output
+        - ${OUT}/inputs
+
+  - id: validate
+    name: Validate documents
+    depends:
+      - produce
+    action: exec
+    with:
+      command: ${CONTRACTS}
+      args:
+        - validate
+        - ${OUT}/inputs/scenario.json
+        - ${OUT}/inputs/runtime-manifest.json
+        - ${OUT}/inputs/acceptance-run.json
+        - ${OUT}/inputs/recording-summary.json
+        - ${OUT}/inputs/evidence-index.json
+
+  - id: explain
+    name: Explain the execution bundle
+    depends:
+      - validate
+    action: exec
+    with:
+      command: ${HARNESS}
+      args:
+        - explain
+        - --scenario
+        - ${OUT}/inputs/scenario.json
+        - --runtime
+        - ${OUT}/inputs/runtime-manifest.json
+
+  - id: tamper
+    name: Apply optional invalid-input byte
+    depends:
+      - explain
+    action: exec
+    with:
+      command: ${PYTHON}
+      args:
+        - -c
+        - >-
+          import sys; from pathlib import Path;
+          p = Path(sys.argv[1]);
+          p.write_bytes(p.read_bytes() + b"\n") if sys.argv[2] == "1" else None
+        - ${OUT}/inputs/metrics.otlp.jsonl
+        - ${TAMPER}
+
+  - id: evaluate
+    name: Evaluate finalized evidence
+    depends:
+      - tamper
+    action: exec
+    with:
+      command: ${HARNESS}
+      args:
+        - evaluate
+        - --scenario
+        - ${OUT}/inputs/scenario.json
+        - --runtime
+        - ${OUT}/inputs/runtime-manifest.json
+        - --run-id
+        - run-01234567-89ab-4def-8123-456789abcdef
+        - --domain-id
+        - primary
+        - --run-context
+        - ${OUT}/inputs/acceptance-run.json
+        - --evidence-index
+        - ${OUT}/inputs/evidence-index.json
+        - --otel-metrics
+        - ${OUT}/inputs/metrics.otlp.jsonl
+        - --window-start-ns
+        - "1785067200000000000"
+        - --window-end-ns
+        - "1785067201000000000"
+        - --output
+        - ${OUT}/results
+        - --diagnostic-output
+        - ${OUT}/evaluation-diagnostic.json
+
+handler_on:
+  failure:
+    id: diagnose
+    name: Explain the retained verdict
+    action: exec
+    with:
+      command: ${PYTHON}
+      args:
+        - -c
+        - >-
+          import subprocess, sys; from pathlib import Path;
+          result = Path(sys.argv[2]);
+          sys.exit(subprocess.call([sys.argv[1], "why", str(result), "--format", "markdown"])
+          if result.is_file() else 0)
+        - ${HARNESS}
+        - ${OUT}/results/acceptance-result.json
