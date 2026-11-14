@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.24.0
+
+Requires contracts 0.22 (`>=0.22,<0.23`), with exact release prerequisite
+`contracts-v0.22.0`. Package and execution-profile qualification remain separate.
+
+- Allow `RosGraphObserver` to use an initialized caller-owned ROS context through
+  the keyword-only `context` argument. The observer owns its node, executor and
+  thread, and leaves a borrowed context running on closure or construction failure.
+- Ignore process-wide ROS remaps and parameter overrides on the observer node
+  in both context modes. Subscribe to `/clock` when declared in the expected graph
+  or explicitly requested with `observe_clock=True`.
 - Render a synthetic `qualification-verdict` JUnit test case that fails for every
   non-passing verdict (`incomplete`, `failed`, `error`, `cancelled`). Assertion
   and coverage cases keep their own outcomes, and the CLI exit-code contract

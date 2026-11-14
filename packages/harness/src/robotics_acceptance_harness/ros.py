@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from contextlib import ExitStack
 from dataclasses import dataclass
 from importlib import import_module
 from threading import Lock, Thread
 from time import monotonic_ns, time_ns
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from robotics_acceptance_harness.errors import HarnessError, HarnessInputError
 from robotics_acceptance_harness.readiness import (
@@ -15,6 +16,9 @@ from robotics_acceptance_harness.readiness import (
     TopicObservation,
 )
 from robotics_acceptance_harness.timing import ClockSample
+
+if TYPE_CHECKING:
+    from rclpy.context import Context
 
 
 class RosObserverError(HarnessError, RuntimeError):
@@ -33,7 +37,11 @@ class _LifecycleTracker:
 
 
 class RosGraphObserver:
-    """Read-only rclpy observer attached to an already running ROS domain."""
+    """Observe a running ROS domain using an owned or initialized borrowed context.
+
+    The observer owns its node, executor and spin thread in either mode. It only
+    initializes and shuts down the context when no context is supplied.
+    """
 
     DEFAULT_MAX_CLOCK_SAMPLES = 1_000_000
     LIFECYCLE_RESPONSE_TIMEOUT_NS = 5_000_000_000
@@ -45,6 +53,7 @@ class RosGraphObserver:
         observe_clock: bool,
         forbidden_graph: Mapping[str, Any] | None = None,
         node_name: str = "robotics_acceptance_observer",
+        context: Context | None = None,
         module_loader: Callable[[str], Any] = import_module,
         max_clock_samples: int = DEFAULT_MAX_CLOCK_SAMPLES,
     ) -> None:
@@ -71,16 +80,24 @@ class RosGraphObserver:
             "services": (),
             "actions": (),
         }
-        self._context = context_module.Context()
-        self._rclpy.init(args=None, context=self._context)
-        try:
+        self._owns_context = context is None
+        self._context = context_module.Context() if context is None else context
+        if not self._owns_context and not self._context.ok():
+            raise RosObserverError("borrowed ROS context must already be initialized and running")
+        with ExitStack() as rollback:
+            if self._owns_context:
+                rollback.callback(self._context.try_shutdown)
+                self._rclpy.init(args=None, context=self._context)
             self._node = self._rclpy.create_node(
                 node_name,
                 context=self._context,
+                use_global_arguments=False,
                 enable_rosout=False,
                 start_parameter_services=False,
             )
+            rollback.callback(self._node.destroy_node)
             self._executor = executor_module.SingleThreadedExecutor(context=self._context)
+            rollback.callback(self._executor.shutdown, timeout_sec=5.0)
             self._executor.add_node(self._node)
             self._observation_lock = Lock()
             self._subscriptions: list[Any] = []
@@ -111,9 +128,7 @@ class RosGraphObserver:
                 daemon=True,
             )
             self._spin_thread.start()
-        except Exception:
-            self._context.try_shutdown()
-            raise
+            rollback.pop_all()
 
     @property
     def clock_samples(self) -> tuple[ClockSample, ...]:
@@ -383,7 +398,8 @@ class RosGraphObserver:
             raise RosObserverError("ROS executor did not stop before the timeout")
         self._executor.remove_node(self._node)
         self._node.destroy_node()
-        self._context.try_shutdown()
+        if self._owns_context:
+            self._context.try_shutdown()
         self._state = "closed"
 
     def __enter__(self) -> RosGraphObserver:

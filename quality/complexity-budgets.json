@@ -37,7 +37,7 @@
   "packages/harness/src/robotics_acceptance_harness/policy.py::evaluate_data_plane_policy::PLR0913": 6,
   "packages/harness/src/robotics_acceptance_harness/readiness.py::wait_for_readiness::PLR0913": 8,
   "packages/harness/src/robotics_acceptance_harness/result.py::build_acceptance_result::PLR0913": 19,
-  "packages/harness/src/robotics_acceptance_harness/ros.py::RosGraphObserver.__init__::PLR0913": 6,
+  "packages/harness/src/robotics_acceptance_harness/ros.py::RosGraphObserver.__init__::PLR0913": 7,
   "packages/harness/src/robotics_acceptance_harness/run_context.py::create_run_context::PLR0913": 8,
   "packages/harness/src/robotics_acceptance_harness/time_authority.py::evaluate_time_authority::PLR0913": 7,
   "packages/harness/src/robotics_acceptance_harness/timing.py::_evaluate_timing::C901": 14,
