@@ -82,7 +82,9 @@ down its own ROS context. Pass an already initialized, running
 `rclpy.context.Context` to share the caller's context instead:
 
 ```python
-with RosGraphObserver(expected_graph, observe_clock=True, context=existing_node.context) as observer:
+with RosGraphObserver(
+    expected_graph, observe_clock=True, context=existing_node.context
+) as observer:
     snapshot = observer.snapshot()
 ```
 
