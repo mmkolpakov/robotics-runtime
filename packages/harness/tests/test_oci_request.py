@@ -360,3 +360,27 @@ def test_invalid_disk_budget_refused_before_staging(tmp_path: Path, budget: int)
     context, documents, method = setup_request(tmp_path)
     with pytest.raises(EvaluationError, match="positive integer"):
         build(context, documents, method, budget=budget)
+
+
+def test_oci_staging_reads_relocated_evidence(tmp_path: Path) -> None:
+    import shutil
+
+    original = tmp_path / "original"
+    original.mkdir()
+    context, documents, method = setup_request(original)
+    copied = tmp_path / "copied"
+    shutil.copytree(original, copied)
+    evidence = load_evidence_index(
+        copied / "index-primary.json", expected_run_id=RUN_ID, evidence_origin_root=original
+    )
+    context = replace(context, evidence=evidence)
+    documents["evidence_index"] = evidence.index
+    for path in context.evidence.local_files:
+        assert path.is_relative_to(copied)
+    packet, captured = build(context, documents, method)
+    request = json.loads(packet)
+    for link in evidence.links:
+        assert captured["objects/" + link["sha256"]] == evidence.read_local(
+            next(path for path, item in evidence.local_files.items() if item == link)
+        )
+    assert request["documents"]["evidence_index"]["uri"] == (copied / "index-primary.json").as_uri()

@@ -214,6 +214,11 @@ def _parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--evidence-index", required=True, metavar="PATH")
     _add_evidence_receipt_arguments(evaluate)
     evaluate.add_argument(
+        "--evidence-origin-root",
+        metavar="PATH",
+        help="Original absolute evidence root, relocated beneath the current index directory.",
+    )
+    evaluate.add_argument(
         "--otel-metrics",
         metavar="PATH",
         help="Verified OTLP/JSON evidence; required for v1 and declared metric definitions.",
@@ -460,6 +465,7 @@ def _archive_evaluation(
         receipt_paths=_receipt_source(arguments),
         verification_paths=arguments.artifact_verification,
         receipt_dependency_paths=arguments.receipt_dependency,
+        evidence_origin_root=arguments.evidence_origin_root,
     )
     context = EvaluationContext(
         arguments.run_id,
@@ -557,6 +563,7 @@ def _offline_outputs(
         run_context_path=arguments.run_context,
         bundle=bundle,
         evidence_index_path=arguments.evidence_index,
+        evidence_origin_root=arguments.evidence_origin_root,
         artifact_receipt_paths=_receipt_source(arguments),
         artifact_verification_paths=arguments.artifact_verification,
         receipt_dependency_paths=arguments.receipt_dependency,

@@ -387,3 +387,47 @@ def test_native_junit_keeps_user_assertions_distinct_from_synthetic_cases(tmp_pa
     assert len([case for case in cases if case.attrib["name"] == "observation-condition"]) == 2
     assert len([case for case in cases if case.attrib["name"] == "evaluation-coverage"]) == 2
     assert json.dumps(result, sort_keys=True) == original
+
+
+def test_public_native_archive_relocates_with_explicit_origin(
+    native_inputs: dict[str, Any], tmp_path: Path
+) -> None:
+    import shutil
+
+    original = Path(native_inputs["evidence_index"]).parent
+    copied = tmp_path / "copied"
+    shutil.copytree(original, copied)
+    inputs = {
+        key: str(copied / Path(value).relative_to(original))
+        if isinstance(value, str) and Path(value).is_relative_to(original)
+        else value
+        for key, value in native_inputs.items()
+    }
+    inputs["evidence_origin_root"] = str(original)
+    before = {
+        path.relative_to(copied): path.read_bytes() for path in copied.rglob("*") if path.is_file()
+    }
+    completed = evaluate(inputs, tmp_path / "assessment")
+    assert completed.returncode == 0, completed.stderr
+    from robotics_acceptance_harness.application import evaluate_from_evidence
+
+    api_arguments: dict[str, Any] = dict(inputs)
+    api_arguments["run_context_path"] = api_arguments.pop("run_context")
+    api_arguments["evidence_index_path"] = api_arguments.pop("evidence_index")
+    api_arguments["otel_metrics_path"] = api_arguments.pop("otel_metrics")
+    api_arguments["bundle"] = load_bundle(
+        api_arguments.pop("scenario"), runtime_path=api_arguments.pop("runtime")
+    )
+    api_result = evaluate_from_evidence(**api_arguments, output_dir=tmp_path / "api-assessment")
+    assert api_result.result["status"] == "passed"
+    result = json.loads((tmp_path / "assessment/acceptance-result.json").read_bytes())
+    assert result["status"] == "passed"
+    assert result["observations"]["condition"]["value"] == 0
+    assert (
+        result["original_execution"]["evidence_index_sha256"]
+        == hashlib.sha256(
+            before[Path(native_inputs["evidence_index"]).relative_to(original)]
+        ).hexdigest()
+    )
+    for relative, raw in before.items():
+        assert (copied / relative).read_bytes() == raw

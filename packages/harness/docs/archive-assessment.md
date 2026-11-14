@@ -89,7 +89,25 @@ is error. Its installed fixture retains the original failed result and verifies
 bundle2 statement matching. It checks actual write refusal and unchanged bytes
 after a byte-preserving copy is mounted read-only at the recorded URI path.
 
-Use explicit read-only bind mounts at recorded paths when moving an archive.
+A byte-preserving archive copy can be evaluated at a new location with
+`evaluate --evidence-origin-root /original/archive`. Supply the copied paths for
+`--scenario`, `--runtime`, `--run-context` and `--evidence-index`, plus the usual
+method and evaluator arguments. Each original local artifact and recording
+summary below that root is read at the same relative path beneath the copied
+evidence index directory. Keep that relative layout intact.
+
+The SDK exposes the same optional `evidence_origin_root` keyword on
+`load_evidence_index` and `evaluate_from_evidence`. Evaluators receive the actual
+copied paths in `context.evidence.local_files` and read verified bytes through
+`read_local`. Original URI, digest and size references remain unchanged.
+Missing, changed, duplicate or escaping mapped files are rejected, including
+symlinks. Selecting a mapping never falls back to the original location.
+
+The option applies to retained evidence. Select assessment controls, calibration
+inputs and operator trust files through their own existing arguments. Signed
+qualification exports use their separate subject inventory and verification
+workflow.
+
 The reader does not rewrite ArtifactRefs or normalize historical ROS documents.
 Output belongs in a separate writable directory. UTC provenance and native
 measurement clocks remain distinct; no clock relation is inferred.
