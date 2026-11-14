@@ -95,7 +95,8 @@ test('output overflow stops the live worker and its owned descendant', { skip: p
       const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
       return { state: fields[0]!, start: fields[19]! };
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT' || code === 'ESRCH') return undefined;
       throw error;
     }
   }
