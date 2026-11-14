@@ -566,6 +566,7 @@ def evaluate_from_evidence(
     window_end_ns: int,
     output_dir: str | Path,
     max_raw_evidence_bytes: int | None = None,
+    evidence_origin_root: str | Path | None = None,
 ) -> VerificationOutputs:
     """Evaluate finalized playback evidence without attaching to a ROS graph."""
 
@@ -585,6 +586,7 @@ def evaluate_from_evidence(
         receipt_paths=artifact_receipt_paths,
         verification_paths=artifact_verification_paths,
         receipt_dependency_paths=receipt_dependency_paths,
+        evidence_origin_root=evidence_origin_root,
     )
     context = EvaluationContext(
         run_id=run_id,
