@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+from contextlib import ExitStack
 from time import monotonic, monotonic_ns, sleep
 from typing import TYPE_CHECKING
 
@@ -184,3 +186,86 @@ def test_late_observer_receives_cache_only_with_explicit_durability(
             assert observer.snapshot().topics[topic].qos_compatible
     finally:
         live_graph.producer.destroy_publisher(publisher)
+
+
+@pytest.mark.parametrize("borrowed", [False, True])
+@pytest.mark.parametrize("observe_clock", [False, True])
+def test_observer_ignores_process_ros_arguments(
+    borrowed: bool, observe_clock: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import rclpy
+    from rclpy.context import Context
+    from rclpy.executors import SingleThreadedExecutor
+    from std_msgs.msg import String
+
+    arguments = ["--ros-args", "-p", "use_sim_time:=true", "-r", "/odom:=/other"]
+    monkeypatch.setattr(sys, "argv", ["observer-global-arguments", *arguments])
+    graph: ExpectedGraph = {
+        "topics": [
+            {
+                "name": "/odom",
+                "type": "std_msgs/msg/String",
+                "min_publishers": 0,
+                "min_subscribers": 1,
+                "first_message_timeout_sec": 2.0,
+                "qos_profile": "system_default",
+            }
+        ],
+        "services": [],
+        "actions": [],
+        "lifecycle_nodes": [],
+    }
+    with ExitStack() as resources:
+        caller_context = Context()
+        rclpy.init(args=arguments, context=caller_context)
+        resources.callback(caller_context.try_shutdown)
+        caller = rclpy.create_node("global_arguments_caller", context=caller_context)
+        resources.callback(caller.destroy_node)
+        caller_subscription = caller.create_subscription(String, "/odom", lambda _message: None, 10)
+        reference = rclpy.create_node(
+            "global_arguments_reference", context=caller_context, use_global_arguments=False
+        )
+        resources.callback(reference.destroy_node)
+        reference.create_subscription(String, "/odom", lambda _message: None, 10)
+        caller_executor = SingleThreadedExecutor(context=caller_context)
+        resources.callback(caller_executor.shutdown, timeout_sec=1.0)
+        caller_executor.add_node(caller)
+        guard_calls: list[bool] = []
+        guard = caller.create_guard_condition(lambda: guard_calls.append(True))
+        observer_name = "global_arguments_observer"
+        expected_topics = ["/clock", "/odom"] if observe_clock else ["/odom"]
+        with RosGraphObserver(
+            graph,
+            observe_clock=observe_clock,
+            context=caller_context if borrowed else None,
+            node_name=observer_name,
+        ) as observer:
+            deadline = monotonic() + 5.0
+            while monotonic() < deadline:
+                actual_topics = sorted(
+                    topic
+                    for topic in ("/clock", "/odom", "/other")
+                    for endpoint in reference.get_subscriptions_info_by_topic(topic)
+                    if endpoint.node_name == observer_name
+                )
+                snapshot = observer.snapshot()
+                if (
+                    actual_topics == expected_topics
+                    and snapshot.topics["/odom"].subscribers == 1
+                    and reference.count_subscribers("/clock") == 1 + int(observe_clock)
+                ):
+                    break
+                sleep(0.02)
+            assert actual_topics == expected_topics
+            assert snapshot.topics["/odom"].subscribers == 1
+            assert reference.count_subscribers("/clock") == 1 + int(observe_clock)
+            assert caller_subscription.topic_name == "/other"
+            assert caller.get_parameter("use_sim_time").value is True
+        assert caller_context.ok()
+        guard.trigger()
+        deadline = monotonic() + 1.0
+        while not guard_calls and monotonic() < deadline:
+            caller_executor.spin_once(timeout_sec=0.05)
+        assert guard_calls == [True]
+        assert caller_subscription.topic_name == "/other"
+        assert caller.get_parameter("use_sim_time").value is True

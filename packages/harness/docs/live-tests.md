@@ -75,9 +75,30 @@ with RosGraphObserver(expected_graph, observe_clock=True) as observer:
 ```
 
 `RosGraphObserver(expected_graph, *, observe_clock, forbidden_graph=None,
-node_name="robotics_acceptance_observer", module_loader=import_module,
-max_clock_samples=1_000_000)` owns a ROS context, node, executor and spin
-thread. Use the installed ROS modules in the selected runtime; `module_loader`
+node_name="robotics_acceptance_observer", context=None,
+module_loader=import_module, max_clock_samples=1_000_000)` owns its node,
+executor and spin thread. By default it also creates, initializes and shuts
+down its own ROS context. Pass an already initialized, running
+`rclpy.context.Context` to share the caller's context instead:
+
+```python
+with RosGraphObserver(
+    expected_graph, observe_clock=True, context=existing_node.context
+) as observer:
+    snapshot = observer.snapshot()
+```
+
+The caller must keep a borrowed context running until the observer is closed.
+Closing the observer or failing its construction never initializes or shuts
+down a borrowed context. The caller's existing node and executor remain under
+the caller's ownership; the observer creates and manages its own node and
+executor. The observer ignores process-wide ROS arguments, including topic
+remaps and `use_sim_time` parameter overrides, in both context modes. Its
+subscriptions use the declared topic names, and `/clock` is subscribed only when
+the graph declares it or `observe_clock=True`. Sharing a context does not
+establish graph readiness or receipt of a topic message.
+
+Use the installed ROS modules in the selected runtime; `module_loader`
 is an injection seam for tests. `snapshot()` observes the configured graph;
 discovery is not an atomic snapshot of the distributed system. The observer's
 own subscriptions are excluded from subscriber counts. A declared `/clock`
@@ -133,7 +154,7 @@ does not replace a successful stop.
 `error_id = "RosObserverError.failed"`. Missing ROS modules and a stopped
 executor are among its failure cases; other ROS exceptions may propagate.
 `close()` shuts down the executor, removes and destroys the node, and shuts
-down the context. It is idempotent after successful closure and may raise if
+down an owned context. It is idempotent after successful closure and may raise if
 the executor does not stop. The context manager invokes `close()`; neither
 closure nor a readiness result proves that the workload or robot stopped.
 

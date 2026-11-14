@@ -17,30 +17,34 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "live_ros: requires real ROS 2 Jazzy (explicit opt-in)")
 
 
-@pytest.fixture(autouse=True)
-def require_live_ros() -> None:
-    if os.environ.get("ROBOTICS_LIVE_ROS") != "1":
-        pytest.skip("set ROBOTICS_LIVE_ROS=1 to run the ROS 2 Jazzy integration tests")
-    if os.environ.get("ROS_DISTRO") != "jazzy":
-        pytest.fail("live tests require ROS_DISTRO=jazzy; source /opt/ros/jazzy/setup.bash")
-    for name in (
-        "rclpy",
-        "rclpy.lifecycle",
-        "rosidl_runtime_py.utilities",
-        "rosgraph_msgs.msg",
-        "lifecycle_msgs.srv",
-        "std_msgs.msg",
-        "example_interfaces.srv",
-        "action_tutorials_interfaces.action",
-    ):
+def _require_ros_modules(*names: str) -> None:
+    for name in names:
         try:
             importlib.import_module(name)
         except ImportError as error:
             pytest.fail(f"live ROS dependency {name} is unavailable: {error}")
 
 
+@pytest.fixture(autouse=True)
+def require_live_ros() -> None:
+    if os.environ.get("ROBOTICS_LIVE_ROS") != "1":
+        pytest.skip("set ROBOTICS_LIVE_ROS=1 to run the ROS 2 Jazzy integration tests")
+    if os.environ.get("ROS_DISTRO") != "jazzy":
+        pytest.fail("live tests require ROS_DISTRO=jazzy; source /opt/ros/jazzy/setup.bash")
+    _require_ros_modules(
+        "rclpy",
+        "rosidl_runtime_py.utilities",
+        "rosgraph_msgs.msg",
+        "lifecycle_msgs.srv",
+        "std_msgs.msg",
+    )
+
+
 @pytest.fixture
 def live_graph(require_live_ros: None) -> Iterator[LiveGraph]:
+    _require_ros_modules(
+        "rclpy.lifecycle", "example_interfaces.srv", "action_tutorials_interfaces.action"
+    )
     # Import only after the opt-in check; ordinary unit collection needs no ROS.
     from tests.live.graph import LiveGraph
 

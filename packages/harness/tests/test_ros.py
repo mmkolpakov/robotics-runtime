@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from threading import Event
+from threading import Event, Thread
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -13,10 +14,16 @@ from tests.graph_types import ExpectedGraph
 
 
 class FakeContext:
-    def __init__(self) -> None:
+    def __init__(self, *, initialized: bool = False) -> None:
+        self.initialized = initialized
         self.closed = False
+        self.shutdown_calls = 0
+
+    def ok(self) -> bool:
+        return self.initialized and not self.closed
 
     def try_shutdown(self) -> None:
+        self.shutdown_calls += 1
         self.closed = True
 
 
@@ -131,7 +138,8 @@ class FakeExecutor:
 
     def shutdown(self, timeout_sec: float) -> bool:
         assert timeout_sec == 5.0
-        assert self.node is not None
+        if self.node is None:
+            return True
         result = self.node.shutdown_results.pop(0) if self.node.shutdown_results else True
         if not result:
             return False
@@ -485,3 +493,299 @@ def test_named_topic_qos_reaches_the_subscription_unchanged(name: str, expected:
     graph["topics"][0]["qos_profile"] = name
     with RosGraphObserver(graph, observe_clock=False, module_loader=fake_modules(node).__getitem__):
         assert node.subscription_qos["/camera/image"] == expected
+
+
+def test_default_context_is_initialized_and_closed_once() -> None:
+    node = FakeNode()
+    context = FakeContext()
+    initialized: list[FakeContext] = []
+    created: list[FakeContext] = []
+    modules = fake_modules(node)
+
+    def create_context() -> FakeContext:
+        created.append(context)
+        return context
+
+    def initialize(*, args: object, context: FakeContext) -> None:
+        assert args is None
+        initialized.append(context)
+        context.initialized = True
+
+    modules["rclpy.context"] = SimpleNamespace(Context=create_context)
+    modules["rclpy"] = SimpleNamespace(init=initialize, create_node=lambda *_args, **_kwargs: node)
+    observer = RosGraphObserver(
+        expected_graph(), observe_clock=False, module_loader=modules.__getitem__
+    )
+    assert node.executor_started.wait(timeout=1.0)
+    assert created == initialized == [context]
+    assert context.ok()
+    observer.close()
+    observer.close()
+    assert node.destroyed
+    assert node.executor_stopped.is_set()
+    assert context.shutdown_calls == 1
+    assert not context.ok()
+
+
+def test_borrowed_context_survives_observer_close_and_caller_can_continue() -> None:
+    context = FakeContext(initialized=True)
+    caller_node = FakeNode()
+    caller_executor = FakeExecutor(context=context)
+    caller_executor.add_node(caller_node)
+    observer_node = FakeNode()
+    modules = fake_modules(observer_node)
+    executors: list[FakeExecutor] = []
+
+    def unexpected(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("borrowed context must not be created or initialized")
+
+    def create_node(*_args: object, **kwargs: object) -> FakeNode:
+        assert kwargs["context"] is context
+        return observer_node
+
+    def create_executor(*, context: FakeContext) -> FakeExecutor:
+        executor = FakeExecutor(context=context)
+        executors.append(executor)
+        return executor
+
+    modules["rclpy.context"] = SimpleNamespace(Context=unexpected)
+    modules["rclpy"] = SimpleNamespace(init=unexpected, create_node=create_node)
+    modules["rclpy.executors"] = SimpleNamespace(SingleThreadedExecutor=create_executor)
+    with RosGraphObserver(
+        expected_graph(),
+        observe_clock=False,
+        context=context,
+        module_loader=modules.__getitem__,
+    ) as observer:
+        assert observer_node.executor_started.wait(timeout=1.0)
+        assert observer.snapshot().topics["/camera/image"].publishers == 1
+        assert len(executors) == 1
+        assert executors[0].context is context
+        assert executors[0].node is observer_node
+
+    observer.close()
+    assert observer_node.destroyed
+    assert observer_node.executor_stopped.is_set()
+    assert context.ok()
+    assert context.shutdown_calls == 0
+    assert not caller_node.destroyed
+    assert caller_executor.node is caller_node
+    assert not caller_node.executor_stopped.is_set()
+    caller_node.create_subscription(object, "/still_running", lambda _message: None, object())
+    assert "/still_running" in caller_node.callbacks
+
+
+@pytest.mark.parametrize("initialized, closed", [(False, False), (True, True)])
+def test_borrowed_context_must_already_be_running(initialized: bool, closed: bool) -> None:
+    context = FakeContext(initialized=initialized)
+    context.closed = closed
+    modules = fake_modules(FakeNode())
+
+    def unexpected(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("invalid borrowed context must not acquire ROS resources")
+
+    modules["rclpy.context"] = SimpleNamespace(Context=unexpected)
+    modules["rclpy"] = SimpleNamespace(init=unexpected, create_node=unexpected)
+    modules["rclpy.executors"] = SimpleNamespace(SingleThreadedExecutor=unexpected)
+    with pytest.raises(RosObserverError, match="must already be initialized and running"):
+        RosGraphObserver(
+            expected_graph(),
+            observe_clock=False,
+            context=context,
+            module_loader=modules.__getitem__,
+        )
+    assert context.shutdown_calls == 0
+    assert context.closed is closed
+
+
+@pytest.mark.parametrize("borrowed", [False, True])
+@pytest.mark.parametrize(
+    "stage", ["create_node", "create_executor", "add_node", "subscription", "thread_start"]
+)
+def test_constructor_failure_releases_only_observer_resources(
+    monkeypatch: pytest.MonkeyPatch, borrowed: bool, stage: str
+) -> None:
+    context = FakeContext(initialized=borrowed)
+    node = FakeNode()
+    executor = FakeExecutor(context=context)
+    modules = fake_modules(node)
+    failure = RuntimeError("injected " + stage + " failure")
+
+    def initialize(*, args: object, context: FakeContext) -> None:
+        assert not borrowed
+        assert args is None
+        context.initialized = True
+
+    create_context = Mock(return_value=context)
+    init = Mock(side_effect=initialize)
+    create_node = Mock(return_value=node)
+    create_executor = Mock(return_value=executor)
+    add_node = Mock(wraps=executor.add_node)
+    subscription = Mock(wraps=node.create_subscription)
+    shutdown = Mock(wraps=executor.shutdown)
+    modules["rclpy.context"] = SimpleNamespace(Context=create_context)
+    modules["rclpy"] = SimpleNamespace(init=init, create_node=create_node)
+    modules["rclpy.executors"] = SimpleNamespace(SingleThreadedExecutor=create_executor)
+    monkeypatch.setattr(executor, "add_node", add_node)
+    monkeypatch.setattr(executor, "shutdown", shutdown)
+    monkeypatch.setattr(node, "create_subscription", subscription)
+    failures = {
+        "create_node": create_node,
+        "create_executor": create_executor,
+        "add_node": add_node,
+        "subscription": subscription,
+    }
+    if stage in failures:
+        failures[stage].side_effect = failure
+    else:
+        monkeypatch.setattr(Thread, "start", Mock(side_effect=failure))
+
+    with pytest.raises(RuntimeError) as caught:
+        RosGraphObserver(
+            expected_graph(),
+            observe_clock=True,
+            context=context if borrowed else None,
+            module_loader=modules.__getitem__,
+        )
+
+    assert caught.value is failure
+    assert create_context.call_count == init.call_count == (0 if borrowed else 1)
+    assert context.shutdown_calls == (0 if borrowed else 1)
+    assert context.ok() is borrowed
+    assert node.destroyed is (stage != "create_node")
+    if stage in {"create_node", "create_executor"}:
+        shutdown.assert_not_called()
+    else:
+        shutdown.assert_called_once_with(timeout_sec=5.0)
+    assert not node.executor_started.is_set()
+
+
+def test_owned_context_init_failure_closes_context_without_creating_node() -> None:
+    context = FakeContext()
+    modules = fake_modules(FakeNode())
+    failure = RuntimeError("context initialization failed")
+
+    def initialize(*, args: object, context: FakeContext) -> None:
+        context.initialized = True
+        raise failure
+
+    def unexpected(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("node must not be created after init failure")
+
+    modules["rclpy.context"] = SimpleNamespace(Context=lambda: context)
+    modules["rclpy"] = SimpleNamespace(init=initialize, create_node=unexpected)
+    with pytest.raises(RuntimeError) as caught:
+        RosGraphObserver(expected_graph(), observe_clock=False, module_loader=modules.__getitem__)
+
+    assert caught.value is failure
+    assert context.shutdown_calls == 1
+    assert not context.ok()
+
+
+def test_borrowed_context_is_not_closed_when_executor_shutdown_must_be_retried() -> None:
+    context = FakeContext(initialized=True)
+    node = FakeNode()
+    node.shutdown_results = [False, True]
+    observer = RosGraphObserver(
+        expected_graph(),
+        observe_clock=False,
+        context=context,
+        module_loader=fake_modules(node).__getitem__,
+    )
+    assert node.executor_started.wait(timeout=1.0)
+    with pytest.raises(RosObserverError, match="did not stop"):
+        observer.close()
+    assert not node.destroyed
+    assert context.ok()
+    assert context.shutdown_calls == 0
+    with pytest.raises(RosObserverError, match="closing"):
+        observer.snapshot()
+    observer.close()
+    observer.close()
+    assert node.destroyed
+    assert node.executor_stopped.is_set()
+    assert context.ok()
+    assert context.shutdown_calls == 0
+
+
+@pytest.mark.parametrize("borrowed", [False, True])
+@pytest.mark.parametrize("observe_clock", [False, True])
+def test_process_ros_arguments_cannot_remap_subscriptions_or_enable_sim_time(
+    borrowed: bool, observe_clock: bool
+) -> None:
+    class ArgumentNode(FakeNode):
+        def __init__(self) -> None:
+            super().__init__()
+            self.use_sim_time = False
+            self.remaps: dict[str, str] = {}
+            self.subscription_names: list[str] = []
+
+        def apply_global_arguments(self, use_global_arguments: bool) -> None:
+            self.use_sim_time = use_global_arguments
+            self.remaps = {"/odom": "/other"} if use_global_arguments else {}
+            if self.use_sim_time:
+                self.create_subscription(object, "/clock", lambda _message: None, object())
+
+        def create_subscription(
+            self,
+            message_type: object,
+            topic: str,
+            callback: Callable[[object], None],
+            qos: object,
+        ) -> object:
+            resolved = self.remaps.get(topic, topic)
+            self.subscription_names.append(resolved)
+            return super().create_subscription(message_type, resolved, callback, qos)
+
+    caller_context = FakeContext(initialized=True)
+    observer_context = caller_context if borrowed else FakeContext()
+    caller = ArgumentNode()
+    caller.apply_global_arguments(True)
+    caller.create_subscription(object, "/odom", lambda _message: None, object())
+    node = ArgumentNode()
+    modules = fake_modules(node)
+
+    def initialize(*, args: object, context: FakeContext) -> None:
+        assert not borrowed
+        context.initialized = True
+
+    def create_node(
+        _name: str, *, use_global_arguments: bool = True, **kwargs: object
+    ) -> ArgumentNode:
+        assert kwargs["context"] is observer_context
+        node.apply_global_arguments(use_global_arguments)
+        return node
+
+    modules["rclpy.context"] = SimpleNamespace(Context=lambda: observer_context)
+    modules["rclpy"] = SimpleNamespace(init=initialize, create_node=create_node)
+    graph: ExpectedGraph = {
+        "topics": [
+            {
+                "name": "/odom",
+                "type": "std_msgs/msg/String",
+                "min_publishers": 0,
+                "min_subscribers": 0,
+                "qos_profile": "system_default",
+                "first_message_timeout_sec": 2.0,
+            }
+        ],
+        "services": [],
+        "actions": [],
+        "lifecycle_nodes": [],
+    }
+    with RosGraphObserver(
+        graph,
+        observe_clock=observe_clock,
+        context=observer_context if borrowed else None,
+        module_loader=modules.__getitem__,
+    ):
+        assert node.executor_started.wait(timeout=1.0)
+        assert not node.use_sim_time
+        assert node.subscription_names == (["/odom", "/clock"] if observe_clock else ["/odom"])
+        assert "/other" not in node.callbacks
+
+    assert caller_context.ok()
+    assert caller_context.shutdown_calls == 0
+    assert caller.use_sim_time
+    assert caller.subscription_names == ["/clock", "/other"]
+    assert not caller.destroyed
