@@ -44,9 +44,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d  # v10.4.0
         with:
-          version: "0.13.8"
+          version: "0.13.9"
           python-version: ${{ matrix.python }}
           enable-cache: true
           prune-cache: true
@@ -99,16 +99,16 @@ jobs:
         run: >-
           git fetch --no-tags https://github.com/mmkolpakov/robotics-runtime-contracts.git
           refs/tags/v0.16.0:refs/tags/contracts-legacy/v0.16.0
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d  # v10.4.0
         with:
-          version: "0.13.8"
+          version: "0.13.9"
           python-version: "3.12"
           enable-cache: true
           prune-cache: true
           cache-dependency-glob: uv.lock
       - run: uv sync --locked --all-packages --all-groups
       - name: Verify hosted runner dependency updates
-        uses: docker://renovate/renovate:43.257.5@sha256:3c9169d402da098f57eaf16d03947777a195bb91383d9000ad02dee92e0a0a7d
+        uses: docker://renovate/renovate:43.288.0@sha256:3b72fc4274c56f65f53dcd4dcbed3143289358e0a2d96f7af215e6cf1923e5f6
         with:
           entrypoint: node
           args: test/renovate/check-runners.mjs /usr/local/renovate
@@ -159,9 +159,9 @@ jobs:
           ref: dfbf26e99d3d569f9d25bdc260510220d4dd2872
           path: .consumer-infra
           persist-credentials: false
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d  # v10.4.0
         with:
-          version: "0.13.8"
+          version: "0.13.9"
           python-version: "3.12"
           enable-cache: true
           prune-cache: true
@@ -219,9 +219,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d  # v10.4.0
         with:
-          version: "0.13.8"
+          version: "0.13.9"
           python-version: "3.12"
           enable-cache: true
           prune-cache: true
@@ -386,9 +386,9 @@ jobs:
         working-directory: .
       - run: npm audit --audit-level=high
         working-directory: .
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d  # v10.4.0
         with:
-          version: "0.13.8"
+          version: "0.13.9"
           python-version: "3.12"
           enable-cache: true
           prune-cache: true
